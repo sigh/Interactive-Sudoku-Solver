@@ -11,7 +11,7 @@ const {
   BitSet
 } = await import('../util.js' + self.VERSION_PARAM);
 const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM);
-const { SHAPE_MAX } = await import('../grid_shape.js' + self.VERSION_PARAM);
+const { GEOMETRY_MAX } = await import('../grid_shape.js' + self.VERSION_PARAM);
 const { SudokuConstraintBase, fnToBinaryKey } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
 const { CandidateFinders } = await import('./candidate_selector.js' + self.VERSION_PARAM);
 
@@ -1248,7 +1248,7 @@ export class Skyscraper extends SudokuConstraintHandler {
   }
 
   static _baseBuffer = new Uint16Array(
-    (SHAPE_MAX.numValues * 2) * SHAPE_MAX.numValues);
+    (GEOMETRY_MAX.numValues * 2) * GEOMETRY_MAX.numValues);
 
   // The state arrays are all backed by a single buffer.
   // - We have two so that separate forward and backward states can be kept to
@@ -1616,8 +1616,8 @@ export class Lunchbox extends SudokuConstraintHandler {
   });
 
   // Scratch buffers for reuse so we don't have to create arrays at runtime.
-  static _validSettings = new Uint16Array(SHAPE_MAX.numValues);
-  static _cellValues = new Uint16Array(SHAPE_MAX.numValues);
+  static _validSettings = new Uint16Array(GEOMETRY_MAX.numValues);
+  static _cellValues = new Uint16Array(GEOMETRY_MAX.numValues);
 
   enforceConsistency(grid, handlerAccumulator) {
     const isHouse = this._isHouse;
@@ -2094,7 +2094,7 @@ class _Squishable2x2 extends SudokuConstraintHandler {
     this._cellExclusions = null;
   }
 
-  static _valuesBuffer = new Uint16Array(SHAPE_MAX.numValues);
+  static _valuesBuffer = new Uint16Array(GEOMETRY_MAX.numValues);
 
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
     if (shape.numValues !== 9) {
@@ -2920,9 +2920,9 @@ export class CountDistinct extends SudokuConstraintHandler {
   static _cellMatch = new Int16Array(0);      // cell -> matched value bit, or -1
   static _stackCell = new Uint16Array(0);     // augmenting-path stack: cell
   static _stackVal = new Uint16Array(0);      // augmenting-path stack: value bit
-  static _valueOwner = new Int16Array(SHAPE_MAX.numValues); // value bit -> cell, or -1
-  static _packOwnerDom = new Uint16Array(SHAPE_MAX.numValues); // value index -> its picked cell's domain, or 0
-  static _reach = new Uint16Array(SHAPE_MAX.numValues);     // value -> reachable values (Régin)
+  static _valueOwner = new Int16Array(GEOMETRY_MAX.numValues); // value bit -> cell, or -1
+  static _packOwnerDom = new Uint16Array(GEOMETRY_MAX.numValues); // value index -> its picked cell's domain, or 0
+  static _reach = new Uint16Array(GEOMETRY_MAX.numValues);     // value -> reachable values (Régin)
 
   static _ensureScratch(numCells) {
     if (numCells > CountDistinct._cellCap) {
@@ -3430,8 +3430,8 @@ export class FullRank extends SudokuConstraintHandler {
     return true;
   }
 
-  _viableEntriesBuffer = new Int16Array(SHAPE_MAX.numValues * 4 + 1);
-  _flagsBuffer = new Uint8Array(SHAPE_MAX.numValues * 4);
+  _viableEntriesBuffer = new Int16Array(GEOMETRY_MAX.numValues * 4 + 1);
+  _flagsBuffer = new Uint8Array(GEOMETRY_MAX.numValues * 4);
 
   _enforceUncluedEntriesForGiven(
     grid, handlerAccumulator, viableEntries, numViableEntries, given) {

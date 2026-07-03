@@ -281,7 +281,7 @@ const GENERATE_AND_TEST_FN = async () => {
   const TARGET_SUM = 6;
 
   const solver = await makeSolver();
-  const gridShape = GridShape.fromGridSize(GRID_SIZE);
+  const gridShape = CellGeometry.fromGridSize(GRID_SIZE);
 
   // Get all little killer diagonals, plus corners as single-cell sums.
   // (Single cell little killers are handled by the LittleKiller constraint).
@@ -372,7 +372,7 @@ const ROTATE_GRID_FN = () => {
     .filter(c => c.type !== 'Shape')
     .map(rotateConstraint);
 
-  const rotatedShape = GridShape.fromGridSize(shape.numCols, shape.numRows);
+  const rotatedShape = CellGeometry.fromGridSize(shape.numCols, shape.numRows);
 
   return [new Shape(rotatedShape.name), ...rotatedConstraints];
 };

@@ -410,13 +410,13 @@ await runTest('Indexing should fail when no index remains compatible (control ce
 // Offset (0-indexed) tests
 // =============================================================================
 
-const { GridShape } = await import('../../js/grid_shape.js');
+const { CellGeometry } = await import('../../js/grid_shape.js');
 
 await runTest('Indexing offset: external value 2 with offset -1', () => {
   // 0-indexed: external values 0-4, offset=-1.
   // Builder passes external value 2.
   // Control: _controlShift=1, allowed bits 1-4. bit 1→cells[0], bit 2→cells[1], etc.
-  const shape = GridShape.fromGridSize(1, 5, null, -1);
+  const shape = CellGeometry.fromGridSize(1, 5, null, -1);
   const context = new GridTestContext({ shape });
   const handler = new Indexing(0, [1, 2, 3, 4], 2); // external value 2
   context.initializeHandler(handler);
@@ -439,7 +439,7 @@ await runTest('Indexing offset: external value 2 with offset -1', () => {
 await runTest('Indexing offset: external value 0 with offset -1', () => {
   // Builder passes external value 0.
   // Control: _controlShift=1, allowed bits 1-4. bit 1→cells[0], bit 2→cells[1], etc.
-  const shape = GridShape.fromGridSize(1, 5, null, -1);
+  const shape = CellGeometry.fromGridSize(1, 5, null, -1);
   const context = new GridTestContext({ shape });
   const handler = new Indexing(0, [1, 2, 3, 4], 0); // external value 0
   context.initializeHandler(handler);

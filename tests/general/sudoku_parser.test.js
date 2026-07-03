@@ -6,7 +6,7 @@ import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 ensureGlobalEnvironment();
 
 const { SudokuParser, toShortSolution } = await import('../../js/sudoku_parser.js');
-const { GridShape, SHAPE_9x9 } = await import('../../js/grid_shape.js');
+const { CellGeometry, GEOMETRY_9x9 } = await import('../../js/grid_shape.js');
 
 // Find all constraints of a given type (recursive).
 const findConstraints = (constraint, type) => {
@@ -625,14 +625,14 @@ await runTest('extractConstraintTypes should handle empty string', () => {
 
 await runTest('toShortSolution should convert 9x9 solution', () => {
   const solution = [1, 2, 3, 4, 5, 6, 7, 8, 9, ...Array(72).fill(1)];
-  const result = toShortSolution(solution, SHAPE_9x9);
+  const result = toShortSolution(solution, GEOMETRY_9x9);
 
   assert.equal(result.length, 81);
   assert.equal(result.slice(0, 9), '123456789');
 });
 
 await runTest('toShortSolution should convert 16x16 solution', () => {
-  const shape = GridShape.fromGridSize(16);
+  const shape = CellGeometry.fromGridSize(16);
   const solution = Array(256).fill(1);
   solution[0] = 16;
   solution[1] = 10;
@@ -645,7 +645,7 @@ await runTest('toShortSolution should convert 16x16 solution', () => {
 });
 
 await runTest('toShortSolution should convert 6x6 solution', () => {
-  const shape = GridShape.fromGridSize(6);
+  const shape = CellGeometry.fromGridSize(6);
   const solution = [1, 2, 3, 4, 5, 6, ...Array(30).fill(1)];
   const result = toShortSolution(solution, shape);
 
@@ -654,7 +654,7 @@ await runTest('toShortSolution should convert 6x6 solution', () => {
 });
 
 await runTest('toShortSolution should use digits for zero-based values less than 10', () => {
-  const shape = GridShape.fromGridSpec('9x9~0-8');
+  const shape = CellGeometry.fromGridSpec('9x9~0-8');
   const solution = [0, 1, 2, 3, 4, 5, 6, 7, 8, ...Array(72).fill(0)];
   const result = toShortSolution(solution, shape);
 
@@ -663,7 +663,7 @@ await runTest('toShortSolution should use digits for zero-based values less than
 });
 
 await runTest('toShortSolution should use digits when extended range values are less than 10', () => {
-  const shape = GridShape.fromGridSpec('9x9~0-10');
+  const shape = CellGeometry.fromGridSpec('9x9~0-10');
   const solution = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, ...Array(71).fill(0)];
   const result = toShortSolution(solution, shape);
 
@@ -672,7 +672,7 @@ await runTest('toShortSolution should use digits when extended range values are 
 });
 
 await runTest('toShortSolution should map 0 to 0 when extended values use letters', () => {
-  const shape = GridShape.fromGridSpec('9x9~0-10');
+  const shape = CellGeometry.fromGridSpec('9x9~0-10');
   const solution = [0, 1, 10, ...Array(78).fill(0)];
   const result = toShortSolution(solution, shape);
 

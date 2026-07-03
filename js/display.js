@@ -7,7 +7,7 @@ const {
   setIntersectSize,
 } = await import('./util.js' + self.VERSION_PARAM);
 const { toShortSolution } = await import('./sudoku_parser.js' + self.VERSION_PARAM);
-const { GridShape, CellGraph, SHAPE_9x9 } = await import('./grid_shape.js' + self.VERSION_PARAM);
+const { CellGeometry, CellGraph, GEOMETRY_9x9 } = await import('./grid_shape.js' + self.VERSION_PARAM);
 
 export class DisplayItem {
   static SVG_PADDING = 29;
@@ -371,7 +371,7 @@ export class CellValueDisplay extends DisplayItem {
 
     // Note: font size is not quite the same to allow for larger gaps in the
     // large grid.
-    const fontSize = shape.numValues <= SHAPE_9x9.numValues ? 15 : 10;
+    const fontSize = shape.numValues <= GEOMETRY_9x9.numValues ? 15 : 10;
     const fontWidth = fontSize * 0.6;
     const lineHeight = fontSize + 2;
     const valuesPerLine = Math.ceil(Math.sqrt(shape.numValues));
@@ -465,7 +465,7 @@ export class CellValueDisplay extends DisplayItem {
 
     if (value !== null && !isIterable(value)) {
       const text = this.makeTextNode(
-        value, x, y+2, this.constructor.SINGLE_VALUE_CLASS);
+        value, x, y + 2, this.constructor.SINGLE_VALUE_CLASS);
       const color = colorFn?.(cellIndex, value);
       if (color) text.setAttribute('fill', color);
       return text;
@@ -589,7 +589,7 @@ export class DisplayContainer {
     this._mainSvg.setAttribute('width', width);
     this._mainSvg.setAttribute(
       'class',
-      shape.numValues <= SHAPE_9x9.numValues
+      shape.numValues <= GEOMETRY_9x9.numValues
         ? 'grid-size-small' : 'grid-size-large');
 
     this._cellPositioner.reshape(shape);
@@ -1186,7 +1186,7 @@ export class VarCellDisplay extends DisplayItem {
       label.setAttribute('x', 14);
       label.setAttribute('y', yLabel + labelHeight - 3);
       label.setAttribute('class', 'var-cell-label');
-      const groupPrefix = GridShape.displayCellId(group.prefix);
+      const groupPrefix = CellGeometry.displayCellId(group.prefix);
       const groupLabel = group.label ? `: ${group.label}` : '';
       label.textContent = `${groupPrefix}${groupLabel}`;
       svg.append(label);

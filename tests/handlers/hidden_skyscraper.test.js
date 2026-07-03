@@ -215,12 +215,12 @@ await runTest('HiddenSkyscraper should fail when target cannot be placed', () =>
 // Offset (0-indexed) tests
 // =============================================================================
 
-const { GridShape } = await import('../../js/grid_shape.js');
+const { CellGeometry } = await import('../../js/grid_shape.js');
 
 await runTest('HiddenSkyscraper offset: external value 1 maps to internal 2 with offset -1', () => {
   // 0-indexed grid: external values 0-3, internal 1-4, offset=-1.
   // External firstHidden=1 should map to internal 2 (bit mask for value 2).
-  const shape = GridShape.fromGridSize(1, 4, null, -1);
+  const shape = CellGeometry.fromGridSize(1, 4, null, -1);
   const context = new GridTestContext({ shape });
   const cells = context.cells();
   const handler = new HiddenSkyscraper(cells, 1); // external value 1
@@ -236,7 +236,7 @@ await runTest('HiddenSkyscraper offset: external value 1 maps to internal 2 with
 
 await runTest('HiddenSkyscraper offset: enforceConsistency works with offset values', () => {
   // External firstHidden=0, offset=-1 → internal value 1.
-  const shape = GridShape.fromGridSize(1, 3, null, -1);
+  const shape = CellGeometry.fromGridSize(1, 3, null, -1);
   const context = new GridTestContext({ shape });
   const cells = context.cells();
   const handler = new HiddenSkyscraper(cells, 0); // external value 0

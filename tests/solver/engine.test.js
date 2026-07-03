@@ -7,7 +7,7 @@ ensureGlobalEnvironment();
 
 const { SudokuBuilder } = await import('../../js/solver/sudoku_builder.js');
 const { SudokuConstraint } = await import('../../js/sudoku_constraint.js');
-const { GridShape } = await import('../../js/grid_shape.js');
+const { CellGeometry } = await import('../../js/grid_shape.js');
 const { SudokuSolver, HandlerSet } = await import('../../js/solver/engine.js');
 const {
   SudokuConstraintHandler,
@@ -264,7 +264,7 @@ await runTest('nthStep returns null for contradictory puzzle', () => {
 });
 
 await runTest('nthStep debug logs support extra solver state', () => {
-  const shape = GridShape.fromGridSize(9);
+  const shape = CellGeometry.fromGridSize(9);
   const solver = new SudokuSolver([new ExtraStateHandler()], shape, { logLevel: 1 });
   const step = solver.nthStep(0, new Map());
   assert.ok(step);
@@ -311,7 +311,7 @@ await runTest('state() counters include expected fields', () => {
 // ============================================================================
 
 await runTest('cell priorities sum handler priorities and apply explicit overrides', () => {
-  const shape = GridShape.fromGridSize(2);
+  const shape = CellGeometry.fromGridSize(2);
   const solver = new SudokuSolver([
     new FixedPriorityHandler([0, 1], 4),
     new FixedPriorityHandler([1, 2], 3),
@@ -326,7 +326,7 @@ await runTest('cell priorities sum handler priorities and apply explicit overrid
 });
 
 await runTest('cell priorities are computed before initialization expands watched cells', () => {
-  const shape = GridShape.fromGridSize(2);
+  const shape = CellGeometry.fromGridSize(2);
   const solver = new SudokuSolver([
     new WatchedCellExpandingHandler([0], 5),
   ], shape);
@@ -337,7 +337,7 @@ await runTest('cell priorities are computed before initialization expands watche
 });
 
 await runTest('cell priorities boost linked cell pairs', () => {
-  const shape = GridShape.fromGridSize(2);
+  const shape = CellGeometry.fromGridSize(2);
   shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
   const regionCells = shape.varCellsForGroup('CC');
 

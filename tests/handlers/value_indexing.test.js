@@ -247,12 +247,12 @@ await runTest('ValueIndexing should update both value and control cells', () => 
 // ValueIndexing control cell uses shifted bits with offset.
 // =============================================================================
 
-const { GridShape } = await import('../../js/grid_shape.js');
+const { CellGeometry } = await import('../../js/grid_shape.js');
 
 await runTest('ValueIndexing offset: control shifted with offset -1', () => {
   // With offset=-1, _controlShift=1. Allowed control bits 1-3 (internal 2-4).
   // bit 1 (int 2, ext 1) → indexed[0], bit 2 (int 3, ext 2) → indexed[1], etc.
-  const shape = GridShape.fromGridSize(1, 5, null, -1);
+  const shape = CellGeometry.fromGridSize(1, 5, null, -1);
   const context = new GridTestContext({ shape });
   const handler = new ValueIndexing(0, 1, 2, 3, 4);
   context.initializeHandler(handler);

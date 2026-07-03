@@ -1,5 +1,5 @@
 const { SudokuConstraint } = await import('./sudoku_constraint.js' + self.VERSION_PARAM);
-const { GridShape, SHAPE_9x9 } = await import('./grid_shape.js' + self.VERSION_PARAM);
+const { CellGeometry, GEOMETRY_9x9 } = await import('./grid_shape.js' + self.VERSION_PARAM);
 
 const FIRST_LETTER_CODE = 'A'.charCodeAt(0);
 
@@ -121,7 +121,7 @@ export class SudokuParser {
     // Reference for format:
     // http://forum.enjoysudoku.com/understandable-snarfable-killer-cages-t6119.html
 
-    const shape = SHAPE_9x9;
+    const shape = GEOMETRY_9x9;
     const numCells = shape.numGridCells;
     const numCols = shape.numCols;
 
@@ -210,7 +210,7 @@ export class SudokuParser {
 
     if (!text.startsWith('3x3:')) return null;
 
-    const shape = SHAPE_9x9;
+    const shape = GEOMETRY_9x9;
     const numCells = shape.numGridCells;
 
     let parts = text.split(':');
@@ -245,7 +245,7 @@ export class SudokuParser {
   }
 
   static _parsePlainSudokuToAst(text) {
-    const shape = GridShape.fromNumCells(text.length);
+    const shape = CellGeometry.fromNumCells(text.length);
     if (!shape) return null;
 
     const numCells = shape.numGridCells;
@@ -273,7 +273,7 @@ export class SudokuParser {
   }
 
   static _parseJigsawLayoutToAst(text) {
-    const shape = GridShape.fromNumCells(text.length);
+    const shape = CellGeometry.fromNumCells(text.length);
     if (!shape) return null;
 
     const numCells = shape.numGridCells;
@@ -300,7 +300,7 @@ export class SudokuParser {
   static _parseJigsawToAst(text) {
     if (text.length % 2 !== 0) return null;
 
-    const shape = GridShape.fromNumCells(text.length / 2);
+    const shape = CellGeometry.fromNumCells(text.length / 2);
     if (!shape) return null;
 
     const numCells = shape.numGridCells;
@@ -321,7 +321,7 @@ export class SudokuParser {
     const parts = [...rawText.matchAll(/[.]|\d+/g)];
     const numParts = parts.length;
 
-    const shape = GridShape.fromNumCells(numParts);
+    const shape = CellGeometry.fromNumCells(numParts);
     if (!shape) return null;
 
     let fixedValues = [];
@@ -338,7 +338,7 @@ export class SudokuParser {
   }
 
   static _parsePencilmarksToAst(text) {
-    const shape = GridShape.fromNumPencilmarks(text.length);
+    const shape = CellGeometry.fromNumPencilmarks(text.length);
     if (!shape) return null;
 
     // Only allow digits, and dots.

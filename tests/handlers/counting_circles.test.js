@@ -70,13 +70,13 @@ await runTest('exact count fixes cells', () => {
 // Offset (0-indexed) tests
 // =============================================================================
 
-const { GridShape } = await import('../../js/grid_shape.js');
+const { CellGeometry } = await import('../../js/grid_shape.js');
 
 await runTest('offset: init excludes external 0 and shifts combinations', () => {
   // 2 cells, offset=-1, numValues=4: external 0-3.
   // External 0 can't appear. Valid external values: {1,2,3}.
   // Combos with external sum=2: {2} → both cells must be 2.
-  const shape = GridShape.fromGridSize(1, 4, null, -1);
+  const shape = CellGeometry.fromGridSize(1, 4, null, -1);
   const context = new GridTestContext({ shape });
   const handler = new CountingCircles([0, 1]);
   context.initializeHandler(handler, { cellExclusions: noExclusions(4) });
@@ -91,7 +91,7 @@ await runTest('offset: init excludes external 0 and shifts combinations', () => 
 await runTest('offset: enforceConsistency uses shifted counts', () => {
   // 3 cells, offset=-1. Fix cell 0 to 1 → only combo {1, 2} survives.
   // Value 2 must appear twice.
-  const shape = GridShape.fromGridSize(1, 4, null, -1);
+  const shape = CellGeometry.fromGridSize(1, 4, null, -1);
   const context = new GridTestContext({ shape });
   const handler = new CountingCircles([0, 1, 2]);
   context.initializeHandler(handler, { cellExclusions: noExclusions(4) });
@@ -107,7 +107,7 @@ await runTest('offset: enforceConsistency uses shifted counts', () => {
 
 await runTest('offset: too many of a value fails', () => {
   // External 1 should appear exactly 1 time.
-  const shape = GridShape.fromGridSize(1, 4, null, -1);
+  const shape = CellGeometry.fromGridSize(1, 4, null, -1);
   const context = new GridTestContext({ shape });
   const handler = new CountingCircles([0, 1, 2]);
   context.initializeHandler(handler, { cellExclusions: noExclusions(4) });
@@ -167,7 +167,7 @@ await runTest('works with more than 16 exclusion groups', () => {
   // summing to numCells=17 restricted to {1, 16} is {1, 16}: value 16 must
   // occur 16 times and value 1 once. 16 cells are already fixed to 16; the
   // 17th still allows {1, 16} and should be forced down to 1.
-  const shape = GridShape.fromGridSize(2, 9, 16);
+  const shape = CellGeometry.fromGridSize(2, 9, 16);
   const context = new GridTestContext({ shape });
   const cells = Array.from({ length: 17 }, (_, i) => i);
   const handler = new CountingCircles(cells);

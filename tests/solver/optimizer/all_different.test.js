@@ -6,7 +6,7 @@ ensureGlobalEnvironment();
 
 const { SudokuConstraintOptimizer } = await import('../../../js/solver/optimizer.js' + self.VERSION_PARAM);
 const HandlerModule = await import('../../../js/solver/handlers.js' + self.VERSION_PARAM);
-const { GridShape } = await import('../../../js/grid_shape.js' + self.VERSION_PARAM);
+const { CellGeometry } = await import('../../../js/grid_shape.js' + self.VERSION_PARAM);
 const { HandlerSet } = await import('../../../js/solver/engine.js' + self.VERSION_PARAM);
 const { SudokuConstraintBase } = await import('../../../js/sudoku_constraint.js' + self.VERSION_PARAM);
 
@@ -17,7 +17,7 @@ const { SudokuConstraintBase } = await import('../../../js/sudoku_constraint.js'
 await runTest('_addPerfectAllDifferentHandlers: promotes AllDifferent to PerfectAllDifferent with restricted values', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
   // 6x6 grid with numValues=10 (values 1-10).
-  const shape = GridShape.fromGridSize(6, 6, 10);
+  const shape = CellGeometry.fromGridSize(6, 6, 10);
   const numCells = shape.numGridCells;
 
   // Restrict all 36 grid cells to values 1-6 via GivenCandidates.
@@ -44,7 +44,7 @@ await runTest('_addPerfectAllDifferentHandlers: promotes AllDifferent to Perfect
 
 await runTest('_addPerfectAllDifferentHandlers: promotes grid-house sized region to PerfectAllDifferent', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
-  const shape = GridShape.fromGridSize(9);
+  const shape = CellGeometry.fromGridSize(9);
   const numCells = shape.numGridCells;
 
   const rowCells = [0, 1, 2, 3, 4, 5, 6, 7, 8];
@@ -62,7 +62,7 @@ await runTest('_addPerfectAllDifferentHandlers: promotes grid-house sized region
 await runTest('_addPerfectAllDifferentHandlers: skips when cell values exceed cell count', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
   // 6x6 grid with numValues=10.
-  const shape = GridShape.fromGridSize(6, 6, 10);
+  const shape = CellGeometry.fromGridSize(6, 6, 10);
   const numCells = shape.numGridCells;
 
   // Restrict cells to values 1-8 (8 values > 6 cells — not a house).
@@ -86,7 +86,7 @@ await runTest('_addPerfectAllDifferentHandlers: skips when cell values exceed ce
 await runTest('_addPerfectAllDifferentHandlers: promotes subset AllDifferent on standard grid', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
   // Standard 9x9 grid.
-  const shape = GridShape.fromGridSize(9);
+  const shape = CellGeometry.fromGridSize(9);
   const numCells = shape.numGridCells;
 
   // 4 cells restricted to {1,2,3,4} via GivenCandidates.
@@ -109,7 +109,7 @@ await runTest('_addPerfectAllDifferentHandlers: promotes subset AllDifferent on 
 
 await runTest('_addPerfectAllDifferentHandlers: skips AllDifferent with 2 or fewer cells', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
-  const shape = GridShape.fromGridSize(9);
+  const shape = CellGeometry.fromGridSize(9);
   const numCells = shape.numGridCells;
 
   // 2 cells restricted to {1,2} — would match but too small to be useful.
@@ -136,7 +136,7 @@ await runTest('_addPerfectAllDifferentHandlers: skips AllDifferent with 2 or few
 await runTest('_addGridHouseIntersections: creates intersections for restricted grid', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
   // 6x6 grid with numValues=10 (values 0-9).
-  const shape = GridShape.fromGridSize(6, 6, 10);
+  const shape = CellGeometry.fromGridSize(6, 6, 10);
   const numCells = shape.numGridCells;
 
   // Restrict all cells to values 1-6 via GivenCandidates.
@@ -178,7 +178,7 @@ await runTest('_addGridHouseIntersections: creates intersections for restricted 
 
 await runTest('_addGridHouseIntersections: skips pairing handlers with different value masks', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
-  const shape = GridShape.fromGridSize(6, 6, 10);
+  const shape = CellGeometry.fromGridSize(6, 6, 10);
   const numCells = shape.numGridCells;
 
   // Row 0 cells restricted to {1,2,3,4,5,6}.

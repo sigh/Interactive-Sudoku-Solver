@@ -1,7 +1,7 @@
 const { memoize, MultiMap, countOnes16bit } = await import('../util.js' + self.VERSION_PARAM);
 const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM);
 const { SudokuConstraintHandler, HandlerUtil, InvalidConstraintError } = await import('./handlers.js' + self.VERSION_PARAM);
-const { SHAPE_MAX, SHAPE_9x9 } = await import('../grid_shape.js' + self.VERSION_PARAM);
+const { GEOMETRY_MAX, GEOMETRY_9x9 } = await import('../grid_shape.js' + self.VERSION_PARAM);
 
 // Enforces a weighted linear equation `Σ coeff·value = sum` over the cells
 // (killer cages, arithmetic sums, equalities). See SUM.md for the full
@@ -579,7 +579,7 @@ export class Sum extends SudokuConstraintHandler {
   }
 
   // Scratch buffers for reuse so we don't have to create arrays at runtime.
-  static _seenMinMaxs = new Uint32Array(SHAPE_MAX.numGridCells);
+  static _seenMinMaxs = new Uint32Array(GEOMETRY_MAX.numGridCells);
 
   // Restricts cell values to only the ranges that are possible taking into
   // account uniqueness constraints between values.
@@ -940,7 +940,7 @@ class SumData {
     // pairwiseSums[(a<<numValues)|b] = sum>>2;
     // (The shift is so the result fits in 16 bits).
     this.pairwiseSums = (() => {
-      if (numValues > SHAPE_9x9.numValues) return;
+      if (numValues > GEOMETRY_9x9.numValues) return;
       const table = new Uint16Array(combinations * combinations);
 
       for (let i = 0; i < combinations; i++) {

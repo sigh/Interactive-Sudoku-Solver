@@ -5,14 +5,14 @@ import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 
 ensureGlobalEnvironment();
 
-const { GridShape, CellGraph, SHAPE_9x9, SHAPE_MAX } = await import('../../js/grid_shape.js');
+const { CellGeometry, CellGraph, GEOMETRY_9x9, GEOMETRY_MAX } = await import('../../js/grid_shape.js');
 
 // ============================================================================
-// GridShape.fromGridSize (square grids)
+// CellGeometry.fromGridSize (square grids)
 // ============================================================================
 
 await runTest('fromGridSize creates valid shape for size 9', () => {
-  const shape = GridShape.fromGridSize(9);
+  const shape = CellGeometry.fromGridSize(9);
   assert.equal(shape.numRows, 9);
   assert.equal(shape.numCols, 9);
   assert.equal(shape.numValues, 9);
@@ -21,7 +21,7 @@ await runTest('fromGridSize creates valid shape for size 9', () => {
 });
 
 await runTest('fromGridSize creates valid shape for size 4', () => {
-  const shape = GridShape.fromGridSize(4);
+  const shape = CellGeometry.fromGridSize(4);
   assert.equal(shape.numRows, 4);
   assert.equal(shape.numCols, 4);
   assert.equal(shape.numValues, 4);
@@ -29,7 +29,7 @@ await runTest('fromGridSize creates valid shape for size 4', () => {
 });
 
 await runTest('fromGridSize creates valid shape for size 16', () => {
-  const shape = GridShape.fromGridSize(16);
+  const shape = CellGeometry.fromGridSize(16);
   assert.equal(shape.numRows, 16);
   assert.equal(shape.numCols, 16);
   assert.equal(shape.numValues, 16);
@@ -37,15 +37,15 @@ await runTest('fromGridSize creates valid shape for size 16', () => {
 });
 
 await runTest('fromGridSize returns null for invalid sizes', () => {
-  assert.equal(GridShape.fromGridSize(0), null);
-  assert.equal(GridShape.fromGridSize(-1), null);
-  assert.equal(GridShape.fromGridSize(17), null);
-  assert.equal(GridShape.fromGridSize(1.5), null);
+  assert.equal(CellGeometry.fromGridSize(0), null);
+  assert.equal(CellGeometry.fromGridSize(-1), null);
+  assert.equal(CellGeometry.fromGridSize(17), null);
+  assert.equal(CellGeometry.fromGridSize(1.5), null);
 });
 
 
 await runTest('fromGridSize creates rectangular 6x8 grid', () => {
-  const shape = GridShape.fromGridSize(6, 8);
+  const shape = CellGeometry.fromGridSize(6, 8);
   assert.equal(shape.numRows, 6);
   assert.equal(shape.numCols, 8);
   assert.equal(shape.numValues, 8); // max(6, 8)
@@ -54,7 +54,7 @@ await runTest('fromGridSize creates rectangular 6x8 grid', () => {
 });
 
 await runTest('fromGridSize creates rectangular 8x6 grid', () => {
-  const shape = GridShape.fromGridSize(8, 6);
+  const shape = CellGeometry.fromGridSize(8, 6);
   assert.equal(shape.numRows, 8);
   assert.equal(shape.numCols, 6);
   assert.equal(shape.numValues, 8); // max(8, 6)
@@ -63,38 +63,38 @@ await runTest('fromGridSize creates rectangular 8x6 grid', () => {
 });
 
 await runTest('fromGridSize returns null for invalid dimensions', () => {
-  assert.equal(GridShape.fromGridSize(0, 9), null);
-  assert.equal(GridShape.fromGridSize(9, 0), null);
-  assert.equal(GridShape.fromGridSize(17, 9), null);
-  assert.equal(GridShape.fromGridSize(9, 17), null);
+  assert.equal(CellGeometry.fromGridSize(0, 9), null);
+  assert.equal(CellGeometry.fromGridSize(9, 0), null);
+  assert.equal(CellGeometry.fromGridSize(17, 9), null);
+  assert.equal(CellGeometry.fromGridSize(9, 17), null);
 });
 
 // ============================================================================
-// GridShape.fromGridSpec
+// CellGeometry.fromGridSpec
 // ============================================================================
 
 await runTest('fromGridSpec parses square grid specs', () => {
-  const shape = GridShape.fromGridSpec('9x9');
+  const shape = CellGeometry.fromGridSpec('9x9');
   assert.equal(shape.numRows, 9);
   assert.equal(shape.numCols, 9);
 });
 
 await runTest('fromGridSpec parses rectangular grid specs', () => {
-  const shape = GridShape.fromGridSpec('6x8');
+  const shape = CellGeometry.fromGridSpec('6x8');
   assert.equal(shape.numRows, 6);
   assert.equal(shape.numCols, 8);
   assert.equal(shape.numValues, 8);
 });
 
 await runTest('fromGridSpec parses 4x6 grid spec', () => {
-  const shape = GridShape.fromGridSpec('4x6');
+  const shape = CellGeometry.fromGridSpec('4x6');
   assert.equal(shape.numRows, 4);
   assert.equal(shape.numCols, 6);
   assert.equal(shape.numValues, 6);
 });
 
 await runTest('fromGridSpec parses ~numValues when non-default', () => {
-  const shape = GridShape.fromGridSpec('9x9~10');
+  const shape = CellGeometry.fromGridSpec('9x9~10');
   assert.equal(shape.numRows, 9);
   assert.equal(shape.numCols, 9);
   assert.equal(shape.numValues, 10);
@@ -102,7 +102,7 @@ await runTest('fromGridSpec parses ~numValues when non-default', () => {
 });
 
 await runTest('fromGridSpec canonicalizes default ~numValues', () => {
-  const shape = GridShape.fromGridSpec('9x9~9');
+  const shape = CellGeometry.fromGridSpec('9x9~9');
   assert.equal(shape.numRows, 9);
   assert.equal(shape.numCols, 9);
   assert.equal(shape.numValues, 9);
@@ -110,24 +110,24 @@ await runTest('fromGridSpec canonicalizes default ~numValues', () => {
 });
 
 await runTest('fromGridSpec throws when ~numValues is too small', () => {
-  assert.throws(() => GridShape.fromGridSpec('9x9~8'));
+  assert.throws(() => CellGeometry.fromGridSpec('9x9~8'));
 });
 
 await runTest('fromGridSpec throws when ~numValues is too large', () => {
-  assert.throws(() => GridShape.fromGridSpec('9x9~17'));
+  assert.throws(() => CellGeometry.fromGridSpec('9x9~17'));
 });
 
 await runTest('fromGridSpec throws on invalid format', () => {
-  assert.throws(() => GridShape.fromGridSpec('9'));
-  assert.throws(() => GridShape.fromGridSpec('9x9x9'));
-  assert.throws(() => GridShape.fromGridSpec('abc'));
-  assert.throws(() => GridShape.fromGridSpec('axb'));
+  assert.throws(() => CellGeometry.fromGridSpec('9'));
+  assert.throws(() => CellGeometry.fromGridSpec('9x9x9'));
+  assert.throws(() => CellGeometry.fromGridSpec('abc'));
+  assert.throws(() => CellGeometry.fromGridSpec('axb'));
 });
 
 await runTest('fromGridSpec throws on invalid dimensions', () => {
-  assert.throws(() => GridShape.fromGridSpec('0x9'));
-  assert.throws(() => GridShape.fromGridSpec('9x0'));
-  assert.throws(() => GridShape.fromGridSpec('17x9'));
+  assert.throws(() => CellGeometry.fromGridSpec('0x9'));
+  assert.throws(() => CellGeometry.fromGridSpec('9x0'));
+  assert.throws(() => CellGeometry.fromGridSpec('17x9'));
 });
 
 // ============================================================================
@@ -135,7 +135,7 @@ await runTest('fromGridSpec throws on invalid dimensions', () => {
 // ============================================================================
 
 await runTest('cellIndex computes correct index for 9x9', () => {
-  const shape = GridShape.fromGridSize(9);
+  const shape = CellGeometry.fromGridSize(9);
   assert.equal(shape.cellIndex(0, 0), 0);
   assert.equal(shape.cellIndex(0, 8), 8);
   assert.equal(shape.cellIndex(1, 0), 9);
@@ -143,7 +143,7 @@ await runTest('cellIndex computes correct index for 9x9', () => {
 });
 
 await runTest('cellIndex computes correct index for rectangular 6x8', () => {
-  const shape = GridShape.fromGridSize(6, 8);
+  const shape = CellGeometry.fromGridSize(6, 8);
   assert.equal(shape.cellIndex(0, 0), 0);
   assert.equal(shape.cellIndex(0, 7), 7);  // last col of first row
   assert.equal(shape.cellIndex(1, 0), 8);  // first col of second row
@@ -151,7 +151,7 @@ await runTest('cellIndex computes correct index for rectangular 6x8', () => {
 });
 
 await runTest('splitCellIndex is inverse of cellIndex for 9x9', () => {
-  const shape = GridShape.fromGridSize(9);
+  const shape = CellGeometry.fromGridSize(9);
   for (let r = 0; r < 9; r++) {
     for (let c = 0; c < 9; c++) {
       const idx = shape.cellIndex(r, c);
@@ -163,7 +163,7 @@ await runTest('splitCellIndex is inverse of cellIndex for 9x9', () => {
 });
 
 await runTest('splitCellIndex is inverse of cellIndex for rectangular 6x8', () => {
-  const shape = GridShape.fromGridSize(6, 8);
+  const shape = CellGeometry.fromGridSize(6, 8);
   for (let r = 0; r < 6; r++) {
     for (let c = 0; c < 8; c++) {
       const idx = shape.cellIndex(r, c);
@@ -179,22 +179,22 @@ await runTest('splitCellIndex is inverse of cellIndex for rectangular 6x8', () =
 // ============================================================================
 
 await runTest('boxDimsForSize is correct for common square sizes', () => {
-  assert.deepEqual(GridShape.boxDimsForSize(4, 4, 4), [2, 2]);
-  assert.deepEqual(GridShape.boxDimsForSize(6, 6, 6), [2, 3]);
-  assert.deepEqual(GridShape.boxDimsForSize(9, 9, 9), [3, 3]);
-  assert.deepEqual(GridShape.boxDimsForSize(12, 12, 12), [3, 4]);
-  assert.deepEqual(GridShape.boxDimsForSize(16, 16, 16), [4, 4]);
+  assert.deepEqual(CellGeometry.boxDimsForSize(4, 4, 4), [2, 2]);
+  assert.deepEqual(CellGeometry.boxDimsForSize(6, 6, 6), [2, 3]);
+  assert.deepEqual(CellGeometry.boxDimsForSize(9, 9, 9), [3, 3]);
+  assert.deepEqual(CellGeometry.boxDimsForSize(12, 12, 12), [3, 4]);
+  assert.deepEqual(CellGeometry.boxDimsForSize(16, 16, 16), [4, 4]);
 });
 
 await runTest('boxDimsForSize for rectangular grids', () => {
   // 6x8 grid with size 8: boxes must have 8 cells
-  const [h68, w68] = GridShape.boxDimsForSize(6, 8, 8);
+  const [h68, w68] = CellGeometry.boxDimsForSize(6, 8, 8);
   assert.equal(h68 * w68, 8);
   assert.equal(6 % h68, 0);
   assert.equal(8 % w68, 0);
 
   // 4x6 grid with size 6: boxes must have 6 cells
-  const [h46, w46] = GridShape.boxDimsForSize(4, 6, 6);
+  const [h46, w46] = CellGeometry.boxDimsForSize(4, 6, 6);
   assert.equal(h46 * w46, 6);
   assert.equal(4 % h46, 0);
   assert.equal(6 % w46, 0);
@@ -202,47 +202,47 @@ await runTest('boxDimsForSize for rectangular grids', () => {
 
 await runTest('boxDimsForSize for square grids have correct cells', () => {
   for (const size of [4, 6, 9, 12, 16]) {
-    const [h, w] = GridShape.boxDimsForSize(size, size, size);
+    const [h, w] = CellGeometry.boxDimsForSize(size, size, size);
     assert.equal(h * w, size, `${size}x${size} box should have ${size} cells`);
   }
 });
 
 await runTest('boxDimsForSize prefers squarer boxes', () => {
   // 9x9: should be 3x3, not 1x9
-  assert.deepEqual(GridShape.boxDimsForSize(9, 9, 9), [3, 3]);
+  assert.deepEqual(CellGeometry.boxDimsForSize(9, 9, 9), [3, 3]);
 
   // 6x6: should be 2x3, not 1x6
-  assert.deepEqual(GridShape.boxDimsForSize(6, 6, 6), [2, 3]);
+  assert.deepEqual(CellGeometry.boxDimsForSize(6, 6, 6), [2, 3]);
 
   // 6x8 with size 8: should be 2x4, not 1x8 or 8x1
-  assert.deepEqual(GridShape.boxDimsForSize(6, 8, 8), [2, 4]);
+  assert.deepEqual(CellGeometry.boxDimsForSize(6, 8, 8), [2, 4]);
 
   // 8x6 with size 8: should be 4x2, not 1x8 or 8x1
-  assert.deepEqual(GridShape.boxDimsForSize(8, 6, 8), [4, 2]);
+  assert.deepEqual(CellGeometry.boxDimsForSize(8, 6, 8), [4, 2]);
 });
 
 await runTest('boxDimsForSize returns null for invalid sizes', () => {
   // 5x7 grid cannot have 7-cell boxes that tile evenly
-  assert.deepEqual(GridShape.boxDimsForSize(5, 7, 7), [null, null]);
+  assert.deepEqual(CellGeometry.boxDimsForSize(5, 7, 7), [null, null]);
 
   // 3x5 grid cannot have 5-cell boxes
-  assert.deepEqual(GridShape.boxDimsForSize(3, 5, 5), [null, null]);
+  assert.deepEqual(CellGeometry.boxDimsForSize(3, 5, 5), [null, null]);
 });
 
 // ============================================================================
 // Exported constants
 // ============================================================================
 
-await runTest('SHAPE_9x9 is correct', () => {
-  assert.equal(SHAPE_9x9.numRows, 9);
-  assert.equal(SHAPE_9x9.numCols, 9);
-  assert.equal(SHAPE_9x9.numValues, 9);
+await runTest('GEOMETRY_9x9 is correct', () => {
+  assert.equal(GEOMETRY_9x9.numRows, 9);
+  assert.equal(GEOMETRY_9x9.numCols, 9);
+  assert.equal(GEOMETRY_9x9.numValues, 9);
 });
 
-await runTest('SHAPE_MAX is correct', () => {
-  assert.equal(SHAPE_MAX.numRows, 16);
-  assert.equal(SHAPE_MAX.numCols, 16);
-  assert.equal(SHAPE_MAX.numValues, 16);
+await runTest('GEOMETRY_MAX is correct', () => {
+  assert.equal(GEOMETRY_MAX.numRows, 16);
+  assert.equal(GEOMETRY_MAX.numCols, 16);
+  assert.equal(GEOMETRY_MAX.numValues, 16);
 });
 
 // ============================================================================
@@ -250,14 +250,14 @@ await runTest('SHAPE_MAX is correct', () => {
 // ============================================================================
 
 await runTest('makeCellId generates correct format', () => {
-  const shape = GridShape.fromGridSize(9);
+  const shape = CellGeometry.fromGridSize(9);
   assert.equal(shape.makeCellId(0, 0), 'R1C1');
   assert.equal(shape.makeCellId(0, 8), 'R1C9');
   assert.equal(shape.makeCellId(8, 8), 'R9C9');
 });
 
 await runTest('parseCellId is inverse of makeCellId', () => {
-  const shape = GridShape.fromGridSize(9);
+  const shape = CellGeometry.fromGridSize(9);
   for (let r = 0; r < 9; r++) {
     for (let c = 0; c < 9; c++) {
       const cellId = shape.makeCellId(r, c);
@@ -270,7 +270,7 @@ await runTest('parseCellId is inverse of makeCellId', () => {
 });
 
 await runTest('parseCellId documents current fixed-width parsing behavior', () => {
-  const shape = GridShape.fromGridSize(9);
+  const shape = CellGeometry.fromGridSize(9);
 
   assert.deepEqual(shape.parseCellId('R1C10'), { cell: 0, row: 0, col: 0 });
   assert.deepEqual(shape.parseCellId('R9C9extra'), { cell: 80, row: 8, col: 8 });
@@ -279,7 +279,7 @@ await runTest('parseCellId documents current fixed-width parsing behavior', () =
 });
 
 await runTest('parseValueId documents current permissive parseInt behavior', () => {
-  const shape = GridShape.fromGridSize(9);
+  const shape = CellGeometry.fromGridSize(9);
   const parsed = shape.parseValueId('R1C1_2x_x_99');
 
   assert.equal(parsed.cellId, 'R1C1');
@@ -289,7 +289,7 @@ await runTest('parseValueId documents current permissive parseInt behavior', () 
 });
 
 await runTest('makeCellId works for rectangular grids', () => {
-  const shape = GridShape.fromGridSize(6, 8);
+  const shape = CellGeometry.fromGridSize(6, 8);
   assert.equal(shape.makeCellId(0, 0), 'R1C1');
   assert.equal(shape.makeCellId(0, 7), 'R1C8');
   assert.equal(shape.makeCellId(5, 7), 'R6C8');
@@ -301,28 +301,28 @@ await runTest('makeCellId works for rectangular grids', () => {
 
 await runTest('numRows * numCols equals numGridCells', () => {
   for (const size of [4, 6, 9, 12, 16]) {
-    const shape = GridShape.fromGridSize(size);
+    const shape = CellGeometry.fromGridSize(size);
     assert.equal(shape.numRows * shape.numCols, shape.numGridCells);
   }
   // Also test rectangular
-  const rect = GridShape.fromGridSize(6, 8);
+  const rect = CellGeometry.fromGridSize(6, 8);
   assert.equal(rect.numRows * rect.numCols, rect.numGridCells);
 });
 
 await runTest('numValues equals max(numRows, numCols)', () => {
   // Square grids
   for (const size of [4, 6, 9, 12, 16]) {
-    const shape = GridShape.fromGridSize(size);
+    const shape = CellGeometry.fromGridSize(size);
     assert.equal(shape.numValues, Math.max(shape.numRows, shape.numCols));
   }
   // Rectangular grids
-  assert.equal(GridShape.fromGridSize(6, 8).numValues, 8);
-  assert.equal(GridShape.fromGridSize(8, 6).numValues, 8);
-  assert.equal(GridShape.fromGridSize(4, 6).numValues, 6);
+  assert.equal(CellGeometry.fromGridSize(6, 8).numValues, 8);
+  assert.equal(CellGeometry.fromGridSize(8, 6).numValues, 8);
+  assert.equal(CellGeometry.fromGridSize(4, 6).numValues, 6);
 });
 
 await runTest('gridSize property no longer exists', () => {
-  const shape = GridShape.fromGridSize(9);
+  const shape = CellGeometry.fromGridSize(9);
   assert.equal(shape.gridSize, undefined);
 });
 
@@ -332,14 +332,14 @@ await runTest('gridSize property no longer exists', () => {
 
 await runTest('isSquare returns true for square grids', () => {
   for (const size of [4, 6, 9, 16]) {
-    const shape = GridShape.fromGridSize(size);
+    const shape = CellGeometry.fromGridSize(size);
     assert.ok(shape.isSquare(), `${size}x${size} should be square`);
   }
 });
 
 await runTest('isSquare returns false for rectangular grids', () => {
   for (const [rows, cols] of [[4, 6], [6, 4], [6, 8], [8, 6]]) {
-    const shape = GridShape.fromGridSize(rows, cols);
+    const shape = CellGeometry.fromGridSize(rows, cols);
     assert.ok(!shape.isSquare(), `${rows}x${cols} should not be square`);
   }
 });
@@ -349,19 +349,19 @@ await runTest('isSquare returns false for rectangular grids', () => {
 // ============================================================================
 
 await runTest('fromGridSize with valueOffset=-1 creates 0-based shape', () => {
-  const shape = GridShape.fromGridSize(9, 9, null, -1);
+  const shape = CellGeometry.fromGridSize(9, 9, null, -1);
   assert.equal(shape.numValues, 9);
   assert.equal(shape.valueOffset, -1);
   assert.equal(shape.name, '9x9~0-8');
 });
 
 await runTest('fromGridSize rejects invalid valueOffset', () => {
-  assert.throws(() => GridShape.fromGridSize(9, 9, null, -2));
-  assert.throws(() => GridShape.fromGridSize(9, 9, null, 1));
+  assert.throws(() => CellGeometry.fromGridSize(9, 9, null, -2));
+  assert.throws(() => CellGeometry.fromGridSize(9, 9, null, 1));
 });
 
 await runTest('fromGridSpec parses range syntax', () => {
-  const shape = GridShape.fromGridSpec('9x9~0-8');
+  const shape = CellGeometry.fromGridSpec('9x9~0-8');
   assert.equal(shape.numValues, 9);
   assert.equal(shape.valueOffset, -1);
   assert.equal(shape.name, '9x9~0-8');
@@ -369,36 +369,36 @@ await runTest('fromGridSpec parses range syntax', () => {
 
 await runTest('fromGridSpec rejects invalid range offset', () => {
   // 2-10 means offset=1, which is not allowed
-  assert.throws(() => GridShape.fromGridSpec('9x9~2-10'));
+  assert.throws(() => CellGeometry.fromGridSpec('9x9~2-10'));
 });
 
 await runTest('makeName produces canonical forms', () => {
   // Default 9x9: no suffix
-  assert.equal(GridShape.makeName(9, 9, 9, 0), '9x9');
+  assert.equal(CellGeometry.makeName(9, 9, 9, 0), '9x9');
   // Non-default numValues: bare number suffix
-  assert.equal(GridShape.makeName(9, 9, 10, 0), '9x9~10');
+  assert.equal(CellGeometry.makeName(9, 9, 10, 0), '9x9~10');
   // Zero-based: range suffix
-  assert.equal(GridShape.makeName(9, 9, 9, -1), '9x9~0-8');
+  assert.equal(CellGeometry.makeName(9, 9, 9, -1), '9x9~0-8');
 });
 
 await runTest('fromGridSpec round-trips through name', () => {
   for (const spec of ['9x9', '9x9~10', '9x9~0-8', '4x6', '6x8~0-7']) {
-    const shape = GridShape.fromGridSpec(spec);
-    const reparsed = GridShape.fromGridSpec(shape.name);
+    const shape = CellGeometry.fromGridSpec(spec);
+    const reparsed = CellGeometry.fromGridSpec(shape.name);
     assert.equal(reparsed.name, shape.name);
     assert.equal(reparsed.numValues, shape.numValues);
     assert.equal(reparsed.valueOffset, shape.valueOffset);
   }
 });
 
-logSuiteComplete('GridShape');
+logSuiteComplete('CellGeometry');
 
 // ============================================================================
 // CellGraph
 // ============================================================================
 
 await runTest('CellGraph adjacency is correct for interior cell', () => {
-  const shape = GridShape.fromGridSize(9);
+  const shape = CellGeometry.fromGridSize(9);
   const graph = shape.cellGraph();
   // Cell at row 4, col 4 (index 40) should have 4 neighbors
   const cell = shape.cellIndex(4, 4);
@@ -410,7 +410,7 @@ await runTest('CellGraph adjacency is correct for interior cell', () => {
 });
 
 await runTest('CellGraph adjacency is null at edges', () => {
-  const shape = GridShape.fromGridSize(9);
+  const shape = CellGeometry.fromGridSize(9);
   const graph = shape.cellGraph();
 
   // Top-left corner (0,0)
@@ -428,7 +428,7 @@ await runTest('CellGraph adjacency is null at edges', () => {
 
 await runTest('CellGraph works for different grid sizes', () => {
   for (const size of [4, 6, 9, 16]) {
-    const shape = GridShape.fromGridSize(size);
+    const shape = CellGeometry.fromGridSize(size);
     const graph = shape.cellGraph();
 
     // Check that last cell has correct bounds
@@ -449,7 +449,7 @@ await runTest('CellGraph works for different grid sizes', () => {
 });
 
 await runTest('CellGraph.adjacent returns neighbor in given direction', () => {
-  const shape = GridShape.fromGridSize(9);
+  const shape = CellGeometry.fromGridSize(9);
   const graph = shape.cellGraph();
   const cell = shape.cellIndex(4, 4);
   assert.equal(graph.adjacent(cell, CellGraph.RIGHT), shape.cellIndex(4, 5));
@@ -457,7 +457,7 @@ await runTest('CellGraph.adjacent returns neighbor in given direction', () => {
 });
 
 await runTest('CellGraph.diagonal returns diagonal neighbor', () => {
-  const shape = GridShape.fromGridSize(9);
+  const shape = CellGeometry.fromGridSize(9);
   const graph = shape.cellGraph();
   const cell = shape.cellIndex(4, 4);
   // Down-right diagonal
@@ -467,14 +467,14 @@ await runTest('CellGraph.diagonal returns diagonal neighbor', () => {
 });
 
 await runTest('CellGraph.diagonal returns null at edge', () => {
-  const shape = GridShape.fromGridSize(9);
+  const shape = CellGeometry.fromGridSize(9);
   const graph = shape.cellGraph();
   const corner = shape.cellIndex(0, 0);
   assert.equal(graph.diagonal(corner, CellGraph.LEFT, CellGraph.UP), null);
 });
 
 await runTest('CellGraph.diagonal handles cell index 0 as intermediate', () => {
-  const shape = GridShape.fromGridSize(9);
+  const shape = CellGeometry.fromGridSize(9);
   const graph = shape.cellGraph();
   // From R2C1 the up-right diagonal steps through R1C1 (cell index 0), which
   // is a valid cell and must not be treated as falsy.
@@ -485,7 +485,7 @@ await runTest('CellGraph.diagonal handles cell index 0 as intermediate', () => {
 });
 
 await runTest('CellGraph.cellPosition returns grid row, col, and origin', () => {
-  const shape = GridShape.fromGridSize(9);
+  const shape = CellGeometry.fromGridSize(9);
   const graph = shape.cellGraph();
 
   assert.deepEqual(graph.cellPosition(shape.cellIndex(0, 0)), [0, 0, shape.cellIndex(0, 0)]);
@@ -494,7 +494,7 @@ await runTest('CellGraph.cellPosition returns grid row, col, and origin', () => 
 });
 
 await runTest('CellGraph.cellPosition computes lazily and caches per cell', () => {
-  const shape = GridShape.fromGridSize(4);
+  const shape = CellGeometry.fromGridSize(4);
   const graph = shape.cellGraph();
   const cell = shape.cellIndex(2, 3);
 
@@ -515,13 +515,13 @@ logSuiteComplete('CellGraph');
 // ============================================================================
 
 function makeShapeWithGroups(size, groups) {
-  const shape = GridShape.fromGridSize(size);
+  const shape = CellGeometry.fromGridSize(size);
   shape._varCellRegistry.addGroups(groups);
   return shape;
 }
 
 await runTest('VarCellRegistry.addGroups throws on duplicate prefix', () => {
-  const shape = GridShape.fromGridSize(4);
+  const shape = CellGeometry.fromGridSize(4);
   shape._varCellRegistry.addGroups([{ prefix: 'X', label: 'x', count: 2 }]);
   assert.throws(
     () => shape._varCellRegistry.addGroups([{ prefix: 'X', label: 'x2', count: 3 }]),
@@ -529,7 +529,7 @@ await runTest('VarCellRegistry.addGroups throws on duplicate prefix', () => {
 });
 
 await runTest('VarCellRegistry.clear removes all groups', () => {
-  const shape = GridShape.fromGridSize(4);
+  const shape = CellGeometry.fromGridSize(4);
   shape._varCellRegistry.addGroups([
     { prefix: 'A', label: 'a', count: 2 },
     { prefix: 'B', label: 'b', count: 3 },
@@ -541,7 +541,7 @@ await runTest('VarCellRegistry.clear removes all groups', () => {
 });
 
 await runTest('cellGraph: caches result without var cells', () => {
-  const shape = GridShape.fromGridSize(9);
+  const shape = CellGeometry.fromGridSize(9);
   assert.equal(shape.cellGraph(), shape.cellGraph());
 });
 
@@ -680,7 +680,7 @@ await runTest('cellGraph: returns same instance on repeated calls', () => {
 });
 
 await runTest('cellGraph: invalidates when var cells change', () => {
-  const shape = GridShape.fromGridSize(4);
+  const shape = CellGeometry.fromGridSize(4);
   const g1 = shape.cellGraph();
 
   shape._varCellRegistry.addGroups([
@@ -696,7 +696,7 @@ await runTest('cellGraph: invalidates when var cells change', () => {
 });
 
 await runTest('cellGraph: invalidates on removal too', () => {
-  const shape = GridShape.fromGridSize(4);
+  const shape = CellGeometry.fromGridSize(4);
   shape._varCellRegistry.addGroups([
     { prefix: 'T', label: 'test', count: 4 },
   ]);

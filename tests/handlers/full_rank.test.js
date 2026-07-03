@@ -13,14 +13,14 @@ import {
 } from '../helpers/grid_test_utils.js';
 
 const { FullRank } = await import('../../js/solver/handlers.js');
-const { GridShape } = await import('../../js/grid_shape.js');
+const { CellGeometry } = await import('../../js/grid_shape.js');
 
 //////////////////////////////////////////////////////////////////////////////
 // buildEntries tests
 //////////////////////////////////////////////////////////////////////////////
 
 await runTest('FullRank.buildEntries should create correct entries for 9x9', () => {
-  const shape = GridShape.fromGridSize(9);
+  const shape = CellGeometry.fromGridSize(9);
   const entries = FullRank.buildEntries(shape);
 
   // 9 rows * 2 directions + 9 cols * 2 directions = 36 entries
@@ -37,7 +37,7 @@ await runTest('FullRank.buildEntries should create correct entries for 9x9', () 
 });
 
 await runTest('FullRank.buildEntries should create correct entries for 4x4', () => {
-  const shape = GridShape.fromGridSize(4);
+  const shape = CellGeometry.fromGridSize(4);
   const entries = FullRank.buildEntries(shape);
 
   // 4 rows * 2 directions + 4 cols * 2 directions = 16 entries

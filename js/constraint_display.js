@@ -8,7 +8,7 @@ const {
 const { LineOptions, CellArgs } = await import('./sudoku_constraint.js' + self.VERSION_PARAM);
 const { createSvgElement, clearDOMNode } = await import('./util.js' + self.VERSION_PARAM);
 const { SudokuConstraint, SudokuConstraintBase } = await import('./sudoku_constraint.js' + self.VERSION_PARAM);
-const { GridShape, CellGraph } = await import('./grid_shape.js' + self.VERSION_PARAM);
+const { CellGeometry, CellGraph } = await import('./grid_shape.js' + self.VERSION_PARAM);
 
 const constraintDisplayOrder = () => [
   DefaultRegions,
@@ -1036,8 +1036,8 @@ class DefaultRegions extends BaseConstraintDisplayItem {
 
     // Determine effective box dimensions.
     const effectiveSize = this._regionSize
-      ?? GridShape.defaultNumValues(shape.numRows, shape.numCols);
-    const [boxHeight, boxWidth] = GridShape.boxDimsForSize(
+      ?? CellGeometry.defaultNumValues(shape.numRows, shape.numCols);
+    const [boxHeight, boxWidth] = CellGeometry.boxDimsForSize(
       shape.numRows, shape.numCols, effectiveSize);
 
     if (!boxHeight || !boxWidth) {

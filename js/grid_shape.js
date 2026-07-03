@@ -6,7 +6,7 @@ const VALUE_BASE = 17;  // for parsing cell IDs
 // the solver, so this must stay below 2^16.
 export const MAX_SEARCH_CELLS = 1000;
 
-export class GridShape {
+export class CellGeometry {
   static MIN_SIZE = 1;
   static MAX_SIZE = 16;
 
@@ -20,7 +20,7 @@ export class GridShape {
     if (!this._isValidDimension(numRows) || !this._isValidDimension(numCols)) {
       return null;
     }
-    return new GridShape(numRows, numCols, numValues, valueOffset);
+    return new CellGeometry(numRows, numCols, numValues, valueOffset);
   }
 
   static fromGridSpec(gridSpec) {
@@ -508,11 +508,11 @@ export class CellGraph {
 }
 
 const CELL_ID_CHAR = new Uint8Array(128).fill(255);
-for (let i = 1; i <= GridShape.MAX_SIZE; i++) {
+for (let i = 1; i <= CellGeometry.MAX_SIZE; i++) {
   const c = i.toString(VALUE_BASE);
   CELL_ID_CHAR[c.charCodeAt(0)] = i - 1;
   CELL_ID_CHAR[c.toUpperCase().charCodeAt(0)] = i - 1;
 }
 
-export const SHAPE_MAX = GridShape.fromGridSize(GridShape.MAX_SIZE);
-export const SHAPE_9x9 = GridShape.fromGridSize(9);
+export const GEOMETRY_MAX = CellGeometry.fromGridSize(CellGeometry.MAX_SIZE);
+export const GEOMETRY_9x9 = CellGeometry.fromGridSize(9);

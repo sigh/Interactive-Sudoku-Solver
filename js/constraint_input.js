@@ -14,7 +14,7 @@ const {
   binaryKeyToFnString,
   encodedNFAToJsSpec
 } = await import('./sudoku_constraint.js' + self.VERSION_PARAM);
-const { GridShape } = await import('./grid_shape.js' + self.VERSION_PARAM);
+const { CellGeometry } = await import('./grid_shape.js' + self.VERSION_PARAM);
 
 export class CollapsibleContainer {
   constructor(element, defaultOpen) {
@@ -252,7 +252,7 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
     if (!text) return;
     try {
       // Try parsing as a full spec (handles paste of e.g. "9x9~0-8").
-      const parsed = GridShape.fromGridSpec(text);
+      const parsed = CellGeometry.fromGridSpec(text);
       this._gridSpecInput.setCustomValidity('');
       this.collection.setShape(parsed);
     } catch (e) {
@@ -265,7 +265,7 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
     const numValues = max - min + 1;
     const valueOffset = min - 1;
     try {
-      const shape = GridShape.fromGridSize(
+      const shape = CellGeometry.fromGridSize(
         this._shape.numRows, this._shape.numCols, numValues, valueOffset);
       if (shape) {
         this.collection.setShape(shape);
@@ -277,7 +277,7 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
   }
 
   _updateValueRangeDropdowns(shape) {
-    const defaultNV = GridShape.defaultNumValues(shape.numRows, shape.numCols);
+    const defaultNV = CellGeometry.defaultNumValues(shape.numRows, shape.numCols);
     const minValue = shape.minValue();
     const maxValue = shape.maxValue();
 
@@ -293,7 +293,7 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
 
     // Populate max dropdown: min+defaultNV-1 .. min+MAX_SIZE-1.
     const maxLow = minValue + defaultNV - 1;
-    const maxHigh = minValue + GridShape.MAX_SIZE - 1;
+    const maxHigh = minValue + CellGeometry.MAX_SIZE - 1;
     clearDOMNode(this._maxSelect);
     for (let v = maxLow; v <= maxHigh; v++) {
       const opt = document.createElement('option');
@@ -1118,7 +1118,7 @@ ConstraintCategoryInput.Region = class Region extends ConstraintCategoryInput {
       for (const c of this.collection.getConstraintsByType('Jigsaw')) {
         this.collection.removeConstraint(c);
       }
-      const defaultSize = GridShape.defaultNumValues(
+      const defaultSize = CellGeometry.defaultNumValues(
         this._shape.numRows, this._shape.numCols);
       if (selected !== defaultSize) {
         this.collection.addConstraint(new SudokuConstraint.RegionSize(selected));
@@ -1154,7 +1154,7 @@ ConstraintCategoryInput.Region = class Region extends ConstraintCategoryInput {
     select.parentNode.style.display = 'block';
     checkboxContainer.style.display = 'block';
 
-    const defaultNumValues = GridShape.defaultNumValues(
+    const defaultNumValues = CellGeometry.defaultNumValues(
       shape.numRows, shape.numCols);
     const numValues = shape.numValues;
 
@@ -1230,7 +1230,7 @@ ConstraintCategoryInput.Region = class Region extends ConstraintCategoryInput {
 
   onRemoveConstraint(c) {
     if (c.type === SudokuConstraint.RegionSize.name) {
-      this._regionSizeSelect.value = GridShape.defaultNumValues(
+      this._regionSizeSelect.value = CellGeometry.defaultNumValues(
         this._shape?.numRows, this._shape?.numCols);
     } else if (c.type === SudokuConstraint.RegionSameValues.name) {
       this._sameValuesCheckbox.checked = false;

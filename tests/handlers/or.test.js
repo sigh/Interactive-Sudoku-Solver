@@ -6,7 +6,7 @@ import { GridTestContext, createAccumulator, createCellExclusions, valueMask } f
 ensureGlobalEnvironment();
 
 const { Or, True, False, GivenCandidates } = await import('../../js/solver/handlers.js');
-const { GridShape } = await import('../../js/grid_shape.js');
+const { CellGeometry } = await import('../../js/grid_shape.js');
 const { LookupTables } = await import('../../js/solver/lookup_tables.js');
 
 // Or requires a stateAllocator with an allocate method, and postInitialize

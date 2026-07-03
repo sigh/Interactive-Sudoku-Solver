@@ -120,12 +120,12 @@ await runTest('Rellik fails when forced naked-set values reach the sum', () => {
 // (toValue + valueOffset) from the external sum.
 // =============================================================================
 
-const { GridShape } = await import('../../js/grid_shape.js');
+const { CellGeometry } = await import('../../js/grid_shape.js');
 
 await runTest('offset: forbidden external sum detected', () => {
   // 2 cells, external forbidden sum = 3, offset = -1.
   // Cells: ext 1 + ext 2 = 3 → forbidden.
-  const shape = GridShape.fromGridSize(1, 4, null, -1);
+  const shape = CellGeometry.fromGridSize(1, 4, null, -1);
   const context = new GridTestContext({ shape });
   const handler = new Rellik([0, 1], 3);
   context.initializeHandler(handler);
@@ -141,7 +141,7 @@ await runTest('offset: forbidden external sum detected', () => {
 await runTest('offset: non-forbidden external sum passes', () => {
   // 2 cells, external forbidden sum = 3, offset = -1.
   // Cells: ext 0 + ext 1 = 1 ≠ 3 → pass.
-  const shape = GridShape.fromGridSize(1, 4, null, -1);
+  const shape = CellGeometry.fromGridSize(1, 4, null, -1);
   const context = new GridTestContext({ shape });
   const handler = new Rellik([0, 1], 3);
   context.initializeHandler(handler);
@@ -159,7 +159,7 @@ await runTest('offset: removes dangerous external value from unfixed cells', () 
   // Cell 0 fixed to ext 3 (int 4). Cell 1 fixed to ext 1 (int 2).
   // Remainder after cell 0: ext 3 subtracted → remainder 2.
   // Ext 2 (int 3) should be removed from unfixed cell 2.
-  const shape = GridShape.fromGridSize(1, 4, null, -1);
+  const shape = CellGeometry.fromGridSize(1, 4, null, -1);
   const context = new GridTestContext({ shape });
   const handler = new Rellik([0, 1, 2], 5);
   context.initializeHandler(handler);

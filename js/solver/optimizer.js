@@ -14,7 +14,7 @@ const {
 } = await import('../util.js' + self.VERSION_PARAM);
 const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM);
 const { SudokuConstraintBase, fnToBinaryKey } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
-const { GridShape } = await import('../grid_shape.js' + self.VERSION_PARAM);
+const { CellGeometry } = await import('../grid_shape.js' + self.VERSION_PARAM);
 const HandlerModule = await import('./handlers.js' + self.VERSION_PARAM);
 const {
   buildLinkedSearchCells,
@@ -412,7 +412,7 @@ export class SudokuConstraintOptimizer {
     if (boxRegions.length === 0) return;
     const boxSize = boxRegions[0].length;
 
-    const [boxHeight, boxWidth] = GridShape.boxDimsForSize(
+    const [boxHeight, boxWidth] = CellGeometry.boxDimsForSize(
       shape.numRows, shape.numCols, boxSize);
     if (!boxHeight) return;
 

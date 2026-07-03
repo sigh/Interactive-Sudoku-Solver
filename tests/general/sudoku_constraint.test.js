@@ -5,7 +5,7 @@ import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 
 ensureGlobalEnvironment();
 
-const { GridShape } = await import('../../js/grid_shape.js');
+const { CellGeometry } = await import('../../js/grid_shape.js');
 const { SudokuConstraintBase, SudokuConstraint } = await import('../../js/sudoku_constraint.js');
 
 // ============================================================================
@@ -13,7 +13,7 @@ const { SudokuConstraintBase, SudokuConstraint } = await import('../../js/sudoku
 // ============================================================================
 
 await runTest('rowRegions returns correct number of regions', () => {
-  const shape = GridShape.fromGridSize(9);
+  const shape = CellGeometry.fromGridSize(9);
   const regions = SudokuConstraintBase.rowRegions(shape);
   assert.equal(regions.length, 9);
   for (const region of regions) {
@@ -22,7 +22,7 @@ await runTest('rowRegions returns correct number of regions', () => {
 });
 
 await runTest('rowRegions contains correct cells', () => {
-  const shape = GridShape.fromGridSize(9);
+  const shape = CellGeometry.fromGridSize(9);
   const regions = SudokuConstraintBase.rowRegions(shape);
   // First row should be cells 0-8
   assert.deepEqual(regions[0], [0, 1, 2, 3, 4, 5, 6, 7, 8]);
@@ -31,7 +31,7 @@ await runTest('rowRegions contains correct cells', () => {
 });
 
 await runTest('colRegions returns correct number of regions', () => {
-  const shape = GridShape.fromGridSize(9);
+  const shape = CellGeometry.fromGridSize(9);
   const regions = SudokuConstraintBase.colRegions(shape);
   assert.equal(regions.length, 9);
   for (const region of regions) {
@@ -40,7 +40,7 @@ await runTest('colRegions returns correct number of regions', () => {
 });
 
 await runTest('colRegions contains correct cells', () => {
-  const shape = GridShape.fromGridSize(9);
+  const shape = CellGeometry.fromGridSize(9);
   const regions = SudokuConstraintBase.colRegions(shape);
   // First column should be cells 0, 9, 18, ...
   assert.deepEqual(regions[0], [0, 9, 18, 27, 36, 45, 54, 63, 72]);
@@ -49,7 +49,7 @@ await runTest('colRegions contains correct cells', () => {
 });
 
 await runTest('boxRegions returns correct number of regions', () => {
-  const shape = GridShape.fromGridSize(9);
+  const shape = CellGeometry.fromGridSize(9);
   const regions = SudokuConstraintBase.boxRegions(shape);
   assert.equal(regions.length, 9);
   for (const region of regions) {
@@ -58,14 +58,14 @@ await runTest('boxRegions returns correct number of regions', () => {
 });
 
 await runTest('boxRegions contains correct cells for 9x9', () => {
-  const shape = GridShape.fromGridSize(9);
+  const shape = CellGeometry.fromGridSize(9);
   const regions = SudokuConstraintBase.boxRegions(shape);
   // First box (top-left) should contain cells in rows 0-2, cols 0-2
   assert.deepEqual(regions[0].sort((a, b) => a - b), [0, 1, 2, 9, 10, 11, 18, 19, 20]);
 });
 
 await runTest('boxRegions works for 6x6', () => {
-  const shape = GridShape.fromGridSize(6);
+  const shape = CellGeometry.fromGridSize(6);
   const regions = SudokuConstraintBase.boxRegions(shape);
   assert.equal(regions.length, 6);
   for (const region of regions) {
@@ -76,7 +76,7 @@ await runTest('boxRegions works for 6x6', () => {
 });
 
 await runTest('ChaosArrow getCells includes control and maps chaos cells', () => {
-  const shape = GridShape.fromGridSize(4);
+  const shape = CellGeometry.fromGridSize(4);
   shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
 
   const constraint = new SudokuConstraint.ChaosArrow('R2C1', 0, ['CC6', 'CC16']);
@@ -85,7 +85,7 @@ await runTest('ChaosArrow getCells includes control and maps chaos cells', () =>
 });
 
 await runTest('ChaosArrow allows var control cells with explicit arms', () => {
-  const shape = GridShape.fromGridSize(4);
+  const shape = CellGeometry.fromGridSize(4);
   shape.addVarCellsForConstraints([
     new SudokuConstraint.ChaosConstruction(),
     new SudokuConstraint.Var('X', 'Control', 1),
@@ -96,7 +96,7 @@ await runTest('ChaosArrow allows var control cells with explicit arms', () => {
 });
 
 await runTest('ChaosArrow maps grouped chaos arms for display', () => {
-  const shape = GridShape.fromGridSize(4);
+  const shape = CellGeometry.fromGridSize(4);
   shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
 
   const constraint = new SudokuConstraint.ChaosArrow(
@@ -109,13 +109,13 @@ await runTest('ChaosArrow maps grouped chaos arms for display', () => {
 });
 
 await runTest('ChaosArrow getCells survives missing CC cells for removal', () => {
-  const shape = GridShape.fromGridSize(4);
+  const shape = CellGeometry.fromGridSize(4);
 
   assert.deepEqual(new SudokuConstraint.ChaosArrow('R2C2').getCells(shape), ['R2C2', 'CC1']);
 });
 
 await runTest('ChaosArrow expands control-only arrows orthogonally', () => {
-  const shape = GridShape.fromGridSize(4);
+  const shape = CellGeometry.fromGridSize(4);
   shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
 
   const constraint = new SudokuConstraint.ChaosArrow('R2C2');
@@ -129,7 +129,7 @@ await runTest('ChaosArrow expands control-only arrows orthogonally', () => {
 });
 
 await runTest('ChaosCount getCells includes control and maps chaos cells', () => {
-  const shape = GridShape.fromGridSize(4);
+  const shape = CellGeometry.fromGridSize(4);
   shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
 
   const constraint = new SudokuConstraint.ChaosCount('R2C1', 0, 'CC6', 'CC16');
@@ -138,7 +138,7 @@ await runTest('ChaosCount getCells includes control and maps chaos cells', () =>
 });
 
 await runTest('ChaosCount allows var control cells', () => {
-  const shape = GridShape.fromGridSize(4);
+  const shape = CellGeometry.fromGridSize(4);
   shape.addVarCellsForConstraints([
     new SudokuConstraint.ChaosConstruction(),
     new SudokuConstraint.Var('X', 'Control', 1),
@@ -149,14 +149,14 @@ await runTest('ChaosCount allows var control cells', () => {
 });
 
 await runTest('ChaosCount getCells survives missing CC cells for removal', () => {
-  const shape = GridShape.fromGridSize(4);
+  const shape = CellGeometry.fromGridSize(4);
 
   assert.deepEqual(new SudokuConstraint.ChaosCount('R2C2').getCells(shape), ['R2C2', 'CC1']);
 });
 
 // Rectangular grid tests for boxRegions
 await runTest('boxRegions for 4x6 grid has correct structure', () => {
-  const shape = GridShape.fromGridSize(4, 6);
+  const shape = CellGeometry.fromGridSize(4, 6);
   // 4 rows, 6 cols, numValues=6, boxes are 2x3
 
   const regions = SudokuConstraintBase.boxRegions(shape);
@@ -168,7 +168,7 @@ await runTest('boxRegions for 4x6 grid has correct structure', () => {
 });
 
 await runTest('boxRegions for 4x6 grid cells are in bounds', () => {
-  const shape = GridShape.fromGridSize(4, 6);
+  const shape = CellGeometry.fromGridSize(4, 6);
   const regions = SudokuConstraintBase.boxRegions(shape);
 
   for (const region of regions) {
@@ -180,21 +180,21 @@ await runTest('boxRegions for 4x6 grid cells are in bounds', () => {
 });
 
 await runTest('boxRegions for 4x6 grid first box is correct', () => {
-  const shape = GridShape.fromGridSize(4, 6);
+  const shape = CellGeometry.fromGridSize(4, 6);
   const regions = SudokuConstraintBase.boxRegions(shape);
   // Box 0 (top-left): rows 0-1, cols 0-2 => cells 0,1,2,6,7,8
   assert.deepEqual(regions[0].sort((a, b) => a - b), [0, 1, 2, 6, 7, 8]);
 });
 
 await runTest('boxRegions for 4x6 grid second box is correct', () => {
-  const shape = GridShape.fromGridSize(4, 6);
+  const shape = CellGeometry.fromGridSize(4, 6);
   const regions = SudokuConstraintBase.boxRegions(shape);
   // Box 1 (top-right): rows 0-1, cols 3-5 => cells 3,4,5,9,10,11
   assert.deepEqual(regions[1].sort((a, b) => a - b), [3, 4, 5, 9, 10, 11]);
 });
 
 await runTest('boxRegions for 6x4 grid has correct structure', () => {
-  const shape = GridShape.fromGridSize(6, 4);
+  const shape = CellGeometry.fromGridSize(6, 4);
   // 6 rows, 4 cols, numValues=6, boxes are 3x2
 
   const regions = SudokuConstraintBase.boxRegions(shape);
@@ -206,7 +206,7 @@ await runTest('boxRegions for 6x4 grid has correct structure', () => {
 });
 
 await runTest('boxRegions for 6x4 grid cells are in bounds', () => {
-  const shape = GridShape.fromGridSize(6, 4);
+  const shape = CellGeometry.fromGridSize(6, 4);
   const regions = SudokuConstraintBase.boxRegions(shape);
 
   for (const region of regions) {
@@ -219,7 +219,7 @@ await runTest('boxRegions for 6x4 grid cells are in bounds', () => {
 
 await runTest('boxRegions for rectangular grids cover all cells exactly once', () => {
   for (const [rows, cols] of [[4, 6], [6, 4], [6, 8], [8, 6]]) {
-    const shape = GridShape.fromGridSize(rows, cols);
+    const shape = CellGeometry.fromGridSize(rows, cols);
 
     const regions = SudokuConstraintBase.boxRegions(shape);
     const allCells = regions.flat().sort((a, b) => a - b);
@@ -230,7 +230,7 @@ await runTest('boxRegions for rectangular grids cover all cells exactly once', (
 
 await runTest('all regions cover all cells exactly once', () => {
   for (const size of [4, 6, 9]) {
-    const shape = GridShape.fromGridSize(size);
+    const shape = CellGeometry.fromGridSize(size);
     for (const regionFn of [
       SudokuConstraintBase.rowRegions,
       SudokuConstraintBase.colRegions,
@@ -249,7 +249,7 @@ await runTest('all regions cover all cells exactly once', () => {
 // ============================================================================
 
 await runTest('disjointSetRegions for 9x9 has correct structure', () => {
-  const shape = GridShape.fromGridSize(9);
+  const shape = CellGeometry.fromGridSize(9);
   const regions = SudokuConstraintBase.disjointSetRegions(shape);
   // 9 positions per box => 9 sets
   assert.equal(regions.length, 9);
@@ -260,7 +260,7 @@ await runTest('disjointSetRegions for 9x9 has correct structure', () => {
 });
 
 await runTest('disjointSetRegions for 9x9 covers all cells exactly once', () => {
-  const shape = GridShape.fromGridSize(9);
+  const shape = CellGeometry.fromGridSize(9);
   const regions = SudokuConstraintBase.disjointSetRegions(shape);
   const allCells = regions.flat().sort((a, b) => a - b);
   const expected = Array.from({ length: 81 }, (_, i) => i);
@@ -268,7 +268,7 @@ await runTest('disjointSetRegions for 9x9 covers all cells exactly once', () => 
 });
 
 await runTest('disjointSetRegions for 9x9 each set has one cell per box', () => {
-  const shape = GridShape.fromGridSize(9);
+  const shape = CellGeometry.fromGridSize(9);
   const disjointSets = SudokuConstraintBase.disjointSetRegions(shape);
   const boxes = SudokuConstraintBase.boxRegions(shape);
 
@@ -283,7 +283,7 @@ await runTest('disjointSetRegions for 9x9 each set has one cell per box', () => 
 });
 
 await runTest('disjointSetRegions for 9x9 cells are at same position in their box', () => {
-  const shape = GridShape.fromGridSize(9);
+  const shape = CellGeometry.fromGridSize(9);
   const disjointSets = SudokuConstraintBase.disjointSetRegions(shape);
 
   // Helper to get position within box (0-8 for 3x3 box)
@@ -304,7 +304,7 @@ await runTest('disjointSetRegions for 9x9 cells are at same position in their bo
 });
 
 await runTest('disjointSetRegions for 6x6 has correct structure', () => {
-  const shape = GridShape.fromGridSize(6);
+  const shape = CellGeometry.fromGridSize(6);
   const regions = SudokuConstraintBase.disjointSetRegions(shape);
   // 6 positions per box => 6 sets
   assert.equal(regions.length, 6);
@@ -315,7 +315,7 @@ await runTest('disjointSetRegions for 6x6 has correct structure', () => {
 });
 
 await runTest('disjointSetRegions for 6x6 covers all cells exactly once', () => {
-  const shape = GridShape.fromGridSize(6);
+  const shape = CellGeometry.fromGridSize(6);
   const regions = SudokuConstraintBase.disjointSetRegions(shape);
   const allCells = regions.flat().sort((a, b) => a - b);
   const expected = Array.from({ length: 36 }, (_, i) => i);
@@ -323,7 +323,7 @@ await runTest('disjointSetRegions for 6x6 covers all cells exactly once', () => 
 });
 
 await runTest('disjointSetRegions for 4x6 rectangular grid', () => {
-  const shape = GridShape.fromGridSize(4, 6);
+  const shape = CellGeometry.fromGridSize(4, 6);
   // 4x6 grid, numValues=6, boxes are 2x3
   // 6 positions per box => 6 sets
   // 4 boxes => 4 cells per set
@@ -340,7 +340,7 @@ await runTest('disjointSetRegions for 4x6 rectangular grid', () => {
 });
 
 await runTest('disjointSetRegions for 6x4 rectangular grid', () => {
-  const shape = GridShape.fromGridSize(6, 4);
+  const shape = CellGeometry.fromGridSize(6, 4);
   // 6x4 grid, numValues=6, boxes are 3x2
   // 6 positions per box => 6 sets
   // 4 boxes => 4 cells per set
@@ -358,7 +358,7 @@ await runTest('disjointSetRegions for 6x4 rectangular grid', () => {
 
 await runTest('disjointSetRegions with custom size parameter', () => {
   // 6x6 grid with size=4 => 2x2 boxes
-  const shape = GridShape.fromGridSize(6, 6);
+  const shape = CellGeometry.fromGridSize(6, 6);
   const regions = SudokuConstraintBase.disjointSetRegions(shape, 4);
   // 4 positions per box => 4 sets
   // 9 boxes (6/2 * 6/2) => 9 cells per set
@@ -375,7 +375,7 @@ await runTest('disjointSetRegions with custom size parameter', () => {
 
 await runTest('disjointSetRegions with custom size: cells at same position', () => {
   // 6x6 grid with size=4 => 2x2 boxes
-  const shape = GridShape.fromGridSize(6, 6);
+  const shape = CellGeometry.fromGridSize(6, 6);
   const disjointSets = SudokuConstraintBase.disjointSetRegions(shape, 4);
   const boxes = SudokuConstraintBase.boxRegions(shape, 4);
 
@@ -408,7 +408,7 @@ await runTest('disjointSetRegions with custom size: cells at same position', () 
 
 await runTest('disjointSetRegions returns empty for invalid box size', () => {
   // 5x7 grid cannot have valid boxes
-  const shape = GridShape.fromGridSize(5, 7);
+  const shape = CellGeometry.fromGridSize(5, 7);
   const regions = SudokuConstraintBase.disjointSetRegions(shape);
   assert.deepEqual(regions, []);
 });
@@ -421,7 +421,7 @@ await runTest('disjointSetRegions returns empty for invalid box size', () => {
 const JIGSAW_9x9_LAYOUT = '000111222000111222000111222333444555333444555333444555666777888666777888666777888';
 
 await runTest('Jigsaw.makeFromArgs parses square grid without gridSpec', () => {
-  const shape9x9 = GridShape.fromGridSize(9);
+  const shape9x9 = CellGeometry.fromGridSize(9);
   const jigsaws = [...SudokuConstraint.Jigsaw.makeFromArgs([JIGSAW_9x9_LAYOUT], shape9x9)];
   assert.equal(jigsaws.length, 9, 'should have 9 jigsaw regions');
 
@@ -438,7 +438,7 @@ await runTest('Jigsaw.makeFromArgs parses rectangular grid with gridSpec prefix'
   // 4x6 grid layout (24 cells, 4 regions of 6 cells each)
   // Layout: 4 rows x 6 cols = 24 cells
   const layout4x6 = '000111000111222333222333';
-  const shape4x6 = GridShape.fromGridSpec('4x6');
+  const shape4x6 = CellGeometry.fromGridSpec('4x6');
   const jigsaws = [...SudokuConstraint.Jigsaw.makeFromArgs(['4x6', layout4x6], shape4x6)];
 
   assert.equal(jigsaws.length, 4, 'should have 4 jigsaw regions');
@@ -450,7 +450,7 @@ await runTest('Jigsaw.makeFromArgs parses rectangular grid with gridSpec prefix'
 });
 
 await runTest('Jigsaw.serialize omits gridSpec for square grids', () => {
-  const shape9x9 = GridShape.fromGridSize(9);
+  const shape9x9 = CellGeometry.fromGridSize(9);
   const jigsaws = [...SudokuConstraint.Jigsaw.makeFromArgs([JIGSAW_9x9_LAYOUT], shape9x9)];
   const serialized = SudokuConstraint.Jigsaw.serialize(jigsaws);
 
@@ -463,7 +463,7 @@ await runTest('Jigsaw.serialize omits gridSpec for square grids', () => {
 await runTest('Jigsaw.serialize omits gridSpec for rectangular grids', () => {
   // 4x6 = 24 cells, 4 regions of 6 cells each
   const layout4x6 = '000111000111222333222333';
-  const shape4x6 = GridShape.fromGridSpec('4x6');
+  const shape4x6 = CellGeometry.fromGridSpec('4x6');
   const jigsaws = [...SudokuConstraint.Jigsaw.makeFromArgs(['4x6', layout4x6], shape4x6)];
   const serialized = SudokuConstraint.Jigsaw.serialize(jigsaws);
 
@@ -472,7 +472,7 @@ await runTest('Jigsaw.serialize omits gridSpec for rectangular grids', () => {
 });
 
 await runTest('Jigsaw round-trips for square grid', () => {
-  const shape9x9 = GridShape.fromGridSize(9);
+  const shape9x9 = CellGeometry.fromGridSize(9);
   const jigsaws = [...SudokuConstraint.Jigsaw.makeFromArgs([JIGSAW_9x9_LAYOUT], shape9x9)];
   const serialized = SudokuConstraint.Jigsaw.serialize(jigsaws);
   // serialized is '.Jigsaw~LAYOUT', extract just the args after '.Jigsaw~'
@@ -492,7 +492,7 @@ await runTest('Jigsaw round-trips for square grid', () => {
 await runTest('Jigsaw round-trips for rectangular grid', () => {
   // 4x6 grid: 24 cells, numValues=6, so 4 regions of 6 cells each
   const layout4x6 = '000111000111222333222333';
-  const shape4x6 = GridShape.fromGridSpec('4x6');
+  const shape4x6 = CellGeometry.fromGridSpec('4x6');
   const jigsaws = [...SudokuConstraint.Jigsaw.makeFromArgs(['4x6', layout4x6], shape4x6)];
   const serialized = SudokuConstraint.Jigsaw.serialize(jigsaws);
   // serialized is '.Jigsaw~LAYOUT', extract args after '.Jigsaw~'
@@ -511,7 +511,7 @@ await runTest('Jigsaw round-trips for rectangular grid', () => {
 
 await runTest('Jigsaw.makeFromArgs throws when gridSpec does not match layout length', () => {
   // 4x6 = 24 cells, but provide a 9x9 layout (81 cells)
-  const shape4x6 = GridShape.fromGridSpec('4x6');
+  const shape4x6 = CellGeometry.fromGridSpec('4x6');
   assert.throws(
     () => [...SudokuConstraint.Jigsaw.makeFromArgs(['4x6', JIGSAW_9x9_LAYOUT], shape4x6)],
     /expects 24 cells.*but layout has 81/
@@ -528,14 +528,14 @@ const JIGSAW_16x16_LAYOUT = (
 );
 
 await runTest('Jigsaw.makeFromArgs parses 16x16 grid', () => {
-  const shape = GridShape.fromGridSize(16);
+  const shape = CellGeometry.fromGridSize(16);
   const jigsaws = [...SudokuConstraint.Jigsaw.makeFromArgs([JIGSAW_16x16_LAYOUT], shape)];
   assert.equal(jigsaws.length, 16, 'should have 16 jigsaw regions');
   assert.equal(jigsaws[0].cells.length, 16, 'each region should have 16 cells');
 });
 
 await runTest('Jigsaw.serialize produces single-character indices for 16x16 grid', () => {
-  const shape = GridShape.fromGridSize(16);
+  const shape = CellGeometry.fromGridSize(16);
   const jigsaws = [...SudokuConstraint.Jigsaw.makeFromArgs([JIGSAW_16x16_LAYOUT], shape)];
   const serialized = SudokuConstraint.Jigsaw.serialize(jigsaws);
   const layoutStr = serialized.replace('.Jigsaw~', '');
@@ -547,7 +547,7 @@ await runTest('Jigsaw.serialize produces single-character indices for 16x16 grid
 });
 
 await runTest('Jigsaw round-trips for 16x16 grid', () => {
-  const shape = GridShape.fromGridSize(16);
+  const shape = CellGeometry.fromGridSize(16);
   const jigsaws = [...SudokuConstraint.Jigsaw.makeFromArgs([JIGSAW_16x16_LAYOUT], shape)];
   const serialized = SudokuConstraint.Jigsaw.serialize(jigsaws);
   const argsStr = serialized.replace('.Jigsaw~', '');
@@ -567,7 +567,7 @@ await runTest('Jigsaw round-trips for 16x16 grid', () => {
 // shiftCells / makeShifted
 // ============================================================================
 
-const shape9x9 = GridShape.fromGridSize(9);
+const shape9x9 = CellGeometry.fromGridSize(9);
 
 await runTest('shiftCells shifts a simple constraint', () => {
   // Thermo at R1C1, R1C2 shifted to base R2C3.
@@ -610,7 +610,7 @@ await runTest('shiftCells throws when base cell is an extra cell without graph',
 });
 
 await runTest('shiftCells shifts grid constraint to var cell target', () => {
-  const shape = GridShape.fromGridSize(4);
+  const shape = CellGeometry.fromGridSize(4);
   shape.addVarCellsForConstraints([{
     getVarCellGroups: () => [{ prefix: 'VA', count: 4, label: 'test', columns: 2 }],
   }]);
@@ -625,7 +625,7 @@ await runTest('shiftCells shifts grid constraint to var cell target', () => {
 });
 
 await runTest('shiftCells throws when target subgraph is too small', () => {
-  const shape = GridShape.fromGridSize(4);
+  const shape = CellGeometry.fromGridSize(4);
   shape.addVarCellsForConstraints([{
     getVarCellGroups: () => [{ prefix: 'VA', count: 2, label: 'test', columns: 2 }],
   }]);
@@ -639,7 +639,7 @@ await runTest('shiftCells throws when target subgraph is too small', () => {
 });
 
 await runTest('shiftCells shifts entirely within var cell group', () => {
-  const shape = GridShape.fromGridSize(4);
+  const shape = CellGeometry.fromGridSize(4);
   shape.addVarCellsForConstraints([{
     getVarCellGroups: () => [{ prefix: 'VA', count: 4, label: 'test', columns: 2 }],
   }]);
@@ -654,7 +654,7 @@ await runTest('shiftCells shifts entirely within var cell group', () => {
 });
 
 await runTest('shiftCells shifts var cells downward', () => {
-  const shape = GridShape.fromGridSize(4);
+  const shape = CellGeometry.fromGridSize(4);
   shape.addVarCellsForConstraints([{
     getVarCellGroups: () => [{ prefix: 'VA', count: 6, label: 'test', columns: 2 }],
   }]);
@@ -669,7 +669,7 @@ await runTest('shiftCells shifts var cells downward', () => {
 });
 
 await runTest('shiftCells shifts var cell constraint to grid target', () => {
-  const shape = GridShape.fromGridSize(4);
+  const shape = CellGeometry.fromGridSize(4);
   shape.addVarCellsForConstraints([{
     getVarCellGroups: () => [{ prefix: 'VA', count: 4, label: 'test', columns: 2 }],
   }]);
@@ -684,7 +684,7 @@ await runTest('shiftCells shifts var cell constraint to grid target', () => {
 });
 
 await runTest('shiftCells throws for cross-subgraph constraint cells', () => {
-  const shape = GridShape.fromGridSize(4);
+  const shape = CellGeometry.fromGridSize(4);
   shape.addVarCellsForConstraints([{
     getVarCellGroups: () => [{ prefix: 'VA', count: 4, label: 'test', columns: 2 }],
   }]);
@@ -749,13 +749,13 @@ logSuiteComplete('SudokuConstraintBase');
 // ============================================================================
 
 function makeShapeWithGroups(size, groups) {
-  const shape = GridShape.fromGridSize(size);
+  const shape = CellGeometry.fromGridSize(size);
   shape._varCellRegistry.addGroups(groups);
   return shape;
 }
 
 await runTest('_hasAdjacentCells: grid cells work', () => {
-  const shape = GridShape.fromGridSize(9);
+  const shape = CellGeometry.fromGridSize(9);
   assert.ok(SudokuConstraintBase._hasAdjacentCells(['R1C1', 'R1C2'], shape));
   assert.ok(!SudokuConstraintBase._hasAdjacentCells(['R1C1', 'R1C3'], shape));
 });
@@ -829,7 +829,7 @@ await runTest('_cellsAre2x2Square: non-square state cells', () => {
 await runTest('NFA.makeFromArgs treats non-underscore items as cells', () => {
   const constraints = [...SudokuConstraint.NFA.makeFromArgs(
     ['encoded', '_named', 'R1C1', '$0', '', '$1'],
-    GridShape.fromGridSize(9))];
+    CellGeometry.fromGridSize(9))];
 
   assert.equal(constraints.length, 2);
 
@@ -845,7 +845,7 @@ await runTest('NFA.makeFromArgs treats non-underscore items as cells', () => {
 await runTest('Pair.makeFromArgs treats non-underscore items as cells', () => {
   const constraints = [...SudokuConstraint.Pair.makeFromArgs(
     ['key', '_group', '$0', 'R1C2', '', '$1'],
-    GridShape.fromGridSize(9))];
+    CellGeometry.fromGridSize(9))];
 
   assert.equal(constraints.length, 2);
 
@@ -1026,7 +1026,7 @@ await runTest('NFA.serialize and makeFromArgs round-trip with named groups', () 
   const argsStr = serialized.substring('.NFA~'.length);
   const args = argsStr.split('~');
 
-  const shape = GridShape.fromGridSize(9);
+  const shape = CellGeometry.fromGridSize(9);
   const recovered = [...SudokuConstraint.NFA.makeFromArgs(args, shape)];
   assert.equal(recovered.length, 2);
   assert.equal(recovered[0].encodedNFA, encodedNFA);
@@ -1052,7 +1052,7 @@ logSuiteComplete('NFA serialize');
 // ============================================================================
 
 await runTest('Container.getCells collects cells from child constraints', () => {
-  const shape = GridShape.fromGridSize(9);
+  const shape = CellGeometry.fromGridSize(9);
 
   // Create constraints with specific cells
   const given1 = new SudokuConstraint.Given('R1C1', 5);

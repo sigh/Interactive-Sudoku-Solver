@@ -6,7 +6,7 @@ ensureGlobalEnvironment();
 const { CellExclusions, HandlerSet } = await import('../../../js/solver/engine.js' + self.VERSION_PARAM);
 const { HandlerUtil } = await import('../../../js/solver/handlers.js' + self.VERSION_PARAM);
 
-const SHAPE_9x9 = {
+const GEOMETRY_9x9 = {
   numGridCells: 81,
   numValues: 9,
   gridSize: 9,
@@ -34,8 +34,8 @@ const rowOf = (cell) => (cell / 9) | 0;
 const colOf = (cell) => cell % 9;
 
 const makeEmptyExclusions = () => {
-  const handlerSet = new HandlerSet([], SHAPE_9x9.numGridCells);
-  return new CellExclusions(handlerSet, SHAPE_9x9.numGridCells);
+  const handlerSet = new HandlerSet([], GEOMETRY_9x9.numGridCells);
+  return new CellExclusions(handlerSet, GEOMETRY_9x9.numGridCells);
 };
 
 const addSudokuBaseEdges = (exclusions) => {

@@ -9,7 +9,7 @@ if (typeof g.VERSION_PARAM === 'undefined') {
 }
 
 const { LookupTables } = await import('../../js/solver/lookup_tables.js');
-const { GridShape } = await import('../../js/grid_shape.js');
+const { CellGeometry } = await import('../../js/grid_shape.js');
 const { CellExclusions } = await import('../../js/solver/engine.js');
 
 const DEFAULT_NUM_VALUES = 9;
@@ -18,7 +18,7 @@ const DEFAULT_NUM_CELLS = 81;
 /*
  * Guidance for AIs
  *
- * - Prefer `new GridTestContext({ gridSize, numValues })` so tests always use a real `GridShape`.
+ * - Prefer `new GridTestContext({ gridSize, numValues })` so tests always use a real `CellGeometry`.
  * - Model “line length” scenarios with rectangles:
  *   - short line: `gridSize: [1, N]`, `numValues: M` where `N < M`
  *   - long line:  `gridSize: [1, N]`, `numValues: M` where `N > M`
@@ -50,13 +50,13 @@ export class GridTestContext {
     shape,
   } = {}) {
     this.shape = (() => {
-      if (shape) return (numValues === null || numValues === undefined) ? shape : GridShape.fromGridSize(shape.numRows, shape.numCols, numValues);
+      if (shape) return (numValues === null || numValues === undefined) ? shape : CellGeometry.fromGridSize(shape.numRows, shape.numCols, numValues);
 
       const dims = normalizeGridSize(gridSize);
       if (!dims) throw new Error(`Invalid gridSize: ${gridSize}`);
       const [numRows, numCols] = dims;
 
-      const baseShape = GridShape.fromGridSize(numRows, numCols, numValues);
+      const baseShape = CellGeometry.fromGridSize(numRows, numCols, numValues);
       if (!baseShape) throw new Error(`Invalid gridSize: ${gridSize}`);
       return baseShape;
     })();

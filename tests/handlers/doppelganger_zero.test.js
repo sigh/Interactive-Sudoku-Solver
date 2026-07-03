@@ -11,7 +11,7 @@ import {
 
 ensureGlobalEnvironment();
 
-const { GridShape } = await import('../../js/grid_shape.js');
+const { CellGeometry } = await import('../../js/grid_shape.js');
 const { DoppelgangerZero } = await import('../../js/solver/handlers.js');
 
 // DoppelgangerZero operates on a grid cell + 2-3 state cells.
@@ -25,7 +25,7 @@ const { DoppelgangerZero } = await import('../../js/solver/handlers.js');
 // valueMask0 is 0-indexed: valueMask0(0) = display value 0, etc.
 const ZERO = valueMask0(0);
 
-const makeShape = () => GridShape.fromGridSize(9, 9, 10, -1);
+const makeShape = () => CellGeometry.fromGridSize(9, 9, 10, -1);
 
 const makeContext = (numStateCells = 3) => {
   const shape = makeShape();
@@ -96,7 +96,7 @@ await runTest('DoppelgangerZero initialize succeeds with valueOffset -1', () => 
 });
 
 await runTest('DoppelgangerZero initialize fails with valueOffset 0', () => {
-  const shape = GridShape.fromGridSize(9);
+  const shape = CellGeometry.fromGridSize(9);
   const handler = new DoppelgangerZero(0, [1, 2, 3]);
   const context = new GridTestContext({ shape });
   assert.throws(() => context.initializeHandler(handler));

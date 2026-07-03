@@ -12,7 +12,7 @@ import {
 ensureGlobalEnvironment();
 
 const { CountDistinct } = await import('../../js/solver/handlers.js');
-const { GridShape } = await import('../../js/grid_shape.js');
+const { CellGeometry } = await import('../../js/grid_shape.js');
 
 const noExclusions = (numCells) => createCellExclusions({ numCells, allUnique: false });
 
@@ -159,7 +159,7 @@ await runTest('fails when the control value is unreachable', () => {
 
 await runTest('offset: control counts distinct values in a 0-indexed grid', () => {
   // numValues=4, values 0-3. 2 counted cells → at most 2 distinct.
-  const shape = GridShape.fromGridSize(1, 4, null, -1);
+  const shape = CellGeometry.fromGridSize(1, 4, null, -1);
   const context = new GridTestContext({ shape });
   const handler = new CountDistinct(0, [1, 2]);
   context.initializeHandler(handler, { cellExclusions: noExclusions(4) });

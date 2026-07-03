@@ -1,6 +1,6 @@
 const { SudokuConstraint } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
 const { SudokuParser } = await import('../sudoku_parser.js' + self.VERSION_PARAM);
-const { GridShape, SHAPE_9x9, SHAPE_MAX } = await import('../grid_shape.js' + self.VERSION_PARAM);
+const { CellGeometry, GEOMETRY_9x9, GEOMETRY_MAX } = await import('../grid_shape.js' + self.VERSION_PARAM);
 const { SolverStats } = await import('./solver_stats.js' + self.VERSION_PARAM);
 const { SANDBOX_HELP_TEXT } = await import('./help_text.js' + self.VERSION_PARAM);
 
@@ -98,17 +98,17 @@ const help = (arg) => {
 };
 
 const parseCellId = (cellId) => {
-  const parsed = SHAPE_MAX.parseCellId(cellId);
+  const parsed = GEOMETRY_MAX.parseCellId(cellId);
   return {
     row: parsed.row + 1,
     col: parsed.col + 1,
   };
 };
 
-const makeCellId = (row, col) => SHAPE_MAX.makeCellId(row - 1, col - 1);
+const makeCellId = (row, col) => GEOMETRY_MAX.makeCellId(row - 1, col - 1);
 
-// Resolve a lenient shape argument to a GridShape:
-//   - a GridShape                       (returned as-is)
+// Resolve a lenient shape argument to a CellGeometry:
+//   - a CellGeometry                       (returned as-is)
 //   - a grid spec string, e.g. '6x6'
 //   - a Shape constraint (or any object carrying a gridSpec)
 //   - nothing                           (the default grid)
@@ -176,7 +176,7 @@ class SandboxCellGraph {
 }
 
 // A SandboxCellGraph for a shape. The argument is passed through cellGeometry(), so
-// it accepts a grid spec, Shape constraint, GridShape, or nothing for the default.
+// it accepts a grid spec, Shape constraint, CellGeometry, or nothing for the default.
 const cellGraph = (shapeSpec) => new SandboxCellGraph(cellGeometry(shapeSpec));
 
 const parseConstraint = (str) => {
@@ -314,9 +314,9 @@ export const SANDBOX_GLOBALS = {
   help,
   makeSolver,
   SolverStats,
-  SHAPE_9x9,
-  SHAPE_MAX,
-  GridShape,
+  GEOMETRY_9x9,
+  GEOMETRY_MAX,
+  CellGeometry,
   extendTimeoutMs: () => {
     console.error('extendTimeoutMs is deprecated, sandbox has no timeout.');
   },

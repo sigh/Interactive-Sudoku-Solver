@@ -6,7 +6,7 @@ ensureGlobalEnvironment();
 
 const { SudokuConstraintOptimizer } = await import('../../../js/solver/optimizer.js' + self.VERSION_PARAM);
 const HandlerModule = await import('../../../js/solver/handlers.js' + self.VERSION_PARAM);
-const { GridShape } = await import('../../../js/grid_shape.js' + self.VERSION_PARAM);
+const { CellGeometry } = await import('../../../js/grid_shape.js' + self.VERSION_PARAM);
 const { HandlerSet } = await import('../../../js/solver/engine.js' + self.VERSION_PARAM);
 const { SudokuConstraintBase } = await import('../../../js/sudoku_constraint.js' + self.VERSION_PARAM);
 
@@ -16,7 +16,7 @@ const { SudokuConstraintBase } = await import('../../../js/sudoku_constraint.js'
 
 await runTest('_overlapRegions: square grid includes rows and columns', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
-  const shape = GridShape.fromGridSize(9);
+  const shape = CellGeometry.fromGridSize(9);
 
   const results = optimizer._overlapRegions(shape, [], shape.numValues);
 
@@ -29,7 +29,7 @@ await runTest('_overlapRegions: square grid includes rows and columns', () => {
 
 await runTest('_overlapRegions: 4x6 grid includes only rows (not columns)', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
-  const shape = GridShape.fromGridSize(4, 6);
+  const shape = CellGeometry.fromGridSize(4, 6);
 
   // numValues=6, numCols=6 (rows are houses), numRows=4 (columns are NOT houses).
   const results = optimizer._overlapRegions(shape, [], shape.numValues);
@@ -44,7 +44,7 @@ await runTest('_overlapRegions: 4x6 grid includes only rows (not columns)', () =
 
 await runTest('_overlapRegions: 6x4 grid includes only columns (not rows)', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
-  const shape = GridShape.fromGridSize(6, 4);
+  const shape = CellGeometry.fromGridSize(6, 4);
 
   // numValues=6, numRows=6 (columns are houses), numCols=4 (rows are NOT houses).
   const results = optimizer._overlapRegions(shape, [], shape.numValues);
@@ -59,7 +59,7 @@ await runTest('_overlapRegions: 6x4 grid includes only columns (not rows)', () =
 
 await runTest('_overlapRegions: 5x7 grid (no houses) returns empty', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
-  const shape = GridShape.fromGridSize(5, 7);
+  const shape = CellGeometry.fromGridSize(5, 7);
 
   // numValues=7, numCols=7 (rows are houses), numRows=5 (columns are NOT houses).
   // Wait, numCols=7 === numValues=7, so rows ARE houses.
@@ -77,7 +77,7 @@ await runTest('_overlapRegions: 5x7 grid (no houses) returns empty', () => {
 
 await runTest('_optimizeNonSquareGrids: adds aux handler for 8x9 no-box grid', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
-  const shape = GridShape.fromGridSize(8, 9);
+  const shape = CellGeometry.fromGridSize(8, 9);
 
   // Add all-different constraints for both axes.
   const handlers = [];
@@ -98,7 +98,7 @@ await runTest('_optimizeNonSquareGrids: adds aux handler for 8x9 no-box grid', (
 
 await runTest('_optimizeNonSquareGrids: skips when numValues matches neither axis', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
-  const shape = GridShape.fromGridSize(8, 9, 10);
+  const shape = CellGeometry.fromGridSize(8, 9, 10);
 
   // Add all-different constraints for both axes.
   const handlers = [];
@@ -120,7 +120,7 @@ await runTest('_optimizeNonSquareGrids: skips when numValues matches neither axi
 
 await runTest('_optimizeNonSquareGrids: skips aux handler for 1x9 grid', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
-  const shape = GridShape.fromGridSize(1, 9);
+  const shape = CellGeometry.fromGridSize(1, 9);
 
   // Add all-different constraints for both axes.
   const handlers = [];
@@ -147,7 +147,7 @@ await runTest('_makeJigsawIntersections: creates intersections from PerfectAllDi
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
   // 6x6 grid with numValues=10 so 6-cell AllDifferent promotes to
   // PerfectAllDifferent regions.
-  const shape = GridShape.fromGridSize(6, 6, 10);
+  const shape = CellGeometry.fromGridSize(6, 6, 10);
   const numCells = shape.numGridCells;
 
   // Restrict all cells to values 1-6.
@@ -180,7 +180,7 @@ await runTest('_makeJigsawIntersections: creates intersections from PerfectAllDi
 
 await runTest('_makeJigsawIntersections: skips pairing with different value masks', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
-  const shape = GridShape.fromGridSize(6, 6, 10);
+  const shape = CellGeometry.fromGridSize(6, 6, 10);
   const numCells = shape.numGridCells;
 
   // Region A cells restricted to {1,2,3,4,5,6}.
@@ -228,7 +228,7 @@ await runTest('_makeJigsawLawOfLeftoverHandlers: restricted grid uses row region
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
   // 4x4 grid with numValues=6. Cells restricted to 4 values so
   // effectiveValueCount (4) === numCols (4).
-  const shape = GridShape.fromGridSize(4, 4, 6);
+  const shape = CellGeometry.fromGridSize(4, 4, 6);
   const numCells = shape.numGridCells;
 
   const valueMap = new Map();
@@ -273,7 +273,7 @@ await runTest('_makeJigsawLawOfLeftoverHandlers: skips restricted path when effe
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
   // Standard 4x4 grid with numValues=4. effectiveValueCount === numValues,
   // so the restricted path should not run (already handled by _overlapRegions).
-  const shape = GridShape.fromGridSize(4, 4, 4);
+  const shape = CellGeometry.fromGridSize(4, 4, 4);
   const numCells = shape.numGridCells;
 
   const givenHandler = new HandlerModule.GivenCandidates(new Map());

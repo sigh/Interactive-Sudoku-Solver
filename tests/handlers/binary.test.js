@@ -11,7 +11,7 @@ import {
 
 ensureGlobalEnvironment();
 
-const { GridShape } = await import('../../js/grid_shape.js');
+const { CellGeometry } = await import('../../js/grid_shape.js');
 
 const { fnToBinaryKey, binaryKeyToFnString } = await import('../../js/sudoku_constraint.js');
 const { BinaryConstraint } = await import('../../js/solver/handlers.js');
@@ -527,7 +527,7 @@ await runTest('binaryKeyToFnString: no offset uses 1-based values', () => {
 });
 
 await runTest('BinaryConstraint: enforces 0-based key correctly', () => {
-  const shape = GridShape.fromGridSize(1, 4, null, -1);
+  const shape = CellGeometry.fromGridSize(1, 4, null, -1);
   const context = new GridTestContext({ shape });
   // "sum equals 3" in 0-based: pairs (0,3),(1,2),(2,1),(3,0)
   const key = fnToBinaryKey((a, b) => a + b === 3, 4, -1);

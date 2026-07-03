@@ -62,8 +62,8 @@ CELL IDENTIFIERS
 
 CELL GEOMETRY
 
-    cellGeometry('6x6')  => GridShape (also accepts a Shape constraint, a
-                            GridShape, or nothing for the default grid)
+    cellGeometry('6x6')  => CellGeometry (also accepts a Shape constraint, a
+                            CellGeometry, or nothing for the default grid)
     cellGraph('6x6')     => cell graph for the shape (same argument as cellGeometry()).
                             Its methods all work in cell ids:
       .neighbours(cell)        orthogonally-adjacent in-grid cells

@@ -7,7 +7,7 @@ ensureGlobalEnvironment();
 
 const { SudokuConstraintOptimizer } = await import('../../../js/solver/optimizer.js' + self.VERSION_PARAM);
 const HandlerModule = await import('../../../js/solver/handlers.js' + self.VERSION_PARAM);
-const { GridShape } = await import('../../../js/grid_shape.js' + self.VERSION_PARAM);
+const { CellGeometry } = await import('../../../js/grid_shape.js' + self.VERSION_PARAM);
 const { HandlerSet } = await import('../../../js/solver/engine.js' + self.VERSION_PARAM);
 const { LookupTables } = await import('../../../js/solver/lookup_tables.js' + self.VERSION_PARAM);
 
@@ -20,7 +20,7 @@ const createExclusions = (numCells) => createCellExclusions({ allUnique: false, 
 
 await runTest('_optimizeTaxicab: creates region handler for grid-house sized PerfectAllDifferent', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
-  const shape = GridShape.fromGridSize(9);
+  const shape = CellGeometry.fromGridSize(9);
   const numCells = shape.numGridCells;
 
   const houseCells = Array.from({ length: 9 }, (_, i) => i);
@@ -40,7 +40,7 @@ await runTest('_optimizeTaxicab: creates region handler for grid-house sized Per
 
 await runTest('_optimizeTaxicab: no-op when no taxicab handlers are present', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
-  const shape = GridShape.fromGridSize(9);
+  const shape = CellGeometry.fromGridSize(9);
   const numCells = shape.numGridCells;
 
   const houseCells = Array.from({ length: 9 }, (_, i) => i);
@@ -59,7 +59,7 @@ await runTest('_optimizeTaxicab: no-op when no taxicab handlers are present', ()
 
 await runTest('_optimizeTaxicab: ignores plain AllDifferent handlers', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
-  const shape = GridShape.fromGridSize(9);
+  const shape = CellGeometry.fromGridSize(9);
   const numCells = shape.numGridCells;
 
   // _optimizeTaxicab should only target PerfectAllDifferent handlers.
@@ -78,7 +78,7 @@ await runTest('_optimizeTaxicab: ignores plain AllDifferent handlers', () => {
 
 await runTest('_optimizeTaxicab: creates region handler for PerfectAllDifferent', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
-  const shape = GridShape.fromGridSize(9);
+  const shape = CellGeometry.fromGridSize(9);
   const numCells = shape.numGridCells;
 
   const padCells = [0, 1, 2, 3];
@@ -99,7 +99,7 @@ await runTest('_optimizeTaxicab: creates region handler for PerfectAllDifferent'
 
 await runTest('_optimizeTaxicab: creates region handlers for mixed PerfectAllDifferent sizes', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
-  const shape = GridShape.fromGridSize(9);
+  const shape = CellGeometry.fromGridSize(9);
   const numCells = shape.numGridCells;
 
   const houseCells = Array.from({ length: 9 }, (_, i) => i);
@@ -131,7 +131,7 @@ await runTest('_optimizeTaxicab: creates region handlers for mixed PerfectAllDif
 
 await runTest('_optimizeTaxicab: PerfectAllDifferent region handler propagates removals', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
-  const shape = GridShape.fromGridSize(9);
+  const shape = CellGeometry.fromGridSize(9);
   const numCells = shape.numGridCells;
 
   const padCells = [0, 1, 2, 3];
@@ -181,7 +181,7 @@ await runTest('_optimizeTaxicab: PerfectAllDifferent region handler propagates r
 
 await runTest('_optimizeTaxicab: propagation works for non-1 values', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
-  const shape = GridShape.fromGridSize(9);
+  const shape = CellGeometry.fromGridSize(9);
   const numCells = shape.numGridCells;
 
   const padCells = [0, 1, 2, 3];
@@ -227,7 +227,7 @@ await runTest('_optimizeTaxicab: propagation works for non-1 values', () => {
 
 await runTest('_optimizeTaxicab: does not modify grid when no value appears exactly twice', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
-  const shape = GridShape.fromGridSize(9);
+  const shape = CellGeometry.fromGridSize(9);
   const numCells = shape.numGridCells;
 
   const padCells = [0, 1, 2, 3];

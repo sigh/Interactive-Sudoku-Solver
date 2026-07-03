@@ -11,7 +11,7 @@ import {
 
 ensureGlobalEnvironment();
 
-const { GridShape } = await import('../../js/grid_shape.js');
+const { CellGeometry } = await import('../../js/grid_shape.js');
 const { SudokuConstraint } = await import('../../js/sudoku_constraint.js');
 const { LookupTables } = await import('../../js/solver/lookup_tables.js');
 const {
@@ -29,7 +29,7 @@ const makeChaosGrid = (shape) => {
 };
 
 const makeChaosContext = (gridSpec = '2x2', configureGrid = null) => {
-  const shape = GridShape.fromGridSpec(gridSpec);
+  const shape = CellGeometry.fromGridSpec(gridSpec);
   const constraint = new SudokuConstraint.ChaosConstruction();
   shape.addVarCellsForConstraints([constraint]);
 
@@ -184,7 +184,7 @@ const partialChaosGridHasCompletion = (shape, partialValues, partialRegions) => 
 };
 
 await runTest('ChaosConstruction defines one visible region cell per grid cell', () => {
-  const shape = GridShape.fromGridSize(4);
+  const shape = CellGeometry.fromGridSize(4);
   const constraint = new SudokuConstraint.ChaosConstruction();
   assert.deepEqual(constraint.getVarCellGroups(shape), [{
     prefix: 'CC',
@@ -200,7 +200,7 @@ await runTest('ChaosConstruction defines one visible region cell per grid cell',
 
 await runTest('ChaosConstruction accepts non-square grids', () => {
   // 2x3 has regionSize=3 (max), numRegions=2 — valid.
-  const shape = GridShape.fromGridSpec('2x3');
+  const shape = CellGeometry.fromGridSpec('2x3');
   const constraint = new SudokuConstraint.ChaosConstruction();
   shape.addVarCellsForConstraints([constraint]);
 
@@ -219,7 +219,7 @@ await runTest('ChaosConstruction accepts non-square grids', () => {
 
 await runTest('ChaosConstruction rejects region size that does not divide grid cell count', () => {
   // 4x5 = 20 cells, regionSize=3 — 20 % 3 !== 0.
-  const shape = GridShape.fromGridSpec('4x5');
+  const shape = CellGeometry.fromGridSpec('4x5');
   const constraint = new SudokuConstraint.ChaosConstruction();
   shape.addVarCellsForConstraints([constraint]);
 
@@ -256,7 +256,7 @@ await runTest('ChaosConstruction initializes canonical region candidates', () =>
 });
 
 await runTest('ChaosCount prunes control candidates to feasible match counts', () => {
-  const shape = GridShape.fromGridSize(4);
+  const shape = CellGeometry.fromGridSize(4);
   shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
   const grid = makeChaosGrid(shape);
   const regionCells = shape.varCellsForGroup('CC');
@@ -286,7 +286,7 @@ const makeEnclosedCount = (shape, runCells) => {
 await runTest('ChaosCount removes count 1 when the first cell is enclosed', () => {
   // First counted cell is corner 0; its neighbours (1 right, 4 down) are both
   // counted, so it is enclosed and the count can never be 1.
-  const shape = GridShape.fromGridSize(4);
+  const shape = CellGeometry.fromGridSize(4);
   shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
   const { grid, ok } = makeEnclosedCount(shape, [0, 1, 4]);
   assert.equal(ok, true);
@@ -296,7 +296,7 @@ await runTest('ChaosCount removes count 1 when the first cell is enclosed', () =
 
 await runTest('ChaosCount keeps count 1 when the first cell is not enclosed', () => {
   // Missing the down-neighbour (4), so the first cell is not enclosed.
-  const shape = GridShape.fromGridSize(4);
+  const shape = CellGeometry.fromGridSize(4);
   shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
   const { grid, ok } = makeEnclosedCount(shape, [0, 1]);
   assert.equal(ok, true);
@@ -307,7 +307,7 @@ await runTest('ChaosCount removes the infeasible count 0 in a 0-indexed grid', (
   // 0-3 grid (valueOffset -1): count k sits at value k+1, so count 0 is value 1.
   // The count is never 0 (the first cell is always counted), so value 1 is removed
   // even when the first cell is not enclosed.
-  const shape = GridShape.fromGridSpec('4x4~0-3');
+  const shape = CellGeometry.fromGridSpec('4x4~0-3');
   shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
   const { grid, ok } = makeEnclosedCount(shape, [0, 1]);  // not enclosed
   assert.equal(ok, true);
@@ -316,7 +316,7 @@ await runTest('ChaosCount removes the infeasible count 0 in a 0-indexed grid', (
 });
 
 await runTest('ChaosCount removes counts 0 and 1 through the offset when enclosed', () => {
-  const shape = GridShape.fromGridSpec('4x4~0-3');  // valueOffset -1
+  const shape = CellGeometry.fromGridSpec('4x4~0-3');  // valueOffset -1
   shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
   const { grid, ok } = makeEnclosedCount(shape, [0, 1, 4]);
   assert.equal(ok, true);
@@ -328,7 +328,7 @@ await runTest('ChaosCount: enclosed first cell needs an extra in-region neighbou
   // First cell (corner 0) is enclosed by counted cells 1, 4. A non-neighbour
   // counted cell (5) is fixed to the first cell's region, but neither neighbour
   // is — so a neighbour must still join, forcing the count to >= 3.
-  const shape = GridShape.fromGridSize(4);
+  const shape = CellGeometry.fromGridSize(4);
   shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
   const regionCells = shape.varCellsForGroup('CC');
   const { handler, grid, ok } = makeEnclosedCount(shape, [0, 1, 4, 5]);
@@ -346,7 +346,7 @@ await runTest('ChaosCount: enclosed first cell needs an extra in-region neighbou
 await runTest('ChaosCount maps the control value through the shape value offset', () => {
   // On a 0-8 style grid (valueOffset -1) the control's displayed count is one
   // less than its stored value, so a count of 2 fixes the control to value 3.
-  const shape = GridShape.fromGridSpec('4x4~0-3');
+  const shape = CellGeometry.fromGridSpec('4x4~0-3');
   assert.equal(shape.valueOffset, -1);
   shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
   const grid = makeChaosGrid(shape);
@@ -362,7 +362,7 @@ await runTest('ChaosCount maps the control value through the shape value offset'
 });
 
 await runTest('ChaosCount prunes unsupported first region candidates', () => {
-  const shape = GridShape.fromGridSize(4);
+  const shape = CellGeometry.fromGridSize(4);
   shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
   const grid = makeChaosGrid(shape);
   const regionCells = shape.varCellsForGroup('CC');
@@ -378,7 +378,7 @@ await runTest('ChaosCount prunes unsupported first region candidates', () => {
 });
 
 await runTest('ChaosCount rejects impossible fixed counts', () => {
-  const shape = GridShape.fromGridSize(4);
+  const shape = CellGeometry.fromGridSize(4);
   shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
   const grid = makeChaosGrid(shape);
   const regionCells = shape.varCellsForGroup('CC');
@@ -392,7 +392,7 @@ await runTest('ChaosCount rejects impossible fixed counts', () => {
 });
 
 await runTest('ChaosCount prunes counted cells when control forces no extra matches', () => {
-  const shape = GridShape.fromGridSize(4);
+  const shape = CellGeometry.fromGridSize(4);
   shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
   const grid = makeChaosGrid(shape);
   const regionCells = shape.varCellsForGroup('CC');
@@ -409,7 +409,7 @@ await runTest('ChaosCount prunes counted cells when control forces no extra matc
 });
 
 await runTest('ChaosCount prunes counted cells when control forces all matches', () => {
-  const shape = GridShape.fromGridSize(4);
+  const shape = CellGeometry.fromGridSize(4);
   shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
   const grid = makeChaosGrid(shape);
   const regionCells = shape.varCellsForGroup('CC');
@@ -452,7 +452,7 @@ await runTest('ChaosCount does not shard-merge non-contiguous fixed matching reg
 });
 
 await runTest('ChaosConstruction priority anchor selection does not mutate grid', () => {
-  const shape = GridShape.fromGridSpec('4x4');
+  const shape = CellGeometry.fromGridSpec('4x4');
   const constraint = new SudokuConstraint.ChaosConstruction();
   shape.addVarCellsForConstraints([constraint]);
 
@@ -478,7 +478,7 @@ await runTest('ChaosConstruction anchor separation uses regionSize not numCols f
   // 4x3: numRows=4, numCols=3, regionSize=4, numRegions=3
   // With numCols (3) as threshold: triple [0,5,9] passes since dist(0,9)=3 >= 3, but 3 < regionSize=4
   // With regionSize (4) as threshold: no triple has all pairwise distances >= 4, so falls back to [0]
-  const shape = GridShape.fromGridSpec('4x3');
+  const shape = CellGeometry.fromGridSpec('4x3');
   const constraint = new SudokuConstraint.ChaosConstruction();
   shape.addVarCellsForConstraints([constraint]);
   const regionCells = shape.varCellsForGroup('CC');
@@ -488,7 +488,7 @@ await runTest('ChaosConstruction anchor separation uses regionSize not numCols f
 });
 
 await runTest('ChaosConstruction returned anchors have pairwise Manhattan distance at least regionSize', () => {
-  const shape = GridShape.fromGridSpec('4x4');
+  const shape = CellGeometry.fromGridSpec('4x4');
   const constraint = new SudokuConstraint.ChaosConstruction();
   shape.addVarCellsForConstraints([constraint]);
   const regionCells = shape.varCellsForGroup('CC');
@@ -512,7 +512,7 @@ await runTest('ChaosConstruction returned anchors have pairwise Manhattan distan
 
 await runTest('ChaosConstruction exits early with single anchor when numRegions < 3 (tall 4x2)', () => {
   // 4x2: numRows=4, numCols=2, regionSize=4, numRegions=2 — hits the numRegions<3 early return
-  const shape = GridShape.fromGridSpec('4x2');
+  const shape = CellGeometry.fromGridSpec('4x2');
   const constraint = new SudokuConstraint.ChaosConstruction();
   shape.addVarCellsForConstraints([constraint]);
   const regionCells = shape.varCellsForGroup('CC');
@@ -525,7 +525,7 @@ await runTest('ChaosConstruction falls back to single anchor when no sufficientl
   // 3x4: numRows=3, numCols=4, regionSize=4, numRegions=3 — enough regions but no triple
   // with all pairwise Manhattan distance >= 4 exists in this narrow grid.
   // Max distance = 2+3=5, but three mutually-distant cells cannot be found.
-  const shape = GridShape.fromGridSpec('3x4');
+  const shape = CellGeometry.fromGridSpec('3x4');
   const constraint = new SudokuConstraint.ChaosConstruction();
   shape.addVarCellsForConstraints([constraint]);
   const regionCells = shape.varCellsForGroup('CC');
@@ -538,7 +538,7 @@ await runTest('ChaosConstruction anchor selection picks highest-scoring valid tr
   // 6x6: multiple valid triples exist; boost cell 23 (r3,c5, right-column edge cell)
   // so the algorithm prefers any triple containing it over the default first-found triple.
   // Triple (0, 23, 31): dist(0,23)=8, dist(0,31)=6, dist(23,31)=6 — all >= regionSize=6.
-  const shape = GridShape.fromGridSpec('6x6');
+  const shape = CellGeometry.fromGridSpec('6x6');
   const constraint = new SudokuConstraint.ChaosConstruction();
   shape.addVarCellsForConstraints([constraint]);
   const regionCells = shape.varCellsForGroup('CC');
@@ -559,7 +559,7 @@ await runTest('ChaosConstruction rejects conflicting default canonical anchor du
 });
 
 await runTest('ChaosConstruction default anchor is applied without priority selection', () => {
-  const shape = GridShape.fromGridSpec('4x4');
+  const shape = CellGeometry.fromGridSpec('4x4');
   const constraint = new SudokuConstraint.ChaosConstruction();
   shape.addVarCellsForConstraints([constraint]);
 

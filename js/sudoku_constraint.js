@@ -5,7 +5,7 @@ const {
   groupSortedBy,
   Base64Codec
 } = await import('./util.js' + self.VERSION_PARAM);
-const { GridShape, CellGraph, SHAPE_9x9, SHAPE_MAX } = await import('./grid_shape.js' + self.VERSION_PARAM);
+const { CellGeometry, CellGraph, GEOMETRY_9x9, GEOMETRY_MAX } = await import('./grid_shape.js' + self.VERSION_PARAM);
 const { NFASerializer, javascriptSpecToNFA, nfaToJavascriptSpec } = await import('./nfa_builder.js' + self.VERSION_PARAM);
 
 export class CellArgs {
@@ -234,9 +234,9 @@ export class SudokuConstraintBase {
   static boxRegions = memoize((shape, size = null) => {
     const numRows = shape.numRows;
     const numCols = shape.numCols;
-    const effectiveSize = size ?? GridShape.defaultNumValues(numRows, numCols);
+    const effectiveSize = size ?? CellGeometry.defaultNumValues(numRows, numCols);
 
-    const [boxHeight, boxWidth] = GridShape.boxDimsForSize(
+    const [boxHeight, boxWidth] = CellGeometry.boxDimsForSize(
       numRows, numCols, effectiveSize);
     if (!boxHeight) return [];
 
@@ -252,11 +252,11 @@ export class SudokuConstraintBase {
         const cellCol = i % boxWidth;
         return (boxRow * boxHeight + cellRow) * numCols + (boxCol * boxWidth + cellCol);
       }, numBoxes, effectiveSize);
-  }, (shape, size = null) => `${shape.gridDimsStr}~${size ?? GridShape.defaultNumValues(shape.numRows, shape.numCols)}`);
+  }, (shape, size = null) => `${shape.gridDimsStr}~${size ?? CellGeometry.defaultNumValues(shape.numRows, shape.numCols)}`);
   static disjointSetRegions = memoize((shape, size = null) => {
     const numCols = shape.numCols;
-    const effectiveSize = size ?? GridShape.defaultNumValues(shape.numRows, numCols);
-    const [boxHeight, boxWidth] = GridShape.boxDimsForSize(
+    const effectiveSize = size ?? CellGeometry.defaultNumValues(shape.numRows, numCols);
+    const [boxHeight, boxWidth] = CellGeometry.boxDimsForSize(
       shape.numRows, numCols, effectiveSize);
     if (!boxHeight) return [];
 
@@ -273,7 +273,7 @@ export class SudokuConstraintBase {
         const posCol = r % boxWidth;
         return (boxRow * boxHeight + posRow) * numCols + boxCol * boxWidth + posCol;
       }, numSets, numBoxes);
-  }, (shape, size = null) => `${shape.gridDimsStr}~${size ?? GridShape.defaultNumValues(shape.numRows, shape.numCols)}`);
+  }, (shape, size = null) => `${shape.gridDimsStr}~${size ?? CellGeometry.defaultNumValues(shape.numRows, shape.numCols)}`);
   static square2x2Regions = memoize(
     (shape) => {
       const numRows = shape.numRows;
@@ -752,7 +752,7 @@ export class SudokuConstraint {
 
     chipLabel() {
       if (this.origin === 'R1C1') return 'Replicate';
-      return `Replicate ${GridShape.displayCellId(this.origin)}`;
+      return `Replicate ${CellGeometry.displayCellId(this.origin)}`;
     }
 
     getCells(shape) {
@@ -860,7 +860,7 @@ export class SudokuConstraint {
       if (map.size === 1) return;
 
       const maxRegionSize = shape.numValues;
-      const minRegionSize = GridShape.defaultNumValues(
+      const minRegionSize = CellGeometry.defaultNumValues(
         shape.numRows, shape.numCols);
 
       let sawOtherRegionSize = false;
@@ -884,7 +884,7 @@ export class SudokuConstraint {
 
       // Get shape from the first constraint's gridSpec.
       const gridSpec = parts[0].gridSpec;
-      const shape = GridShape.fromGridSpec(gridSpec);
+      const shape = CellGeometry.fromGridSpec(gridSpec);
 
       // Fill parts grid such that each cell has a reference to the part.
       const partsGrid = new Array(shape.numGridCells).fill(null);
@@ -1536,9 +1536,9 @@ export class SudokuConstraint {
     static CATEGORY = 'Shape';
     static UNIQUENESS_KEY_FIELD = 'type';
     static _DEFAULT_SPECS = new Set([
-      SHAPE_9x9.name,
-      `${SHAPE_9x9.gridDimsStr}~${SHAPE_9x9.numValues}`,
-      `${SHAPE_9x9.gridDimsStr}~1-${SHAPE_9x9.numValues}`,
+      GEOMETRY_9x9.name,
+      `${GEOMETRY_9x9.gridDimsStr}~${GEOMETRY_9x9.numValues}`,
+      `${GEOMETRY_9x9.gridDimsStr}~1-${GEOMETRY_9x9.numValues}`,
     ]);
 
     constructor(gridDims, ...optionalValueRange) {
@@ -1553,7 +1553,7 @@ export class SudokuConstraint {
       // Reconstruct gridSpec from args the same way the constructor does,
       // and verify it matches the already-parsed shape.
       const constraint = new this(...args);
-      if (GridShape.fromGridSpec(constraint.gridSpec).name !== shape.name) {
+      if (CellGeometry.fromGridSpec(constraint.gridSpec).name !== shape.name) {
         throw Error('Inconsistent Shape constraints.');
       }
 
@@ -1575,10 +1575,10 @@ export class SudokuConstraint {
 
     static getShapeFromGridSpec(gridSpec) {
       if (!gridSpec) {
-        return GridShape.fromGridSize(
-          SHAPE_9x9.numRows, SHAPE_9x9.numCols);
+        return CellGeometry.fromGridSize(
+          GEOMETRY_9x9.numRows, GEOMETRY_9x9.numCols);
       }
-      return GridShape.fromGridSpec(gridSpec);
+      return CellGeometry.fromGridSpec(gridSpec);
     }
   }
 
@@ -1594,7 +1594,7 @@ export class SudokuConstraint {
       const numRows = shape.numRows;
       const numCols = shape.numCols;
       const effectiveSize = size ?? shape.numValues;
-      const [boxHeight, boxWidth] = GridShape.boxDimsForSize(
+      const [boxHeight, boxWidth] = CellGeometry.boxDimsForSize(
         numRows, numCols, effectiveSize);
       if (!boxHeight) return [];
 
@@ -1650,9 +1650,9 @@ export class SudokuConstraint {
       && shape.numValues === shape.numRows + 1;
 
     getVarCellGroups(shape) {
-      const defaultSize = GridShape.defaultNumValues(
+      const defaultSize = CellGeometry.defaultNumValues(
         shape.numRows, shape.numCols);
-      const [boxHeight, boxWidth] = GridShape.boxDimsForSize(
+      const [boxHeight, boxWidth] = CellGeometry.boxDimsForSize(
         shape.numRows, shape.numCols, defaultSize);
       const boxCount = boxHeight ? boxHeight * boxWidth : 0;
       return [
@@ -2544,7 +2544,7 @@ export class SudokuConstraint {
       return `Quad (${this.values.join(',')})`;
     }
 
-    static cells(topLeftCell, shape = SHAPE_MAX) {
+    static cells(topLeftCell, shape = GEOMETRY_MAX) {
       const graph = shape.cellGraph();
       const { cell } = shape.parseCellId(topLeftCell);
       const topRight = graph.adjacent(cell, CellGraph.RIGHT);
@@ -2802,7 +2802,7 @@ export class SudokuConstraint {
     chipLabel() {
       let valueStr = this.values.join(',');
       if (this.values.length !== 1) valueStr = `[${valueStr}]`;
-      const displayCell = GridShape.displayCellId(this.cell);
+      const displayCell = CellGeometry.displayCellId(this.cell);
       return `${displayCell}: ${valueStr}`;
     }
 
@@ -2879,7 +2879,7 @@ export class SudokuConstraint {
 
     chipLabel() {
       const countStr = this.count > 1 ? `[${this.count}]` : '';
-      return `Extra Cells: ${GridShape.displayCellId('V' + this.prefix)}${countStr}`;
+      return `Extra Cells: ${CellGeometry.displayCellId('V' + this.prefix)}${countStr}`;
     }
   }
 }

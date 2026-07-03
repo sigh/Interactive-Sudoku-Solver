@@ -13,7 +13,7 @@ ensureGlobalEnvironment();
 const { FullGridRequiredValues } = await import('../../js/solver/handlers.js');
 
 // Use shapes whose dimensions don't exceed numValues.
-// (GridShape requires numValues >= max(numRows, numCols).)
+// (CellGeometry requires numValues >= max(numRows, numCols).)
 
 const makeLines3x2 = () => {
   // 3 lines, each with 2 cells (6 total cells).

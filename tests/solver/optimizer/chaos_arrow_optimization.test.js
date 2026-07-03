@@ -12,7 +12,7 @@ import {
 ensureGlobalEnvironment();
 
 const { SudokuConstraintOptimizer } = await import('../../../js/solver/optimizer.js' + self.VERSION_PARAM);
-const { GridShape } = await import('../../../js/grid_shape.js' + self.VERSION_PARAM);
+const { CellGeometry } = await import('../../../js/grid_shape.js' + self.VERSION_PARAM);
 const { SudokuConstraint } = await import('../../../js/sudoku_constraint.js' + self.VERSION_PARAM);
 const { HandlerSet } = await import('../../../js/solver/engine.js' + self.VERSION_PARAM);
 const { LookupTables } = await import('../../../js/solver/lookup_tables.js' + self.VERSION_PARAM);
@@ -26,7 +26,7 @@ const makeChaosGrid = (shape) => {
 };
 
 const makeShape = () => {
-  const shape = GridShape.fromGridSpec('4x4');
+  const shape = CellGeometry.fromGridSpec('4x4');
   shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
   return shape;
 };
