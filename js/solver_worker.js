@@ -25,7 +25,7 @@ if (!self.VERSION_PARAM.endsWith('&sync')) {
   import('./solver/chaos_handler.js' + self.VERSION_PARAM);
   import('./solver/sum_handler.js' + self.VERSION_PARAM);
   import('./solver/nfa_handler.js' + self.VERSION_PARAM);
-  import('./grid_shape.js' + self.VERSION_PARAM);
+  import('./cell_geometry.js' + self.VERSION_PARAM);
   import('./sudoku_constraint.js' + self.VERSION_PARAM);
 }
 const { SudokuBuilder } = await import('./solver/sudoku_builder.js' + self.VERSION_PARAM);

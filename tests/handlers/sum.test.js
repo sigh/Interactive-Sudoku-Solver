@@ -13,7 +13,7 @@ import {
 ensureGlobalEnvironment();
 
 const { Sum } = await import('../../js/solver/sum_handler.js');
-const { CellGeometry } = await import('../../js/grid_shape.js');
+const { CellGeometry } = await import('../../js/cell_geometry.js');
 
 const uniqueCells = () => createCellExclusions({ allUnique: true });
 const nonUniqueCells = () => createCellExclusions({ allUnique: false });

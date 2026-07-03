@@ -12,7 +12,7 @@ import {
 ensureGlobalEnvironment();
 
 const { CountDistinct } = await import('../../js/solver/handlers.js');
-const { CellGeometry } = await import('../../js/grid_shape.js');
+const { CellGeometry } = await import('../../js/cell_geometry.js');
 
 const noExclusions = (numCells) => createCellExclusions({ numCells, allUnique: false });
 

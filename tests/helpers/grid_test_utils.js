@@ -9,7 +9,7 @@ if (typeof g.VERSION_PARAM === 'undefined') {
 }
 
 const { LookupTables } = await import('../../js/solver/lookup_tables.js');
-const { CellGeometry } = await import('../../js/grid_shape.js');
+const { CellGeometry } = await import('../../js/cell_geometry.js');
 const { CellExclusions } = await import('../../js/solver/engine.js');
 
 const DEFAULT_NUM_VALUES = 9;

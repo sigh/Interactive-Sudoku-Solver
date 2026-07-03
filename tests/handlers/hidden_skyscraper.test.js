@@ -215,7 +215,7 @@ await runTest('HiddenSkyscraper should fail when target cannot be placed', () =>
 // Offset (0-indexed) tests
 // =============================================================================
 
-const { CellGeometry } = await import('../../js/grid_shape.js');
+const { CellGeometry } = await import('../../js/cell_geometry.js');
 
 await runTest('HiddenSkyscraper offset: external value 1 maps to internal 2 with offset -1', () => {
   // 0-indexed grid: external values 0-3, internal 1-4, offset=-1.

@@ -1,5 +1,5 @@
 const { SudokuConstraint } = await import('./sudoku_constraint.js' + self.VERSION_PARAM);
-const { CellGeometry, GEOMETRY_9x9 } = await import('./grid_shape.js' + self.VERSION_PARAM);
+const { CellGeometry, GEOMETRY_9x9 } = await import('./cell_geometry.js' + self.VERSION_PARAM);
 
 const FIRST_LETTER_CODE = 'A'.charCodeAt(0);
 

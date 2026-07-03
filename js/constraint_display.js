@@ -8,7 +8,7 @@ const {
 const { LineOptions, CellArgs } = await import('./sudoku_constraint.js' + self.VERSION_PARAM);
 const { createSvgElement, clearDOMNode } = await import('./util.js' + self.VERSION_PARAM);
 const { SudokuConstraint, SudokuConstraintBase } = await import('./sudoku_constraint.js' + self.VERSION_PARAM);
-const { CellGeometry, CellGraph } = await import('./grid_shape.js' + self.VERSION_PARAM);
+const { CellGeometry, CellGraph } = await import('./cell_geometry.js' + self.VERSION_PARAM);
 
 const constraintDisplayOrder = () => [
   DefaultRegions,

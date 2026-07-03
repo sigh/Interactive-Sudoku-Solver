@@ -120,7 +120,7 @@ await runTest('Rellik fails when forced naked-set values reach the sum', () => {
 // (toValue + valueOffset) from the external sum.
 // =============================================================================
 
-const { CellGeometry } = await import('../../js/grid_shape.js');
+const { CellGeometry } = await import('../../js/cell_geometry.js');
 
 await runTest('offset: forbidden external sum detected', () => {
   // 2 cells, external forbidden sum = 3, offset = -1.

@@ -338,7 +338,7 @@ await runTest('Lunchbox should accumulate changes', () => {
 // Offset (0-indexed) tests
 // =============================================================================
 
-const { CellGeometry } = await import('../../js/grid_shape.js');
+const { CellGeometry } = await import('../../js/cell_geometry.js');
 
 await runTest('offset: per-distance combinations adjust correctly', () => {
   // 4 cells (house), numValues=4, offset=-1. External 0-3, internal 1-4.

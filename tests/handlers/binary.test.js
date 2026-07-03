@@ -11,7 +11,7 @@ import {
 
 ensureGlobalEnvironment();
 
-const { CellGeometry } = await import('../../js/grid_shape.js');
+const { CellGeometry } = await import('../../js/cell_geometry.js');
 
 const { fnToBinaryKey, binaryKeyToFnString } = await import('../../js/sudoku_constraint.js');
 const { BinaryConstraint } = await import('../../js/solver/handlers.js');

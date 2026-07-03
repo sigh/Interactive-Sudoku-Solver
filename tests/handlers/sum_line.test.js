@@ -88,7 +88,7 @@ await runTest('forward pass propagation', () => {
 // Offset (0-indexed) tests
 // =============================================================================
 
-const { CellGeometry } = await import('../../js/grid_shape.js');
+const { CellGeometry } = await import('../../js/cell_geometry.js');
 
 await runTest('offset: external values used for partial sums', () => {
   // 2 cells, sum=3, offset=-1. External values 0-3.

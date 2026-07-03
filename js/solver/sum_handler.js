@@ -1,7 +1,7 @@
 const { memoize, MultiMap, countOnes16bit } = await import('../util.js' + self.VERSION_PARAM);
 const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM);
 const { SudokuConstraintHandler, HandlerUtil, InvalidConstraintError } = await import('./handlers.js' + self.VERSION_PARAM);
-const { GEOMETRY_MAX, GEOMETRY_9x9 } = await import('../grid_shape.js' + self.VERSION_PARAM);
+const { GEOMETRY_MAX, GEOMETRY_9x9 } = await import('../cell_geometry.js' + self.VERSION_PARAM);
 
 // Enforces a weighted linear equation `Σ coeff·value = sum` over the cells
 // (killer cages, arithmetic sums, equalities). See SUM.md for the full

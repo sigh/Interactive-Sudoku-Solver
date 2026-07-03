@@ -7,7 +7,7 @@ const {
   setIntersectSize,
 } = await import('./util.js' + self.VERSION_PARAM);
 const { toShortSolution } = await import('./sudoku_parser.js' + self.VERSION_PARAM);
-const { CellGeometry, CellGraph, GEOMETRY_9x9 } = await import('./grid_shape.js' + self.VERSION_PARAM);
+const { CellGeometry, CellGraph, GEOMETRY_9x9 } = await import('./cell_geometry.js' + self.VERSION_PARAM);
 
 export class DisplayItem {
   static SVG_PADDING = 29;

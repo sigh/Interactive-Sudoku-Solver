@@ -103,7 +103,7 @@ Use this table to choose the narrowest useful tests.
 
 | Change | Start with |
 | --- | --- |
-| Parser, serialization, or grid IDs | [general/sudoku_parser.test.js](general/sudoku_parser.test.js), [general/sudoku_constraint.test.js](general/sudoku_constraint.test.js), [general/grid_shape.test.js](general/grid_shape.test.js) |
+| Parser, serialization, or grid IDs | [general/sudoku_parser.test.js](general/sudoku_parser.test.js), [general/sudoku_constraint.test.js](general/sudoku_constraint.test.js), [general/cell_geometry.test.js](general/cell_geometry.test.js) |
 | Constraint-to-handler mapping | [solver/sudoku_builder.test.js](solver/sudoku_builder.test.js), [solver/sudoku_builder_or_and.test.js](solver/sudoku_builder_or_and.test.js) |
 | Handler propagation | The matching file in [handlers/](handlers/), plus [solver/handler_util.test.js](solver/handler_util.test.js) when shared helper behavior changes |
 | Search, candidate ordering, or exclusions | [solver/engine.test.js](solver/engine.test.js), [solver/candidate_selector_invariants.test.js](solver/candidate_selector_invariants.test.js), [solver/cell_exclusions.test.js](solver/cell_exclusions.test.js), [solver/conflict_scores.test.js](solver/conflict_scores.test.js) |

@@ -93,7 +93,7 @@ const storageMock = {
 globalThis.sessionStorage = storageMock;
 globalThis.localStorage = { ...storageMock, _data: new Map() };
 
-const { CellGeometry } = await import('../../js/grid_shape.js');
+const { CellGeometry } = await import('../../js/cell_geometry.js');
 const { SudokuConstraint } = await import('../../js/sudoku_constraint.js');
 const { ConstraintCategoryInput } = await import('../../js/constraint_input.js');
 

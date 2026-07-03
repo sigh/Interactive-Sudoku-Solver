@@ -6,7 +6,7 @@ import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 ensureGlobalEnvironment();
 
 const { SudokuConstraint } = await import('../../js/sudoku_constraint.js');
-const { GEOMETRY_9x9 } = await import('../../js/grid_shape.js');
+const { GEOMETRY_9x9 } = await import('../../js/cell_geometry.js');
 const { SudokuBuilder } = await import('../../js/solver/sudoku_builder.js');
 const HandlerModule = await import('../../js/solver/handlers.js');
 

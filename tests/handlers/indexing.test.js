@@ -410,7 +410,7 @@ await runTest('Indexing should fail when no index remains compatible (control ce
 // Offset (0-indexed) tests
 // =============================================================================
 
-const { CellGeometry } = await import('../../js/grid_shape.js');
+const { CellGeometry } = await import('../../js/cell_geometry.js');
 
 await runTest('Indexing offset: external value 2 with offset -1', () => {
   // 0-indexed: external values 0-4, offset=-1.

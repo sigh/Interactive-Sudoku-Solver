@@ -10,7 +10,7 @@ import {
 ensureGlobalEnvironment();
 
 const { GivenCandidates } = await import('../../js/solver/handlers.js');
-const { CellGeometry } = await import('../../js/grid_shape.js' + self.VERSION_PARAM);
+const { CellGeometry } = await import('../../js/cell_geometry.js' + self.VERSION_PARAM);
 
 await runTest('GivenCandidates should restrict cells to given candidates on init', () => {
   const context = new GridTestContext({ gridSize: 9 });

@@ -11,7 +11,7 @@ const {
   BitSet
 } = await import('../util.js' + self.VERSION_PARAM);
 const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM);
-const { GEOMETRY_MAX } = await import('../grid_shape.js' + self.VERSION_PARAM);
+const { GEOMETRY_MAX } = await import('../cell_geometry.js' + self.VERSION_PARAM);
 const { SudokuConstraintBase, fnToBinaryKey } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
 const { CandidateFinders } = await import('./candidate_selector.js' + self.VERSION_PARAM);
 

@@ -247,7 +247,7 @@ await runTest('ValueIndexing should update both value and control cells', () => 
 // ValueIndexing control cell uses shifted bits with offset.
 // =============================================================================
 
-const { CellGeometry } = await import('../../js/grid_shape.js');
+const { CellGeometry } = await import('../../js/cell_geometry.js');
 
 await runTest('ValueIndexing offset: control shifted with offset -1', () => {
   // With offset=-1, _controlShift=1. Allowed control bits 1-3 (internal 2-4).

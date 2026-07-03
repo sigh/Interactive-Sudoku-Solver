@@ -13,7 +13,7 @@ import {
 } from '../helpers/grid_test_utils.js';
 
 const { FullRank } = await import('../../js/solver/handlers.js');
-const { CellGeometry } = await import('../../js/grid_shape.js');
+const { CellGeometry } = await import('../../js/cell_geometry.js');
 
 //////////////////////////////////////////////////////////////////////////////
 // buildEntries tests

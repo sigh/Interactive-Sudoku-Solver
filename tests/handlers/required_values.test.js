@@ -286,7 +286,7 @@ await runTest('RequiredValues initialize: accepts more than 16 singleton exclusi
 // Tests – Offset (0-indexed) value translation
 // ===========================================================================
 
-const { CellGeometry } = await import('../../js/grid_shape.js');
+const { CellGeometry } = await import('../../js/cell_geometry.js');
 
 await runTest('RequiredValues offset: enforceConsistency finds hidden single with offset -1', () => {
   // 0-indexed: external values 0-3, offset=-1.

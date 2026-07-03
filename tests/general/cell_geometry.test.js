@@ -5,7 +5,7 @@ import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 
 ensureGlobalEnvironment();
 
-const { CellGeometry, CellGraph, GEOMETRY_9x9, GEOMETRY_MAX } = await import('../../js/grid_shape.js');
+const { CellGeometry, CellGraph, GEOMETRY_9x9, GEOMETRY_MAX } = await import('../../js/cell_geometry.js');
 
 // ============================================================================
 // CellGeometry.fromGridSize (square grids)

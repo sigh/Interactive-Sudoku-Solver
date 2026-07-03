@@ -6,7 +6,7 @@ import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 ensureGlobalEnvironment();
 
 const { SudokuParser, toShortSolution } = await import('../../js/sudoku_parser.js');
-const { CellGeometry, GEOMETRY_9x9 } = await import('../../js/grid_shape.js');
+const { CellGeometry, GEOMETRY_9x9 } = await import('../../js/cell_geometry.js');
 
 // Find all constraints of a given type (recursive).
 const findConstraints = (constraint, type) => {

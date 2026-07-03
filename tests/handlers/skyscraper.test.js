@@ -552,7 +552,7 @@ await runTest('Skyscraper should be idempotent', () => {
 // Offset (0-indexed) tests — zero only matters in the first cell
 // =============================================================================
 
-const { CellGeometry } = await import('../../js/grid_shape.js');
+const { CellGeometry } = await import('../../js/cell_geometry.js');
 
 await runTest('Skyscraper offset: visibility=1, zero in first cell should not count as visible', () => {
   // 0-indexed 4x4: external 0-3, internal 1-4, offset=-1.

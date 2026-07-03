@@ -11,7 +11,7 @@ import {
 
 ensureGlobalEnvironment();
 
-const { CellGeometry } = await import('../../js/grid_shape.js');
+const { CellGeometry } = await import('../../js/cell_geometry.js');
 const { DoppelgangerZero } = await import('../../js/solver/handlers.js');
 
 // DoppelgangerZero operates on a grid cell + 2-3 state cells.

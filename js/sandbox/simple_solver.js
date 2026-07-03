@@ -6,7 +6,7 @@
 const { SudokuParser, toShortSolution, valueToShortChar } = await import('../sudoku_parser.js' + self.VERSION_PARAM);
 const { SudokuConstraint } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
 const { SudokuBuilder } = await import('../solver/sudoku_builder.js' + self.VERSION_PARAM);
-const { CellGeometry } = await import('../grid_shape.js' + self.VERSION_PARAM);
+const { CellGeometry } = await import('../cell_geometry.js' + self.VERSION_PARAM);
 const { Timer } = await import('../util.js' + self.VERSION_PARAM);
 const { SolverStats } = await import('./solver_stats.js' + self.VERSION_PARAM);
 

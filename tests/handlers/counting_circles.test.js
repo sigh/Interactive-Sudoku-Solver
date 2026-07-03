@@ -70,7 +70,7 @@ await runTest('exact count fixes cells', () => {
 // Offset (0-indexed) tests
 // =============================================================================
 
-const { CellGeometry } = await import('../../js/grid_shape.js');
+const { CellGeometry } = await import('../../js/cell_geometry.js');
 
 await runTest('offset: init excludes external 0 and shifts combinations', () => {
   // 2 cells, offset=-1, numValues=4: external 0-3.

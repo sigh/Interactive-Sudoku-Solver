@@ -5,7 +5,7 @@ const {
   groupSortedBy,
   Base64Codec
 } = await import('./util.js' + self.VERSION_PARAM);
-const { CellGeometry, CellGraph, GEOMETRY_9x9, GEOMETRY_MAX } = await import('./grid_shape.js' + self.VERSION_PARAM);
+const { CellGeometry, CellGraph, GEOMETRY_9x9, GEOMETRY_MAX } = await import('./cell_geometry.js' + self.VERSION_PARAM);
 const { NFASerializer, javascriptSpecToNFA, nfaToJavascriptSpec } = await import('./nfa_builder.js' + self.VERSION_PARAM);
 
 export class CellArgs {

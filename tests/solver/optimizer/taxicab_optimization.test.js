@@ -7,7 +7,7 @@ ensureGlobalEnvironment();
 
 const { SudokuConstraintOptimizer } = await import('../../../js/solver/optimizer.js' + self.VERSION_PARAM);
 const HandlerModule = await import('../../../js/solver/handlers.js' + self.VERSION_PARAM);
-const { CellGeometry } = await import('../../../js/grid_shape.js' + self.VERSION_PARAM);
+const { CellGeometry } = await import('../../../js/cell_geometry.js' + self.VERSION_PARAM);
 const { HandlerSet } = await import('../../../js/solver/engine.js' + self.VERSION_PARAM);
 const { LookupTables } = await import('../../../js/solver/lookup_tables.js' + self.VERSION_PARAM);
 

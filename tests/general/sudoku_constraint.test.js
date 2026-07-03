@@ -5,7 +5,7 @@ import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 
 ensureGlobalEnvironment();
 
-const { CellGeometry } = await import('../../js/grid_shape.js');
+const { CellGeometry } = await import('../../js/cell_geometry.js');
 const { SudokuConstraintBase, SudokuConstraint } = await import('../../js/sudoku_constraint.js');
 
 // ============================================================================

@@ -14,7 +14,7 @@ const {
   binaryKeyToFnString,
   encodedNFAToJsSpec
 } = await import('./sudoku_constraint.js' + self.VERSION_PARAM);
-const { CellGeometry } = await import('./grid_shape.js' + self.VERSION_PARAM);
+const { CellGeometry } = await import('./cell_geometry.js' + self.VERSION_PARAM);
 
 export class CollapsibleContainer {
   constructor(element, defaultOpen) {
