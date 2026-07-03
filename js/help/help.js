@@ -234,6 +234,15 @@ const CATEGORY_CONFIGS = {
       When a group is selected, new constraints you create will be added to it.
     `
   },
+  'ChaosConstruction': {
+    description: 'Constraints specialized for Chaos Construction',
+    instructions: `
+      Enable "Chaos Construction" in the "Layouts" panel. This this enable a
+      "Chaos Construction" panel.
+      Select cells by click and dragging on the grid then select a constraint
+      from this panel.
+    `
+  },
   'Shape': {
     description: 'Overall grid size',
     instructions: `Select the grid shape using the "Shape" dropdown.`
