@@ -60,11 +60,11 @@ CELL IDENTIFIERS
     parseCellId('R3C4')  => { row: 3, col: 4 }
     makeCellId(3, 4)     => 'R3C4'
 
-GRID GEOMETRY
+CELL GEOMETRY
 
-    shape('6x6')         => GridShape (also accepts a Shape constraint, a
+    cellGeometry('6x6')  => GridShape (also accepts a Shape constraint, a
                             GridShape, or nothing for the default grid)
-    cellGraph('6x6')     => cell graph for the shape (same argument as shape()).
+    cellGraph('6x6')     => cell graph for the shape (same argument as cellGeometry()).
                             Its methods all work in cell ids:
       .neighbours(cell)        orthogonally-adjacent in-grid cells
       .step(cell, dR, dC)      the cell (dR, dC) away, or null off-grid
@@ -107,7 +107,7 @@ SOLVER
 CURRENT CONSTRAINT
 
   currentConstraint()   - returns the current constraint in the UI.
-  currentShape()        - returns the current shape in the UI.
+  currentCellGeometry() - returns the current shape in the UI.
 
 HELP
 

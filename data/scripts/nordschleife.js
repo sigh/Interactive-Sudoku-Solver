@@ -14,7 +14,7 @@
 const ON = 1;                  // loop-membership values, stored in the Var cells
 const OFF = 2;
 
-const gridShape = shape('9x9');
+const gridShape = cellGeometry('9x9');
 const graph = cellGraph(gridShape);
 
 // The loop-membership Var cell paired with a grid cell (VL1..VL81, in grid order).

@@ -308,11 +308,11 @@ await runTest('getSandboxExtraGlobals.currentConstraint returns null for non-str
   assert.equal(currentConstraint(), null);
 });
 
-await runTest('getSandboxExtraGlobals.currentShape returns shape', () => {
+await runTest('getSandboxExtraGlobals.currentCellGeometry returns shape', () => {
   const givens = '.Given~R1C1_5';
-  const { currentShape } = getSandboxExtraGlobals(givens);
+  const { currentCellGeometry } = getSandboxExtraGlobals(givens);
 
-  const shape = currentShape();
+  const shape = currentCellGeometry();
   assert.ok(shape);
   assert.equal(shape.numRows, 9);
 });

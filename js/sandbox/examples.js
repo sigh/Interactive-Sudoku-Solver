@@ -336,7 +336,7 @@ const ROTATE_GRID_FN = () => {
   // Rotates the shape and constraint argument that looks like a cell.
 
   const constraints = currentConstraint();
-  const shape = currentShape();
+  const shape = currentCellGeometry();
 
   const rotateCellId = (cellId) => {
     const { row, col } = parseCellId(cellId);

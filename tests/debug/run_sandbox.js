@@ -18,7 +18,7 @@
 //
 // Options:
 //   --current <str>    Constraint string exposed to currentConstraint() /
-//                      currentShape() (for scripts that transform the loaded
+//                      currentCellGeometry() (for scripts that transform the loaded
 //                      puzzle). Defaults to none.
 //   --raw              Print the return value as-is (via console.log) instead of
 //                      serializing it to a constraint string.
@@ -64,7 +64,7 @@ Source (pick one):
   --code <string>    Inline script source.
 
 Options:
-  --current <str>    Constraint string for currentConstraint()/currentShape().
+  --current <str>    Constraint string for currentConstraint()/currentCellGeometry().
   --raw              Print the return value as-is instead of serializing it.
   -h, --help         Print this help and exit.`);
 

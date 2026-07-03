@@ -22,7 +22,7 @@ const usesLeft = s => s === HORIZ || s === UL || s === DL;
 const usesRight = s => s === HORIZ || s === UR || s === DR;
 const isTurn = s => s >= UL;   // the four corners
 
-const gridShape = shape('9x9');
+const gridShape = cellGeometry('9x9');
 const graph = cellGraph(gridShape);
 const shapeCell = cell => `VS${gridShape.parseCellId(cell).cell + 1}`;
 const gridCells = Array.from({ length: gridShape.numGridCells },

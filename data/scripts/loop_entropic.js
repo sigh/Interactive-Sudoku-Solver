@@ -25,7 +25,7 @@ const OFF = 2;
 const bandOf = digit => (digit - 1) >> 1;
 const ALL_BANDS = 0b111;
 
-const gridShape = shape('6x6');
+const gridShape = cellGeometry('6x6');
 const graph = cellGraph(gridShape);
 
 // The loop-membership Var cell paired with a grid cell (VL1..VL36, in grid order).

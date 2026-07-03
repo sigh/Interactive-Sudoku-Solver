@@ -225,10 +225,10 @@ await runTest('runSandboxCode currentConstraint()', async () => {
   assert.equal(response.result.constraintStr, currentConstraintStr);
 });
 
-await runTest('runSandboxCode currentShape()', async () => {
+await runTest('runSandboxCode currentCellGeometry()', async () => {
   const currentConstraintStr = '.Shape~6x6';
   const code = `
-    const shape = currentShape();
+    const shape = currentCellGeometry();
     if (shape.numRows !== 6 || shape.numCols !== 6) {
       throw new Error('Unexpected shape');
     }

@@ -191,6 +191,6 @@ node tests/debug/run_sandbox.js --code 'return [new Shape("6x6"), new Given("R1C
 ```
 
 Use `--current <constraintString>` to populate `currentConstraint()` /
-`currentShape()` for scripts that transform the loaded puzzle. This is how the
+`currentCellGeometry()` for scripts that transform the loaded puzzle. This is how the
 `.iss` puzzle files under [`data/`](../../data/) are (re)generated from a sandbox
 script.

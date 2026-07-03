@@ -112,7 +112,7 @@ const makeCellId = (row, col) => SHAPE_MAX.makeCellId(row - 1, col - 1);
 //   - a grid spec string, e.g. '6x6'
 //   - a Shape constraint (or any object carrying a gridSpec)
 //   - nothing                           (the default grid)
-const shape = (shapeSpec) => {
+const cellGeometry = (shapeSpec) => {
   if (shapeSpec && typeof shapeSpec.cellGraph === 'function') return shapeSpec;
   const gridSpec = typeof shapeSpec === 'string' ? shapeSpec
     : shapeSpec && typeof shapeSpec === 'object' ? shapeSpec.gridSpec ?? null
@@ -175,9 +175,9 @@ class SandboxCellGraph {
   }
 }
 
-// A SandboxCellGraph for a shape. The argument is passed through shape(), so it
-// accepts a grid spec, Shape constraint, GridShape, or nothing for the default.
-const cellGraph = (shapeSpec) => new SandboxCellGraph(shape(shapeSpec));
+// A SandboxCellGraph for a shape. The argument is passed through cellGeometry(), so
+// it accepts a grid spec, Shape constraint, GridShape, or nothing for the default.
+const cellGraph = (shapeSpec) => new SandboxCellGraph(cellGeometry(shapeSpec));
 
 const parseConstraint = (str) => {
   const parsed = SudokuParser.parseString(str);
@@ -308,7 +308,7 @@ export const SANDBOX_GLOBALS = {
   parseConstraint,
   parseCellId,
   makeCellId,
-  shape,
+  cellGeometry,
   cellGraph,
   solverLink,
   help,
@@ -347,9 +347,9 @@ export const getSandboxExtraGlobals = (currentConstraintStr) => {
     return [parsedConstraint];
   };
 
-  const currentShape = () => {
+  const currentCellGeometry = () => {
     return parseConstraint()?.getShape();
   };
 
-  return { currentConstraint, currentShape };
+  return { currentConstraint, currentCellGeometry };
 };
