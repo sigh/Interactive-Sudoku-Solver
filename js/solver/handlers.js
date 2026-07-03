@@ -2748,15 +2748,14 @@ export class CountingCircles extends SudokuConstraintHandler {
 
     const exclusionGroups = HandlerUtil.findExclusionGroups(
       this.cells, cellExclusions).groups;
-    if (exclusionGroups.length > 16) {
-      throw new Error(
-        `CountingCircles supports cells spanning up to 16 regions, got ${exclusionGroups.length}`);
-    }
 
     // Restrict values to the possible sums.
-    // We can't have more values than exclusion groups.
     let allowedValues = combinations.reduce((a, b) => a | b, 0);
-    allowedValues &= (1 << (exclusionGroups.length - valueOffset)) - 1;
+    // We can't have more values than exclusion groups.
+    const countFromExclusionsGroups = exclusionGroups.length - valueOffset;
+    if (countFromExclusionsGroups <= numValues) {
+      allowedValues &= (1 << countFromExclusionsGroups) - 1;
+    }
 
     for (let i = 0; i < numCells; i++) {
       if (!(initialGridCells[this.cells[i]] &= allowedValues)) return false;
@@ -2764,17 +2763,13 @@ export class CountingCircles extends SudokuConstraintHandler {
     this._combinations = new Uint16Array(combinations);
     this._numValues = numValues;
 
-    this._exclusionMap = new Uint16Array(this.cells.length);
     this._exclusionGroups = exclusionGroups;
-    for (let i = 0; i < exclusionGroups.length; i++) {
-      for (const cell of exclusionGroups[i]) {
-        this._exclusionMap[this.cells.indexOf(cell)] = 1 << i;
-      }
-    }
+    this._exclusionGroupsSeen = new Uint16Array(exclusionGroups.length);
 
     // Complements to the exclusions groups.
+    // Only for non-singletons, as the complements are otherwise unused.
     this._exclusionComplements = exclusionGroups.map(
-      g => cellExclusions.getListExclusions(g));
+      g => g.length > 1 ? cellExclusions.getListExclusions(g) : null);
 
     return true;
   }
@@ -2824,29 +2819,39 @@ export class CountingCircles extends SudokuConstraintHandler {
 
     // Count each possible value and restrict cells.
     const valueOffset = this._valueOffset;
-    const exclusionMap = this._exclusionMap;
+    const groups = this._exclusionGroups;
+    const groupsLen = groups.length;
+    const groupsSeen = this._exclusionGroupsSeen;
     // Iterate in reverse order as larger numbers are more constrained.
-    for (let j = this._numValues + valueOffset; j > 0; j--) {
-      const v = LookupTables.fromOffsetValue(j, valueOffset);
-      if (!(v & allowedValues)) continue;
+    while (allowedValues) {
+      let value = LookupTables.maxValue(allowedValues);
+      const v = LookupTables.fromValue(value);
+      value += valueOffset;
+      allowedValues ^= v;
 
       let totalCount = 0;
       let fixedCount = 0;
-      let vExclusionGroups = 0;
-      for (let i = 0; i < numCells; i++) {
-        if (grid[cells[i]] & v) {
-          totalCount++;
-          fixedCount += (grid[cells[i]] === v);
-          vExclusionGroups |= exclusionMap[i];
+      let numExclusionGroups = 0;
+      for (let i = 0; i < groupsLen; i++) {
+        let count = 0;
+        const group = groups[i];
+        for (let k = 0; k < group.length; k++) {
+          if (grid[group[k]] & v) {
+            fixedCount += (grid[group[k]] === v);
+            count++;
+          }
+        }
+        if (count) {
+          totalCount += count;
+          groupsSeen[numExclusionGroups++] = i;
         }
       }
-      const numExclusionGroups = countOnes16bit(vExclusionGroups);
 
-      if (fixedCount > j) {
+      if (fixedCount > value) {
         // There are too many fixed values.
         return false;
       }
-      if (numExclusionGroups < j) {
+      if (numExclusionGroups < value) {
         // If there are too few exclusion groups, then we can't have this value.
         // If the value is required, then this is a conflict.
         if (v & requiredValues) {
@@ -2856,7 +2861,7 @@ export class CountingCircles extends SudokuConstraintHandler {
             if (!(grid[cells[i]] &= ~v)) return false;
           }
         }
-      } else if (totalCount === j) {
+      } else if (totalCount === value) {
         // If we have the exact count and the value is required,
         // then we can fix the values.
         if (v & requiredValues & unfixedValues) {
@@ -2866,25 +2871,25 @@ export class CountingCircles extends SudokuConstraintHandler {
             }
           }
         }
-      } else if (numExclusionGroups === j && (v & requiredValues & unfixedValues)) {
+      } else if (numExclusionGroups === value && (v & requiredValues & unfixedValues)) {
         // If there is an exact number of exclusion groups, then check if
         // any have just a single cell and hence can be fixed.
-        while (vExclusionGroups) {
-          const vGroup = vExclusionGroups & -vExclusionGroups;
-          vExclusionGroups ^= vGroup;
-          const groupIndex = LookupTables.toIndex(vGroup);
-          const group = this._exclusionGroups[groupIndex];
-          let uniqueCell = 0;
-          let count = 0;
+        for (let i = 0; i < numExclusionGroups; i++) {
+          const groupIndex = groupsSeen[i];
+          const group = groups[groupIndex];
+          let uniqueCell = -1;
           for (let k = 0; k < group.length; k++) {
             const cell = group[k];
             if (grid[cell] & v) {
-              if (++count > 1) break;
+              if (uniqueCell >= 0) {
+                uniqueCell = -1;
+                break;
+              }
               uniqueCell = cell;
             }
           }
 
-          if (count === 1) {
+          if (uniqueCell >= 0) {
             // If it's unique, then we can fix the value.
             grid[uniqueCell] = v;
           } else {

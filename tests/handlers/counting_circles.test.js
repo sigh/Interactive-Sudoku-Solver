@@ -67,16 +67,6 @@ await runTest('exact count fixes cells', () => {
   assert.equal(grid[1], valueMask(2));
 });
 
-await runTest('throws with more than 16 exclusion groups', () => {
-  const context = new GridTestContext({ gridSize: 9, numValues: 9 });
-  const cells = Array.from({ length: 17 }, (_, i) => i);
-  const handler = new CountingCircles(cells);
-
-  assert.throws(() => {
-    context.initializeHandler(handler, { cellExclusions: noExclusions(context.shape.numGridCells) });
-  }, { name: 'Error' });
-});
-
 // Offset (0-indexed) tests
 // =============================================================================
 
@@ -166,6 +156,34 @@ await runTest('CountingCircles works when cells have fewer values than numValues
   assert.equal(handler.enforceConsistency(grid, acc), true);
   assert.equal(grid[0], valueMask(2));
   assert.equal(grid[1], valueMask(2));
+});
+
+// =============================================================================
+// Exclusion groups beyond the old 16-group limit
+// =============================================================================
+
+await runTest('works with more than 16 exclusion groups', () => {
+  // 17 cells (own singleton exclusion groups), numValues=16. The only combo
+  // summing to numCells=17 restricted to {1, 16} is {1, 16}: value 16 must
+  // occur 16 times and value 1 once. 16 cells are already fixed to 16; the
+  // 17th still allows {1, 16} and should be forced down to 1.
+  const shape = GridShape.fromGridSize(2, 9, 16);
+  const context = new GridTestContext({ shape });
+  const cells = Array.from({ length: 17 }, (_, i) => i);
+  const handler = new CountingCircles(cells);
+
+  for (let i = 0; i < 16; i++) {
+    context.grid[i] = valueMask(16);
+  }
+  context.grid[16] = valueMask(1, 16);
+
+  context.initializeHandler(
+    handler, { cellExclusions: noExclusions(context.shape.numGridCells) });
+
+  const grid = context.grid;
+  const acc = createAccumulator();
+  assert.equal(handler.enforceConsistency(grid, acc), true);
+  assert.equal(grid[16], valueMask(1));
 });
 
 logSuiteComplete('counting_circles.test.js');
