@@ -33,7 +33,7 @@ await runTest('_optimizeTaxicab: creates region handler for grid-house sized Per
   optimizer._optimizeTaxicab(handlerSet, createExclusions(numCells), geometry);
 
   const regionHandlers = handlerSet.getAllofType(
-    HandlerModule.ValueDependentUniqueValueExclusionForPerfectAllDifferent);
+    HandlerModule.PerfectAllDifferentValueExclusion);
   assert.equal(regionHandlers.length, 1);
   assert.deepEqual([...regionHandlers[0].cells], houseCells);
 });
@@ -53,7 +53,7 @@ await runTest('_optimizeTaxicab: no-op when no taxicab handlers are present', ()
   optimizer._optimizeTaxicab(handlerSet, createExclusions(numCells), geometry);
 
   const regionHandlers = handlerSet.getAllofType(
-    HandlerModule.ValueDependentUniqueValueExclusionForPerfectAllDifferent);
+    HandlerModule.PerfectAllDifferentValueExclusion);
   assert.equal(regionHandlers.length, 0);
 });
 
@@ -72,7 +72,7 @@ await runTest('_optimizeTaxicab: ignores plain AllDifferent handlers', () => {
   optimizer._optimizeTaxicab(handlerSet, createExclusions(numCells), geometry);
 
   const regionHandlers = handlerSet.getAllofType(
-    HandlerModule.ValueDependentUniqueValueExclusionForPerfectAllDifferent);
+    HandlerModule.PerfectAllDifferentValueExclusion);
   assert.equal(regionHandlers.length, 0);
 });
 
@@ -92,7 +92,7 @@ await runTest('_optimizeTaxicab: creates region handler for PerfectAllDifferent'
   optimizer._optimizeTaxicab(handlerSet, createExclusions(numCells), geometry);
 
   const regionHandlers = handlerSet.getAllofType(
-    HandlerModule.ValueDependentUniqueValueExclusionForPerfectAllDifferent);
+    HandlerModule.PerfectAllDifferentValueExclusion);
   assert.equal(regionHandlers.length, 1);
   assert.deepEqual([...regionHandlers[0].cells], padCells);
 });
@@ -117,7 +117,7 @@ await runTest('_optimizeTaxicab: creates region handlers for mixed PerfectAllDif
   optimizer._optimizeTaxicab(handlerSet, createExclusions(numCells), geometry);
 
   const regionHandlers = handlerSet.getAllofType(
-    HandlerModule.ValueDependentUniqueValueExclusionForPerfectAllDifferent);
+    HandlerModule.PerfectAllDifferentValueExclusion);
   assert.equal(regionHandlers.length, 2);
 
   const actual = regionHandlers
@@ -153,7 +153,7 @@ await runTest('_optimizeTaxicab: PerfectAllDifferent region handler propagates r
   optimizer._optimizeTaxicab(handlerSet, createExclusions(numCells), geometry);
 
   const regionHandlers = handlerSet.getAllofType(
-    HandlerModule.ValueDependentUniqueValueExclusionForPerfectAllDifferent);
+    HandlerModule.PerfectAllDifferentValueExclusion);
   assert.equal(regionHandlers.length, 1);
 
   const allValues = LookupTables.allValues(geometry.numValues);
@@ -200,7 +200,7 @@ await runTest('_optimizeTaxicab: propagation works for non-1 values', () => {
   optimizer._optimizeTaxicab(handlerSet, createExclusions(numCells), geometry);
 
   const regionHandler = handlerSet.getAllofType(
-    HandlerModule.ValueDependentUniqueValueExclusionForPerfectAllDifferent)[0];
+    HandlerModule.PerfectAllDifferentValueExclusion)[0];
   assert.ok(regionHandler);
 
   const allValues = LookupTables.allValues(geometry.numValues);
@@ -241,7 +241,7 @@ await runTest('_optimizeTaxicab: does not modify grid when no value appears exac
   optimizer._optimizeTaxicab(handlerSet, createExclusions(numCells), geometry);
 
   const regionHandler = handlerSet.getAllofType(
-    HandlerModule.ValueDependentUniqueValueExclusionForPerfectAllDifferent)[0];
+    HandlerModule.PerfectAllDifferentValueExclusion)[0];
   assert.ok(regionHandler);
 
   const allValues = LookupTables.allValues(geometry.numValues);

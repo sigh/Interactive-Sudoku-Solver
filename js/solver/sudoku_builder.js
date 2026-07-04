@@ -36,7 +36,7 @@ export class SudokuBuilder {
     yield* this._rowColHandlers(geometry);
 
     const boxRegions = this._getBoxRegions(geometry, constraintMap);
-    yield new HandlerModule.BoxInfo(boxRegions);
+    yield new HandlerModule.BoxRegionInfo(boxRegions);
     yield* this._boxHandlers(boxRegions);
 
     yield* this._constraintHandlers(constraintMap, geometry);
@@ -898,9 +898,9 @@ export class SudokuBuilder {
           }
           break;
 
-        case 'Priority':
+        case 'SearchPriority':
           cells = constraint.cells.map(c => geometry.parseCellId(c).cell);
-          yield new HandlerModule.Priority(cells, constraint.priority);
+          yield new HandlerModule.SearchPriority(cells, constraint.priority);
           break;
 
         case 'Or':

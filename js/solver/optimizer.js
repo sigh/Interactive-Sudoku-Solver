@@ -55,8 +55,8 @@ export class SudokuConstraintOptimizer {
   }
 
   optimize(handlerSet, cellExclusions, geometry) {
-    const boxInfo = handlerSet.getAllofType(HandlerModule.BoxInfo)[0];
-    const boxRegions = boxInfo?.boxRegions() || [];
+    const boxRegionInfo = handlerSet.getAllofType(HandlerModule.BoxRegionInfo)[0];
+    const boxRegions = boxRegionInfo?.boxRegions() || [];
 
     this._addExtraCellExclusions(handlerSet, cellExclusions, geometry);
 
@@ -117,7 +117,7 @@ export class SudokuConstraintOptimizer {
 
     this._boostLinkedCellPriorities(priorities, handlerSet, geometry);
 
-    for (const handler of handlerSet.getAllofType(HandlerModule.Priority)) {
+    for (const handler of handlerSet.getAllofType(HandlerModule.SearchPriority)) {
       for (const cell of handler.priorityCells()) {
         priorities[cell] = handler.priority(geometry);
       }
@@ -1639,7 +1639,7 @@ export class SudokuConstraintOptimizer {
     }
 
     for (const h of handlerSet.getAllofType(HandlerModule.PerfectAllDifferent)) {
-      const newHandler = new HandlerModule.ValueDependentUniqueValueExclusionForPerfectAllDifferent(
+      const newHandler = new HandlerModule.PerfectAllDifferentValueExclusion(
         h.cells, valueCellExclusions);
       handlerSet.add(newHandler);
       this._logAddHandler('_optimizeTaxicab', newHandler);

@@ -2807,7 +2807,7 @@ export class SudokuConstraint {
     }
   }
 
-  static Priority = class Priority extends SudokuConstraintBase {
+  static SearchPriority = class SearchPriority extends SudokuConstraintBase {
     static DESCRIPTION = (
       "Assigns a priority level to cells for solving order.");
     static ARGUMENT_CONFIG = {

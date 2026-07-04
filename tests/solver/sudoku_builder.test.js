@@ -97,10 +97,10 @@ await runTest('resolveConstraint resolves composite Container', () => {
 await runTest('default 9x9 produces row and column AllDifferent handlers', () => {
   const constraint = new SudokuConstraint.Container([]);
   const handlers = buildHandlers(constraint);
-  // 9 rows + 9 cols + 9 boxes = 27 AllDifferent, plus BoxInfo.
+  // 9 rows + 9 cols + 9 boxes = 27 AllDifferent, plus BoxRegionInfo.
   const adCount = countHandlers(handlers, 'AllDifferent');
   assert.equal(adCount, 27, `Expected 27 AllDifferent, got ${adCount}`);
-  assert.ok(hasHandler(handlers, 'BoxInfo'));
+  assert.ok(hasHandler(handlers, 'BoxRegionInfo'));
 });
 
 await runTest('4x4 produces correct number of AllDifferent handlers', () => {
@@ -547,16 +547,16 @@ await runTest('ChaosConstruction solves through builder with canonical labels', 
 });
 
 // ============================================================================
-// Priority
+// SearchPriority
 // ============================================================================
 
-await runTest('Priority constraint produces Priority handler', () => {
+await runTest('SearchPriority constraint produces SearchPriority handler', () => {
   const constraint = new SudokuConstraint.Container([
-    new SudokuConstraint.Priority(5, 'R1C1', 'R1C2'),
+    new SudokuConstraint.SearchPriority(5, 'R1C1', 'R1C2'),
   ]);
   const handlers = buildHandlers(constraint);
-  assert.ok(hasHandler(handlers, 'Priority'));
-  const priorityHandler = handlers.find(h => h.constructor.name === 'Priority');
+  assert.ok(hasHandler(handlers, 'SearchPriority'));
+  const priorityHandler = handlers.find(h => h.constructor.name === 'SearchPriority');
   assert.equal(priorityHandler.priority(), 5);
   assert.equal(priorityHandler.priorityCells().length, 2);
 });

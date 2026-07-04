@@ -14,7 +14,7 @@ import {
 ensureGlobalEnvironment();
 
 const {
-  ValueDependentUniqueValueExclusionForPerfectAllDifferent,
+  PerfectAllDifferentValueExclusion,
 } = await import('../../js/solver/handlers.js');
 
 // Build a valueCellExclusions array of length numValues.
@@ -36,7 +36,7 @@ const buildExclusions = (numValues, numCells, pairExclusionsByValueIndex) => {
 };
 
 // =============================================================================
-// ValueDependentUniqueValueExclusionForPerfectAllDifferent tests
+// PerfectAllDifferentValueExclusion tests
 // =============================================================================
 
 await runTest('removes value from pair-exclusion cells when value appears in exactly two region cells', () => {
@@ -48,7 +48,7 @@ await runTest('removes value from pair-exclusion cells when value appears in exa
   const valueCellExclusions = buildExclusions(9, 81, {
     0: [{ cells: [0, 1], excludes: [20] }],
   });
-  const handler = new ValueDependentUniqueValueExclusionForPerfectAllDifferent(
+  const handler = new PerfectAllDifferentValueExclusion(
     regionCells, valueCellExclusions);
 
   const grid = context.grid;
@@ -69,7 +69,7 @@ await runTest('no-op when value does not appear in any region cell', () => {
   const valueCellExclusions = buildExclusions(9, 81, {
     0: [{ cells: [0, 1], excludes: [20] }],
   });
-  const handler = new ValueDependentUniqueValueExclusionForPerfectAllDifferent(
+  const handler = new PerfectAllDifferentValueExclusion(
     regionCells, valueCellExclusions);
 
   const grid = context.grid;
@@ -92,7 +92,7 @@ await runTest('no-op when value appears in exactly one region cell', () => {
   const valueCellExclusions = buildExclusions(9, 81, {
     0: [{ cells: [0], excludes: [20] }],
   });
-  const handler = new ValueDependentUniqueValueExclusionForPerfectAllDifferent(
+  const handler = new PerfectAllDifferentValueExclusion(
     regionCells, valueCellExclusions);
 
   const grid = context.grid;
@@ -115,7 +115,7 @@ await runTest('no-op when value appears in three or more region cells', () => {
   const valueCellExclusions = buildExclusions(9, 81, {
     0: [{ cells: [0, 1], excludes: [20] }],
   });
-  const handler = new ValueDependentUniqueValueExclusionForPerfectAllDifferent(
+  const handler = new PerfectAllDifferentValueExclusion(
     regionCells, valueCellExclusions);
 
   const grid = context.grid;
@@ -138,7 +138,7 @@ await runTest('returns false when value removal empties an exclusion cell', () =
   const valueCellExclusions = buildExclusions(9, 81, {
     0: [{ cells: [0, 1], excludes: [20] }],
   });
-  const handler = new ValueDependentUniqueValueExclusionForPerfectAllDifferent(
+  const handler = new PerfectAllDifferentValueExclusion(
     regionCells, valueCellExclusions);
 
   const grid = context.grid;
@@ -162,7 +162,7 @@ await runTest('handles multiple values independently — each fires its own excl
     0: [{ cells: [0, 1], excludes: [20] }],
     1: [{ cells: [2, 3], excludes: [21] }],
   });
-  const handler = new ValueDependentUniqueValueExclusionForPerfectAllDifferent(
+  const handler = new PerfectAllDifferentValueExclusion(
     regionCells, valueCellExclusions);
 
   const grid = context.grid;
@@ -184,7 +184,7 @@ await runTest('reports touched cells in the accumulator', () => {
   const valueCellExclusions = buildExclusions(9, 81, {
     0: [{ cells: [0, 1], excludes: [20, 21] }],
   });
-  const handler = new ValueDependentUniqueValueExclusionForPerfectAllDifferent(
+  const handler = new PerfectAllDifferentValueExclusion(
     regionCells, valueCellExclusions);
 
   const grid = context.grid;
@@ -207,7 +207,7 @@ await runTest('no grid changes when pair has no registered exclusions', () => {
   const regionCells = [0, 1, 2, 3];
   // Empty exclusions for all values.
   const valueCellExclusions = buildExclusions(9, 81, {});
-  const handler = new ValueDependentUniqueValueExclusionForPerfectAllDifferent(
+  const handler = new PerfectAllDifferentValueExclusion(
     regionCells, valueCellExclusions);
 
   const grid = context.grid;
@@ -232,7 +232,7 @@ await runTest('fires for non-consecutive region cells using correct pairIndex en
   const valueCellExclusions = buildExclusions(9, 81, {
     2: [{ cells: [5, 10], excludes: [50] }],
   });
-  const handler = new ValueDependentUniqueValueExclusionForPerfectAllDifferent(
+  const handler = new PerfectAllDifferentValueExclusion(
     regionCells, valueCellExclusions);
 
   const grid = context.grid;
@@ -254,7 +254,7 @@ await runTest('does not touch exclusion cell when it does not hold the value', (
   const valueCellExclusions = buildExclusions(9, 81, {
     0: [{ cells: [0, 1], excludes: [20] }],
   });
-  const handler = new ValueDependentUniqueValueExclusionForPerfectAllDifferent(
+  const handler = new PerfectAllDifferentValueExclusion(
     regionCells, valueCellExclusions);
 
   const grid = context.grid;

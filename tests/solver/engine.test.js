@@ -12,7 +12,7 @@ const { SudokuSolver, HandlerSet } = await import('../../js/solver/engine.js');
 const {
   SudokuConstraintHandler,
   AllDifferent,
-  Priority,
+  SearchPriority,
   UniqueValueExclusion,
 } = await import('../../js/solver/handlers.js');
 
@@ -315,7 +315,7 @@ await runTest('cell priorities sum handler priorities and apply explicit overrid
   const solver = new SudokuSolver([
     new FixedPriorityHandler([0, 1], 4),
     new FixedPriorityHandler([1, 2], 3),
-    new Priority([1, 3], 12),
+    new SearchPriority([1, 3], 12),
   ], geometry);
 
   const priorities = solver._internalSolver._cellPriorities;

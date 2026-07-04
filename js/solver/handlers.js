@@ -86,7 +86,7 @@ export class SudokuConstraintHandler {
 }
 
 // This handler purely exists to pass information about boxes to the optimizer.
-export class BoxInfo extends SudokuConstraintHandler {
+export class BoxRegionInfo extends SudokuConstraintHandler {
   constructor(boxRegions) {
     super();
     this._boxRegions = boxRegions;
@@ -99,7 +99,7 @@ export class BoxInfo extends SudokuConstraintHandler {
 
 // This handler purely exists to manually adjust the priorities of cells to
 // adjust initial cell selection.
-export class Priority extends SudokuConstraintHandler {
+export class SearchPriority extends SudokuConstraintHandler {
   constructor(cells, priority) {
     // Don't register cells, so that this handler doesn't get added to the cells
     // and is not invoked during solving or any other calculations.
@@ -335,7 +335,7 @@ export class ValueDependentUniqueValueExclusion extends SudokuConstraintHandler 
   }
 }
 
-export class ValueDependentUniqueValueExclusionForPerfectAllDifferent extends SudokuConstraintHandler {
+export class PerfectAllDifferentValueExclusion extends SudokuConstraintHandler {
   constructor(cells, valueCellExclusions) {
     super(cells);
     this._valueCellExclusions = valueCellExclusions;
