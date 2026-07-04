@@ -123,7 +123,7 @@ export class SudokuConstraintBase {
     return cMap.getMap();
   }
 
-  getShape() {
+  getGeometry() {
     let shapeSpec = null;
     this.forEachTopLevel(c => {
       if (c.type === 'Shape') shapeSpec = c.shapeSpec;

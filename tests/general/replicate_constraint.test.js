@@ -58,11 +58,11 @@ await runTest('Replicate should replicate child constraints onto targets', () =>
   ]);
 
   const resolved = SudokuBuilder.resolveConstraint(root);
-  const resolvedShape = resolved.getShape();
+  const resolvedGeometry = resolved.getGeometry();
   const constraintMap = resolved.toMap();
-  resolvedShape.addVarCellsForConstraints([].concat(...constraintMap.values()));
+  resolvedGeometry.addVarCellsForConstraints([].concat(...constraintMap.values()));
 
-  const handlers = [...SudokuBuilder._handlers(constraintMap, resolvedShape)];
+  const handlers = [...SudokuBuilder._handlers(constraintMap, resolvedGeometry)];
   const givenHandlers = handlers.filter(h => h instanceof HandlerModule.GivenCandidates);
 
   const cellToValues = new Map();
@@ -91,11 +91,11 @@ await runTest('Replicate does not enforce template when target is not in bitset'
   ]);
 
   const resolved = SudokuBuilder.resolveConstraint(root);
-  const resolvedShape = resolved.getShape();
+  const resolvedGeometry = resolved.getGeometry();
   const constraintMap = resolved.toMap();
-  resolvedShape.addVarCellsForConstraints([].concat(...constraintMap.values()));
+  resolvedGeometry.addVarCellsForConstraints([].concat(...constraintMap.values()));
 
-  const handlers = [...SudokuBuilder._handlers(constraintMap, resolvedShape)];
+  const handlers = [...SudokuBuilder._handlers(constraintMap, resolvedGeometry)];
   const givenHandlers = handlers.filter(h => h instanceof HandlerModule.GivenCandidates);
 
   const cellToValues = new Map();

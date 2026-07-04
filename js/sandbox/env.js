@@ -349,7 +349,7 @@ export const getSandboxExtraGlobals = (currentConstraintStr) => {
   };
 
   const currentCellGeometry = () => {
-    return parseConstraint()?.getShape();
+    return parseConstraint()?.getGeometry();
   };
 
   return { currentConstraint, currentCellGeometry };

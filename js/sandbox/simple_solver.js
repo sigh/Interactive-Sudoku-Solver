@@ -49,7 +49,7 @@ export class SimpleSolver {
     const setupTimeMs = timer.elapsedMs();
     return {
       solver,
-      geometry: constraints.getShape(),
+      geometry: constraints.getGeometry(),
       captureState: () => {
         const state = solver.state?.();
         if (state) state.puzzleSetupTime = setupTimeMs;

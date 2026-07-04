@@ -104,7 +104,7 @@ const resolveLadder = (spec) => {
     throw new Error(`ladder counts must be positive integers (e.g. @25-15-5): ${spec}`);
   }
   const puzzle = findExample(name);
-  const geometry = SudokuParser.parseText(resolveInput(puzzle.input)).getShape();
+  const geometry = SudokuParser.parseText(resolveInput(puzzle.input)).getGeometry();
   return buildSolutionGivenLadder(puzzle, geometry.numRows, geometry.numCols, counts);
 };
 
@@ -205,7 +205,7 @@ const solutionString = (grid, geometry) => {
 // runs after build but before search, e.g. to install method wrappers.
 export const runSolve = (puzzle, { maxBacktracks, maxSolutions }, onSolver) => {
   const constraint = SudokuParser.parseText(resolveInput(puzzle.input));
-  const geometry = constraint.getShape();
+  const geometry = constraint.getGeometry();
   // Reconstruct constraint instances from their type+args, as the worker and
   // SimpleSolver do after a constraint crosses a serialization boundary. A no-op
   // for a freshly parsed constraint; kept so this path matches production.

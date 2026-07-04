@@ -11,7 +11,7 @@ const { InvalidConstraintError } = HandlerModule;
 
 export class SudokuBuilder {
   static build(constraint, debugOptions) {
-    const geometry = constraint.getShape();
+    const geometry = constraint.getGeometry();
     const constraintMap = constraint.toMap();
     // The geometry enforces the cell-count limit here (throws if too many cells).
     geometry.addVarCellsForConstraints([].concat(...constraintMap.values()));

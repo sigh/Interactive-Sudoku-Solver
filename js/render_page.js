@@ -909,7 +909,7 @@ class ConstraintManager {
 
     this.clear();
 
-    const geometry = constraint.getShape();
+    const geometry = constraint.getGeometry();
     this._rootCollection.setShape(geometry);
 
     // Add var-cell-defining constraints first so their cell IDs are

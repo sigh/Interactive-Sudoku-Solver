@@ -4027,7 +4027,7 @@ export class Or extends SudokuConstraintHandler {
     this._resultGrid = null;
     this._handlers = handlers;
     this._initializations = [];
-    this._numShapeCells = 0;
+    this._numSearchCells = 0;
     this._stateOffset = 0;
     this._numHandlerStates = 0;
     this._dummyHandlerAccumulator = new DummyHandlerAccumulator();
@@ -4077,7 +4077,7 @@ export class Or extends SudokuConstraintHandler {
 
   initialize(initialGridCells, cellExclusions, geometry, stateAllocator) {
     const scratchGrid = initialGridCells.slice();
-    const numShapeCells = geometry.totalCells();
+    const numSearchCells = geometry.totalCells();
 
     // Initialize each handler and store any initialization changes that it
     // makes.
@@ -4092,7 +4092,7 @@ export class Or extends SudokuConstraintHandler {
       }
 
       const initialization = [];
-      for (let i = 0; i < numShapeCells; i++) {
+      for (let i = 0; i < numSearchCells; i++) {
         if (scratchGrid[i] !== initialGridCells[i]) {
           initialization.push(i, scratchGrid[i]);
           initializationCells.add(i);
@@ -4106,7 +4106,7 @@ export class Or extends SudokuConstraintHandler {
     if (validHandlers.length === 0) return false;
 
     this._handlers = validHandlers;
-    this._numShapeCells = numShapeCells;
+    this._numSearchCells = numSearchCells;
 
     // state = [finalHandlerIndex|numRemainingHandlers, ...handlerStates]
     // For state[0] The 16th bit is a flag which determine if we are counting
@@ -4159,7 +4159,7 @@ export class Or extends SudokuConstraintHandler {
         grid, handlerAccumulator);
     }
 
-    const numShapeCells = this._numShapeCells;
+    const numSearchCells = this._numSearchCells;
 
     const resultGrid = this._resultGrid;
     const scratchGrid = this._scratchGrid;
@@ -4183,11 +4183,11 @@ export class Or extends SudokuConstraintHandler {
         continue;
       }
 
-      for (let j = 0; j < numShapeCells; j++) {
+      for (let j = 0; j < numSearchCells; j++) {
         resultGrid[j] |= scratchGrid[j];
       }
       // Handler state is written directly to the grid.
-      for (let j = numShapeCells; j < grid.length; j++) {
+      for (let j = numSearchCells; j < grid.length; j++) {
         grid[j] = scratchGrid[j];
       }
     }
@@ -4196,7 +4196,7 @@ export class Or extends SudokuConstraintHandler {
     if (resultGrid[0] === 0) return false;
 
     // Only copy the cells. The state has already been directly copied.
-    for (let j = 0; j < numShapeCells; j++) {
+    for (let j = 0; j < numSearchCells; j++) {
       grid[j] = resultGrid[j];
     }
     return true;
