@@ -52,36 +52,23 @@ const parityCountSpec = {
 
 const parityCountNFA = NFA.encodeSpec(parityCountSpec, 9);
 
-// Helpers
-
-const ccToGrid = (ccId) => {
-  const n = +ccId.slice(2) - 1;
-  return `R${Math.floor(n / 9) + 1}C${(n % 9) + 1}`;
-};
-
-const gridToCC = (cellId) => {
-  const { row, col } = parseCellId(cellId);
-  return `CC${(row - 1) * 9 + col}`;
-};
-
-const rowCC = (row) => Array.from({ length: 9 }, (_, i) => `CC${(row - 1) * 9 + i + 1}`);
+// The chaos-construction region-label cell paired with each grid cell.
+const cc = cellGraph('9x9').makeOverlay('CC');
 
 // Build constraints
 
 const chaosArrows = ARROW_DEFS.map(({ origin, arm }) => new ChaosArrow(origin, 1, ...arm));
 
 const parityCounts = ARROW_DEFS.map(({ origin, arm }) =>
-  new NFA(parityCountNFA, 'ParityCount', origin, ...arm.slice(1).map(ccToGrid))
+  new NFA(parityCountNFA, 'ParityCount', origin, ...arm.slice(1).map(id => cc.gridAt(id)))
 );
 
 const orangeLines = ORANGE_LINE_PAIRS.flatMap(([a, b]) => [
   new Whisper(4, a, b),
-  new AllDifferent(gridToCC(a), gridToCC(b)),
+  new AllDifferent(cc.at(a), cc.at(b)),
 ]);
 
-const circles = CIRCLE_CELLS.map(cell => {
-  return new CountDistinct(cell, ...rowCC(parseCellId(cell).row));
-});
+const circles = CIRCLE_CELLS.map(cell => new CountDistinct(cell, ...cc.row(cc.at(cell))));
 
 return [
   new Shape('9x9'),

@@ -17,10 +17,11 @@ const OFF = 2;
 const gridShape = cellGeometry('9x9');
 const graph = cellGraph(gridShape);
 
-// The loop-membership Var cell paired with a grid cell (VL1..VL81, in grid order).
-const loopCell = cell => `VL${gridShape.parseCellId(cell).cell + 1}`;
+// The loop-membership Var cell paired with each grid cell (VL1..VL81, in grid order).
+const loop = graph.makeOverlay('VL');
+const loopCell = cell => loop.at(cell);
 
-const gridCells = graph.gridCells();
+const gridCells = graph.cells();
 
 const constraints = [new Shape('9x9'), new Var('L', 'loop', gridShape.numGridCells)];
 const add = (...newConstraints) => constraints.push(...newConstraints);

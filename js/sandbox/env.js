@@ -1,6 +1,6 @@
 const { SudokuConstraint } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
 const { SudokuParser } = await import('../sudoku_parser.js' + self.VERSION_PARAM);
-const { CellGeometry, GEOMETRY_9x9, GEOMETRY_MAX } = await import('../cell_geometry.js' + self.VERSION_PARAM);
+const { CellGeometry, CellGraph, GEOMETRY_9x9, GEOMETRY_MAX } = await import('../cell_geometry.js' + self.VERSION_PARAM);
 const { SolverStats } = await import('./solver_stats.js' + self.VERSION_PARAM);
 const { SANDBOX_HELP_TEXT } = await import('./help_text.js' + self.VERSION_PARAM);
 
@@ -137,7 +137,7 @@ class SandboxCellGraph {
   }
 
   // Every cell of the main grid, row-major, excluding var cells.
-  gridCells() {
+  cells() {
     const cells = [];
     for (let i = 0; i < this._geometry.numGridCells; i++) cells.push(this._cell(i));
     return cells;
@@ -153,7 +153,9 @@ class SandboxCellGraph {
   // neighbours that lie on the grid, in row-major order.
   kingNeighbours(cell) {
     const KING = [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1]];
-    return KING.map(([dRow, dCol]) => this.step(cell, dRow, dCol)).filter(c => c != null);
+    const index = this._index(cell);
+    return KING.map(([dRow, dCol]) => this._cell(this._graph.traverse(index, dRow, dCol)))
+      .filter(c => c != null);
   }
 
   // The cell (dRow, dCol) away, or null past the grid edge. Steps are signed,
@@ -165,7 +167,9 @@ class SandboxCellGraph {
   // Cells from `cell` to the grid edge along (dRow, dCol), inclusive of `cell`.
   ray(cell, dRow, dCol) {
     const cells = [];
-    for (let c = cell; c != null; c = this.step(c, dRow, dCol)) cells.push(c);
+    for (let i = this._index(cell); i != null; i = this._graph.traverse(i, dRow, dCol)) {
+      cells.push(this._cell(i));
+    }
     return cells;
   }
 
@@ -203,6 +207,65 @@ class SandboxCellGraph {
   connected(cells) {
     const indices = new Set([...cells].map(c => this._index(c)));
     return indices.size === 0 || this._graph.cellsAreConnected(indices);
+  }
+
+  // A cell graph over a var-cell group, paired 1:1 with an ordered list of grid
+  // cells (default: the whole grid). `prefix` is the var group's id
+  // prefix, e.g. 'CC' for chaos construction or 'VL' for a Var('L', ...).
+  // this is a standalone view, it does not add the var cells to this graph.
+  makeOverlay(prefix, cells = this.cells()) {
+    return new SandboxOverlay(this, prefix, cells);
+  }
+}
+
+// A cell graph in its own right whose cells are a var-cell group: the nth grid
+// cell is shadowed by the nth var cell (`${prefix}${n}`), and two var cells are
+// adjacent iff their grid cells are. So neighbours()/step()/ray()/row()/etc all
+// work over the var cells, and at()/gridAt() cross between a var cell and the
+// grid cell it shadows.
+class SandboxOverlay extends SandboxCellGraph {
+  constructor(parent, prefix, gridCells) {
+    super(parent._geometry);
+
+    // Everything is indexed by position: the nth grid cell and nth var cell are a
+    // pair. Two arrays (pos -> cell) and two maps (cell -> pos) give O(1) both ways.
+    this._gridCells = gridCells;
+    this._cells = gridCells.map((_, i) => `${prefix}${i + 1}`);
+    this._gridPos = new Map(gridCells.map((cell, i) => [cell, i]));
+    this._varPos = new Map(this._cells.map((varCell, i) => [varCell, i]));
+
+    // Connect the overlay cells exactly as their grid cells connect. An off-grid
+    // or unpaired neighbour maps to no position, so has no edge.
+    const DIRS = [[0, -1], [0, 1], [-1, 0], [1, 0]];   // LEFT, RIGHT, UP, DOWN
+    const adjacency = gridCells.map(gridCell => DIRS.map(([dRow, dCol]) =>
+      this._gridPos.get(parent.step(gridCell, dRow, dCol)) ?? null));
+    this._graph = new CellGraph(adjacency);
+  }
+
+  // Translate ids for the inherited graph methods, which run over the overlay's
+  // own cells indexed by position.
+  _index(cell) {
+    const pos = this._varPos.get(cell);
+    if (pos === undefined) throw new Error(`Cell not in overlay: ${cell}`);
+    return pos;
+  }
+  _cell(index) {
+    return index == null ? null : this._cells[index];
+  }
+
+  // The overlay's cells (the var cells), in grid order.
+  cells() { return [...this._cells]; }
+
+  // The var cell shadowing `gridCell`, or null if `gridCell` has no overlay cell.
+  at(gridCell) {
+    const pos = this._gridPos.get(gridCell);
+    return pos === undefined ? null : this._cells[pos];
+  }
+
+  // The grid cell shadowed by `varCell`, or null if `varCell` isn't in the overlay.
+  gridAt(varCell) {
+    const pos = this._varPos.get(varCell);
+    return pos === undefined ? null : this._gridCells[pos];
   }
 }
 

@@ -326,4 +326,179 @@ await runTest('getSandboxExtraGlobals caches parsed constraint', () => {
   assert.equal(first, second);
 });
 
+// ============================================================================
+// cellGeometry
+// ============================================================================
+
+const { cellGeometry, cellGraph, parseCellId, makeCellId, makeSolver, CellGeometry } =
+  SANDBOX_GLOBALS;
+
+await runTest('cellGeometry resolves a shape spec string', () => {
+  assert.equal(cellGeometry('9x9').numGridCells, 81);
+  assert.equal(cellGeometry('6x6').numGridCells, 36);
+});
+
+await runTest('cellGeometry returns a CellGeometry argument as-is', () => {
+  const geometry = cellGeometry('6x6');
+  assert.equal(cellGeometry(geometry), geometry);
+});
+
+await runTest('cellGeometry reads shapeSpec off an object', () => {
+  assert.equal(cellGeometry({ shapeSpec: '4x4' }).numGridCells, 16);
+});
+
+await runTest('cellGeometry defaults with no/empty argument', () => {
+  const expected = CellGeometry.newDefault().numGridCells;
+  assert.equal(cellGeometry().numGridCells, expected);
+  assert.equal(cellGeometry({}).numGridCells, expected);
+});
+
+// ============================================================================
+// cellGraph: SandboxCellGraph over the main grid
+// ============================================================================
+
+await runTest('cells() returns every grid cell row-major', () => {
+  const cells = cellGraph('9x9').cells();
+  assert.equal(cells.length, 81);
+  assert.equal(cells[0], 'R1C1');
+  assert.equal(cells[80], 'R9C9');
+  assert.equal(cells[9], 'R2C1');
+});
+
+await runTest('neighbours() gives orthogonal in-grid cells', () => {
+  const g = cellGraph('9x9');
+  assert.deepEqual(new Set(g.neighbours('R1C1')), new Set(['R1C2', 'R2C1']));
+  assert.deepEqual(new Set(g.neighbours('R1C5')), new Set(['R1C4', 'R1C6', 'R2C5']));
+  assert.deepEqual(
+    new Set(g.neighbours('R5C5')),
+    new Set(['R5C4', 'R5C6', 'R4C5', 'R6C5']));
+});
+
+await runTest('kingNeighbours() gives the up-to-8 cells, row-major', () => {
+  const g = cellGraph('9x9');
+  assert.deepEqual(g.kingNeighbours('R1C1'), ['R1C2', 'R2C1', 'R2C2']);
+  assert.deepEqual(g.kingNeighbours('R5C5'),
+    ['R4C4', 'R4C5', 'R4C6', 'R5C4', 'R5C6', 'R6C4', 'R6C5', 'R6C6']);
+  assert.equal(g.kingNeighbours('R1C5').length, 5);
+});
+
+await runTest('step() moves by a signed offset or off the grid', () => {
+  const g = cellGraph('9x9');
+  assert.equal(g.step('R1C1', 0, 1), 'R1C2');
+  assert.equal(g.step('R1C1', 1, 0), 'R2C1');
+  assert.equal(g.step('R1C1', 1, 1), 'R2C2');
+  assert.equal(g.step('R1C1', -1, 0), null);
+  assert.equal(g.step('R9C9', 1, 0), null);
+});
+
+await runTest('ray() walks to the grid edge, inclusive', () => {
+  const g = cellGraph('9x9');
+  assert.deepEqual(g.ray('R1C1', 0, 1),
+    ['R1C1', 'R1C2', 'R1C3', 'R1C4', 'R1C5', 'R1C6', 'R1C7', 'R1C8', 'R1C9']);
+  assert.deepEqual(g.ray('R5C5', 1, 1), ['R5C5', 'R6C6', 'R7C7', 'R8C8', 'R9C9']);
+  assert.deepEqual(g.ray('R1C9', 0, 1), ['R1C9']);
+});
+
+await runTest('row() / column() give the whole line through a cell', () => {
+  const g = cellGraph('9x9');
+  assert.deepEqual(g.row('R5C3'),
+    ['R5C1', 'R5C2', 'R5C3', 'R5C4', 'R5C5', 'R5C6', 'R5C7', 'R5C8', 'R5C9']);
+  assert.deepEqual(g.column('R3C5'),
+    ['R1C5', 'R2C5', 'R3C5', 'R4C5', 'R5C5', 'R6C5', 'R7C5', 'R8C5', 'R9C5']);
+});
+
+await runTest('block() returns a rectangle or null if off-grid', () => {
+  const g = cellGraph('9x9');
+  assert.deepEqual(g.block('R1C1', 2, 2), ['R1C1', 'R1C2', 'R2C1', 'R2C2']);
+  assert.deepEqual(g.block('R1C1', 1, 3), ['R1C1', 'R1C2', 'R1C3']);
+  assert.deepEqual(g.block('R2C3', 1, 1), ['R2C3']);
+  assert.equal(g.block('R9C9', 2, 2), null);
+  assert.equal(g.block('R1C8', 1, 3), null);
+});
+
+await runTest('connected() tests orthogonal connectivity', () => {
+  const g = cellGraph('9x9');
+  assert.equal(g.connected(['R1C1', 'R1C2', 'R2C1']), true);
+  assert.equal(g.connected(['R1C1', 'R4C4']), false);
+  assert.equal(g.connected(['R1C1']), true);
+  assert.equal(g.connected([]), true);
+});
+
+// ============================================================================
+// makeOverlay: SandboxOverlay as a cell graph over a var-cell group
+// ============================================================================
+
+await runTest('a dense overlay pairs each grid cell with a var cell', () => {
+  const cc = cellGraph('4x4').makeOverlay('CC');
+  assert.equal(cc.cells().length, 16);
+  assert.equal(cc.cells()[0], 'CC1');
+  assert.equal(cc.cells()[15], 'CC16');
+  assert.equal(cc.at('R1C1'), 'CC1');
+  assert.equal(cc.at('R2C1'), 'CC5');
+  assert.equal(cc.gridAt('CC5'), 'R2C1');
+});
+
+await runTest('overlay at()/gridAt() return null when unpaired', () => {
+  const cc = cellGraph('4x4').makeOverlay('CC');
+  assert.equal(cc.gridAt('CC99'), null);
+  const sparse = cellGraph('4x4').makeOverlay('VC', ['R1C1', 'R1C2', 'R3C3']);
+  assert.equal(sparse.at('R2C2'), null);
+  assert.equal(sparse.gridAt('VC9'), null);
+});
+
+await runTest('overlay defaults to the whole grid, and honours a prefix', () => {
+  const overlay = cellGraph('4x4').makeOverlay('VL');
+  assert.equal(overlay.cells().length, 16);
+  assert.equal(overlay.cells()[0], 'VL1');
+});
+
+await runTest('a dense overlay is connected as its grid cells are', () => {
+  const cc = cellGraph('4x4').makeOverlay('CC');
+  assert.deepEqual(new Set(cc.neighbours('CC1')), new Set(['CC2', 'CC5']));
+  assert.deepEqual(new Set(cc.neighbours('CC6')),
+    new Set(['CC5', 'CC7', 'CC2', 'CC10']));
+  assert.equal(cc.step('CC1', 0, 1), 'CC2');
+  assert.equal(cc.step('CC1', 1, 0), 'CC5');
+  assert.equal(cc.step('CC1', -1, 0), null);
+  assert.deepEqual(cc.row('CC5'), ['CC5', 'CC6', 'CC7', 'CC8']);
+  assert.deepEqual(cc.column('CC2'), ['CC2', 'CC6', 'CC10', 'CC14']);
+  assert.deepEqual(cc.kingNeighbours('CC6'),
+    ['CC1', 'CC2', 'CC3', 'CC5', 'CC7', 'CC9', 'CC10', 'CC11']);
+});
+
+await runTest('a sparse overlay is the induced subgraph', () => {
+  const sparse = cellGraph('4x4').makeOverlay('VC', ['R1C1', 'R1C2', 'R3C3']);
+  assert.deepEqual(sparse.cells(), ['VC1', 'VC2', 'VC3']);
+  assert.deepEqual(sparse.neighbours('VC1'), ['VC2']);   // R1C2 is the only member adjacent
+  assert.deepEqual(sparse.neighbours('VC3'), []);        // R3C3 has no member neighbours
+});
+
+await runTest('overlay graph methods throw for a foreign cell', () => {
+  const cc = cellGraph('4x4').makeOverlay('CC');
+  assert.throws(() => cc.neighbours('R1C1'), /not in overlay/);
+});
+
+// ============================================================================
+// parseCellId / makeCellId  (1-based, over the max geometry)
+// ============================================================================
+
+await runTest('parseCellId / makeCellId round-trip', () => {
+  assert.deepEqual(parseCellId('R3C4'), { row: 3, col: 4 });
+  assert.deepEqual(parseCellId('R1C1'), { row: 1, col: 1 });
+  assert.equal(makeCellId(3, 4), 'R3C4');
+  const { row, col } = parseCellId('R7C2');
+  assert.equal(makeCellId(row, col), 'R7C2');
+});
+
+// ============================================================================
+// makeSolver
+// ============================================================================
+
+await runTest('makeSolver returns a solver with the expected interface', async () => {
+  const solver = await makeSolver();
+  assert.equal(typeof solver.solution, 'function');
+  assert.equal(typeof solver.uniqueSolution, 'function');
+  assert.equal(typeof solver.countSolutions, 'function');
+});
+
 logSuiteComplete('sandbox env');

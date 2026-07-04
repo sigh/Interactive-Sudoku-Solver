@@ -39,29 +39,30 @@ function* rangeI(from, to) {
   }
 }
 
-function colorCandidates(_, i) {
-  return new Given(circleVars[i], ...[
+function colorCandidates(cell, i) {
+  return new Given(color.at(cell), ...[
     ("RGB".indexOf(circles[circleIndices[i]]) + 1) || [1, 2, 3]
   ].flat());
 }
 
 const graph = cellGraph();
-const allCells = graph.gridCells();
+const allCells = graph.cells();
 
 const circleIndices = circles.split('').flatMap((value, i) =>
   value == '.' ? [] : [i]);
 const circleCells = circleIndices.map(i => allCells[i]);
-const circleVars = circleIndices.map((_, i) => `VC${i + 1}`);
-const gridToVarMap = new Map(circleCells.map((cell, i) => [cell, circleVars[i]]));
+
+// The Color Var cell paired with each circle (VC1.., in circle order).
+const color = graph.makeOverlay('VC', circleCells);
 
 // Each orthogonally-adjacent pair of circles, once: the horizontal and vertical
 // dominoes starting at each circle whose other cell is also a circle.
 const circleAdjacencies = () => circleCells
   .flatMap(cell => [graph.block(cell, 1, 2), graph.block(cell, 2, 1)])
-  .filter(domino => domino?.every(c => gridToVarMap.has(c)))
-  .map(domino => domino.map(c => gridToVarMap.get(c)));
+  .filter(domino => domino?.every(c => color.at(c) !== null))
+  .map(domino => domino.map(c => color.at(c)));
 
-const allCircleEntries = circleCells.flatMap((cell, i) => [cell, circleVars[i]]);
+const allCircleEntries = circleCells.flatMap(cell => [cell, color.at(cell)]);
 
 function colorDigitSpec(color, digit) {
   return NFA.encodeSpec({

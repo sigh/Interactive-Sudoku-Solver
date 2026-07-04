@@ -159,7 +159,7 @@ const CHECKERBOARD_FN = () => {
   // Order each cell against its right and down neighbours. On even (max) squares
   // the cell is the larger; on odd (min) squares the neighbour is. step() returns
   // null past the grid edge, so edge cells simply contribute fewer constraints.
-  for (const cell of graph.gridCells()) {
+  for (const cell of graph.cells()) {
     const { row, col } = parseCellId(cell);
     const isMax = (row + col) % 2 === 0;
     for (const neighbour of [graph.step(cell, 0, 1), graph.step(cell, 1, 0)]) {

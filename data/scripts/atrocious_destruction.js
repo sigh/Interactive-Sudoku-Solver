@@ -13,7 +13,7 @@
 
 const N = 8;
 const graph = cellGraph('8x8');
-const cc = (r, c) => `CC${(r - 1) * N + c}`;   // real-region (chaos) cell id
+const cc = graph.makeOverlay('CC');   // real-region (chaos) cell per grid cell
 
 // Fixed false-region id per cell, row-major R1..R8.
 const FALSE = [
@@ -67,10 +67,10 @@ for (const [f, cells] of falseCells) {
 for (const circle of circles) {
   const { row: r, col: c } = parseCellId(circle);
   const fr = falseAt(r, c);
-  const set = [cc(r, c)];   // the circle's own real-region cell is the reference
+  const set = [cc.at(circle)];   // the circle's own real-region cell is the reference
   for (const neighbour of graph.kingNeighbours(circle)) {
     const { row: nr, col: nc } = parseCellId(neighbour);
-    if (falseAt(nr, nc) === fr) set.push(cc(nr, nc));
+    if (falseAt(nr, nc) === fr) set.push(cc.at(neighbour));
   }
   constraints.push(new ChaosCount(circle, 0, ...set));
 }
