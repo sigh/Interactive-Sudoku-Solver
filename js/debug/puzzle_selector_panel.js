@@ -65,6 +65,11 @@ export class PuzzleSelectorPanel {
     this._filter = bodyElement.querySelector('#puzzle-selector-filter');
     this._list = bodyElement.querySelector('#puzzle-selector-list');
     this._count = bodyElement.querySelector('#puzzle-selector-count');
+    this._status = bodyElement.querySelector('#puzzle-selector-status');
+
+    // Bumped on every selection; a load whose token is stale by the time it
+    // resolves is dropped (latest click wins).
+    this._loadToken = 0;
 
     // Per-group rows (for filtering) and a flat ordered list (for keyboard nav).
     this._groups = [];
@@ -91,6 +96,7 @@ export class PuzzleSelectorPanel {
 
   clear() {
     this._setActive(null);
+    this._setStatus('');
   }
 
   // Build the grouped model: Examples followed by each benchmark collection.
@@ -187,7 +193,7 @@ export class PuzzleSelectorPanel {
         const entry = { row, item, search: item.search };
         row.addEventListener('click', () => {
           this._setActive(entry);
-          this._select(item);
+          this._select(entry);
         });
 
         groupItems.push(entry);
@@ -238,7 +244,7 @@ export class PuzzleSelectorPanel {
       case 'Enter':
         if (this._active) {
           e.preventDefault();
-          this._select(this._active.item);
+          this._select(this._active);
         }
         break;
       case 'Escape':
@@ -271,29 +277,47 @@ export class PuzzleSelectorPanel {
     }
   }
 
-  async _select(item) {
-    const puzzle = resolvePuzzleConfig(item.puzzle);
-    // Lazily fetch input from file if it's a path.
-    if (puzzle.input.startsWith('/')) {
-      const response = await fetch('.' + puzzle.input);
-      const text = await response.text();
-      // .js files are sandbox scripts that generate the constraint.
-      if (puzzle.input.endsWith('.js')) {
-        puzzle.input = await this._runSandboxScript(text);
-      } else {
-        puzzle.input = text;
-      }
+  async _select(entry) {
+    const token = ++this._loadToken;
+    // Latest click wins: abort a script still running for a previous pick. The
+    // token guard below drops its stale result even if it finishes first.
+    this._userScriptExecutor?.abort();
+
+    const { label } = entry.item;
+    this._setStatus(`Loading ${label}…`);
+    try {
+      const input = await this._resolveInput(resolvePuzzleConfig(entry.item.puzzle));
+      if (token !== this._loadToken) return;
+      this._constraintManager.loadUnsafeFromText(input);
+      this._setStatus('');
+    } catch (e) {
+      if (token !== this._loadToken) return;
+      this._setStatus(`Couldn't load ${label}: ${e.message || e}`, 'error');
     }
-    this._constraintManager.loadUnsafeFromText(puzzle.input);
   }
 
-  // Run a sandbox script and return the constraint string it generates. The
-  // script has the same capabilities (and risks) as code typed into the
-  // sandbox editor.
-  _runSandboxScript(code) {
+  // Resolve a puzzle's input to constraint text: pass literals through, fetch
+  // paths, and run .js paths as sandbox scripts to get the constraint they
+  // generate.
+  async _resolveInput(puzzle) {
+    if (!puzzle.input.startsWith('/')) return puzzle.input;
+
+    const response = await fetch('.' + puzzle.input);
+    if (!response.ok) {
+      throw new Error(`fetch ${puzzle.input} failed (${response.status})`);
+    }
+    const text = await response.text();
+    if (!puzzle.input.endsWith('.js')) return text;
+
     this._userScriptExecutor ??= new UserScriptExecutor();
-    return this._userScriptExecutor.runSandboxCode(code, {}, '')
-      .then(result => result.constraintStr);
+    const { constraintStr } = await this._userScriptExecutor.runSandboxCode(text, {}, '');
+    return constraintStr;
+  }
+
+  _setStatus(text, variant = 'info') {
+    this._status.textContent = text;
+    this._status.classList.toggle('notice-info', text !== '' && variant === 'info');
+    this._status.classList.toggle('notice-error', variant === 'error');
   }
 
   // A small link icon that opens the puzzle's source, or an empty placeholder
