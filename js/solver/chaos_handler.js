@@ -76,11 +76,11 @@ class ChaosRegionShardState {
   }
 
   // Merge the shards of cellA and cellB, queuing their region cells if they changed.
-  merge(grid, cellA, cellB, handlerAccumulator = null) {
+  merge(grid, cellA, cellB, pQueue = null) {
     if (!unionShardRoots(grid, this._regionShardOffset, cellA, cellB)) return false;
-    if (handlerAccumulator) {
-      handlerAccumulator.addForCell(this._regionCellOffset + cellA);
-      handlerAccumulator.addForCell(this._regionCellOffset + cellB);
+    if (pQueue) {
+      pQueue.addForCell(this._regionCellOffset + cellA);
+      pQueue.addForCell(this._regionCellOffset + cellB);
     }
     return true;
   }
@@ -316,7 +316,7 @@ export class ChaosConstruction extends SudokuConstraintHandler {
   }
 
   // Writes mask to every member of a shard's region cell, queuing changed cells.
-  _writeShardRegion(grid, root, mask, handlerAccumulator) {
+  _writeShardRegion(grid, root, mask, pQueue) {
     const regionCellOffset = this._regionCellOffset;
     const nextCells = this._shards.nextCells;
 
@@ -325,7 +325,7 @@ export class ChaosConstruction extends SudokuConstraintHandler {
       const regionCell = regionCellOffset + cell;
       if (grid[regionCell] === mask) continue;
       grid[regionCell] = mask;
-      handlerAccumulator.addForCell(regionCell);
+      pQueue.addForCell(regionCell);
     }
   }
 
@@ -395,7 +395,7 @@ export class ChaosConstruction extends SudokuConstraintHandler {
 
   // Phase 2a: merges fixed neighbours, flattens the shard forest, rebuilds summaries,
   // and tightens each shard's region mask to the intersection of its members' masks.
-  _rebuildShards(grid, handlerAccumulator, shards) {
+  _rebuildShards(grid, pQueue, shards) {
     // Phase 1: materialize same-region facts into shards and rebuild summaries.
     this._mergeAdjacentFixedRegions(grid);
 
@@ -436,7 +436,7 @@ export class ChaosConstruction extends SudokuConstraintHandler {
           if (newRegionMask !== currentRegionMask) {
             if (!newRegionMask) return false;
             grid[rootRegionCell] = newRegionMask;        // the root itself narrowed
-            handlerAccumulator.addForCell(rootRegionCell);
+            pQueue.addForCell(rootRegionCell);
           }
           // Record the root for write-back. The back-of-list check elides the
           // common run of adjacent same-shard members.
@@ -460,7 +460,7 @@ export class ChaosConstruction extends SudokuConstraintHandler {
     // Propagate each narrowed intersection to the shard's members.
     for (let i = 0; i < constrainedCount; i++) {
       const root = constrainedRoots[i];
-      this._writeShardRegion(grid, root, grid[regionCellOffset + root], handlerAccumulator);
+      this._writeShardRegion(grid, root, grid[regionCellOffset + root], pQueue);
     }
 
     return true;
@@ -771,7 +771,7 @@ export class ChaosConstruction extends SudokuConstraintHandler {
 
   // Phase 1: restricts region labels so label k may first appear only after label k−1,
   // breaking the label-permutation symmetry (§4 in CHAOS_CONSTRUCTION.md).
-  _enforceCanonicalOrder(grid, handlerAccumulator) {
+  _enforceCanonicalOrder(grid, pQueue) {
     const regionCellOffset = this._regionCellOffset;
     const regionMask = this._regionMask;
     const regionCellLimit = regionCellOffset + this._numGridCells;
@@ -787,7 +787,7 @@ export class ChaosConstruction extends SudokuConstraintHandler {
       if (!newMask) return false;
       if (newMask !== oldMask) {
         grid[regionCell] = newMask;
-        handlerAccumulator.addForCell(regionCell);
+        pQueue.addForCell(regionCell);
       }
       allowedMask |= newMask << 1;
     }
@@ -797,7 +797,7 @@ export class ChaosConstruction extends SudokuConstraintHandler {
 
   // Phase 3: for each dirty region, prunes shards that cannot reach a connected s-cell
   // component, forces uniquely-determined components, and checks door bottlenecks.
-  _enforceConnectivity(grid, handlerAccumulator, shards, regions) {
+  _enforceConnectivity(grid, pQueue, shards, regions) {
     // Phase 3: connectivity runs on the current shard graph for dirty labels only.
     const numGridCells = this._numGridCells;
     const regionCellOffset = this._regionCellOffset;
@@ -918,7 +918,7 @@ export class ChaosConstruction extends SudokuConstraintHandler {
 
     for (let root = 0; root < numGridCells; root++) {
       if (!shardSizes[root] || shardMasks[root] === grid[regionCellOffset + root]) continue;
-      this._writeShardRegion(grid, root, shardMasks[root], handlerAccumulator);
+      this._writeShardRegion(grid, root, shardMasks[root], pQueue);
     }
 
     return true;
@@ -927,7 +927,7 @@ export class ChaosConstruction extends SudokuConstraintHandler {
   // When a region's active value set equals s, places any value confined to one cell
   // and fixes that cell's shard; returns true if a placement fired (caller must rescan).
   _enforceHiddenRegionValueSingles(
-    grid, handlerAccumulator, shards, regions, checkRegionsMask,
+    grid, pQueue, shards, regions, checkRegionsMask,
     hiddenDuplicateValueMasks) {
     // Apply at most one precomputed shard-level witness after confirming the member cell.
     const firstRootByRegionValue = this._scratchRoots0;
@@ -970,10 +970,10 @@ export class ChaosConstruction extends SudokuConstraintHandler {
         let changed = false;
         if (grid[cell] !== valueBit) {
           grid[cell] = valueBit;
-          handlerAccumulator.addForCell(cell);
+          pQueue.addForCell(cell);
           changed = true;
         }
-        if (regionChanged) this._writeShardRegion(grid, root, regionBit, handlerAccumulator);
+        if (regionChanged) this._writeShardRegion(grid, root, regionBit, pQueue);
         if (changed || regionChanged) return true;
       }
     }
@@ -983,7 +983,7 @@ export class ChaosConstruction extends SudokuConstraintHandler {
 
   // Phase 2b: fixed-point loop — scan shard summaries, apply size/value/full-region
   // pruning rules, then attempt a hidden-region-value single (§6 in CHAOS_CONSTRUCTION.md).
-  _enforceShardHouseRules(grid, handlerAccumulator, shards, regions) {
+  _enforceShardHouseRules(grid, pQueue, shards, regions) {
     // Phase 2: scan summaries, prune shard labels, then use stable witnesses.
     const regionScanData = regions.scanData;
     const fixedValueMasks = regions.fixedValueMasks;
@@ -1077,7 +1077,7 @@ export class ChaosConstruction extends SudokuConstraintHandler {
 
           if (!keepMask) return false;
           if (keepMask === regionMask) continue;
-          this._writeShardRegion(grid, root, keepMask, handlerAccumulator);
+          this._writeShardRegion(grid, root, keepMask, pQueue);
           changed = true;
         }
       }
@@ -1086,7 +1086,7 @@ export class ChaosConstruction extends SudokuConstraintHandler {
 
       if (hiddenRegionsMask) {
         if (this._enforceHiddenRegionValueSingles(
-          grid, handlerAccumulator, shards, regions, hiddenRegionsMask,
+          grid, pQueue, shards, regions, hiddenRegionsMask,
           hiddenDuplicateValueMasks)) return DEFER_CONNECTIVITY;
       }
 
@@ -1094,23 +1094,23 @@ export class ChaosConstruction extends SudokuConstraintHandler {
     }
   }
 
-  enforceConsistency(grid, handlerAccumulator) {
+  enforceConsistency(grid, pQueue) {
     this._connectivityDirtyRegionsMask = 0;
     const shards = this._shards;
     const regions = this._regions;
 
     // Phase order keeps derived summaries local and avoids stale connectivity input.
-    if (!this._enforceCanonicalOrder(grid, handlerAccumulator)) return false;
-    if (!this._rebuildShards(grid, handlerAccumulator, shards)) return false;
+    if (!this._enforceCanonicalOrder(grid, pQueue)) return false;
+    if (!this._rebuildShards(grid, pQueue, shards)) return false;
 
     const shardConsistencyResult =
-      this._enforceShardHouseRules(grid, handlerAccumulator, shards, regions);
+      this._enforceShardHouseRules(grid, pQueue, shards, regions);
     if (!shardConsistencyResult) return false;
     if (shardConsistencyResult === DEFER_CONNECTIVITY) {
       return true;
     }
 
-    if (!this._enforceConnectivity(grid, handlerAccumulator, shards, regions)) return false;
+    if (!this._enforceConnectivity(grid, pQueue, shards, regions)) return false;
 
     return true;
   }
@@ -1297,7 +1297,7 @@ export class ChaosArrow extends SudokuConstraintHandler {
     }
   }
 
-  _applySupportedCellMasks(grid, handlerAccumulator) {
+  _applySupportedCellMasks(grid, pQueue) {
     // Apply the supported run lengths back to CC candidates, and persist any
     // newly forced prefixes into the shared shard state.
     for (let armIndex = 0; armIndex < this._regionArms.length; armIndex++) {
@@ -1318,7 +1318,7 @@ export class ChaosArrow extends SudokuConstraintHandler {
         const runArm = this._regionRunArms[armIndex];
         const startCell = runArm[0];
         for (let i = appliedCount; i < minSupportedLength; i++) {
-          this._regionShardState.merge(grid, startCell, runArm[i], handlerAccumulator);
+          this._regionShardState.merge(grid, startCell, runArm[i], pQueue);
         }
       }
 
@@ -1346,7 +1346,7 @@ export class ChaosArrow extends SudokuConstraintHandler {
         if (!newMask) return false;
         if (newMask !== cellMask) {
           grid[regionCell] = newMask;
-          handlerAccumulator.addForCell(regionCell);
+          pQueue.addForCell(regionCell);
         }
       }
     }
@@ -1354,7 +1354,7 @@ export class ChaosArrow extends SudokuConstraintHandler {
     return true;
   }
 
-  enforceConsistency(grid, handlerAccumulator) {
+  enforceConsistency(grid, pQueue) {
     const controlCell = this._controlCell;
     let controlMask = grid[controlCell];
     this._supportedControlMask = 0;
@@ -1375,10 +1375,10 @@ export class ChaosArrow extends SudokuConstraintHandler {
     if (!(controlMask &= supportedControlMask)) return false;
     if (controlMask !== grid[controlCell]) {
       grid[controlCell] = controlMask;
-      handlerAccumulator.addForCell(controlCell);
+      pQueue.addForCell(controlCell);
     }
 
-    return this._applySupportedCellMasks(grid, handlerAccumulator);
+    return this._applySupportedCellMasks(grid, pQueue);
   }
 }
 
@@ -1442,7 +1442,7 @@ export class ChaosCount extends SudokuConstraintHandler {
     return !!(initialGridCells[this._controlCell] &= rangeMask);
   }
 
-  enforceConsistency(grid, handlerAccumulator) {
+  enforceConsistency(grid, pQueue) {
     const controlCell = this._controlCell;
     const controlMask = grid[controlCell];
     const regionCells = this._regionCells;
@@ -1514,11 +1514,11 @@ export class ChaosCount extends SudokuConstraintHandler {
     if (!supportedControlMask) return false;
     if (supportedControlMask !== controlMask) {
       grid[controlCell] = supportedControlMask;
-      handlerAccumulator.addForCell(controlCell);
+      pQueue.addForCell(controlCell);
     }
     if (supportedFirstRegionMask !== firstRegionMask) {
       grid[firstRegionCell] = supportedFirstRegionMask;
-      handlerAccumulator.addForCell(firstRegionCell);
+      pQueue.addForCell(firstRegionCell);
     }
 
     for (let i = 1; i < regionCells.length; i++) {
@@ -1528,7 +1528,7 @@ export class ChaosCount extends SudokuConstraintHandler {
       if (!supportedMask) return false;
       if (supportedMask !== cellMask) {
         grid[regionCell] = supportedMask;
-        handlerAccumulator.addForCell(regionCell);
+        pQueue.addForCell(regionCell);
       }
     }
 
@@ -1541,7 +1541,7 @@ export class ChaosCount extends SudokuConstraintHandler {
         const indexB = mergePairs[i + 1];
         if (grid[regionCells[indexA]] === firstRegionBit && grid[regionCells[indexB]] === firstRegionBit) {
           this._regionShardState.merge(
-            grid, this._regionRunCells[indexA], this._regionRunCells[indexB], handlerAccumulator);
+            grid, this._regionRunCells[indexA], this._regionRunCells[indexB], pQueue);
         }
       }
     }
@@ -1561,7 +1561,7 @@ export class ChaosFixedValueRegionExclusion extends SudokuConstraintHandler {
     this.idStr = [this.constructor.name, sourceIndex, triggerCell].join('|');
   }
 
-  enforceConsistency(grid, handlerAccumulator) {
+  enforceConsistency(grid, pQueue) {
     const sourceIndex = this._sourceIndex;
     const regionCellOffset = this._regionCellOffset;
     const value = grid[sourceIndex];
@@ -1583,12 +1583,12 @@ export class ChaosFixedValueRegionExclusion extends SudokuConstraintHandler {
 
       if (cellValue === value && (otherRegionMask & regionBit)) {
         if (!(grid[otherRegionCell] &= keepRegionMask)) return false;
-        handlerAccumulator.addForCell(otherRegionCell);
+        pQueue.addForCell(otherRegionCell);
       }
 
       if (otherRegionMask === regionBit && (cellValue & value)) {
         if (!(grid[i] &= keepValueMask)) return false;
-        handlerAccumulator.addForCell(i);
+        pQueue.addForCell(i);
       }
     }
 

@@ -459,7 +459,7 @@ export class Sum extends SudokuConstraintHandler {
     return result;
   }
 
-  _enforceCombinationsWithComplement(grid, handlerAccumulator) {
+  _enforceCombinationsWithComplement(grid, pQueue) {
     const set0 = this.cells;
     const set1 = this._complementCells;
     const sum = this._sum;
@@ -507,7 +507,7 @@ export class Sum extends SudokuConstraintHandler {
       for (let i = 0; i < set0.length; i++) {
         if (grid[set0[i]] & valuesToRemove0) {
           if (!(grid[set0[i]] &= ~valuesToRemove0)) return false;
-          handlerAccumulator.addForCell(set0[i]);
+          pQueue.addForCell(set0[i]);
         }
       }
     }
@@ -516,7 +516,7 @@ export class Sum extends SudokuConstraintHandler {
       for (let i = 0; i < set1.length; i++) {
         if (grid[set1[i]] & valuesToRemove1) {
           if (!(grid[set1[i]] &= ~valuesToRemove1)) return false;
-          handlerAccumulator.addForCell(set1[i]);
+          pQueue.addForCell(set1[i]);
         }
       }
     }
@@ -721,7 +721,7 @@ export class Sum extends SudokuConstraintHandler {
     return true;
   }
 
-  _restrictCellsSingleExclusionGroup(grid, sum, cells, handlerAccumulator) {
+  _restrictCellsSingleExclusionGroup(grid, sum, cells, pQueue) {
     const numCells = cells.length;
 
     // Check that we can make the current sum with the unfixed values remaining.
@@ -790,7 +790,7 @@ export class Sum extends SudokuConstraintHandler {
     const nonUniqueRequired = requiredUnfixed & nonUniqueValues;
     if (nonUniqueRequired) {
       if (!HandlerUtil.enforceRequiredValueExclusions(
-        grid, cells, nonUniqueRequired, this._cellExclusions, handlerAccumulator)) {
+        grid, cells, nonUniqueRequired, this._cellExclusions, pQueue)) {
         return false;
       }
     }
@@ -798,7 +798,7 @@ export class Sum extends SudokuConstraintHandler {
     return true;
   }
 
-  enforceConsistency(grid, handlerAccumulator) {
+  enforceConsistency(grid, pQueue) {
     const sum = this._sum;
     const coeffGroups = this._coeffGroups;
     const rangeInfo = this._sumData.lookupTables.rangeInfo;
@@ -877,7 +877,7 @@ export class Sum extends SudokuConstraintHandler {
     }
 
     if (this._complementCells !== null) {
-      return this._enforceCombinationsWithComplement(grid, handlerAccumulator);
+      return this._enforceCombinationsWithComplement(grid, pQueue);
     }
 
     // If _enforceFewRemainingCells has run, then we've already done all we can.
@@ -885,7 +885,7 @@ export class Sum extends SudokuConstraintHandler {
 
     if (this._flags & this.constructor._FLAG_CAGE) {
       if (!this._restrictCellsSingleExclusionGroup(
-        grid, this._sum, this.cells, handlerAccumulator)) return false;
+        grid, this._sum, this.cells, pQueue)) return false;
     } else {
       if (!this._restrictCellsWithCoefficients(
         grid, sum, this._coeffGroups)) return false;

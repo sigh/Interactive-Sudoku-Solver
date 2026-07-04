@@ -134,10 +134,10 @@ not a win/loss ranked by how much work it did.
 
 **Workflow.**
 
-1. *Know the contract.* Separate the handler's semantic obligations (contradictions
+1. *Know the contract.* Separate the handler's semantic obligations (conflicts
    it must reject, propagation required for correctness) from propagation that is
    only a search aid. Arc-consistency, hidden singles, Hall/distance/graph checks
-   are usually optional aids; cheap contradiction checks that prune early usually
+   are usually optional aids; cheap conflict checks that prune early usually
    earn their keep. Keep a correctness-required rule even if expensive — optimize
    its implementation, don't remove it.
 2. *Measure before changing.* Use a fast correctness-sized case plus ≥1 realistic
@@ -150,9 +150,9 @@ not a win/loss ranked by how much work it did.
    are non-additive. Compare micro **and** macro: a faster single propagation that
    grows total search is a loss.
 4. *Promote* only if it improves completed proof runs or turns capped runs into
-   completed ones, without losing required contradictions. Keep experimental
+   completed ones, without losing required conflicts. Keep experimental
    variants in `extensions/`; production holds only the chosen behaviour. Update
-   tests to assert the contract (contradictions kept; propagation intentionally
+   tests to assert the contract (conflicts kept; propagation intentionally
    removed stays removed). Re-run finalist ablations afterwards — a new baseline can
    make other variants newly viable or newly risky.
 

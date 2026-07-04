@@ -47,7 +47,7 @@ removal in the input string).
 ### `step_analysis.js` — walk the search, inspect state
 
 ```sh
-# Walk the first 10 steps. If the walk ends in a contradiction, the refuter (the
+# Walk the first 10 steps. If the walk ends in a conflict, the refuter (the
 # handler that returned false) prints automatically — no extra flag needed.
 node tests/debug/step_analysis.js --puzzle "Chaos Construction: The Fountain" --steps 10
 
@@ -64,7 +64,7 @@ node tests/debug/step_analysis.js --puzzle "Chaos Construction: The Fountain" \
 # Read the constraint string from a file; show initial var-cell state (step 0).
 node tests/debug/step_analysis.js --input-file puzzle.txt --steps 0 --grid --vars
 
-# Show what each handler pruned at a step, and (at a contradiction step) the
+# Show what each handler pruned at a step, and (at a conflict step) the
 # handler that returned false — the "refuter" that killed the branch.
 node tests/debug/step_analysis.js --puzzle "Chaos Construction: The Fountain" --steps 2 --log
 

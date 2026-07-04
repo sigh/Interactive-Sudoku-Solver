@@ -107,7 +107,7 @@ export class NFAConstraint extends SudokuConstraintHandler {
     return this._cnfa;
   }
 
-  enforceConsistency(grid, handlerAccumulator) {
+  enforceConsistency(grid, pQueue) {
     const cells = this.cells;
     const numCells = cells.length;
     const cnfa = this._cnfa;
@@ -199,7 +199,7 @@ export class NFAConstraint extends SudokuConstraintHandler {
 
       if (values !== supportedValues) {
         grid[cells[i]] = supportedValues;
-        handlerAccumulator.addForCell(cells[i]);
+        pQueue.addForCell(cells[i]);
       }
     }
 

@@ -121,7 +121,7 @@ minD allowed:  keep v iff fixing x_j = v can still reach minD distinct values
 ```text
 function enforceConsistency(grid):
     split counted cells into fixedMask and the unfixed list   # §2.2
-    if any counted domain is empty: return CONTRADICTION
+    if any counted domain is empty: return CONFLICT
 
     maxD = fixedCount + maxMatching(unfixed, ~fixedMask)       # §3.1
     minD = fixedCount + packing(unfixed, seed = fixedMask)     # §4.1

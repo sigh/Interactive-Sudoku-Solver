@@ -100,12 +100,12 @@ previous one, and the final (most expensive) phase must not run on stale input.
 ```text
 function enforceConsistency(grid):
     dirtyRegions ← ∅
-    if not enforceCanonicalOrder(grid):       return CONTRADICTION   # §4
-    if not rebuildShards(grid):                return CONTRADICTION   # §5
+    if not enforceCanonicalOrder(grid):       return CONFLICT   # §4
+    if not rebuildShards(grid):                return CONFLICT   # §5
     result ← enforceShardHouseRules(grid)                            # §6
-    if result = CONTRADICTION:                 return CONTRADICTION
+    if result = CONFLICT:                 return CONFLICT
     if result = DEFER_CONNECTIVITY:            return OK             # re-enter later
-    if not enforceConnectivity(grid):          return CONTRADICTION   # §7
+    if not enforceConnectivity(grid):          return CONFLICT   # §7
     return OK
 ```
 
@@ -201,14 +201,14 @@ function rebuildShardSummaries(grid):
             if grid[regionCell(c)] ≠ grid[regionCell(r)]:    # member disagrees
                 inter ← grid[regionCell(r)] ∧ grid[regionCell(c)]
                 if inter ≠ grid[regionCell(r)]:              # it narrows the shard
-                    if inter = 0: return CONTRADICTION
+                    if inter = 0: return CONFLICT
                     grid[regionCell(r)] ← inter
                 append r to constrained                       # (skip if already the tail)
         size[r] ← size[r] + 1
-        if size[r] > s: return CONTRADICTION          # region would overflow
+        if size[r] > s: return CONFLICT          # region would overflow
         valueMask[r] ← valueMask[r] | grid[c]
         if grid[c] is a single value v:
-            if v ∈ fixedValueMask[r]: return CONTRADICTION   # two cells fix the same value
+            if v ∈ fixedValueMask[r]: return CONFLICT   # two cells fix the same value
             fixedValueMask[r] ← fixedValueMask[r] | v
     return constrained
 ```
@@ -451,7 +451,7 @@ complete.
 
 A fixed component smaller than `s` must still grow to `s` cells, and it can grow
 only into neighbouring shards that still carry its label — its **doors**. If a
-component has no door it is trapped (contradiction); if it has exactly one door,
+component has no door it is trapped (conflict); if it has exactly one door,
 every completion must use it, so that door is forced into the region.
 
 ```text
@@ -475,7 +475,7 @@ at least one cell beyond it. With one free cell the door would be the last cell,
 which §7.1 already forces whenever it is the unique reachable extension; with
 zero free cells the region is complete. So regions with `fixedCount + 2 > s` are
 excluded from the bottleneck pass entirely, even dirty ones — for a dirty region
-any genuine "no door" contradiction is already reported by the size check in
+any genuine "no door" conflict is already reported by the size check in
 §7.1. Among the remaining regions, dirty labels are always checked and clean
 labels are checked once they are at least half fixed.
 

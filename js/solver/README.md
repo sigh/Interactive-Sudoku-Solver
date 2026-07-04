@@ -11,7 +11,7 @@ The solver is a **constraint-satisfaction problem (CSP) engine** that uses backt
 1. Pick the next candidate. Fixed cells are processed first; unresolved choices use conflict score per candidate, with MRV behavior when scores are zero.
 2. Try a candidate value or a handler-provided candidate group.
 3. Propagate constraints — let all affected handlers remove impossible candidates.
-4. If a contradiction is found, backtrack and try the next value.
+4. If a conflict is found, backtrack and try the next value.
 5. If all cells are solved, yield a solution.
 
 Before search begins, an **optimization phase** derives additional constraints that are logically implied by the existing ones. These don't change the solution set but make propagation faster.
@@ -27,7 +27,7 @@ flowchart TD
     subgraph "Search Loop"
         Select["Select cell + value"] --> Propagate["Propagate constraints"]
         Propagate -->|"unsolved cells"| Select
-        Propagate -->|"contradiction"| BT["Backtrack"] --> Select
+        Propagate -->|"conflict"| BT["Backtrack"] --> Select
         Propagate -->|"all cells solved"| Solution["Yield solution"]
     end
 
@@ -47,18 +47,18 @@ flowchart TD
 
 1. [candidate_selector.js](candidate_selector.js) picks the next cell and value to try.
 2. The engine sets the cell and propagates — calling `enforceConsistency()` on all affected handlers until no more candidates change (fixed-point).
-3. If a contradiction is found, the engine backtracks and tries the next value.
+3. If a conflict is found, the engine backtracks and tries the next value.
 4. If all cells are solved, a solution is yielded.
 
 ## Files
 
 | File | Purpose |
 |------|---------|
-| [engine.js](engine.js) | **Core solver.** `SudokuSolver` is the public API (`countSolutions`, `nthSolution`, `nthStep`, `solveAllPossibilities`). `InternalSolver` implements the search loop with a pre-allocated stack (no recursion). Manages constraint propagation to a fixed point via `HandlerAccumulator`. |
-| [handlers.js](handlers.js) | **Constraint handler library.** `SudokuConstraintHandler` is the base class — all handlers implement `enforceConsistency(grid, accumulator)` which removes invalid candidates and returns `false` on contradiction. ~33 handler implementations including `AllDifferent`, `BinaryConstraint`, `House`, `And`, `Or`. |
+| [engine.js](engine.js) | **Core solver.** `SudokuSolver` is the public API (`countSolutions`, `nthSolution`, `nthStep`, `solveAllPossibilities`). `InternalSolver` implements the search loop with a pre-allocated stack (no recursion). Manages constraint propagation to a fixed point via `PropagationQueue`. |
+| [handlers.js](handlers.js) | **Constraint handler library.** `SudokuConstraintHandler` is the base class — all handlers implement `enforceConsistency(grid, pQueue)` which removes invalid candidates and returns `false` on conflict. ~33 handler implementations including `AllDifferent`, `BinaryConstraint`, `House`, `And`, `Or`. |
 | [sudoku_builder.js](sudoku_builder.js) | **Constraint-to-handler bridge.** `SudokuBuilder.build(constraint, debugOptions)` converts high-level constraint objects into solver handlers. Contains the mapping from each constraint type (Cage, Arrow, Thermo, etc.) to the handler(s) that enforce it. |
 | [optimizer.js](optimizer.js) | **Constraint derivation.** Adds logically-implied handlers that don't change the solution set but speed up propagation: innie/outie sums, cage gap filling, house handlers, jigsaw intersection logic, binary constraint transitivity, combined sums, and more. |
-| [candidate_selector.js](candidate_selector.js) | **Search heuristics.** `CandidateSelector` picks which cell to solve next (ranked by conflict score per candidate, falling back to MRV when scores are zero) and which value to try first. `ConflictScores` tracks cells that caused contradictions to improve future ordering. `SeenCandidateSet` deduplicates solutions. |
+| [candidate_selector.js](candidate_selector.js) | **Search heuristics.** `CandidateSelector` picks which cell to solve next (ranked by conflict score per candidate, falling back to MRV when scores are zero) and which value to try first. `ConflictScores` tracks cells that caused conflicts to improve future ordering. `SeenCandidateSet` deduplicates solutions. |
 | [sum_handler.js](sum_handler.js) | **Algebraic sum constraints.** Handles equations of the form `Σ cᵢ·vᵢ = target` with integer coefficients. Used for cages, arrows, pill arrows, and optimizer-derived sums. Groups cells by coefficient. Specialized fast paths for 1–3 remaining unfixed cells. |
 | [nfa_handler.js](nfa_handler.js) | **NFA-based sequential constraints.** Enforces constraints on ordered cell sequences (palindromes, whisper lines, regex patterns) using a compressed NFA representation. Uses a forward+backward pass to prune candidates. |
 | [chaos_handler.js](chaos_handler.js) | **Chaos construction.** Discovers an unknown region (box) layout: partitions the grid into connected, distinct-value regions. See [CHAOS_CONSTRUCTION.md](CHAOS_CONSTRUCTION.md). |

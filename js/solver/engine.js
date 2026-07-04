@@ -360,7 +360,7 @@ class InternalSolver {
 
     this._seenCandidateSet = new SeenCandidateSet(this._numSearchCells, geometry.numValues);
 
-    this._handlerAccumulator = new HandlerAccumulator(this._handlerSet);
+    this._propagationQueue = new PropagationQueue(this._handlerSet);
     this._candidateSelector = new CandidateSelector(
       geometry, this._numSearchCells, this._handlerSet, debugLogger);
 
@@ -538,11 +538,11 @@ class InternalSolver {
     this._sampleSolution[0] = 0;
   }
 
-  _debugEnforceConsistency(loc, gridState, handler, handlerAccumulator) {
+  _debugEnforceConsistency(loc, gridState, handler, pQueue) {
     const oldGridState = this._debugGridBuffer.subarray(0, gridState.length);
     oldGridState.set(gridState);
 
-    const result = handler.enforceConsistency(gridState, handlerAccumulator);
+    const result = handler.enforceConsistency(gridState, pQueue);
     const handlerName = handler.debugName();
 
     if (!arraysAreEqual(oldGridState, gridState)) {
@@ -582,21 +582,21 @@ class InternalSolver {
     return result;
   }
 
-  _enforceConstraints(gridState, handlerAccumulator) {
+  _enforceConstraints(gridState, pQueue) {
     const counters = this.counters;
     const logSteps = this._debugLogger.enableStepLogs;
 
     let constraintsProcessed = 0;
-    while (!handlerAccumulator.isEmpty()) {
-      const c = handlerAccumulator.takeNext();
+    while (!pQueue.isEmpty()) {
+      const c = pQueue.takeNext();
       constraintsProcessed++;
       if (logSteps) {
-        if (!this._debugEnforceConsistency('_enforceConstraints', gridState, c, handlerAccumulator)) {
+        if (!this._debugEnforceConsistency('_enforceConstraints', gridState, c, pQueue)) {
           counters.constraintsProcessed += constraintsProcessed;
           return false;
         }
       } else {
-        if (!c.enforceConsistency(gridState, handlerAccumulator)) {
+        if (!c.enforceConsistency(gridState, pQueue)) {
           counters.constraintsProcessed += constraintsProcessed;
           return false;
         }
@@ -735,10 +735,10 @@ class InternalSolver {
     }
 
     // Enforce constraints for all cells.
-    const handlerAccumulator = this._handlerAccumulator;
-    handlerAccumulator.reset(false);
-    for (let i = 0; i < this._numSearchCells; i++) handlerAccumulator.addForCell(i);
-    if (!this._enforceConstraints(frame0.gridState, handlerAccumulator)) {
+    const pQueue = this._propagationQueue;
+    pQueue.reset(false);
+    for (let i = 0; i < this._numSearchCells; i++) pQueue.addForCell(i);
+    if (!this._enforceConstraints(frame0.gridState, pQueue)) {
       if (frame0.gridCells.indexOf(0) === -1) frame0.gridCells.fill(0);
     }
 
@@ -786,10 +786,10 @@ class InternalSolver {
       counters.valuesTried += nextDepth - cellDepth;
 
       // Determine the set of cells/constraints to enforce next.
-      const handlerAccumulator = this._handlerAccumulator;
-      handlerAccumulator.reset(nextDepth === this._numSearchCells);
+      const pQueue = this._propagationQueue;
+      pQueue.reset(nextDepth === this._numSearchCells);
       for (let i = cellDepth; i < nextDepth; i++) {
-        handlerAccumulator.addForFixedCell(
+        pQueue.addForFixedCell(
           this._candidateSelector.getCellAtDepth(i));
       }
       // Queue up extra constraints based on prior backtracks. The idea being
@@ -798,7 +798,7 @@ class InternalSolver {
       // NOTE: This must use the value of lastConflictCell before recFrame
       //       is updated.
       if (recFrame.lastConflictCell >= 0) {
-        handlerAccumulator.addForCell(recFrame.lastConflictCell);
+        pQueue.addForCell(recFrame.lastConflictCell);
       }
 
       const cell = this._candidateSelector.getCellAtDepth(cellDepth);
@@ -852,7 +852,7 @@ class InternalSolver {
 
       // Propagate constraints.
       const hasConflict = !this._enforceConstraints(
-        recFrame.gridState, handlerAccumulator);
+        recFrame.gridState, pQueue);
       if (hasConflict) {
         // Store the current cells, so that the level immediately above us
         // can act on this information to run extra constraints.
@@ -1113,7 +1113,7 @@ class InternalSolver {
   }
 }
 
-class HandlerAccumulator {
+class PropagationQueue {
   // NOTE: This is intended to be created once, and reused.
   constructor(handlerSet) {
     this._allHandlers = handlerSet.getAll();

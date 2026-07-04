@@ -46,7 +46,7 @@ export class SudokuConstraintHandler {
   // - `true` if the grid is valid.
   // - `true` if there are still unknown values and the grid
   //          might be valid.
-  enforceConsistency(grid, handlerAccumulator) {
+  enforceConsistency(grid, pQueue) {
     return true;
   }
 
@@ -130,7 +130,7 @@ export class False extends SudokuConstraintHandler {
   initialize(initialGridCells, cellExclusions, geometry, stateAllocator) {
     return false;
   }
-  enforceConsistency(grid, handlerAccumulator) { return false; }
+  enforceConsistency(grid, pQueue) { return false; }
 }
 
 export class And extends SudokuConstraintHandler {
@@ -172,10 +172,10 @@ export class And extends SudokuConstraintHandler {
     }
   }
 
-  enforceConsistency(grid, handlerAccumulator) {
+  enforceConsistency(grid, pQueue) {
     const handlers = this._handlers;
     for (let i = 0; i < handlers.length; i++) {
-      if (!handlers[i].enforceConsistency(grid, handlerAccumulator)) return false;
+      if (!handlers[i].enforceConsistency(grid, pQueue)) return false;
     }
     return true;
   }
@@ -232,7 +232,7 @@ export class AllDifferent extends SudokuConstraintHandler {
       ? this._exclusionCells : [];
   }
 
-  enforceConsistency(grid, handlerAccumulator) {
+  enforceConsistency(grid, pQueue) {
     // NOTE: This is only called when enforcementType is
     // ENFORCE_WITH_PROPAGATION.
     // Currently a very simple, naive implementation.
@@ -268,7 +268,7 @@ export class UniqueValueExclusion extends SudokuConstraintHandler {
     return true;
   }
 
-  enforceConsistency(grid, handlerAccumulator) {
+  enforceConsistency(grid, pQueue) {
     const exclusionCells = this._cellExclusions;
     const numExclusions = exclusionCells.length;
     const value = grid[this._cell];
@@ -277,7 +277,7 @@ export class UniqueValueExclusion extends SudokuConstraintHandler {
       const exclusionCell = exclusionCells[i];
       if (grid[exclusionCell] & value) {
         if (!(grid[exclusionCell] ^= value)) return false;
-        handlerAccumulator.addForCell(exclusionCell);
+        pQueue.addForCell(exclusionCell);
       }
     }
 
@@ -312,7 +312,7 @@ export class ValueDependentUniqueValueExclusion extends SudokuConstraintHandler 
     return true;
   }
 
-  enforceConsistency(grid, handlerAccumulator) {
+  enforceConsistency(grid, pQueue) {
     const v = grid[this._cell];
 
     const index = LookupTables.toIndex(v);
@@ -323,7 +323,7 @@ export class ValueDependentUniqueValueExclusion extends SudokuConstraintHandler 
       const exclusionCell = exclusionCells[i];
       if (grid[exclusionCell] & v) {
         if (!(grid[exclusionCell] ^= v)) return false;
-        handlerAccumulator.addForCell(exclusionCell);
+        pQueue.addForCell(exclusionCell);
       }
     }
 
@@ -341,7 +341,7 @@ export class PerfectAllDifferentValueExclusion extends SudokuConstraintHandler {
     this._valueCellExclusions = valueCellExclusions;
   }
 
-  _handleExactlyTwo(grid, v, handlerAccumulator) {
+  _handleExactlyTwo(grid, v, pQueue) {
     const cells = this.cells;
     const numCells = cells.length;
 
@@ -361,7 +361,7 @@ export class PerfectAllDifferentValueExclusion extends SudokuConstraintHandler {
       for (let i = 0; i < exclusionCells.length; i++) {
         if (grid[exclusionCells[i]] & v) {
           if (!(grid[exclusionCells[i]] ^= v)) return false;
-          handlerAccumulator.addForCell(exclusionCells[i]);
+          pQueue.addForCell(exclusionCells[i]);
         }
       }
     }
@@ -369,7 +369,7 @@ export class PerfectAllDifferentValueExclusion extends SudokuConstraintHandler {
     return true;
   }
 
-  enforceConsistency(grid, handlerAccumulator) {
+  enforceConsistency(grid, pQueue) {
     const cells = this.cells;
     const numCells = cells.length;
 
@@ -387,7 +387,7 @@ export class PerfectAllDifferentValueExclusion extends SudokuConstraintHandler {
     while (exactlyTwo) {
       const v = exactlyTwo & -exactlyTwo;
       exactlyTwo ^= v;
-      if (!this._handleExactlyTwo(grid, v, handlerAccumulator)) {
+      if (!this._handleExactlyTwo(grid, v, pQueue)) {
         return false;
       }
     }
@@ -420,7 +420,7 @@ export class HandlerUtil {
     return true;
   }
 
-  static enforceRequiredValueExclusions(grid, cells, values, cellExclusions, handlerAccumulator) {
+  static enforceRequiredValueExclusions(grid, cells, values, cellExclusions, pQueue) {
     while (values) {
       const value = values & -values;
       values ^= value;
@@ -448,7 +448,7 @@ export class HandlerUtil {
 
       if (exclusionCells && exclusionCells.length) {
         if (!this.removeRequiredValueExclusions(
-          grid, exclusionCells, value, handlerAccumulator)) {
+          grid, exclusionCells, value, pQueue)) {
           return false;
         }
       }
@@ -457,12 +457,12 @@ export class HandlerUtil {
     return true;
   }
 
-  static removeRequiredValueExclusions(grid, exclusionCells, value, handlerAccumulator) {
+  static removeRequiredValueExclusions(grid, exclusionCells, value, pQueue) {
     // Remove the value from the exclusion cells.
     for (let i = 0; i < exclusionCells.length; i++) {
       if (grid[exclusionCells[i]] & value) {
         if (!(grid[exclusionCells[i]] ^= value)) return false;
-        if (handlerAccumulator) handlerAccumulator.addForCell(exclusionCells[i]);
+        if (pQueue) pQueue.addForCell(exclusionCells[i]);
       }
     }
 
@@ -646,7 +646,7 @@ export class PerfectAllDifferent extends SudokuConstraintHandler {
     return true;
   }
 
-  enforceConsistency(grid, handlerAccumulator) {
+  enforceConsistency(grid, pQueue) {
     const cells = this.cells;
     const numCells = cells.length;
 
@@ -714,7 +714,7 @@ export class FullGridRequiredValues extends SudokuConstraintHandler {
     return true;
   }
 
-  enforceConsistency(grid, handlerAccumulator) {
+  enforceConsistency(grid, pQueue) {
     const lines = this._lines;
     const numLines = lines.length;
     const lineLength = this._lineLength;
@@ -777,7 +777,7 @@ export class FullGridRequiredValues extends SudokuConstraintHandler {
             const next = v & invMask;
             if (next !== v) {
               if (!(grid[cell] = next)) return false;
-              handlerAccumulator.addForCell(cell);
+              pQueue.addForCell(cell);
             }
           }
         }
@@ -812,7 +812,7 @@ export class FullGridRequiredValues extends SudokuConstraintHandler {
             const v = grid[cell];
             if (v & removeValues) {
               if (!(grid[cell] &= allRequiredValues)) return false;
-              handlerAccumulator.addForCell(cell);
+              pQueue.addForCell(cell);
             }
           }
         }
@@ -860,7 +860,7 @@ export class BinaryConstraint extends SudokuConstraintHandler {
     return this._tables[0][lookupTables.allValues] !== 0;
   }
 
-  enforceConsistency(grid, handlerAccumulator) {
+  enforceConsistency(grid, pQueue) {
     const v0 = grid[this.cells[0]];
     const v1 = grid[this.cells[1]];
 
@@ -868,8 +868,8 @@ export class BinaryConstraint extends SudokuConstraintHandler {
     const v1New = grid[this.cells[1]] = v1 & this._tables[0][v0];
 
     if (!(v0New && v1New)) return false;
-    if (v0 !== v0New) handlerAccumulator.addForCell(this.cells[0]);
-    if (v1 !== v1New) handlerAccumulator.addForCell(this.cells[1]);
+    if (v0 !== v0New) pQueue.addForCell(this.cells[0]);
+    if (v1 !== v1New) pQueue.addForCell(this.cells[1]);
 
     // If transitive, then required value exclusion is not possible.
     if (this._exclusionsCellsForRequiredValues === null) return true;
@@ -897,7 +897,7 @@ export class BinaryConstraint extends SudokuConstraintHandler {
       const value = requiredValues & -requiredValues;
       requiredValues ^= value;
       if (!HandlerUtil.removeRequiredValueExclusions(
-        grid, this._exclusionsCellsForRequiredValues, value, handlerAccumulator)) {
+        grid, this._exclusionsCellsForRequiredValues, value, pQueue)) {
         return false;
       }
     }
@@ -1056,7 +1056,7 @@ export class BinaryPairwise extends SudokuConstraintHandler {
     return this._table[lookupTables.allValues] !== 0;
   }
 
-  _enforceRequiredValues(grid, cells, requiredValues, handlerAccumulator) {
+  _enforceRequiredValues(grid, cells, requiredValues, pQueue) {
     const numCells = cells.length;
 
     // Calculate the information required to constraint requiredValues.
@@ -1088,7 +1088,7 @@ export class BinaryPairwise extends SudokuConstraintHandler {
     // which will also propagate the changes.
     const nonUniqueRequired = requiredValues & nonUniqueValues & ~fixedValues;
     if (!HandlerUtil.enforceRequiredValueExclusions(
-      grid, cells, nonUniqueRequired, this._cellExclusions, handlerAccumulator)) return false;
+      grid, cells, nonUniqueRequired, this._cellExclusions, pQueue)) return false;
 
     return true;
   }
@@ -1124,7 +1124,7 @@ export class BinaryPairwise extends SudokuConstraintHandler {
     return true;
   }
 
-  enforceConsistency(grid, handlerAccumulator) {
+  enforceConsistency(grid, pQueue) {
     const cells = this.cells;
     const numCells = cells.length;
 
@@ -1162,7 +1162,7 @@ export class BinaryPairwise extends SudokuConstraintHandler {
           const word = i >>> 5;
           if ((bit & allChangedWords[word]) === 0) {
             allChangedWords[word] |= bit;
-            handlerAccumulator.addForCell(i);
+            pQueue.addForCell(i);
           }
         }
         suffix &= table[v];
@@ -1188,7 +1188,7 @@ export class BinaryPairwise extends SudokuConstraintHandler {
       for (let i = 0; i < numCells; i++) {
         if (grid[cells[i]] & ~validValues) {
           if (!(grid[cells[i]] &= validValues)) return false;
-          handlerAccumulator.addForCell(cells[i]);
+          pQueue.addForCell(cells[i]);
         }
       }
     }
@@ -1197,7 +1197,7 @@ export class BinaryPairwise extends SudokuConstraintHandler {
     // combination).
     const requiredValues = (validCombinationInfo >> 16) & 0xffff;
     if (requiredValues) {
-      if (!this._enforceRequiredValues(grid, cells, requiredValues, handlerAccumulator)) {
+      if (!this._enforceRequiredValues(grid, cells, requiredValues, pQueue)) {
         return false;
       }
     }
@@ -1267,7 +1267,7 @@ export class Skyscraper extends SudokuConstraintHandler {
     return [matrix0, matrix1, buffer.subarray(0, numValues * 2 * target)];
   }
 
-  enforceConsistency(grid, handlerAccumulator) {
+  enforceConsistency(grid, pQueue) {
     const cells = this.cells;
     const target = this._numVisible;
     const numCells = cells.length;
@@ -1428,7 +1428,7 @@ export class HiddenSkyscraper extends SudokuConstraintHandler {
     return true;
   }
 
-  enforceConsistency(grid, handlerAccumulator) {
+  enforceConsistency(grid, pQueue) {
     const cells = this.cells;
     const numCells = cells.length;
     const targetV = this._targetV;
@@ -1461,7 +1461,7 @@ export class HiddenSkyscraper extends SudokuConstraintHandler {
 
       if (grid[cell] !== v) {
         if (!(grid[cell] = v)) return false;
-        handlerAccumulator.addForCell(cell);
+        pQueue.addForCell(cell);
       }
 
       // Add any values which are higher than the previous state.
@@ -1479,7 +1479,7 @@ export class HiddenSkyscraper extends SudokuConstraintHandler {
       const cell = cells[i];
       if (grid[cell] & targetV) {
         if (!(grid[cell] &= ~targetV)) return false;
-        handlerAccumulator.addForCell(cell);
+        pQueue.addForCell(cell);
       }
     }
 
@@ -1492,7 +1492,7 @@ export class HiddenSkyscraper extends SudokuConstraintHandler {
       const newV = v & allowedSkyscrapers;
       if (newV !== v) {
         if (!(grid[cells[j]] = newV)) return false;
-        handlerAccumulator.addForCell(cells[j]);
+        pQueue.addForCell(cells[j]);
       }
       allowedSkyscrapers = (1 << (LookupTables.maxValue(newV) - 1)) - 1;
     }
@@ -1619,7 +1619,7 @@ export class Lunchbox extends SudokuConstraintHandler {
   static _validSettings = new Uint16Array(GEOMETRY_MAX.numValues);
   static _cellValues = new Uint16Array(GEOMETRY_MAX.numValues);
 
-  enforceConsistency(grid, handlerAccumulator) {
+  enforceConsistency(grid, pQueue) {
     const isHouse = this._isHouse;
     const cells = this.cells;
     const numCells = this.cells.length;
@@ -1755,7 +1755,7 @@ export class Lunchbox extends SudokuConstraintHandler {
       if (!newV) return false;
       if (v !== newV) {
         grid[cells[i]] = newV;
-        handlerAccumulator.addForCell(cells[i]);
+        pQueue.addForCell(cells[i]);
       }
     }
 
@@ -1832,7 +1832,7 @@ export class SameValues extends SudokuConstraintHandler {
     return true;
   }
 
-  enforceConsistency(grid, handlerAccumulator) {
+  enforceConsistency(grid, pQueue) {
     if (this._stateOffset !== -1 && grid[this._stateOffset]) return true;
 
     const numSets = this._cellSets.length;
@@ -1865,7 +1865,7 @@ export class SameValues extends SudokuConstraintHandler {
         for (let j = setLen - 1; j >= 0; j--) {
           if (grid[s[j]] & ~valueIntersection) {
             if (!(grid[s[j]] &= valueIntersection)) return false;
-            handlerAccumulator.addForCell(s[j]);
+            pQueue.addForCell(s[j]);
           }
         }
       }
@@ -1879,10 +1879,10 @@ export class SameValues extends SudokuConstraintHandler {
       return true;
     }
 
-    return this._enforceCounts(grid, handlerAccumulator, valueIntersection);
+    return this._enforceCounts(grid, pQueue, valueIntersection);
   }
 
-  _enforceCounts(grid, handlerAccumulator, valueIntersection) {
+  _enforceCounts(grid, pQueue, valueIntersection) {
     const numSets = this._cellSets.length;
     const setLen = this._cellSets[0].length;
     const countBuffer = this._buffer1;
@@ -1930,7 +1930,7 @@ export class SameValues extends SudokuConstraintHandler {
             for (let j = 0; j < setLen; j++) {
               if ((grid[s[j]] & v) && grid[s[j]] !== v) {
                 grid[s[j]] &= ~v;
-                handlerAccumulator.addForCell(s[j]);
+                pQueue.addForCell(s[j]);
               }
             }
           } else if (countBuffer[i] === maxRequired && requiredBuffer[i] < maxRequired) {
@@ -1938,7 +1938,7 @@ export class SameValues extends SudokuConstraintHandler {
             for (let j = 0; j < setLen; j++) {
               if ((grid[s[j]] & v) && grid[s[j]] !== v) {
                 grid[s[j]] = v;
-                handlerAccumulator.addForCell(s[j]);
+                pQueue.addForCell(s[j]);
               }
             }
           }
@@ -1966,7 +1966,7 @@ export class SameValuesIgnoreCount extends SameValues {
     return 0;
   }
 
-  _enforceCounts(grid, handlerAccumulator, valueIntersection) {
+  _enforceCounts(grid, pQueue, valueIntersection) {
     return true;
   }
 }
@@ -1998,9 +1998,9 @@ export class Between extends SudokuConstraintHandler {
     return this._mids.length ? this._ends : [];
   }
 
-  enforceConsistency(grid, handlerAccumulator) {
+  enforceConsistency(grid, pQueue) {
     // Constrain the ends to be consistent with each other.
-    if (!this._binaryConstraint.enforceConsistency(grid, handlerAccumulator)) {
+    if (!this._binaryConstraint.enforceConsistency(grid, pQueue)) {
       return false;
     }
 
@@ -2049,9 +2049,9 @@ export class Lockout extends SudokuConstraintHandler {
     return this._ends;
   }
 
-  enforceConsistency(grid, handlerAccumulator) {
+  enforceConsistency(grid, pQueue) {
     // Constrain the ends to be consistent with each other.
-    if (!this._binaryConstraint.enforceConsistency(grid, handlerAccumulator)) {
+    if (!this._binaryConstraint.enforceConsistency(grid, pQueue)) {
       return false;
     }
 
@@ -2106,7 +2106,7 @@ class _Squishable2x2 extends SudokuConstraintHandler {
     return true;
   }
 
-  _enforceRequiredValues(grid, handlerAccumulator) {
+  _enforceRequiredValues(grid, pQueue) {
     const cells = this.cells;
     const numCells = this.cells.length;
 
@@ -2130,13 +2130,13 @@ class _Squishable2x2 extends SudokuConstraintHandler {
       }
       // Now we know `triadValue` is a required value and is in multiple cells.
       if (!HandlerUtil.enforceRequiredValueExclusions(
-        grid, cells, triadValue, this._cellExclusions, handlerAccumulator)) return false;
+        grid, cells, triadValue, this._cellExclusions, pQueue)) return false;
     }
 
     return true;
   }
 
-  enforceConsistency(grid, handlerAccumulator) {
+  enforceConsistency(grid, pQueue) {
     const cells = this.cells;
     const numCells = this.cells.length;
     const squishedMask = this.constructor.SQUISHED_MASK;
@@ -2177,7 +2177,7 @@ class _Squishable2x2 extends SudokuConstraintHandler {
           const unsquishedValue = value | (value << squishOffset) | (value << squishOffset2);
           const cell = cells[i];
           grid[cell] &= unsquishedValue;
-          handlerAccumulator.addForCell(cell);
+          pQueue.addForCell(cell);
         }
       }
       fixedValues |= hiddenSquishedSingles;
@@ -2205,7 +2205,7 @@ class _Squishable2x2 extends SudokuConstraintHandler {
       }
     }
 
-    return this._enforceRequiredValues(grid, handlerAccumulator);
+    return this._enforceRequiredValues(grid, pQueue);
   }
 }
 
@@ -2242,7 +2242,7 @@ export class DutchFlatmateLine extends SudokuConstraintHandler {
     return true;
   }
 
-  enforceConsistency(grid, handlerAccumulator) {
+  enforceConsistency(grid, pQueue) {
     const cells = this.cells;
     const numCells = cells.length;
     const target = this._mid;
@@ -2353,7 +2353,7 @@ export class RequiredValues extends SudokuConstraintHandler {
     return true;
   }
 
-  _enforceRepeatedValues(grid, handlerAccumulator) {
+  _enforceRepeatedValues(grid, pQueue) {
     const repeatedValues = this._repeatedValues;
     const cells = this.cells;
     const numCells = cells.length;
@@ -2385,7 +2385,7 @@ export class RequiredValues extends SudokuConstraintHandler {
     return true;
   }
 
-  enforceConsistency(grid, handlerAccumulator) {
+  enforceConsistency(grid, pQueue) {
     const cells = this.cells;
     const numCells = cells.length;
     const hasRepeatedValues = this._repeatedValues.length > 0;
@@ -2394,7 +2394,7 @@ export class RequiredValues extends SudokuConstraintHandler {
       // NOTE: This must happen before the valueMask & ~fixedValues
       // check as that can return true even if all repeated values aren't
       // satisfied.
-      if (!this._enforceRepeatedValues(grid, handlerAccumulator)) return false;
+      if (!this._enforceRepeatedValues(grid, pQueue)) return false;
     }
 
     let allValues = 0;
@@ -2556,7 +2556,7 @@ export class SumLine extends SudokuConstraintHandler {
     return minTotal < maxTotal - maxRemainder;
   }
 
-  enforceConsistency(grid, handlerAccumulator) {
+  enforceConsistency(grid, pQueue) {
     const states = this._states;
     const numCells = this.cells.length;
 
@@ -2602,7 +2602,7 @@ export class ValueIndexing extends SudokuConstraintHandler {
     return !!initialGridCells[this._valueCell];
   }
 
-  enforceConsistency(grid, handlerAccumulator) {
+  enforceConsistency(grid, pQueue) {
     const cells = this._indexedCells;
     const controlCell = this._controlCell
     const numCells = cells.length;
@@ -2631,12 +2631,12 @@ export class ValueIndexing extends SudokuConstraintHandler {
 
     if (originalValues !== possibleValues) {
       if (!(grid[valueCell] = possibleValues)) return false;
-      handlerAccumulator.addForCell(valueCell);
+      pQueue.addForCell(valueCell);
     }
 
     if (possibleControl !== originalControl) {
       if (!(grid[controlCell] = possibleControl)) return false;
-      handlerAccumulator.addForCell(controlCell);
+      pQueue.addForCell(controlCell);
     }
 
     return true;
@@ -2666,7 +2666,7 @@ export class Indexing extends SudokuConstraintHandler {
     return true;
   }
 
-  enforceConsistency(grid, handlerAccumulator) {
+  enforceConsistency(grid, pQueue) {
     const cells = this._indexedCells;
     const controlCell = this._controlCell;
     const numCells = cells.length;
@@ -2684,7 +2684,7 @@ export class Indexing extends SudokuConstraintHandler {
           // This cell can't have the indexed value because the control cell
           // does not allow selecting it.
           if (!(grid[cell] &= ~indexedMask)) return false;
-          handlerAccumulator.addForCell(cell);
+          pQueue.addForCell(cell);
         }
       } else {
         // The control value can't select this index because the corresponding
@@ -2696,7 +2696,7 @@ export class Indexing extends SudokuConstraintHandler {
 
     if (controlValue !== originalControl) {
       if (!(grid[controlCell] = controlValue)) return false;
-      handlerAccumulator.addForCell(controlCell);
+      pQueue.addForCell(controlCell);
     }
 
     return true;
@@ -2774,7 +2774,7 @@ export class CountingCircles extends SudokuConstraintHandler {
     return true;
   }
 
-  enforceConsistency(grid, handlerAccumulator) {
+  enforceConsistency(grid, pQueue) {
     const cells = this.cells;
     const numCells = cells.length;
 
@@ -2965,7 +2965,7 @@ export class CountDistinct extends SudokuConstraintHandler {
 
   // NValue propagator (`control = #distinct(counted)`). See COUNT_DISTINCT.md for
   // the full derivation; the section references below point into it.
-  enforceConsistency(grid, handlerAccumulator) {
+  enforceConsistency(grid, pQueue) {
     const countedCells = this._countedCells;
     const numCells = countedCells.length;
     const offset = this._valueOffset;
@@ -3016,7 +3016,7 @@ export class CountDistinct extends SudokuConstraintHandler {
     if (!newControlMask) return false;
     if (newControlMask !== controlMask) {
       grid[controlCell] = newControlMask;
-      handlerAccumulator.addForCell(controlCell);
+      pQueue.addForCell(controlCell);
     }
 
     // Counted cells are only prunable once the control is pinned to an extreme
@@ -3072,7 +3072,7 @@ export class CountDistinct extends SudokuConstraintHandler {
       if (keep !== dom) {
         if (!keep) return false;
         grid[unfixedCells[j]] = keep;
-        handlerAccumulator.addForCell(unfixedCells[j]);
+        pQueue.addForCell(unfixedCells[j]);
       }
     }
 
@@ -3434,7 +3434,7 @@ export class FullRank extends SudokuConstraintHandler {
   _flagsBuffer = new Uint8Array(GEOMETRY_MAX.numValues * 4);
 
   _enforceUncluedEntriesForGiven(
-    grid, handlerAccumulator, viableEntries, numViableEntries, given) {
+    grid, pQueue, viableEntries, numViableEntries, given) {
     const { entry, numRanksBelow, numRanksAbove } = given;
     const permissiveClues = this._tieMode === FullRank.TIE_MODE.ANY;
     const entries = this._uncluedEntries;
@@ -3535,7 +3535,7 @@ export class FullRank extends SudokuConstraintHandler {
         if (flagsBuffer[i] & IS_LESS_FLAG) {
           const cell = entries[viableEntries[i]][0];
           grid[cell] = initialV;
-          handlerAccumulator.addForCell(cell);
+          pQueue.addForCell(cell);
         }
       }
     } else if (fixedLessCount === numRanksBelow && maybeLessCount > numRanksBelow) {
@@ -3546,11 +3546,11 @@ export class FullRank extends SudokuConstraintHandler {
           // This entry only had the invalid direction, so we can exclude it.
           const cell = entries[viableEntries[i]][0];
           grid[cell] &= ~initialV;
-          handlerAccumulator.addForCell(cell);
+          pQueue.addForCell(cell);
         } else if (flagsBuffer[i] === (IS_LESS_FLAG | IS_GREATER_FLAG | IS_SET_FLAG | IS_NOT_EQUAL)) {
           // This entry must be included, but currently allows both directions.
           // Try to constraint it to just the valid direction.
-          if (!this._enforceOrderedEntryPair(grid, handlerAccumulator,
+          if (!this._enforceOrderedEntryPair(grid, pQueue,
             entry, entries[viableEntries[i]])) {
             return false;
           }
@@ -3566,7 +3566,7 @@ export class FullRank extends SudokuConstraintHandler {
         if (flagsBuffer[i] & IS_GREATER_FLAG) {
           const cell = entries[viableEntries[i]][0];
           grid[cell] = initialV;
-          handlerAccumulator.addForCell(cell);
+          pQueue.addForCell(cell);
         }
       }
     } else if (fixedGreaterCount === numRanksAbove && maybeGreaterCount > numRanksAbove) {
@@ -3574,9 +3574,9 @@ export class FullRank extends SudokuConstraintHandler {
         if (flagsBuffer[i] === (IS_GREATER_FLAG | IS_NOT_EQUAL)) {
           const cell = entries[viableEntries[i]][0];
           grid[cell] &= ~initialV;
-          handlerAccumulator.addForCell(cell);
+          pQueue.addForCell(cell);
         } else if (flagsBuffer[i] === (IS_LESS_FLAG | IS_GREATER_FLAG | IS_SET_FLAG | IS_NOT_EQUAL)) {
-          if (!this._enforceOrderedEntryPair(grid, handlerAccumulator,
+          if (!this._enforceOrderedEntryPair(grid, pQueue,
             entries[viableEntries[i]], entry)) {
             return false;
           }
@@ -3587,7 +3587,7 @@ export class FullRank extends SudokuConstraintHandler {
     return true;
   }
 
-  _enforceOrderedEntryPair(grid, handlerAccumulator, lowEntry, highEntry) {
+  _enforceOrderedEntryPair(grid, pQueue, lowEntry, highEntry) {
     // We know that lowEntry must be lower then highEntry, and are in the same
     // rank set.
     // Algorithm:
@@ -3616,13 +3616,13 @@ export class FullRank extends SudokuConstraintHandler {
       if (LookupTables.maxValue(lowV) > maxHighV) {
         const mask = (1 << maxHighV) - 1;
         grid[lowEntry[i]] = (lowV &= mask & equalValuesMask);
-        handlerAccumulator.addForCell(lowEntry[i]);
+        pQueue.addForCell(lowEntry[i]);
       }
       const minLowV = LookupTables.minValue(lowV);
       if (LookupTables.minValue(highV) < minLowV) {
         const mask = -1 << (minLowV - 1);
         grid[highEntry[i]] = (highV &= mask & equalValuesMask);
-        handlerAccumulator.addForCell(highEntry[i]);
+        pQueue.addForCell(highEntry[i]);
       }
       if (!lowV || !highV) return false;
       // If the cells are now equal and fixed, then we can keep constraining.
@@ -3637,13 +3637,13 @@ export class FullRank extends SudokuConstraintHandler {
     return false;
   }
 
-  _enforceSingleRankSet(grid, handlerAccumulator, rankSet) {
+  _enforceSingleRankSet(grid, pQueue, rankSet) {
     const { value, givens } = rankSet;
     const numGivens = givens.length;
 
     // First constraint the clued ranks against each other.
     for (let i = 1; i < numGivens; i++) {
-      if (!this._enforceOrderedEntryPair(grid, handlerAccumulator,
+      if (!this._enforceOrderedEntryPair(grid, pQueue,
         givens[i - 1].entry, givens[i].entry)) {
         return false;
       }
@@ -3668,7 +3668,7 @@ export class FullRank extends SudokuConstraintHandler {
     // Enforce the unclued entries.
     for (let i = 0; i < numGivens; i++) {
       if (!this._enforceUncluedEntriesForGiven(
-        grid, handlerAccumulator, viableEntries, numViableEntries, givens[i])) {
+        grid, pQueue, viableEntries, numViableEntries, givens[i])) {
         return false;
       }
     }
@@ -3676,10 +3676,10 @@ export class FullRank extends SudokuConstraintHandler {
     return true;
   }
 
-  enforceConsistency(grid, handlerAccumulator) {
+  enforceConsistency(grid, pQueue) {
     for (let i = 0; i < this._rankSets.length; i++) {
       if (!this._enforceSingleRankSet(
-        grid, handlerAccumulator, this._rankSets[i])) {
+        grid, pQueue, this._rankSets[i])) {
         return false;
       }
     }
@@ -3752,18 +3752,18 @@ export class Rellik extends SudokuConstraintHandler {
     return true;
   }
 
-  enforceConsistency(grid, handlerAccumulator) {
-    return this._enforce(grid, grid[this._forcedState], handlerAccumulator);
+  enforceConsistency(grid, pQueue) {
+    return this._enforce(grid, grid[this._forcedState], pQueue);
   }
 
   // Record `values` as known to be present in the cage.
-  addForcedValues(grid, values, handlerAccumulator) {
+  addForcedValues(grid, values, pQueue) {
     const combined = grid[this._forcedState] | values;
     if (combined === grid[this._forcedState]) return true;
-    return this._enforce(grid, combined, handlerAccumulator);
+    return this._enforce(grid, combined, pQueue);
   }
 
-  _enforce(grid, forcedValues, handlerAccumulator) {
+  _enforce(grid, forcedValues, pQueue) {
     const cells = this.cells;
     const sum = this._sum;
     const valueOffset = this._valueOffset;
@@ -3827,7 +3827,7 @@ export class Rellik extends SudokuConstraintHandler {
       const cell = cells[i];
       if (grid[cell] & valuesToRemove) {
         if (!(grid[cell] &= ~valuesToRemove)) return false;
-        handlerAccumulator.addForCell(cell);
+        pQueue.addForCell(cell);
       }
     }
 
@@ -3844,7 +3844,7 @@ export class HouseRequiredRellik extends SudokuConstraintHandler {
     this._mask = mask;
   }
 
-  enforceConsistency(grid, handlerAccumulator) {
+  enforceConsistency(grid, pQueue) {
     const outside = this.cells;
     const mask = this._mask;
     let outsideValues = 0;
@@ -3856,7 +3856,7 @@ export class HouseRequiredRellik extends SudokuConstraintHandler {
     }
 
     return this._rellik.addForcedValues(
-      grid, mask & ~outsideValues, handlerAccumulator);
+      grid, mask & ~outsideValues, pQueue);
   }
 }
 
@@ -3889,7 +3889,7 @@ export class EqualSizePartitions extends SudokuConstraintHandler {
     return true;
   }
 
-  enforceConsistency(grid, handlerAccumulator) {
+  enforceConsistency(grid, pQueue) {
     const cells = this.cells;
     const numCells = cells.length;
     const mask1 = this._mask1;
@@ -3932,7 +3932,7 @@ export class EqualSizePartitions extends SudokuConstraintHandler {
         const v = grid[cell];
         if (v & maskToKeep) {
           grid[cell] &= ~maskToRemove;
-          if (v & maskToRemove) handlerAccumulator.addForCell(cell);
+          if (v & maskToRemove) pQueue.addForCell(cell);
         }
       }
     }
@@ -3963,7 +3963,7 @@ export class DoppelgangerZero extends SudokuConstraintHandler {
     return true;
   }
 
-  enforceConsistency(grid, handlerAccumulator) {
+  enforceConsistency(grid, pQueue) {
     const v = grid[this._gridCell];
 
     // If the grid cell can't be 0, constraint is trivially satisfied.
@@ -3980,7 +3980,7 @@ export class DoppelgangerZero extends SudokuConstraintHandler {
           if (j === i) continue;
           if (si & grid[s[j]]) {
             if (!(grid[s[j]] &= ~si)) return false;
-            handlerAccumulator.addForCell(s[j]);
+            pQueue.addForCell(s[j]);
           }
         }
       }
@@ -3995,7 +3995,7 @@ export class DoppelgangerZero extends SudokuConstraintHandler {
       );
       if (varCellConflict) {
         if (!(grid[this._gridCell] &= ~1)) return false;
-        handlerAccumulator.addForCell(this._gridCell);
+        pQueue.addForCell(this._gridCell);
       }
     }
 
@@ -4003,7 +4003,7 @@ export class DoppelgangerZero extends SudokuConstraintHandler {
   }
 }
 
-class DummyHandlerAccumulator {
+class NullPropagationQueue {
   addForCell(cell) { }
 }
 
@@ -4030,7 +4030,7 @@ export class Or extends SudokuConstraintHandler {
     this._numSearchCells = 0;
     this._stateOffset = 0;
     this._numHandlerStates = 0;
-    this._dummyHandlerAccumulator = new DummyHandlerAccumulator();
+    this._nullPropagationQueue = new NullPropagationQueue();
   }
 
   _markAsInvalid(grid, handlerIndex) {
@@ -4146,7 +4146,7 @@ export class Or extends SudokuConstraintHandler {
     this._resultGrid = readonlyGridState.slice();
   }
 
-  enforceConsistency(grid, handlerAccumulator) {
+  enforceConsistency(grid, pQueue) {
     // Check if we only have one handler left, and if so, enforce it directly.
     if ((grid[this._stateOffset] & this.constructor._FLAG_FINAL)) {
       const handlerIndex = grid[this._stateOffset] & ~this.constructor._FLAG_FINAL;
@@ -4156,14 +4156,14 @@ export class Or extends SudokuConstraintHandler {
       if (!this._assignInitializations(grid, handlerIndex)) return false;
 
       return this._handlers[handlerIndex].enforceConsistency(
-        grid, handlerAccumulator);
+        grid, pQueue);
     }
 
     const numSearchCells = this._numSearchCells;
 
     const resultGrid = this._resultGrid;
     const scratchGrid = this._scratchGrid;
-    const dummyHandlerAccumulator = this._dummyHandlerAccumulator;
+    const nullPropagationQueue = this._nullPropagationQueue;
     resultGrid.fill(0);
 
     for (let i = 0; i < this._handlers.length; i++) {
@@ -4178,7 +4178,7 @@ export class Or extends SudokuConstraintHandler {
         continue;
       }
       // Enforce consistency on the scratch grid.
-      if (!handler.enforceConsistency(scratchGrid, dummyHandlerAccumulator)) {
+      if (!handler.enforceConsistency(scratchGrid, nullPropagationQueue)) {
         this._markAsInvalid(grid, i);
         continue;
       }

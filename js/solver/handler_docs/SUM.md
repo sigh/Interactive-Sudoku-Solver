@@ -118,9 +118,9 @@ each group's coefficient, then dispatches.
 ```text
 function enforceConsistency(grid):
     minSum, maxSum, fixedSum, numUnfixed ← aggregate over all groups   # §2.2
-    if sum < minSum or maxSum < sum: return CONTRADICTION              # unreachable
+    if sum < minSum or maxSum < sum: return CONFLICT              # unreachable
     if minSum = maxSum:              return OK     # every cell fixed; already exact
-    if numUnfixed ≤ 0:               return CONTRADICTION   # some cell is empty
+    if numUnfixed ≤ 0:               return CONFLICT   # some cell is empty
 
     if few unfixed cells:            enforce them exactly             # §6
     else:                            restrict value ranges by slack   # §4
@@ -198,7 +198,7 @@ function restrictCellsWithCoefficients(grid, sum, coeffGroups):
         seenMax ← the t largest  distinct values the group can realise
         accumulate coeff·sum(seenMin) into strictMin, coeff·sum(seenMax) into strictMax
     minDof ← sum − strictMin;  maxDof ← strictMax − sum
-    if minDof < 0 or maxDof < 0: return CONTRADICTION
+    if minDof < 0 or maxDof < 0: return CONFLICT
     for each exclusion group (largest |coeff| first, stopping once slack is loose):
         build a value mask from seenMin grown up by minDof and seenMax grown down by maxDof
         intersect every cell of the group with that mask
@@ -250,7 +250,7 @@ filtered exactly by enumerating value combinations.
 ```text
 function restrictCellsSingleExclusionGroup(grid, sum, cells):
     fixedValues, allValues ← OR of fixed / of all candidates
-    if popcount(allValues) < numCells:        return CONTRADICTION   # too few values
+    if popcount(allValues) < numCells:        return CONFLICT   # too few values
     if allValues = fixedValues:               return fixedSum = sum  # fully fixed
     target ← sum − sum(fixedValues)
     possibilities ← 0;  required ← unfixedValues
@@ -258,7 +258,7 @@ function restrictCellsSingleExclusionGroup(grid, sum, cells):
         if option ⊆ unfixedValues:            # a feasible distinct combination
             possibilities |= option
             required      &= option            # values common to all options
-    if possibilities = 0:                      return CONTRADICTION
+    if possibilities = 0:                      return CONFLICT
     remove unfixedValues \ possibilities from every cell        # GAC pruning
     expose hidden singles among required values                 # value in exactly one cell
     enforce required-value exclusions for the rest

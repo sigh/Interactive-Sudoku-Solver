@@ -8,7 +8,7 @@ higher-level overview of all solver files, see [README.md](README.md).
 The solver is a constraint-satisfaction problem (CSP) engine. It combines
 **backtracking search** with **constraint propagation**: at each step it picks
 a cell, tries a candidate value, and propagates the consequences through all
-affected constraints until either a contradiction is found (triggering
+affected constraints until either a conflict is found (triggering
 backtracking) or a fixed point is reached (and the next cell is picked).
 
 All solving happens inside a Web Worker to avoid blocking the UI.
@@ -82,11 +82,11 @@ Every constraint is enforced by a handler — a subclass of
 propagation loop is type-agnostic — it interacts with handlers through
 this interface:
 
-- **`enforceConsistency(grid, handlerAccumulator)`** — inspects the
+- **`enforceConsistency(grid, pQueue)`** — inspects the
   bitmasks for its cells, removes invalid candidates, and returns `false`
-  if a contradiction is detected. When it changes a cell, it must call
-  `handlerAccumulator.addForCell(cell)` so other handlers watching that cell
-  are queued. The accumulator automatically skips re-queuing the
+  if a conflict is detected. When it changes a cell, it must call
+  `pQueue.addForCell(cell)` so other handlers watching that cell
+  are queued. The queue automatically skips re-queuing the
   currently-active handler for its own changes.
 - **`initialize(initialGridCells, cellExclusions, geometry, stateAllocator)`** —
   one-time setup before search begins. Can modify initial candidates and
@@ -136,7 +136,7 @@ times. Follow these rules:
   constructor/`initialize`. Use typed arrays (`Uint16Array`, etc.).
 - **Only call `addForCell` when the cell actually changed.** Gate every call.
   Unconditional `addForCell` causes cascading redundant handler invocations.
-- **Use bitwise assignment to update and detect contradiction in one step.**
+- **Use bitwise assignment to update and detect conflict in one step.**
   `if (!(grid[c] &= mask)) return false;` for AND-restriction.
   `if (!(grid[c] ^= value)) return false;` for removing a known single value
   (only when `grid[c] & value` is true).
@@ -154,21 +154,21 @@ times. Follow these rules:
 
 ## Constraint Propagation
 
-`HandlerAccumulator` (in [engine.js](engine.js)) is a linked-list queue of
-handlers that need to run. When a cell's candidates change, the accumulator
+`PropagationQueue` (in [engine.js](engine.js)) is a linked-list queue of
+handlers that need to run. When a cell's candidates change, the queue
 enqueues all handlers that touch that cell. The propagation loop drains the
 queue until it is empty (fixed point) or a handler returns `false`
-(contradiction):
+(conflict):
 
 ```
 while queue is not empty:
     take next handler from queue
-    call handler.enforceConsistency(gridState, accumulator)
-    if contradiction: return false
+    call handler.enforceConsistency(gridState, queue)
+    if conflict: return false
 return true
 ```
 
-The search loop seeds the accumulator via `addForFixedCell`, which pushes
+The search loop seeds the queue via `addForFixedCell`, which pushes
 the cell's singleton handler (e.g., `UniqueValueExclusion`) to the **front**
 of the queue, then enqueues aux and ordinary handlers to the back. During
 propagation itself, handlers call `addForCell`, which only enqueues ordinary
@@ -182,7 +182,7 @@ records:
 
 - **`cellDepth`** — how many cells have been fixed so far.
 - **`gridState`** — the `Uint16Array` view for this depth.
-- **`lastContradictionCell`** — which cell caused a backtrack from a deeper
+- **`lastConflictCell`** — which cell caused a backtrack from a deeper
   frame (used as a hint by the candidate selector).
 - **`newNode`** — whether this is a fresh node or a retry after backtracking.
 
@@ -191,10 +191,10 @@ The loop:
 1. `CandidateSelector.selectNextCandidate()` picks the next cell and value
    to try. Cells are ranked by conflict score divided by candidate count;
    when all scores are zero it falls back to minimum remaining values (MRV).
-2. The value is set in the grid, and the `HandlerAccumulator` is seeded with
+2. The value is set in the grid, and the `PropagationQueue` is seeded with
    all handlers touching that cell.
 3. Constraint propagation runs to a fixed point.
-4. If a contradiction is found, `ConflictScores` records it (for future
+4. If a conflict is found, `ConflictScores` records it (for future
    ordering), and the loop continues at the same stack depth to try the next
    value. If no values remain, the stack depth is decremented (backtrack).
 5. If all cells are solved, a solution is yielded.
@@ -204,7 +204,7 @@ The loop:
 ## Conflict Scores
 
 `ConflictScores` (in [candidate_selector.js](candidate_selector.js)) is a
-history heuristic. When a cell/value assignment leads to a contradiction, its
+history heuristic. When a cell/value assignment leads to a conflict, its
 score is incremented. The candidate selector ranks cells by
 `conflictScore / candidateCount`, so cells with high scores relative to their
 size are explored first. When all scores are zero (e.g., early in the solve),
@@ -250,7 +250,7 @@ The callback fires every `2^logFrequency` iterations; the caller reads
 |-------|------|------|
 | `SudokuSolver` | [engine.js](engine.js) | Public API; wraps `InternalSolver`. |
 | `InternalSolver` | [engine.js](engine.js) | Search loop, propagation, backtracking. |
-| `HandlerAccumulator` | [engine.js](engine.js) | Linked-list queue for constraint propagation. |
+| `PropagationQueue` | [engine.js](engine.js) | Linked-list queue for constraint propagation. |
 | `HandlerSet` | [engine.js](engine.js) | Maps cells to their handlers; manages add/remove/replace. |
 | `CellExclusions` | [engine.js](engine.js) | Tracks which cell pairs must differ. |
 | `GridStateAllocator` | [engine.js](engine.js) | Manages the initial grid state buffer and extra handler state. |

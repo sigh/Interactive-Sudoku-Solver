@@ -114,11 +114,11 @@ function enforceConsistency(grid):
             for each (target, symbols) in transitionLists[s]:
                 if symbols ∩ candidates ≠ ∅:           # transition fires
                     add target to layer[i+1]
-        if layer[i+1] is empty: return CONTRADICTION
+        if layer[i+1] is empty: return CONFLICT
 
     # Restrict the final layer to accepting states.
     layer[k] ← layer[k] ∩ acceptingStates
-    if layer[k] is empty: return CONTRADICTION
+    if layer[k] is empty: return CONFLICT
 
     # Backward pass: drop states that lie on no accepting path; prune values.
     for i in k-1 … 0:
@@ -132,7 +132,7 @@ function enforceConsistency(grid):
                     support ← support ∪ fired
                     kept ← true
             if not kept: remove s from layer[i]
-        if support is empty: return CONTRADICTION
+        if support is empty: return CONFLICT
         if support ≠ candidates:
             grid[cell_i] ← support                     # prune; notify accumulator
     return OK
@@ -168,7 +168,7 @@ Concatenating gives a full accepting sequence that uses `v` at position `i` with
 every other position inside its domain — so `v` genuinely has support. Conversely,
 any value with no such triple is in no cell's support and is removed. That is
 exactly generalized arc consistency for the sequence constraint, and the
-contradiction checks (an empty `layer[i+1]` in the forward pass, an empty accepting
+conflict checks (an empty `layer[i+1]` in the forward pass, an empty accepting
 intersection, or an empty support) fire precisely when no accepting sequence
 remains.
 
