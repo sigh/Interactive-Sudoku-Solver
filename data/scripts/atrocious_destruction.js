@@ -12,6 +12,7 @@
 // the circle's real region, which is exactly a ChaosCount over that set.
 
 const N = 8;
+const graph = cellGraph('8x8');
 const cc = (r, c) => `CC${(r - 1) * N + c}`;   // real-region (chaos) cell id
 
 // Fixed false-region id per cell, row-major R1..R8.
@@ -67,13 +68,10 @@ for (const circle of circles) {
   const { row: r, col: c } = parseCellId(circle);
   const fr = falseAt(r, c);
   const set = [cc(r, c)];   // the circle's own real-region cell is the reference
-  for (let dr = -1; dr <= 1; dr++)
-    for (let dc = -1; dc <= 1; dc++) {
-      if (dr === 0 && dc === 0) continue;
-      const nr = r + dr, nc = c + dc;
-      if (nr < 1 || nr > N || nc < 1 || nc > N) continue;
-      if (falseAt(nr, nc) === fr) set.push(cc(nr, nc));
-    }
+  for (const neighbour of graph.kingNeighbours(circle)) {
+    const { row: nr, col: nc } = parseCellId(neighbour);
+    if (falseAt(nr, nc) === fr) set.push(cc(nr, nc));
+  }
   constraints.push(new ChaosCount(circle, 0, ...set));
 }
 

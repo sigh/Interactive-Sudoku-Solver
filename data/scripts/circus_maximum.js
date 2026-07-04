@@ -45,8 +45,8 @@ function colorCandidates(_, i) {
   ].flat());
 }
 
-const allCells = rangeI(1, 9).flatMap(r => rangeI(1, 9)
-  .map(c => makeCellId(r, c))).toArray();
+const graph = cellGraph();
+const allCells = graph.gridCells();
 
 const circleIndices = circles.split('').flatMap((value, i) =>
   value == '.' ? [] : [i]);
@@ -54,18 +54,12 @@ const circleCells = circleIndices.map(i => allCells[i]);
 const circleVars = circleIndices.map((_, i) => `VC${i + 1}`);
 const gridToVarMap = new Map(circleCells.map((cell, i) => [cell, circleVars[i]]));
 
-const graph = cellGraph();
-
-function circleAdjacencies() {
-  const pairs = [];
-  for (const cell of circleCells) {
-    const right = graph.step(cell, 0, 1);
-    const down = graph.step(cell, 1, 0);
-    if (gridToVarMap.has(right)) pairs.push([cell, right].map(c => gridToVarMap.get(c)));
-    if (gridToVarMap.has(down)) pairs.push([cell, down].map(c => gridToVarMap.get(c)));
-  }
-  return pairs;
-}
+// Each orthogonally-adjacent pair of circles, once: the horizontal and vertical
+// dominoes starting at each circle whose other cell is also a circle.
+const circleAdjacencies = () => circleCells
+  .flatMap(cell => [graph.block(cell, 1, 2), graph.block(cell, 2, 1)])
+  .filter(domino => domino?.every(c => gridToVarMap.has(c)))
+  .map(domino => domino.map(c => gridToVarMap.get(c)));
 
 const allCircleEntries = circleCells.flatMap((cell, i) => [cell, circleVars[i]]);
 
@@ -73,11 +67,11 @@ function colorDigitSpec(color, digit) {
   return NFA.encodeSpec({
     startState: { count: 0 },
     transition: ({ count, digitMatch }, value) =>
-      (digitMatch == undefined) ? { count, digitMatch: value == digit }
+      (digitMatch === undefined) ? { count, digitMatch: value == digit }
         : (digitMatch && value == color) ? ((count == digit) ? [] : { count: count + 1 })
           : { count },
     accept: ({ count, digitMatch }) =>
-      (digitMatch == undefined) && (count == 0 || count == digit),
+      (digitMatch === undefined) && (count == 0 || count == digit),
   }, 9);
 }
 

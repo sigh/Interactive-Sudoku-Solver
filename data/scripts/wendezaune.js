@@ -25,8 +25,7 @@ const isTurn = s => s >= UL;   // the four corners
 const gridShape = cellGeometry('9x9');
 const graph = cellGraph(gridShape);
 const shapeCell = cell => `VS${gridShape.parseCellId(cell).cell + 1}`;
-const gridCells = Array.from({ length: gridShape.numGridCells },
-  (_, i) => gridShape.makeCellIdFromIndex(i));
+const gridCells = graph.gridCells();
 
 const constraints = [new Shape('9x9'), new Given('R1C1', 6),
 new Var('S', 'shape', gridShape.numGridCells)];

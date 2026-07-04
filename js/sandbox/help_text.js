@@ -68,9 +68,12 @@ CELL GEOMETRY
                             CellGeometry, or nothing for the default grid)
     cellGraph('6x6')     => cell graph for the geometry (same argument as cellGeometry()).
                             Its methods all work in cell ids:
+      .gridCells()             all cells of the main grid
       .neighbours(cell)        orthogonally-adjacent in-grid cells
+      .kingNeighbours(cell)    the up-to-8 in-grid king-move neighbours
       .step(cell, dR, dC)      the cell (dR, dC) away, or null off-grid
       .ray(cell, dR, dC)       cells to the grid edge, inclusive of cell
+      .row(cell) / .column(cell)  the whole grid row / column through cell
       .block(topLeft, h, w)    cells of an h x w block, or null if off-grid
       .connected(cells)        is the set one orthogonally-connected group?
 

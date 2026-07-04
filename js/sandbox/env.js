@@ -129,13 +129,31 @@ class SandboxCellGraph {
     this._graph = geometry.cellGraph();
   }
 
-  _index(cell) { return this._geometry.parseCellId(cell).cell; }
-  _cell(index) { return index == null ? null : this._geometry.makeCellIdFromIndex(index); }
+  _index(cell) {
+    return this._geometry.parseCellId(cell).cell;
+  }
+  _cell(index) {
+    return index == null ? null : this._geometry.makeCellIdFromIndex(index);
+  }
+
+  // Every cell of the main grid, row-major, excluding var cells.
+  gridCells() {
+    const cells = [];
+    for (let i = 0; i < this._geometry.numGridCells; i++) cells.push(this._cell(i));
+    return cells;
+  }
 
   // The orthogonally-adjacent in-grid cells.
   neighbours(cell) {
     return this._graph.cellEdges(this._index(cell))
       .filter(i => i != null).map(i => this._cell(i));
+  }
+
+  // The up-to-eight cells a chess king could reach: the orthogonal and diagonal
+  // neighbours that lie on the grid, in row-major order.
+  kingNeighbours(cell) {
+    const KING = [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1]];
+    return KING.map(([dRow, dCol]) => this.step(cell, dRow, dCol)).filter(c => c != null);
   }
 
   // The cell (dRow, dCol) away, or null past the grid edge. Steps are signed,
@@ -149,6 +167,18 @@ class SandboxCellGraph {
     const cells = [];
     for (let c = cell; c != null; c = this.step(c, dRow, dCol)) cells.push(c);
     return cells;
+  }
+
+  // The whole grid row through `cell`, left to right.
+  row(cell) {
+    const leftward = this.ray(cell, 0, -1);
+    return this.ray(leftward[leftward.length - 1], 0, 1);
+  }
+
+  // The whole grid column through `cell`, top to bottom.
+  column(cell) {
+    const upward = this.ray(cell, -1, 0);
+    return this.ray(upward[upward.length - 1], 1, 0);
   }
 
   // The cells of a numRows x numCols block with topLeft as its top-left corner,

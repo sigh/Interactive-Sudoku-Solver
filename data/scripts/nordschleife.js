@@ -20,19 +20,13 @@ const graph = cellGraph(gridShape);
 // The loop-membership Var cell paired with a grid cell (VL1..VL81, in grid order).
 const loopCell = cell => `VL${gridShape.parseCellId(cell).cell + 1}`;
 
-const gridCells = Array.from({ length: gridShape.numGridCells },
-  (_, i) => gridShape.makeCellIdFromIndex(i));
+const gridCells = graph.gridCells();
 
 const constraints = [new Shape('9x9'), new Var('L', 'loop', gridShape.numGridCells)];
 const add = (...newConstraints) => constraints.push(...newConstraints);
 
 const circles = ['R2C8', 'R1C2', 'R2C1', 'R1C6', 'R2C6', 'R4C2', 'R8C7', 'R9C4'];
 const rectangle = 'R6C1';
-
-// The eight king-move neighbours of a cell that lie on the grid.
-const KING = [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1]];
-const kingNeighbours = cell =>
-  KING.map(([dR, dC]) => graph.step(cell, dR, dC)).filter(Boolean);
 
 // --- Loop membership: every cell is on (1) or off (2); circles off, rectangle on.
 for (const cell of gridCells) add(new Given(loopCell(cell), ON, OFF));
@@ -93,7 +87,7 @@ const countMachine = NFA.encodeSpec({
   accept: ({ target, count }) => target !== null && count === target,
 }, gridShape.numValues);
 for (const cell of circles) {
-  add(new NFA(countMachine, 'count', cell, ...kingNeighbours(cell).map(loopCell)));
+  add(new NFA(countMachine, 'count', cell, ...graph.kingNeighbours(cell).map(loopCell)));
 }
 
 // --- Loop multiples: for two orthogonally adjacent on-loop cells, the larger

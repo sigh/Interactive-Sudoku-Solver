@@ -31,8 +31,7 @@ const graph = cellGraph(gridShape);
 // The loop-membership Var cell paired with a grid cell (VL1..VL36, in grid order).
 const loopCell = cell => `VL${gridShape.parseCellId(cell).cell + 1}`;
 
-const gridCells = Array.from({ length: gridShape.numGridCells },
-  (_, i) => gridShape.makeCellIdFromIndex(i));
+const gridCells = graph.gridCells();
 
 const constraints = [new Shape('6x6'), new Var('L', 'loop', gridShape.numGridCells)];
 const add = (...newConstraints) => constraints.push(...newConstraints);
@@ -175,9 +174,9 @@ const clues = [
 for (const [type, clueRow, clueCol] of clues) {
   const clueCell = makeCellId(clueRow, clueCol);
   const cells = [
-    ...graph.ray(makeCellId(clueRow, 1), 0, 1).map(loopCell),   // the clue's row
-    ...graph.ray(makeCellId(1, clueCol), 1, 0).map(loopCell),   // the clue's column
-    clueCell,                                             // the clue digit
+    ...graph.row(clueCell).map(loopCell),      // the clue's row
+    ...graph.column(clueCell).map(loopCell),   // the clue's column
+    clueCell,                                  // the clue digit
   ];
   add(new NFA(visionMachine(type, clueRow, clueCol), 'vision', ...cells));
 }

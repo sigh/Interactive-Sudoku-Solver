@@ -44,18 +44,13 @@ const SHAPE_FN = () => {
 
 const COLUMN_CONSTRAINTS_FN = () => {
   // Puzzle: https://sudokupad.app/gdc/flat-pack/gw
-  // Generate constraints for each column
+  // A Regex constraint down each column.
+  const graph = cellGraph('6x6');
   const columnConstraints = [];
 
-  const GRID_SIZE = 6;
-
-  // A constraint for each column.
-  for (let column = 1; column <= GRID_SIZE; column++) {
-    const cells = [];
-    for (let row = 1; row <= GRID_SIZE; row++) {
-      cells.push(makeCellId(row, column));
-    }
-    columnConstraints.push(new Regex('.*(12|24).*', ...cells));
+  // One constraint per column: walk the top row, take each cell's whole column.
+  for (const top of graph.row('R1C1')) {
+    columnConstraints.push(new Regex('.*(12|24).*', ...graph.column(top)));
   }
 
   return [
@@ -158,24 +153,20 @@ const CHECKERBOARD_FN = () => {
   // Cells alternate between local minima and maxima.
   // Note: This grid has no solutions.
 
-  const size = 5;
+  const graph = cellGraph('5x5');
   const constraints = [new Shape('5x5')];
 
-  for (let row = 1; row <= size; row++) {
-    for (let col = 1; col <= size; col++) {
-      // On even squares, cell is greater than neighbors.
-      // On odd squares, cell is less than neighbors.
-      const isMax = (row + col) % 2 === 0;
-      const cell = makeCellId(row, col);
-
-      if (col < size) {
-        const neighbor = makeCellId(row, col + 1);
-        constraints.push(new GreaterThan(isMax ? cell : neighbor, isMax ? neighbor : cell));
-      }
-      if (row < size) {
-        const neighbor = makeCellId(row + 1, col);
-        constraints.push(new GreaterThan(isMax ? cell : neighbor, isMax ? neighbor : cell));
-      }
+  // Order each cell against its right and down neighbours. On even (max) squares
+  // the cell is the larger; on odd (min) squares the neighbour is. step() returns
+  // null past the grid edge, so edge cells simply contribute fewer constraints.
+  for (const cell of graph.gridCells()) {
+    const { row, col } = parseCellId(cell);
+    const isMax = (row + col) % 2 === 0;
+    for (const neighbour of [graph.step(cell, 0, 1), graph.step(cell, 1, 0)]) {
+      if (!neighbour) continue;
+      constraints.push(isMax
+        ? new GreaterThan(cell, neighbour)
+        : new GreaterThan(neighbour, cell));
     }
   }
 
