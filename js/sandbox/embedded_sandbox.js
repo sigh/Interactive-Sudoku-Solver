@@ -171,6 +171,20 @@ export class EmbeddedSandbox {
     window.history.replaceState({}, '', url);
   }
 
+  // Fetch a script by path and load its source into the editor for editing.
+  async loadScriptFromPath(path) {
+    let code;
+    try {
+      const response = await fetch('.' + path);
+      if (!response.ok) throw new Error(String(response.status));
+      code = await response.text();
+    } catch (e) {
+      this._setError(`Failed to load ${path}: ${e.message || e}`);
+      return;
+    }
+    this._jar.updateCode(code);
+  }
+
   _copyShareableLink() {
     const code = this._jar.toString();
     const encoded = Base64Codec.encodeString(code);

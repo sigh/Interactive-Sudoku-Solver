@@ -48,7 +48,7 @@ export const initPage = () => {
   new SolutionController(constraintManager, displayContainer, bottomDrawer);
 
   // Set up sandbox integration.
-  new SandboxHandler(constraintManager, bottomDrawer);
+  const sandboxHandler = new SandboxHandler(constraintManager, bottomDrawer);
 
   new LazyDrawerManager({
     tabId: 'raw-strings',
@@ -61,7 +61,8 @@ export const initPage = () => {
     tabId: 'puzzle-selector',
     modulePath: './debug/puzzle_selector_panel.js',
     factory: (module, bodyElement) => new module.PuzzleSelectorPanel(
-      constraintManager, bodyElement),
+      constraintManager, bodyElement,
+      (path) => sandboxHandler.openWithScript(path)),
   }, bottomDrawer);
 
   setUpHeaderSettingsDropdown();
@@ -1866,6 +1867,14 @@ class SandboxHandler {
     }
   }
 
+  // Open the sandbox on a script-built puzzle's generating source, for editing
+  // (the reverse of the selector running a script into the grid).
+  async openWithScript(path) {
+    document.getElementById('show-sandbox-input').checked = true;
+    await this._openSandbox();
+    await this._sandbox?.loadScriptFromPath(path);
+  }
+
   _updateCodeParam(isOpen) {
     const url = new URL(window.location);
 
@@ -1899,7 +1908,7 @@ class SandboxHandler {
 
       const { EmbeddedSandbox } = await import('./sandbox/embedded_sandbox.js' + self.VERSION_PARAM);
 
-      new EmbeddedSandbox(
+      this._sandbox = new EmbeddedSandbox(
         this._container,
         (constraintStr) => {
           this._constraintManager.loadUnsafeFromText(constraintStr);

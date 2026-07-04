@@ -59,8 +59,10 @@ const COLLECTION_NAMES = [
 ];
 
 export class PuzzleSelectorPanel {
-  constructor(constraintManager, bodyElement) {
+  constructor(constraintManager, bodyElement, openScriptInSandbox) {
     this._constraintManager = constraintManager;
+    // Opens a script-built puzzle's generating source in the sandbox editor.
+    this._openScriptInSandbox = openScriptInSandbox;
 
     this._filter = bodyElement.querySelector('#puzzle-selector-filter');
     this._list = bodyElement.querySelector('#puzzle-selector-list');
@@ -188,6 +190,11 @@ export class PuzzleSelectorPanel {
           detail.className = 'puzzle-item-detail';
           detail.textContent = item.detail;
           row.append(detail);
+        }
+
+        const input = item.puzzle.input;
+        if (typeof input === 'string' && input.endsWith('.js')) {
+          row.append(this._makeScriptIcon(input));
         }
 
         const entry = { row, item, search: item.search };
@@ -318,6 +325,22 @@ export class PuzzleSelectorPanel {
     this._status.textContent = text;
     this._status.classList.toggle('notice-info', text !== '' && variant === 'info');
     this._status.classList.toggle('notice-error', variant === 'error');
+  }
+
+  // A "</>" button that opens the generating script in the sandbox for editing
+  // (only shown on script-built puzzles).
+  _makeScriptIcon(path) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'puzzle-item-script plain-button';
+    btn.textContent = '</>';
+    btn.title = 'Open generating script in sandbox';
+    btn.addEventListener('click', (e) => {
+      // Don't also load the puzzle into the grid.
+      e.stopPropagation();
+      this._openScriptInSandbox?.(path);
+    });
+    return btn;
   }
 
   // A small link icon that opens the puzzle's source, or an empty placeholder

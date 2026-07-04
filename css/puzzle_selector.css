@@ -92,6 +92,15 @@
   border: 1px solid hsl(var(--tag-hue, 0) 40% 82%);
 }
 
+/* "</>" button opening a script-built puzzle's source in the sandbox. Pushed to
+   the row's right edge */
+.puzzle-item-script.plain-button {
+  flex: 0 0 auto;
+  margin-left: auto;
+  font-family: monospace;
+  font-size: var(--font-size-small);
+}
+
 /* Source link icon (and an equal-width placeholder for source-less rows, so
    the labels line up). */
 .puzzle-item-src {
