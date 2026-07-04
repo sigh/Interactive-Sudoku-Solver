@@ -337,7 +337,7 @@ class StepByStepModeHandler extends ModeHandler {
     const statusData = {
       values: result.values || [],
       isSolution: result.isSolution,
-      hasContradiction: result.hasContradiction,
+      hasConflict: result.hasConflict,
     };
 
     // Update numSteps if we have a new max.

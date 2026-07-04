@@ -8,7 +8,7 @@ ensureGlobalEnvironment();
 
 const { False } = await import('../../js/solver/handlers.js');
 
-await runTest('False: zero-cell handler initializes as contradiction', () => {
+await runTest('False: zero-cell handler initializes as conflict', () => {
   const context = new GridTestContext({ gridSize: [1, 4], numValues: 4 });
   const handler = new False();
 
@@ -16,7 +16,7 @@ await runTest('False: zero-cell handler initializes as contradiction', () => {
   assert.equal(context.initializeHandler(handler), false);
 });
 
-await runTest('False: zero-cell handler enforces as contradiction', () => {
+await runTest('False: zero-cell handler enforces as conflict', () => {
   const context = new GridTestContext({ gridSize: [1, 4], numValues: 4 });
   const handler = new False();
   const accumulator = createAccumulator();

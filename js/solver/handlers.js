@@ -412,7 +412,7 @@ export class HandlerUtil {
       const value = grid[cell] & hiddenSingles;
       if (value) {
         // If there there is more than one value, then this cell has
-        // has multiple hidden singles, which is a contradiction.
+        // has multiple hidden singles, which is a conflict.
         if (value & (value - 1)) return false;
         grid[cell] = value;
       }
@@ -2171,7 +2171,7 @@ class _Squishable2x2 extends SudokuConstraintHandler {
         const value = valuesBuffer[i] & hiddenSquishedSingles;
         if (value) {
           // If there there is more than one value, then this cell has
-          // has multiple hidden singles, which is a contradiction.
+          // has multiple hidden singles, which is a conflict.
           if (value & (value - 1)) return false;
           // Unsquish the value.
           const unsquishedValue = value | (value << squishOffset) | (value << squishOffset2);
@@ -2736,7 +2736,7 @@ export class CountingCircles extends SudokuConstraintHandler {
     const allValues = HandlerUtil.cellsAllValues(initialGridCells, this.cells);
     const numValues = LookupTables.maxValue(allValues);
 
-    // With offset, external 0 can't appear (0 occurrences = contradiction),
+    // With offset, external 0 can't appear (0 occurrences = conflict),
     // so valid external values are 1..(numValues+valueOffset), shifted up by
     // -valueOffset to get internal values.
     let combinations =
@@ -3786,7 +3786,7 @@ export class Rellik extends SudokuConstraintHandler {
       if (count === target) forcedValues |= mask;
     }
 
-    // A value required in the cage that no cell can hold is a contradiction.
+    // A value required in the cage that no cell can hold is a conflict.
     if (forcedValues & ~candidateValues) return false;
     grid[this._forcedState] = forcedValues;
 

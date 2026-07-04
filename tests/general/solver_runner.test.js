@@ -552,7 +552,7 @@ await runTest('step-by-step mode returns step data with statusData', async () =>
   assert.ok(updateResult.statusData, 'Step should have statusData');
   assert.ok('values' in updateResult.statusData);
   assert.ok('isSolution' in updateResult.statusData);
-  assert.ok('hasContradiction' in updateResult.statusData);
+  assert.ok('hasConflict' in updateResult.statusData);
   assert.ok(Array.isArray(updateResult.highlightCells));
 });
 

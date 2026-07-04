@@ -163,7 +163,7 @@ export class SudokuSolver {
       pencilmarks: pencilmarks,
       branchCells: result.cellOrder.subarray(0, result.guessDepth + 1),
       isSolution: result.isSolution,
-      hasContradiction: result.hasContradiction,
+      hasConflict: result.hasConflict,
     };
 
     if (result.guessDepth !== -1) {
@@ -477,7 +477,7 @@ class InternalSolver {
 
     // _conflictScores are initialized to the cell priorities so that
     // so that the initial part of the search is still able to prioritize cells
-    // which may lead to a contradiction.
+    // which may lead to a conflict.
     // NOTE: _conflictScores must not be reassigned as we pass the reference
     // to the candidateSelector.
     this._conflictScores = new ConflictScores(
@@ -637,7 +637,7 @@ class InternalSolver {
       isSolution: stepType === InternalSolver.STEP_RESULT_SOLUTION,
       cellOrder: this._candidateSelector.getCellOrder(),
       guessDepth: this._stepState.pendingGuess.cellDepth,
-      hasContradiction: stepType === InternalSolver.STEP_RESULT_CONTRADICTION,
+      hasConflict: stepType === InternalSolver.STEP_RESULT_CONFLICT,
     };
   }
 
@@ -653,7 +653,7 @@ class InternalSolver {
       recStack.push({
         cellDepth: 0,
         progressRemaining: 1.0,
-        lastContradictionCell: -1,
+        lastConflictCell: -1,
         newNode: true,
         gridState: new Uint16Array(
           stateBuffer,
@@ -686,7 +686,7 @@ class InternalSolver {
 
   static STEP_RESULT_GUESS = 0;
   static STEP_RESULT_SOLUTION = 1;
-  static STEP_RESULT_CONTRADICTION = 2;
+  static STEP_RESULT_CONFLICT = 2;
 
   // Run the solver.
   //
@@ -726,7 +726,7 @@ class InternalSolver {
     const frame0 = recStack[0];
     frame0.gridState.set(this._initialGridState);
     frame0.cellDepth = 0;
-    frame0.lastContradictionCell = -1;
+    frame0.lastConflictCell = -1;
     frame0.progressRemaining = 1.0;
     frame0.newNode = true;
 
@@ -793,12 +793,12 @@ class InternalSolver {
           this._candidateSelector.getCellAtDepth(i));
       }
       // Queue up extra constraints based on prior backtracks. The idea being
-      // that constraints that apply this the contradiction cell are likely
-      // to turn up a contradiction here if it exists.
-      // NOTE: This must use the value of lastContradictionCell before recFrame
+      // that constraints that apply this the conflict cell are likely
+      // to turn up a conflict here if it exists.
+      // NOTE: This must use the value of lastConflictCell before recFrame
       //       is updated.
-      if (recFrame.lastContradictionCell >= 0) {
-        handlerAccumulator.addForCell(recFrame.lastContradictionCell);
+      if (recFrame.lastConflictCell >= 0) {
+        handlerAccumulator.addForCell(recFrame.lastConflictCell);
       }
 
       const cell = this._candidateSelector.getCellAtDepth(cellDepth);
@@ -851,13 +851,13 @@ class InternalSolver {
       }
 
       // Propagate constraints.
-      const hasContradiction = !this._enforceConstraints(
+      const hasConflict = !this._enforceConstraints(
         recFrame.gridState, handlerAccumulator);
-      if (hasContradiction) {
+      if (hasConflict) {
         // Store the current cells, so that the level immediately above us
         // can act on this information to run extra constraints.
         if (recDepth > 0) {
-          recStack[recDepth - 1].lastContradictionCell = cell;
+          recStack[recDepth - 1].lastConflictCell = cell;
         }
         counters.progressRatio += progressDelta;
         counters.backtracks++;
@@ -872,7 +872,7 @@ class InternalSolver {
           }
           if (this._stepState.step >= stepTarget) {
             mode.step.onStep(
-              this._makeStepYieldResult(grid, InternalSolver.STEP_RESULT_CONTRADICTION));
+              this._makeStepYieldResult(grid, InternalSolver.STEP_RESULT_CONFLICT));
             return;
           }
           this._incStep();
@@ -883,7 +883,7 @@ class InternalSolver {
         }
       }
 
-      if (hasContradiction) continue;
+      if (hasConflict) continue;
 
       if (this._seenCandidateSet.enabledInSolver) {
         if (!this._seenCandidateSet.hasInterestingSolutions(grid)) {
@@ -895,7 +895,7 @@ class InternalSolver {
       // If we've enforced all cells, then we have a solution!
       if (nextDepth === this._numSearchCells) {
         counters.progressRatio += progressDelta;
-        // We've set all the values, and we haven't found a contradiction.
+        // We've set all the values, and we haven't found a conflict.
         // This is a solution!
         counters.solutions++;
         counters.backtracks++;
@@ -928,7 +928,7 @@ class InternalSolver {
       recFrame.cellDepth = nextDepth;
       recFrame.newNode = true;
       recFrame.progressRemaining = progressDelta;
-      recFrame.lastContradictionCell = -1;
+      recFrame.lastConflictCell = -1;
       recDepth++;
     }
 
@@ -1089,7 +1089,7 @@ class InternalSolver {
     while (true) {
       this._resetRun();
       // Run one root-to-backtrack path (Knuth sampling).
-      // maxBacktracks:1 stops at the first backtrack (contradiction or solution).
+      // maxBacktracks:1 stops at the first backtrack (conflict or solution).
       let foundSolution = false;
       this.run({ maxBacktracks: 1 }, (grid) => { foundSolution = true; });
 

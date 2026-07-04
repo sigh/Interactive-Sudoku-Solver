@@ -119,7 +119,7 @@ guess); step N (N >= 1) is the Nth guess/dead-end the search reaches.
                         search ends. Default ${DEFAULTS.steps}. The step you walk
                         to is the step the inspectors below report on, so e.g.
                         "--steps 0 --log" shows the initial propagation. If the
-                        walk ends in a contradiction, the refuter is printed
+                        walk ends in a conflict, the refuter is printed
                         automatically (no --log needed).
 
 Inspect the step the walk reached:
@@ -129,7 +129,7 @@ Inspect the step the walk reached:
                         Chaos region labels, Doppelganger cells, sum cells.
                         Grid-shaped groups print as a grid, others as a list.
   --log                 Print the constraint-propagation log: what each handler
-                        pruned, and (at a contradiction) which handler returned
+                        pruned, and (at a conflict) which handler returned
                         false (the refuter).
   --dump-state          Print (to stdout) the grid state at the step as a
                         constraint string; ALL other output goes to stderr, so
@@ -404,7 +404,7 @@ const buildStepRecord = (geometry, stepIndex, step, decision) => {
     count: matched ? decision.count : (guessCellIndex === null ? 0 : 1),
     options: step.values?.join('') ?? '',
     eliminated,
-    contradiction: !!step.hasContradiction,
+    conflict: !!step.hasConflict,
     solution: !!step.isSolution,
     detail: matched && decision.isCustom
       ? (decision.finder ? `${valueOf(geometry, decision.placementValue)}@${describeCells(geometry, decision.finder.cells)}` : 'custom')
@@ -416,7 +416,7 @@ const printWalk = (geometry, records) => {
   const header = ['step', 'guess', 'tried', 'branch', 'n', 'options', 'elim', 'flags', 'detail'];
   console.log(header.join('\t'));
   for (const r of records) {
-    const flags = [r.contradiction ? 'X' : '', r.solution ? 'SOLVED' : ''].filter(Boolean).join(',');
+    const flags = [r.conflict ? 'X' : '', r.solution ? 'SOLVED' : ''].filter(Boolean).join(',');
     console.log([
       r.step,
       r.guessCell ?? '-',
@@ -473,7 +473,7 @@ const printCompare = (records, ablated, name) => {
 const printExplain = (geometry, stepIndex, decision, top) => {
   console.log(`\n=== Explain step ${stepIndex} (the guess made to reach this step) ===`);
   if (!decision) {
-    console.log('No multi-way branch was decided for this step (forced single, contradiction, or past the end).');
+    console.log('No multi-way branch was decided for this step (forced single, conflict, or past the end).');
     return;
   }
 
@@ -588,7 +588,7 @@ const printVarCells = (geometry, pencilmarks, stepIndex) => {
 };
 
 // Print the engine's constraint-propagation log for one step: which handlers
-// pruned which candidates, and (at a contradiction) the handler that returned
+// pruned which candidates, and (at a conflict) the handler that returned
 // false. Requires the solver built with logLevel >= 1. The engine scopes step
 // logs to the target step, so we discard logs from earlier replays, run the step
 // fresh, then read what it produced.
@@ -635,7 +635,7 @@ const printStateString = (geometry, internal, solver, atStep, guides, baseInput)
   let empties = 0;
   for (let cell = 0; cell < internal._numSearchCells; cell++) {
     const values = valuesOf(target.pencilmarks[cell]);
-    if (values.length === 0) { empties++; continue; }  // contradiction state — can't represent
+    if (values.length === 0) { empties++; continue; }  // conflict state — can't represent
     // Only emit cells the search narrowed; initial-propagation narrowings are
     // reproduced by the original constraints when the string is re-propagated.
     if (values.length >= valuesOf(initial.pencilmarks[cell]).length) continue;
@@ -647,7 +647,7 @@ const printStateString = (geometry, internal, solver, atStep, guides, baseInput)
   // `--input -`). console.log is routed to stderr in --dump-state mode, so write
   // the constraint to the real stdout explicitly.
   console.error(`# state at step ${atStep}: ${givens.length} given(s) added` +
-    (empties ? `; ${empties} empty-domain cell(s) omitted (contradiction state)` : '') +
+    (empties ? `; ${empties} empty-domain cell(s) omitted (conflict state)` : '') +
     `. Pipe stdout into a second run with --input - .`);
   process.stdout.write(stateString + '\n');
 };
@@ -708,7 +708,7 @@ export const main = (argv) => {
   const puzzle = loadPuzzle(args);
   const constraint = SudokuParser.parseText(puzzle.input);
   // logLevel 1 enables the engine's per-step propagation log (handler prunings
-  // and refuter). Always on so a contradiction can be explained automatically;
+  // and refuter). Always on so a conflict can be explained automatically;
   // it only logs the walked step, so it's cheap.
   const solver = SudokuBuilder.build(constraint, { logLevel: 1 });
   const internal = solver._internalSolver;
@@ -776,8 +776,8 @@ export const main = (argv) => {
   if (args.vars) printVarCells(geometry, runStep(solver, atStep, guides).step.pencilmarks, atStep);
 
   // Show the propagation log when asked, and always when the walk ended in a
-  // contradiction — so a plain run explains a failure (e.g. 0 guesses) by itself.
-  if (args.log || last?.contradiction) printDebugLog(geometry, solver, atStep, guides);
+  // conflict — so a plain run explains a failure (e.g. 0 guesses) by itself.
+  if (args.log || last?.conflict) printDebugLog(geometry, solver, atStep, guides);
 
   if (args.dumpState) printStateString(geometry, internal, solver, atStep, guides, puzzle.input);
 };

@@ -124,7 +124,7 @@ await runTest('Or constraint: empty Or is unsatisfiable', () => {
   const handlers = collectHandlers(orConstraint);
 
   assert.equal(handlers.length, 1,
-    'An empty Or should emit a contradiction handler');
+    'An empty Or should emit a conflict handler');
   assert.ok(handlers[0] instanceof False);
 });
 

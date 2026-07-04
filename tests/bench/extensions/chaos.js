@@ -7,7 +7,7 @@
 //
 // To add one: write `patch(<description>, <methodName>, <replacement>)` and give
 // it a key below. The replacement must be a safe no-op for that method (one that
-// preserves soundness, e.g. "found nothing" / "no contradiction").
+// preserves soundness, e.g. "found nothing" / "no conflict").
 
 const { ChaosConstruction } = await import('../../../js/solver/chaos_handler.js' + self.VERSION_PARAM);
 
@@ -29,7 +29,7 @@ export const ablations = {
     'Hidden-region-value singles (places a value confined to one cell).',
     '_enforceHiddenRegionValueSingles', function () { return false; }),
 
-  // Forced-door returns true (= "no contradiction, nothing forced").
+  // Forced-door returns true (= "no conflict, nothing forced").
   'chaos-bottlenecks': patch(
     "Forced-door deduction (forces a region's single exit shard).",
     '_forceComponentDoors', function () { return true; }),

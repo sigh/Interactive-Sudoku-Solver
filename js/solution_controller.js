@@ -650,7 +650,7 @@ export class SolutionController {
 
     const statusParts = [];
     if (statusData.isSolution) statusParts.push('[Solution]');
-    if (statusData.hasContradiction) statusParts.push('[Conflict]');
+    if (statusData.hasConflict) statusParts.push('[Conflict]');
     statusElem.appendChild(document.createTextNode(' ' + statusParts.join(' ')));
 
     return statusElem;

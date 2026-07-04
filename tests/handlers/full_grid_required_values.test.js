@@ -82,7 +82,7 @@ await runTest('FullGridRequiredValues: returns false when satisfied + possible <
   const grid = context.grid;
 
   // Make value 2 (bit 0b010) impossible in two lines, leaving it possible
-  // in only one line. With required = 2, this is a contradiction.
+  // in only one line. With required = 2, this is a conflict.
   const v2 = valueMask(2);
 
   // Remove 2 from line 1 and line 2.
@@ -174,7 +174,7 @@ await runTest('FullGridRequiredValues: returns false when a line contains too ma
   const v4 = valueMask(4);
 
   // Make ALL values requiredPossible by removing each value from exactly one line.
-  // Then in line 0, all 4 required values are possible, but line length is 3 => contradiction.
+  // Then in line 0, all 4 required values are possible, but line length is 3 => conflict.
   for (const cell of lines[1]) grid[cell] &= ~v1;
   for (const cell of lines[2]) grid[cell] &= ~v2;
   for (const cell of lines[3]) grid[cell] &= ~v3;

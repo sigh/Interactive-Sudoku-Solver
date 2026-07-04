@@ -1,7 +1,7 @@
 // profile.js — per-method profile of a constraint handler during a solve.
 //
 // Wraps the chosen handler class's methods to count calls, time them, and track
-// how often each returns false (a contradiction / failed propagation), then
+// how often each returns false (a conflict / failed propagation), then
 // solves the given puzzles and prints a per-method breakdown. Works for any
 // handler (default ChaosConstruction); use it to find where a handler spends
 // its time and which of its rules actually fire.

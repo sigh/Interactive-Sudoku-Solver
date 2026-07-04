@@ -250,16 +250,16 @@ await runTest('nthStep(0) returns initial state', () => {
   assert.ok(step);
   assert.ok(step.pencilmarks);
   assert.ok('isSolution' in step);
-  assert.ok('hasContradiction' in step);
+  assert.ok('hasConflict' in step);
   assert.ok(step.branchCells);
 });
 
 await runTest('nthStep returns null for contradictory puzzle', () => {
   const solver = buildSolver(makeContradictoryConstraint());
   const step = solver.nthStep(0, new Map());
-  // Step 0 should still return something (initial propagation may find contradiction).
+  // Step 0 should still return something (initial propagation may find conflict).
   if (step) {
-    assert.equal(step.hasContradiction, true);
+    assert.equal(step.hasConflict, true);
   }
 });
 

@@ -613,7 +613,7 @@ export class ChaosConstruction extends SudokuConstraintHandler {
   }
 
   // For each undersized fixed component, forces its single exit shard into the region;
-  // returns false if any component has no exit (contradiction).
+  // returns false if any component has no exit (conflict).
   _forceComponentDoors(grid, shards, checkRegionsMask) {
     const shardMasks = shards.masks;
     const numGridCells = this._numGridCells;
