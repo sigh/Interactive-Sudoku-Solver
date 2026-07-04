@@ -84,3 +84,21 @@ The `ConstraintManager` (defined in [render_page.js](render_page.js)) is the cen
 - **URL-based state**: The full puzzle state (constraints, solve mode, options) is encoded in URL query parameters (e.g., `?q=...`). This enables sharing, bookmarking, and history-based undo/redo.
 
 - **Serialization format**: Constraints serialize to a dot-separated string: `.Type~arg1~arg2~cell1~cell2`. Cell IDs use the `R{row}C{col}` format (1-indexed). The parser in [sudoku_parser.js](sudoku_parser.js) also accepts several other input formats (plain text, killer shorthand, jigsaw layout strings).
+
+## Glossary (cross-layer terms)
+
+Solver-internal terms are defined in
+[solver/SOLVER_ENGINE.md](solver/SOLVER_ENGINE.md#glossary). Terms that
+span layers:
+
+| Term | Meaning | Legacy synonyms |
+| --- | --- | --- |
+| **constraint** | A `SudokuConstraint.*` object: the UI/serialization representation of a rule. The solver enforces it via one or more *handlers* (see solver glossary). | — |
+| **geometry** (`CellGeometry`) | The structural descriptor of a puzzle: dimensions, value range, cell id/index codec, var-cell groups. Sandbox: `cellGeometry(…)`. | GridShape, shape |
+| **shapeSpec** | The `"RxC~V"` string form of a geometry (e.g. `4x4~9`, `4x4~1-9`). | gridSpec |
+| **`Shape`** | The *constraint* that declares the geometry (serialized in URLs). | — |
+| **cellId** | An `"R1C1"`-style string. Var cells display as `$N`. Integer cell *indices* are solver-internal. | — |
+| **var cells** | User-declared cells outside the grid, addressed uniformly with grid cells. | state cells |
+| **chip** | A UI list entry representing one added constraint. | — |
+| **true candidates** | Candidates appearing in at least *threshold* solutions. Sandbox: `trueCandidates`; engine: `solveAllPossibilities`; UI mode: "all possibilities". | — |
+| **`q`** | The URL parameter carrying the serialized constraint string. | — |

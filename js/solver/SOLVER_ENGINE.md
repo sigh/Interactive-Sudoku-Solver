@@ -3,6 +3,40 @@
 This document describes the solver engine architecture in detail. For a
 higher-level overview of all solver files, see [README.md](README.md).
 
+## Glossary
+
+Canonical terms used throughout the solver. Where legacy synonyms exist
+(older docs, branch names), they are listed so searches don't miss them.
+
+| Term | Meaning | Legacy synonyms |
+| --- | --- | --- |
+| **value** | A displayed integer (e.g. 5). `valueOffset` maps displayed values to internal 1-based values. | — |
+| **candidate** | A still-possible value for a cell. Each cell's candidates are stored as a 16-bit **mask** (one bit per value). | possibility |
+| **mask** | A bitset over values (single- or multi-bit). | — |
+| **cell** | In the solver, always a cell *index*: an integer offset into the grid state. Strings are always **cellIds**. | — |
+| **cellId** | An "R1C1"-style string (or a var-cell id). `displayCellId` renders var cells in their `$`-prefixed display form. | — |
+| **grid cells** | The 2D puzzle cells (`numGridCells`). | — |
+| **var cells** | User-declared extra cells outside the grid, managed by `VarCellRegistry` and addressed uniformly with grid cells. | state cells |
+| **search cells** | Grid cells + var cells — everything the search assigns (`numSearchCells`, from `CellGeometry.totalCells()`). | total cells |
+| **geometry** (`CellGeometry`) | The structural descriptor of a puzzle: dimensions, value range/offset, cell id/index codec, var-cell groups, cell adjacency. Metadata only — it holds no candidates or state. | GridShape, shape |
+| **shapeSpec** | The `"RxC~V"` string form of a geometry (e.g. `4x4~9`). | gridSpec |
+| **`Shape`** | The *constraint* that declares a puzzle's geometry (serialized in URLs; distinct from `CellGeometry`). | — |
+| **grid** (in `enforceConsistency`) | The per-frame `Uint16Array` holding candidate masks for all search cells *plus* handler state lanes. Also called grid state. | — |
+| **handler** (`SudokuConstraintHandler`) | A constraint-enforcement object; the CSP-literature term is *propagator*. | — |
+| **`enforceConsistency`** | A handler's propagation step: prune candidates, return `false` on conflict. | enforce |
+| **`PropagationQueue`** (`pQueue`) | The work-queue of handlers to run until fixpoint; drained by the propagation loop. | HandlerAccumulator, agenda |
+| **conflict** | A dead end: a cell with no candidates or a handler returning `false` (`hasConflict`, `lastConflictCell`). | contradiction, backtrack trigger |
+| **conflict scores** | The cell-weighting search heuristic (decayed conflict counts, normalized by candidate count). **value scores** are its value-ordering component. | backtrack triggers |
+| **branch candidate** | The selector's unit of branching — a (cells, values) choice proposed by `CandidateSelector`/`candidateFinders`. Distinct from *candidate* (a value). | — |
+| **essential** | `essential = false` marks optimizer-derived handlers: redundant for correctness, present for speed, skippable in some paths. | — |
+| **aux handlers** | Handlers enqueued only when one of their cells becomes fixed (not on ordinary candidate changes). | — |
+| **exclusion cells** (`exclusionCells()`) | Cells that must hold mutually distinct values; feeds `CellExclusions`. | — |
+| **handler state lanes** | Per-branch backtrackable storage allocated via the state allocator; saved/restored automatically with the grid state. | extra state, state slots |
+| **optimizer** | The init-time pass deriving implied handlers (innies/outies, combined sums, houses, …) that speed up propagation without changing the solution set. | — |
+| **house** | A region that must contain every value exactly once (row, column, box, or equivalent). | — |
+| **true candidates** | Candidates that appear in at least *threshold* solutions. Sandbox: `trueCandidates`; engine: `solveAllPossibilities`; UI mode: "all possibilities" — one concept, three surfaces. | — |
+| **shard** (chaos) | A union-find fragment of a chaos-construction region tracked in `ChaosRegionShardState`. | — |
+
 ## Overview
 
 The solver is a constraint-satisfaction problem (CSP) engine. It combines
