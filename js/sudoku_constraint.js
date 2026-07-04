@@ -3071,9 +3071,9 @@ export const binaryKeyToFnString = (key, numValues, valueOffset = 0) => {
   return `({${entries}})[a]?.includes(b)`;
 };
 
-export const encodedNFAToJsSpec = (encodedNFA, valueOffset = 0) => {
+export const encodedNFAToJsSpec = (encodedNFA, valueOffset = 0, numValues) => {
   const nfa = NFASerializer.deserialize(encodedNFA);
-  return nfaToJavascriptSpec(nfa, valueOffset);
+  return nfaToJavascriptSpec(nfa, valueOffset, numValues);
 };
 
 function* parseNamedCellGroups(items, decodeName) {

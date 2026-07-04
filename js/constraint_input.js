@@ -1717,7 +1717,8 @@ ConstraintCategoryInput.StateMachine = class StateMachine extends JavaScriptCate
     this._form['unified-mode'].dispatchEvent(new Event('change'));
 
     // Convert the encoded NFA back to JavaScript and populate unified mode.
-    const jsSpec = encodedNFAToJsSpec(constraint.encodedNFA, this._geometry?.valueOffset || 0);
+    const jsSpec = encodedNFAToJsSpec(
+      constraint.encodedNFA, this._geometry.valueOffset, this._geometry.numValues);
     this._form['unified-code'].value = jsSpec;
     this._form.dispatchEvent(new Event('change'));
     this._form['unified-code'].focus();

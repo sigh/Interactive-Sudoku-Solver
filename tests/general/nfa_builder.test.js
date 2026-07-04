@@ -5,7 +5,7 @@ import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 
 ensureGlobalEnvironment();
 
-const { regexToNFA, javascriptSpecToNFA, nfaToJavascriptSpec, optimizeNFA, NFASerializer, JavascriptNFABuilder, NFA, Symbol } = await import('../../js/nfa_builder.js');
+const { regexToNFA, javascriptSpecToNFA, nfaToJavascriptSpec, optimizeNFA, NFASerializer, JavascriptNFABuilder, NFA, Symbol, SEGMENT_BREAK } = await import('../../js/nfa_builder.js');
 const { BitReader } = await import('../../js/util.js');
 
 const evaluateNfa = (nfa, values) => {
@@ -1555,6 +1555,62 @@ await runTest('nfaToJavascriptSpec with offset=-1 shows external values', () => 
   // The transition table should show value 0 (external), not 1 (internal).
   assert.ok(jsCode.includes('0:'), 'should show external value 0 in transition table');
   assert.ok(!jsCode.includes('1:'), 'should not show internal value 1');
+});
+
+await runTest('nfaToJavascriptSpec emits [SEGMENT_BREAK] and round-trips', () => {
+  const numValues = 4;
+  // A multi-segment spec where SEGMENT_BREAK meaningfully changes state.
+  const spec = {
+    startState: { count: 0, seg: 0 },
+    transition: (state, value) =>
+      value === SEGMENT_BREAK
+        ? { count: state.count, seg: state.seg + 1 }
+        : { count: state.count + 1, seg: state.seg },
+    accept: (state) => state.count % 2 === 0 && state.seg >= 1,
+    maxDepth: 6,
+  };
+
+  const nfa = javascriptSpecToNFA(spec, numValues, { multiSegment: true });
+  const jsCode = nfaToJavascriptSpec(nfa, 0, numValues);
+
+  // The segment-break slot (symbol index === numValues) must be a computed
+  // [SEGMENT_BREAK] key, not a numeric value that never matches at runtime.
+  assert.ok(jsCode.includes('[SEGMENT_BREAK]:'),
+    'should emit a computed [SEGMENT_BREAK] key');
+
+  // Recompile the way the worker does, then check the generated spec accepts
+  // exactly what the original does over sequences that include SEGMENT_BREAK.
+  const parsed = new Function('NUM_CELLS', 'SEGMENT_BREAK',
+    `let maxDepth; ${jsCode}\nreturn { startState, transition, accept, maxDepth };`
+  )(9, SEGMENT_BREAK);
+
+  const evalSpec = (s, seq) => {
+    let states = (Array.isArray(s.startState) ? s.startState : [s.startState])
+      .map(x => JSON.stringify(x));
+    for (const sym of seq) {
+      const next = new Set();
+      for (const st of states) {
+        const r = s.transition(JSON.parse(st), sym);
+        const arr = Array.isArray(r) ? r : (r !== undefined ? [r] : []);
+        for (const n of arr) next.add(JSON.stringify(n));
+      }
+      states = [...next];
+    }
+    return states.some(st => s.accept(JSON.parse(st)));
+  };
+
+  const alphabet = [1, 2, 3, 4, SEGMENT_BREAK];
+  const seqs = [[]];
+  for (let len = 1; len <= 5; len++) {
+    const grown = [];
+    for (const s of seqs) for (const a of alphabet) grown.push([...s, a]);
+    seqs.push(...grown);
+  }
+  for (const seq of seqs) {
+    assert.equal(evalSpec(parsed, seq), evalSpec(spec, seq),
+      'recompiled spec should match original on ' +
+      seq.map(x => x === SEGMENT_BREAK ? 'BREAK' : x).join(','));
+  }
 });
 
 logSuiteComplete('NFA builder');

@@ -626,7 +626,7 @@ export const javascriptSpecToNFA = (config, numSymbols, { valueOffset = 0, multi
 
 // Convert an NFA back to JavaScript code (unified format).
 // This generates code equivalent to the original, but not necessarily identical.
-export const nfaToJavascriptSpec = (nfa, valueOffset = 0) => {
+export const nfaToJavascriptSpec = (nfa, valueOffset = 0, numValues = null) => {
   const maybeArrayToString = (arr) => {
     return arr.length === 1 ? `${arr[0]}` : `[${arr.join(', ')}]`;
   }
@@ -639,8 +639,13 @@ export const nfaToJavascriptSpec = (nfa, valueOffset = 0) => {
     for (let symbolIndex = 0; symbolIndex < stateTransitions.length; symbolIndex++) {
       const targets = stateTransitions[symbolIndex];
       if (targets?.length) {
-        const value = symbolIndex + 1 + valueOffset;
-        valueEntries.push(`${value}: ${maybeArrayToString(targets)}`);
+        // The segment-break symbol occupies the slot just past the real values.
+        // Emit it as a computed [SEGMENT_BREAK] key so the recompiled transition
+        // function matches when the runtime passes the SEGMENT_BREAK object.
+        const key = symbolIndex === numValues
+          ? '[SEGMENT_BREAK]'
+          : `${symbolIndex + 1 + valueOffset}`;
+        valueEntries.push(`${key}: ${maybeArrayToString(targets)}`);
       }
     }
     if (valueEntries.length) {
