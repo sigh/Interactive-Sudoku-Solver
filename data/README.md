@@ -7,7 +7,7 @@ Static data files used by the UI and tests: example puzzles, puzzle collections 
 | File | Purpose |
 |------|---------|
 | [example_puzzles.js](example_puzzles.js) | Puzzle definitions for the UI example selector. Exports `PUZZLE_INDEX` (lookup by ID) and `DISPLAYED_EXAMPLES` (showcase list). Each entry has `name`, `input` (constraint string), `solution`, and optional `src` (attribution link). Covers 40+ variants (classic, thermo, killer, arrow, jigsaw, whisper, etc.). |
-| [collections.js](collections.js) | Puzzle collections for benchmarking and testing. Used by the debug panel's benchmark runner and by end-to-end tests. |
+| [collections.js](collections.js) | Puzzle collections for benchmarking and testing. Used by the debug panel's benchmark runner and by end-to-end tests. Path-input entries (`.iss`/`.js`) carry an explicit `constraintTypes` tag list; [`tools/dev/fix_constraint_types.js`](../tools/dev/README.md) keeps it in sync. |
 | [jigsaw_layouts.js](jigsaw_layouts.js) | Valid and easily-invalid jigsaw region layouts for 9×9 grids. Each layout is an 81-character string where each character is a region ID. |
 | [jigsaw_box_layouts.js](jigsaw_box_layouts.js) | Additional valid jigsaw layouts using box-based region assignments. |
 | [invalid_jigsaw_layouts.js](invalid_jigsaw_layouts.js) | 26+ intentionally invalid jigsaw layouts. Used by tests to verify the solver correctly rejects unsolvable configurations. |

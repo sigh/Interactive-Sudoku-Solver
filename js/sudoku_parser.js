@@ -503,6 +503,7 @@ export class SudokuParser {
         uniqueTypes.add(value);
       }
     }
+    uniqueTypes.delete('End');  // End is not a real constraint
     return [...uniqueTypes];
   }
 }

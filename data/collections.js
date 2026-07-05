@@ -467,28 +467,28 @@ export const EXAMPLES = [
     src: 'https://sudokupad.app/gdc/loop-pack/entropic',
     input: '/data/scripts/loop_entropic.js',
     solution: '641523253416362154514632136245425361',
-    constraintTypes: ['NFA'],
+    constraintTypes: ['Shape', 'Var', 'NFA'],
   },
   {
     name: '9x9 Loop: Nordschleife',
     src: 'https://www.youtube.com/watch?v=A8GBl5GGypA',
     input: '/data/scripts/nordschleife.js',
     solution: '526973148384165972917824356145782693279436581638519724793648215852391467461257839',
-    constraintTypes: ['NFA'],
+    constraintTypes: ['Var', 'NFA'],
   },
   {
     name: '9x9 Loop: Wendezäune',
     src: 'https://www.youtube.com/watch?v=bhKtKFEy0AM',
     input: '/data/scripts/wendezaune.js',
     solution: '617349582382715469945682731596134278834527916271896345129463857763958124458271693',
-    constraintTypes: ['NFA', 'Quad'],
+    constraintTypes: ['Var', 'NFA', 'Quad'],
   },
   {
     name: 'Atrocious Destruction',
     src: 'https://sudokupad.app/ow89c0ugwr',
     input: '/data/scripts/atrocious_destruction.js',
     solution: '1536824772641853487536122348716556124738815324763781652464275381',
-    constraintTypes: ['ChaosConstruction', 'ChaosCount', 'CountDistinct'],
+    constraintTypes: ['Shape', 'NoBoxes', 'ChaosConstruction', 'Var', 'CountDistinct', 'ChaosCount'],
   },
   {
     // Segmented state machine (arrows count cells per ring).
@@ -497,6 +497,14 @@ export const EXAMPLES = [
     input: '/data/scripts/hit_reveal_solve.js',
     solution: '751392468283614795964578312326857149478961523195243687542139876837426951619785234',
     constraintTypes: ['NFA'],
+  },
+  {
+    // Two NFAs share a period across both lines to decipher n (sum) and m (diff).
+    name: 'Sums and Differences',
+    src: 'https://sudokupad.app/qj4kzxhp02',
+    input: '/data/scripts/sums_and_differences.js',
+    solution: '149876523356421978287953164895742631714639852623185749538297416471368295962514387',
+    constraintTypes: ['NFA', 'Thermo', 'BlackDot', 'LittleKiller'],
   },
   {
     // Raised in https://github.com/sigh/Interactive-Sudoku-Solver/issues/10
@@ -538,7 +546,7 @@ export const EXAMPLES = [
     src: 'https://www.youtube.com/watch?v=T03vUTiJBjk',
     input: '/data/scripts/rectangle_sums.js',
     solution: 'BFGDAHEICCEAFBIHDGDHIEGCABFACHIEFDGBFGEHDBICAIBDGCAFEHGIFCHEBADHDBAIGCFEEACBFDGHI',
-    constraintTypes: ['Or', 'And', 'Var', 'Sum'],
+    constraintTypes: ['Shape', 'Var', 'AllDifferent', 'Or', 'And', 'Sum'],
   },
   {
     name: 'Embedded Squishdoku',
@@ -1178,6 +1186,7 @@ export const EXAMPLES = [
     src: 'https://www.youtube.com/watch?v=DVy_zGc9UQI',
     input: '/data/scripts/circus_maximum.js',
     solution: '251487369638219754794653218329164875175938642486572193912846537543721986867395421',
+    constraintTypes: ['Renban', 'Var', 'And', 'Pair', 'NFA'],
   },
   {
     name: 'Chaos Construction: Sack Lunch',
@@ -1244,7 +1253,7 @@ export const EXAMPLES = [
     src: 'https://sudokupad.app/y323plq5im',
     input: '/data/scripts/uncovering_tunnels.js',
     solution: '524176398159864732643915287932781465785249613496532871371628954268357149817493526',
-    constraintTypes: ['ChaosConstruction', 'ChaosArrow', 'AllDifferent', 'NFA', 'Whisper', 'CountDistinct'],
+    constraintTypes: ['ChaosConstruction', 'NoBoxes', 'ChaosArrow', 'NFA', 'Whisper', 'AllDifferent', 'CountDistinct'],
   },
   {
     name: 'Chaos Construction: Sunblock',
@@ -1269,13 +1278,13 @@ export const EXAMPLES = [
     src: 'https://www.youtube.com/watch?v=Er6e0ODkVYg',
     input: '/data/thermo_knots.iss',
     solution: '728316459816594723397425816563281974471968235934657182152743698689132547245879361',
-    constraintTypes: ['ChaosConstruction', 'ChaosArrow', 'AllDifferent', 'NFA', 'And', 'WhiteDot'],
+    constraintTypes: ['ChaosConstruction', 'NoBoxes', 'WhiteDot', 'AllDifferent', 'Var', 'And', 'ChaosArrow', 'NFA'],
   },
   {
     name: 'Inset',
     src: 'https://sudokupad.app/nlmbdwt4wn',
     input: '/data/scripts/inset.js',
-    constraintTypes: ['Var', 'AllDifferent', 'NFA'],
+    constraintTypes: ['Shape', 'NoBoxes', 'Var', 'AllDifferent', 'NFA'],
   },
 ];
 

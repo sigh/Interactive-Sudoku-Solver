@@ -612,6 +612,15 @@ await runTest('extractConstraintTypes should handle empty string', () => {
   assert.deepEqual(SudokuParser.extractConstraintTypes(''), []);
 });
 
+await runTest('extractConstraintTypes should ignore the End composite marker', () => {
+  const types = SudokuParser.extractConstraintTypes(
+    '.Or.Cage~10~R1C1~R1C2.Cage~15~R2C1~R2C2.End');
+
+  assert.ok(types.includes('Or'));
+  assert.ok(types.includes('Cage'));
+  assert.ok(!types.includes('End'));
+});
+
 //////////////////////////////////////////////////////////////////////////////
 // toShortSolution
 //////////////////////////////////////////////////////////////////////////////
