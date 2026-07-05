@@ -15,10 +15,16 @@ import { fileURLToPath } from 'node:url';
 
 import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 import { main as solveMain } from './solve.js';
+import { main as verifyMain } from './verify_solution.js';
 import { main as stepMain } from './step_analysis.js';
 import { main as hotspotsMain } from './search_hotspots.js';
 
 const PUZZLE = 'Chaos Construction: 6x6'; // tiny chaos puzzle: ~30 guesses, has var cells
+
+// A classic (no var cells) with a known full solution, for verify_solution.js.
+const VERIFY_PUZZLE = 'Anti-knights move';
+const VERIFY_SOLUTION =
+  '536241897978536241421879635613485972789623514245917368357198426892764153164352789';
 const argv = (script, ...args) => ['node', script, ...args];
 
 // Run a tool's main() with output captured and any throw caught. Captures
@@ -49,6 +55,21 @@ await runTest('solve.js prints a solution', () => {
 await runTest('solve.js requires an explicit --max-backtracks', () => {
   const { thrown } = capture(() => solveMain(argv('solve.js', '--puzzle', PUZZLE)));
   assert.match(thrown?.message ?? '', /backtrack limit is required/);
+});
+
+await runTest('verify_solution.js accepts the correct solution', () => {
+  const { stdout, thrown } = capture(() =>
+    verifyMain(argv('verify_solution.js', '--puzzle', VERIFY_PUZZLE, '--solution', VERIFY_SOLUTION)));
+  assert.equal(thrown, null, thrown?.message);
+  assert.match(stdout, /Result: ACCEPTED/);
+});
+
+await runTest('verify_solution.js rejects a wrong solution (throws non-zero)', () => {
+  const wrong = '6' + VERIFY_SOLUTION.slice(1); // duplicate a digit in row 1 → conflict
+  const { stdout, thrown } = capture(() =>
+    verifyMain(argv('verify_solution.js', '--puzzle', VERIFY_PUZZLE, '--solution', wrong)));
+  assert.match(thrown?.message ?? '', /rejected/);
+  assert.match(stdout, /Result: REJECTED/);
 });
 
 // One call exercises the whole step-inspection surface: the walk table, the

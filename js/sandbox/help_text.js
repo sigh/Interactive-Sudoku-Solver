@@ -93,6 +93,8 @@ STATE MACHINES (NFA)
                                                 must have been compiled with
                                                 opts.multiSegment must be set
 
+    See help/custom-constraints.html for the full state-machine semantics.
+
 SOLVER
 
   makeSolver provides programmatic access to the solver:

@@ -61,6 +61,7 @@ layout: null
             <li><a href="#optimization">Optimization</a></li>
           </ul>
         </li>
+        <li><a href="#sandbox">Sandbox Scripting</a></li>
       </ul>
       <div class="toc-pages">
         <div class="toc-title">Other Help Pages</div>
@@ -433,6 +434,24 @@ function accept(state) {
             size, at the cost of making it less general.
           </li>
         </ul>
+      </div>
+
+      <h2 id="sandbox">Sandbox Scripting</h2>
+      <div>
+        <p>
+          The JavaScript sandbox can build the same state machine directly,
+          without the panel. Compile a spec &mdash; the same
+          <code>startState</code>, <code>transition</code> and
+          <code>accept</code> described above &mdash; then apply it to a list of
+          cells:
+        </p>
+        <pre>const machine = NFA.encodeSpec({ startState, transition, accept }, 9); // 9 possible values
+return new NFA(machine, 'my rule', 'R1C1', 'R1C2', 'R1C3');</pre>
+        <p>
+          Everything on this page still applies: <code>accept</code> runs on the
+          final state, states may be any JSON-serializable value,
+          <code>transition</code> may branch, and the state limit is the same.
+        </p>
       </div>
     </div>
   </div>

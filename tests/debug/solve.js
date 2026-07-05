@@ -1,9 +1,10 @@
 // solve.js — run a puzzle and display the solution content.
 //
 // The "what did the solver find" tool: shows the digit grid and all var-cell
-// groups (e.g. Chaos region labels) for each solution found. Optionally verify
-// a known solution is accepted. Use tests/bench/benchmark_puzzles.js when you
-// want search counters (guesses, backtracks, nodes) rather than solution content.
+// groups (e.g. Chaos region labels) for each solution found. To instead check
+// that an encoding accepts a known answer, use tests/debug/verify_solution.js.
+// Use tests/bench/benchmark_puzzles.js when you want search counters (guesses,
+// backtracks, nodes) rather than solution content.
 //
 // Usage:
 //   node tests/debug/solve.js --max-backtracks <n|none> [options]
@@ -20,30 +21,15 @@
 // Options:
 //   --solutions <n|all>   Number of solutions to find. Default 2 (proves
 //                         uniqueness; reports "multiple" if a 2nd exists).
-//   --solution <digits>   Verify a known solution: inject the digit string as
-//                         givens and confirm the solver accepts it. Exits
-//                         non-zero if the solver rejects it.
 //   --list                List available named puzzles.
 //   -h, --help            Print this help and exit.
 //
 // Examples:
 //   node tests/debug/solve.js --max-backtracks none --puzzle "Chaos Construction"
 //   node tests/debug/solve.js --max-backtracks none --input-file puzzle.txt --solutions all
-//   node tests/debug/solve.js --max-backtracks 50000 --puzzle "Chaos Construction" --solution 123456789...
 
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { ensureGlobalEnvironment } from '../helpers/test_env.js';
 import { runAsCli } from '../helpers/cli_entry.js';
-
-ensureGlobalEnvironment();
-
-const PROJECT_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
-
-const { SudokuParser } = await import('../../js/sudoku_parser.js' + self.VERSION_PARAM);
-const { SudokuBuilder } = await import('../../js/solver/sudoku_builder.js' + self.VERSION_PARAM);
-const { LookupTables } = await import('../../js/solver/lookup_tables.js' + self.VERSION_PARAM);
+import { allPuzzles, loadPuzzle, buildSolver, printSolution } from './puzzle_runner.js';
 
 // ============================================================================
 // Arg parsing
@@ -67,7 +53,7 @@ const parseBacktrackLimit = (raw) => {
 const parseArgs = (argv) => {
   const args = {
     puzzle: null, input: null, inputFile: null,
-    maxSolutions: 2, maxBacktracksRaw: undefined, solution: null,
+    maxSolutions: 2, maxBacktracksRaw: undefined,
     list: false, help: false,
   };
   for (let i = 2; i < argv.length; i++) {
@@ -79,7 +65,6 @@ const parseArgs = (argv) => {
       case '--puzzle': args.puzzle = next(); break;
       case '--input': args.input = next(); break;
       case '--input-file': args.inputFile = next(); break;
-      case '--solution': args.solution = next(); break;
       case '--max-backtracks': args.maxBacktracksRaw = next(); break;
       case '--solutions': {
         const v = next();
@@ -107,139 +92,22 @@ Puzzle source (pick one):
 
 Options:
   --solutions <n|all>   Solutions to find. Default 2 (proves uniqueness).
-  --solution <digits>   Verify a known solution is accepted by the solver.
   --list                List available named puzzles.
-  -h, --help            Print this help and exit.`);
+  -h, --help            Print this help and exit.
 
-// ============================================================================
-// Puzzle loading
-// ============================================================================
-
-const Collections = await import('../../data/collections.js' + self.VERSION_PARAM);
-
-const allPuzzles = () => {
-  const seen = new Set();
-  const puzzles = [];
-  for (const value of Object.values(Collections)) {
-    if (!Array.isArray(value)) continue;
-    for (const entry of value) {
-      if (!entry || typeof entry.input !== 'string' || typeof entry.name !== 'string') continue;
-      if (seen.has(entry.name)) continue;
-      seen.add(entry.name);
-      puzzles.push({ name: entry.name, input: entry.input });
-    }
-  }
-  return puzzles;
-};
-
-const findPuzzle = (query) => {
-  const puzzles = allPuzzles();
-  const exact = puzzles.find(p => p.name === query);
-  if (exact) return exact;
-  const lower = query.toLowerCase();
-  const matches = puzzles.filter(p => p.name.toLowerCase().includes(lower));
-  if (matches.length === 0) throw new Error(`No puzzle matches "${query}". Use --list to see names.`);
-  if (matches.length > 1) {
-    console.error(`"${query}" matched ${matches.length} puzzles; using "${matches[0].name}".`);
-    console.error(`  (others: ${matches.slice(1, 6).map(m => m.name).join(', ')}${matches.length > 6 ? ', ...' : ''})`);
-  }
-  return matches[0];
-};
-
-const resolveInput = (input) =>
-  input.startsWith('/') ? readFileSync(join(PROJECT_ROOT, input), 'utf8') : input;
-
-const loadPuzzle = (args) => {
-  if (args.input !== null) return { name: 'custom', input: resolveInput(args.input) };
-  if (args.inputFile !== null) return { name: args.inputFile, input: readFileSync(args.inputFile, 'utf8') };
-  if (args.puzzle !== null) {
-    const p = findPuzzle(args.puzzle);
-    return { ...p, input: resolveInput(p.input) };
-  }
-  throw new Error('No puzzle specified. Use --puzzle, --input, or --input-file (or --list).');
-};
-
-// ============================================================================
-// Grid rendering
-// ============================================================================
-
-const decode = (mask, offset) =>
-  (mask && !(mask & (mask - 1))) ? String(LookupTables.toOffsetValue(mask, offset)) : '?';
-
-const printDigitGrid = (geometry, grid) => {
-  for (let r = 0; r < geometry.numRows; r++) {
-    const row = [];
-    for (let c = 0; c < geometry.numCols; c++) {
-      row.push(decode(grid[r * geometry.numCols + c], geometry.valueOffset).padStart(2));
-    }
-    console.log(row.join(' '));
-  }
-};
-
-const printVarGrid = (geometry, grid, cells, columns) => {
-  const numRows = Math.ceil(cells.length / columns);
-  for (let r = 0; r < numRows; r++) {
-    const row = [];
-    for (let c = 0; c < columns; c++) {
-      const idx = r * columns + c;
-      if (idx >= cells.length) break;
-      row.push(decode(grid[cells[idx]], 0).padStart(2));
-    }
-    console.log(row.join(' '));
-  }
-};
-
-const printSolution = (geometry, grid, solutionNum) => {
-  console.log(`\n=== Solution ${solutionNum} ===`);
-  printDigitGrid(geometry, grid);
-
-  for (const group of geometry.varCellGroups()) {
-    if (group.hidden) continue;
-    console.log(`\n[${group.prefix}] ${group.label}:`);
-    if (group.columns) {
-      printVarGrid(geometry, grid, group.cells, group.columns);
-    } else {
-      for (const cell of group.cells) {
-        const id = geometry.makeCellIdFromIndex(cell);
-        console.log(`  ${id} = ${decode(grid[cell], 0)}`);
-      }
-    }
-  }
-};
+To check a known answer is accepted, use tests/debug/verify_solution.js.`);
 
 // ============================================================================
 // Solving
 // ============================================================================
-
-const injectSolutionGivens = (input, digits) => {
-  // Parse the digit string into .~RrCc_v given constraints.
-  const D = Math.round(Math.sqrt(digits.length));
-  if (D * D !== digits.length) throw new Error(`--solution must be a perfect-square digit string (got length ${digits.length})`);
-  let givens = '';
-  for (let i = 0; i < digits.length; i++) {
-    const r = Math.floor(i / D) + 1;
-    const c = (i % D) + 1;
-    givens += `.~R${r}C${c}_${digits[i]}`;
-  }
-  return input + givens;
-};
 
 export const main = (argv) => {
   const args = parseArgs(argv);
   if (args.help) { printUsage(); return; }
   if (args.list) { for (const p of allPuzzles()) console.log(p.name); return; }
 
-  let puzzle = loadPuzzle(args);
-
-  if (args.solution !== null) {
-    puzzle = { ...puzzle, input: injectSolutionGivens(puzzle.input, args.solution) };
-  }
-
-  const constraint = SudokuParser.parseText(puzzle.input);
-  const resolved = SudokuBuilder.resolveConstraint(constraint);
-  const solver = SudokuBuilder.build(resolved);
-  const internal = solver._internalSolver;
-  const geometry = internal._geometry;
+  const puzzle = loadPuzzle(args);
+  const { internal, geometry } = buildSolver(puzzle.input);
 
   const maxBacktracks = parseBacktrackLimit(args.maxBacktracksRaw);
 
@@ -259,17 +127,14 @@ export const main = (argv) => {
     internal.counters.backtracks >= maxBacktracks;
 
   console.log(`Puzzle: ${puzzle.name}`);
-  if (args.solution !== null) console.log(`Verifying solution: ${args.solution}`);
 
   if (count === 0) {
-    // A capped run is inconclusive, and a rejected --solution verify is a
-    // failure; both throw so the CLI exits non-zero. A genuine no-solution is a
-    // valid result (exit 0).
+    // A capped run is inconclusive (throw → non-zero exit); a genuine
+    // no-solution is a valid result (exit 0).
     if (capped) {
       throw new Error(`capped after ${maxBacktracks} backtracks — no solution found yet (incomplete)`);
     }
     console.log('Result: no solution');
-    if (args.solution !== null) throw new Error('solver rejected the given solution');
     return;
   }
 

@@ -2,8 +2,8 @@
 
 Tools for understanding *what* the solver found and *why* it did what it did
 — solution content (digit grids, var cells), which cell it branches on, what
-candidates a constraint has pruned, and whether a custom NFA spec accepts a
-known solution. These complement the benchmarking tools in
+candidates a constraint has pruned, and whether an encoding accepts a known
+solution. These complement the benchmarking tools in
 [`tests/bench/`](../bench/README.md), which measure *how much* search a change
 causes.
 
@@ -11,7 +11,8 @@ causes.
 
 | Command | Purpose |
 | --- | --- |
-| `node tests/debug/solve.js` | Run a puzzle and display solution content: digit grid plus all var-cell groups (e.g. Chaos region labels). Optionally verify a known solution is accepted. |
+| `node tests/debug/solve.js` | Run a puzzle and display solution content: digit grid plus all var-cell groups (e.g. Chaos region labels). |
+| `node tests/debug/verify_solution.js` | Check whether an encoding **accepts** a known solution (injects it as givens): prints `ACCEPTED`/`REJECTED` with a matching exit code. The bounded yes/no counterpart to `solve.js`. |
 | `node tests/debug/step_analysis.js` | Walk the search step by step. Explain why a branch was chosen, show pencilmarks/var-cell candidates, the per-step propagation log (what each handler pruned + the refuter), and where an ablation makes the branching diverge. |
 | `node tests/debug/search_hotspots.js` | Where the search concentrates over a (bounded) solve: the conflict heatmap, the cells re-guessed most (churn), the branch-factor shape (grid vs var, MRV gap), and the propagation yield (how often guesses eliminate nothing — branching into the void). The headless view of the debug UI's heatmap. |
 | `node tests/debug/run_sandbox.js` | Run a [sandbox](../../js/sandbox/README.md) script outside the browser and print the constraints it returns. Generate or regenerate puzzle definitions (e.g. `.iss` files) without opening the browser; pipe the output into `solve.js`. |
@@ -31,16 +32,29 @@ node tests/debug/solve.js --max-backtracks none --puzzle "Chaos Construction"
 
 # Show all solutions for a raw constraint string.
 node tests/debug/solve.js --max-backtracks none --input-file puzzle.txt --solutions all
-
-# Verify a known solution is accepted (exits non-zero if rejected).
-node tests/debug/solve.js --max-backtracks 50000 --puzzle "Chaos Construction" --solution 123456789...
 ```
 
-`--solution <digits>` injects the digit string as givens before solving. If the
-solver reports no-solution, the puzzle's constraints reject that assignment —
-useful for confirming a known-good solution after a constraint change, or for
-narrowing which constraints cause a rejection (combine with manual constraint
-removal in the input string).
+---
+
+### `verify_solution.js` — check an encoding accepts a known answer
+
+`--solution <digits>` injects the digit string as givens (main-grid cells,
+row-major) and reports `ACCEPTED` (exit 0) or `REJECTED` (exit non-zero), so it
+doubles as an assertion in scripts/CI. Verifying an answer is a bounded yes/no
+check, not a search — there's no backtrack cap to set.
+
+```sh
+# Confirm the encoding accepts a known-good solution after a constraint change.
+node tests/debug/verify_solution.js --puzzle "Chaos Construction" --solution 123456789...
+
+# Same, from a raw constraint string / file.
+node tests/debug/verify_solution.js --input-file puzzle.txt --solution 123456789...
+```
+
+A `REJECTED` result means the constraints reject that assignment — useful for
+narrowing which constraint causes it (combine with manual constraint removal in
+the input). For puzzles whose answer lives in Var cells, use `solve.js` and read
+the printed Var groups instead.
 
 ---
 
@@ -88,9 +102,9 @@ When a constraint is wrongly pruning a valid solution — the solver reports
 no-solution on what should be a valid puzzle — the goal is to narrow it to a
 concrete, 0-guess reproduction:
 
-1. Use `debug/solve.js --max-backtracks 50000 --solution <digits>` to confirm the
-   solver rejects a known-good assignment. If it does, the bug is in a constraint,
-   not the grid.
+1. Use `debug/verify_solution.js --solution <digits>` to confirm the solver
+   rejects a known-good assignment. If it does, the bug is in a constraint, not
+   the grid.
 
 2. Remove constraints from the input one block at a time until the rejection
    disappears. The last removed block contains the culprit.
