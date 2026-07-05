@@ -22,10 +22,38 @@ const {
   getModeDescription,
 } = await import('./solver_runner.js' + self.VERSION_PARAM);
 
-class HistoryHandler {
-  MAX_HISTORY = 50;
-  HISTORY_ADJUSTMENT = 10;
+export class HistoryState {
+  constructor({ maxHistory = 50, adjustment = 10 } = {}) {
+    this._entries = [];
+    this._cursor = -1;
+    this._maxHistory = maxHistory;
+    this._adjustment = adjustment;
+  }
 
+  // Push a new entry, discarding any redo history ahead of the cursor.
+  // Returns true if the entry was added, false if it matched the current one.
+  add(entry) {
+    if (entry === this._entries[this._cursor]) return false;
+
+    this._entries.length = this._cursor + 1;
+    this._entries.push(entry || '');
+    this._cursor++;
+
+    if (this._entries.length > this._maxHistory) {
+      this._entries = this._entries.slice(this._adjustment);
+      this._cursor -= this._adjustment;
+    }
+    return true;
+  }
+
+  canUndo() { return this._cursor > 0; }
+  canRedo() { return this._cursor < this._entries.length - 1; }
+
+  undo() { return this.canUndo() ? this._entries[--this._cursor] : null; }
+  redo() { return this.canRedo() ? this._entries[++this._cursor] : null; }
+}
+
+class HistoryHandler {
   constructor(onUpdate) {
     this._blockHistoryUpdates = false;
     this._onUpdate = params => {
@@ -34,19 +62,18 @@ class HistoryHandler {
       onUpdate(params);
     }
 
-    this._history = [];
-    this._historyLocation = -1;
+    this._state = new HistoryState();
 
     this._undoButton = document.getElementById('undo-button');
-    this._undoButton.onclick = () => this._incrementHistory(-1);
+    this._undoButton.onclick = () => this._navigateTo(this._state.undo());
     this._redoButton = document.getElementById('redo-button');
-    this._redoButton.onclick = () => this._incrementHistory(+1);
+    this._redoButton.onclick = () => this._navigateTo(this._state.redo());
     // ctrl-z/shift-ctrl-z are shortcuts for undo/redo,
     window.addEventListener('keydown', event => {
       if (isKeyEventFromEditableElement(event)) return;
       if (event.key.toLowerCase() === 'z' && (event.metaKey || event.ctrlKey)) {
         event.preventDefault();
-        this._incrementHistory(event.shiftKey ? 1 : -1);
+        this._navigateTo(event.shiftKey ? this._state.redo() : this._state.undo());
       }
       return false;
     });
@@ -62,29 +89,13 @@ class HistoryHandler {
     }
     let q = '' + (params.q || '');
 
-    this._addToHistory(q);
+    if (this._state.add(q)) this._updateButtons();
     this._updateUrl(params);
   }
 
-  _addToHistory(q) {
-    if (q === this._history[this._historyLocation]) return;
-    this._history.length = this._historyLocation + 1;
-    this._history.push(q || '');
-    this._historyLocation++;
-
-    if (this._history.length > HistoryHandler.MAX_HISTORY) {
-      this._history = this._history.slice(HISTORY_ADJUSTMENT);
-      this._historyLocation -= HISTORY_ADJUSTMENT;
-    }
-
-    this._updateButtons();
-  }
-
-  _incrementHistory(delta) {
-    const index = this._historyLocation + delta;
-    if (index < 0 || index >= this._history.length) return;
-    let q = this._history[this._historyLocation + delta];
-    this._historyLocation += delta;
+  // Apply the result of an undo/redo. A null entry means the move was a no-op.
+  _navigateTo(q) {
+    if (q === null) return;
     this._updateButtons();
 
     this._updateUrl({ q: q });
@@ -92,8 +103,8 @@ class HistoryHandler {
   }
 
   _updateButtons() {
-    this._undoButton.disabled = this._historyLocation <= 0;
-    this._redoButton.disabled = this._historyLocation >= this._history.length - 1;
+    this._undoButton.disabled = !this._state.canUndo();
+    this._redoButton.disabled = !this._state.canRedo();
   }
 
   _updateUrl(params) {
@@ -115,7 +126,7 @@ class HistoryHandler {
 
   _reloadFromUrl() {
     let url = new URL(window.location.href);
-    this._addToHistory(url.searchParams.get('q'));
+    if (this._state.add(url.searchParams.get('q'))) this._updateButtons();
     this._onUpdate(url.searchParams);
   }
 }

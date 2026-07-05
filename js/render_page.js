@@ -891,6 +891,9 @@ class ConstraintManager {
       clearDOMNode(errorElem);
       const input = inputElem.value;
       this.loadUnsafeFromText(input);
+      // Solve even if auto-solve is off.
+      // Future constraint changes in the same frame supersedes this force —
+      // which is intended: the result should follow the user's latest action.
       this.runUpdateCallback({ forceSolve: true });
       return false;
     };
