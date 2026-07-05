@@ -1,0 +1,143 @@
+// puzzle_runner.js — shared plumbing for the debug puzzle CLIs (solve.js,
+// verify_solution.js): puzzle-source loading, solver build, solution-digit
+// injection, and solution rendering. Owns the global-environment setup and the
+// solver-module imports so importers don't repeat them.
+
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { ensureGlobalEnvironment } from '../../tests/helpers/test_env.js';
+
+ensureGlobalEnvironment();
+
+const PROJECT_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+
+const { SudokuParser } = await import('../../js/sudoku_parser.js' + self.VERSION_PARAM);
+const { SudokuBuilder } = await import('../../js/solver/sudoku_builder.js' + self.VERSION_PARAM);
+const { LookupTables } = await import('../../js/solver/lookup_tables.js' + self.VERSION_PARAM);
+const Collections = await import('../../data/collections.js' + self.VERSION_PARAM);
+
+// ============================================================================
+// Puzzle source (--puzzle / --input / --input-file / --list)
+// ============================================================================
+
+export const allPuzzles = () => {
+  const seen = new Set();
+  const puzzles = [];
+  for (const value of Object.values(Collections)) {
+    if (!Array.isArray(value)) continue;
+    for (const entry of value) {
+      if (!entry || typeof entry.input !== 'string' || typeof entry.name !== 'string') continue;
+      if (seen.has(entry.name)) continue;
+      seen.add(entry.name);
+      puzzles.push({ name: entry.name, input: entry.input });
+    }
+  }
+  return puzzles;
+};
+
+export const findPuzzle = (query) => {
+  const puzzles = allPuzzles();
+  const exact = puzzles.find(p => p.name === query);
+  if (exact) return exact;
+  const lower = query.toLowerCase();
+  const matches = puzzles.filter(p => p.name.toLowerCase().includes(lower));
+  if (matches.length === 0) throw new Error(`No puzzle matches "${query}". Use --list to see names.`);
+  if (matches.length > 1) {
+    console.error(`"${query}" matched ${matches.length} puzzles; using "${matches[0].name}".`);
+    console.error(`  (others: ${matches.slice(1, 6).map(m => m.name).join(', ')}${matches.length > 6 ? ', ...' : ''})`);
+  }
+  return matches[0];
+};
+
+const resolveInput = (input) =>
+  input.startsWith('/') ? readFileSync(join(PROJECT_ROOT, input), 'utf8') : input;
+
+// args: { input, inputFile, puzzle } — exactly one set.
+export const loadPuzzle = (args) => {
+  if (args.input != null) return { name: 'custom', input: resolveInput(args.input) };
+  if (args.inputFile != null) return { name: args.inputFile, input: readFileSync(args.inputFile, 'utf8') };
+  if (args.puzzle != null) {
+    const p = findPuzzle(args.puzzle);
+    return { ...p, input: resolveInput(p.input) };
+  }
+  throw new Error('No puzzle specified. Use --puzzle, --input, or --input-file (or --list).');
+};
+
+// ============================================================================
+// Solver build
+// ============================================================================
+
+// Parse a constraint string and build the solver. Returns the internal solver
+// (with .run/.state/.counters) and its geometry.
+export const buildSolver = (input) => {
+  const constraint = SudokuParser.parseText(input);
+  const resolved = SudokuBuilder.resolveConstraint(constraint);
+  const solver = SudokuBuilder.build(resolved);
+  const internal = solver._internalSolver;
+  return { internal, geometry: internal._geometry };
+};
+
+// Append a full solution digit string as `.~RrCc_v` givens (main-grid cells,
+// row-major). The grid side is inferred as sqrt(length).
+export const injectSolutionGivens = (input, digits) => {
+  const D = Math.round(Math.sqrt(digits.length));
+  if (D * D !== digits.length) {
+    throw new Error(`solution must be a perfect-square digit string (got length ${digits.length})`);
+  }
+  let givens = '';
+  for (let i = 0; i < digits.length; i++) {
+    const r = Math.floor(i / D) + 1;
+    const c = (i % D) + 1;
+    givens += `.~R${r}C${c}_${digits[i]}`;
+  }
+  return input + givens;
+};
+
+// ============================================================================
+// Solution rendering
+// ============================================================================
+
+const decode = (mask, offset) =>
+  (mask && !(mask & (mask - 1))) ? String(LookupTables.toOffsetValue(mask, offset)) : '?';
+
+const printDigitGrid = (geometry, grid) => {
+  for (let r = 0; r < geometry.numRows; r++) {
+    const row = [];
+    for (let c = 0; c < geometry.numCols; c++) {
+      row.push(decode(grid[r * geometry.numCols + c], geometry.valueOffset).padStart(2));
+    }
+    console.log(row.join(' '));
+  }
+};
+
+const printVarGrid = (geometry, grid, cells, columns) => {
+  const numRows = Math.ceil(cells.length / columns);
+  for (let r = 0; r < numRows; r++) {
+    const row = [];
+    for (let c = 0; c < columns; c++) {
+      const idx = r * columns + c;
+      if (idx >= cells.length) break;
+      row.push(decode(grid[cells[idx]], 0).padStart(2));
+    }
+    console.log(row.join(' '));
+  }
+};
+
+export const printSolution = (geometry, grid, solutionNum) => {
+  console.log(`\n=== Solution ${solutionNum} ===`);
+  printDigitGrid(geometry, grid);
+
+  for (const group of geometry.varCellGroups()) {
+    if (group.hidden) continue;
+    console.log(`\n[${group.prefix}] ${group.label}:`);
+    if (group.columns) {
+      printVarGrid(geometry, grid, group.cells, group.columns);
+    } else {
+      for (const cell of group.cells) {
+        const id = geometry.makeCellIdFromIndex(cell);
+        console.log(`  ${id} = ${decode(grid[cell], 0)}`);
+      }
+    }
+  }
+};

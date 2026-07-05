@@ -6,12 +6,12 @@
     "test": "node tests/run_all_tests.js",
     "test:quiet": "node tests/run_all_tests.js --quiet",
     "test:coverage": "c8 node tests/run_all_tests.js",
-    "bench": "node tests/bench/run_legacy_benchmarks.js"
+    "bench": "node tools/perf/run_legacy_benchmarks.js"
   },
   "c8": {
     "all": true,
     "src": ["js"],
-    "exclude": ["_site/**", "lib/**", "tests/**", "node_modules/**"],
+    "exclude": ["_site/**", "lib/**", "tests/**", "tools/**", "node_modules/**"],
     "reporter": ["text", "html"],
     "report-dir": "coverage"
   },

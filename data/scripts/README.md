@@ -20,4 +20,4 @@ save the code here.
 
 ## Running scripts
 
-Outside the sandbox, run it through [../../tests/debug/run_sandbox.js](../../tests/debug/run_sandbox.js), which executes the script against the same sandbox globals and prints the resulting constraints — useful for generating a puzzle file or checking a script in CI.
+Outside the sandbox, run it through [../../tools/debug/run_sandbox.js](../../tools/debug/run_sandbox.js), which executes the script against the same sandbox globals and prints the resulting constraints — useful for generating a puzzle file or checking a script in CI.

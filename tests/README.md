@@ -40,8 +40,10 @@ node tests/run_all_tests.js --fail-fast # stop after the first failing file
 | [ui/](ui/) | UI component tests. Constraint input with a mock DOM. |
 | [e2e/](e2e/) | End-to-end tests. Solves full puzzle collections and checks solutions. Runs last. |
 | [helpers/](helpers/) | Test utilities (not tests). `test_runner.js` provides `runTest`/`logSuiteComplete`. `test_env.js` sets up globals. `grid_test_utils.js` provides grid/handler helpers. |
-| [bench/](bench/) | Benchmarks (`*.bench.js`). |
-| [bisect/](bisect/) | Git bisect helper for perf regressions. |
+
+Developer CLIs (solve, verify, benchmark, profile, step-analysis, bisect, …) live
+in [`../tools/`](../tools/), not here. `tools.test.js` (a smoke test that drives
+those CLIs) stays in this tree so the runner discovers it.
 
 ## Test Helpers
 

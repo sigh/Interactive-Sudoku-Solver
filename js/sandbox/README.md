@@ -47,7 +47,7 @@ for the full list of built-in constraint classes.
 
 See [examples.js](examples.js) for runnable scripts demonstrating these patterns.
 To run a script outside the browser — e.g. to generate a puzzle file — use
-[`tests/debug/run_sandbox.js`](../../tests/debug/run_sandbox.js), which executes
+[`tools/debug/run_sandbox.js`](../../tools/debug/run_sandbox.js), which executes
 it against these same globals and prints the resulting constraints.
 
 ### What the engine always enforces
