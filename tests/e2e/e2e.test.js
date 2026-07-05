@@ -155,6 +155,13 @@ const solveCollections = [
         input: '.Replicate~JBAAIJAAAJB.Replicate~BIAB.NFA~UgMP_CIZCmOhP_CGKlKUpX_CJclKUpX_isbJqUpX_VJhG0UpX_UqbSuqpX_UpVHGfZX_UpSqvPC__UpSlWghP_UpSlKulP_UpSlKUpX_itclKUpX_VJjJqUpX_UqbW0UpX_UpVHOqpX_UpSqvfZX_UpSlWhC__jGKlKUpX_VKUlKUpX_Uqc5qUpX_UpVKUUpX_UpSq1qpX_UpSlWtZX_UpSlKve4~_~R1C1~R1C2~R1C3.End.Replicate~H.NFA~UgMP_CIZCmOhP_CGKlKUpX_CJclKUpX_isbJqUpX_VJhG0UpX_UqbSuqpX_UpVHGfZX_UpSqvPC__UpSlWghP_UpSlKulP_UpSlKUpX_itclKUpX_VJjJqUpX_UqbW0UpX_UpVHOqpX_UpSqvfZX_UpSlWhC__jGKlKUpX_VKUlKUpX_Uqc5qUpX_UpVKUUpX_UpSq1qpX_UpSlWtZX_UpSlKve4~_~R1C1~R2C1~R3C1.End.End.~R8C1_7~R9C3_9.Thermo~R6C4~R7C4~R7C3~R8C3~R8C2~R9C2.Thermo~R6C6~R6C7~R7C7~R7C8~R8C8~R8C9.Thermo~R4C6~R3C6~R3C7~R2C7~R2C8~R1C8.Thermo~R4C4~R4C3~R3C3~R3C2~R2C2~R2C1',
         solution: '541627893982531674376984521625493718137865942498172356813259467754316289269748135',
       },
+      {
+        // Regex over a subset of digits ([1-5]*), so the compiled NFA uses
+        // fewer symbols than numValues.
+        name: 'Classic sudoku with subset regex',  // Regex
+        input: '.~R1C5_7~R2C4_1~R2C5_9~R2C6_5~R3C8_6~R4C5_6~R5C4_8~R5C9_1~R6C5_2~R7C7_2~R7C8_8~R8C6_9~R8C9_5~R9C8_7~R8C4_4~R7C2_6~R5C1_4~R4C1_8~R3C3_8~R1C1_5~R1C2_3.Regex~WzEtNV0q~R7C3~R7C4~R7C5~R6C5~R5C6~R4C6~R3C6~R2C6',
+        solution: '534678912672195348198342567859761423426853791713924856961537284287419635345286179',
+      },
     ],
   },
   {

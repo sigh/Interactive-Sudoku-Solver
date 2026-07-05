@@ -118,11 +118,10 @@ export class NFAConstraint extends SudokuConstraintHandler {
 
   initialize(initialGridCells, cellExclusions, geometry, stateAllocator) {
     const isMultiSegment = this._steps.includes(-1);
-    const minNumSymbols = geometry.numValues + (isMultiSegment ? 1 : 0);
-    if (this._cnfa.numSymbols < minNumSymbols) {
+    if (isMultiSegment && this._cnfa.numSymbols < geometry.numValues + 1) {
       throw new InvalidConstraintError(
-        `NFA has ${this._cnfa.numSymbols} symbols but requires ${minNumSymbols} symbols.` +
-        (isMultiSegment ? ' Ensure the NFA is compiled as multiSegment.' : ''));
+        `NFA has ${this._cnfa.numSymbols} symbols but requires ` +
+        `${geometry.numValues + 1} symbols. Ensure the NFA is compiled as multiSegment.`);
     }
     // The segment break is the symbol just past the real values (see nfa_builder's
     // segmentBreakSymbol), so its mask bit is numValues.

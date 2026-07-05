@@ -6,8 +6,11 @@ import { createAccumulator, valueMask } from '../helpers/grid_test_utils.js';
 
 ensureGlobalEnvironment();
 
-const { regexToNFA } = await import('../../js/nfa_builder.js');
+const { regexToNFA, javascriptSpecToNFA, SEGMENT_BREAK } = await import('../../js/nfa_builder.js');
 const { compressNFA, NFAConstraint } = await import('../../js/solver/nfa_handler.js');
+
+// A minimal geometry stub: initialize() only reads numValues.
+const geometry = (numValues) => ({ numValues });
 
 const findStartingStateIndex = (cnfa) => {
   for (let i = 0; i < cnfa.numStates; i++) {
@@ -377,6 +380,53 @@ await runTest('NFAConstraint internal state should be cleared between calls', ()
   grid2[0] = valueMask(2);
   grid2[1] = valueMask(1);
   assert.equal(handler.enforceConsistency(grid2, createAccumulator()), true);
+});
+
+// =============================================================================
+// NFAConstraint initialize symbol check
+// =============================================================================
+
+await runTest('initialize accepts a single-segment NFA over a subset of digits', () => {
+  // `[1-5]*` only references symbols 1-5, so numSymbols (5) is below numValues
+  // (9). The unused digits just get pruned, so this must not throw.
+  const cnfa = compressNFA(regexToNFA('[1-5]*', 9));
+  assert.equal(cnfa.numSymbols, 5);
+  const handler = new NFAConstraint([[0]], cnfa);
+
+  assert.equal(handler.initialize(null, null, geometry(9), null), true);
+});
+
+await runTest('initialize accepts a single-segment NFA regardless of symbol count', () => {
+  const cnfa = compressNFA(regexToNFA('12', 9));
+  const handler = new NFAConstraint([[0, 1]], cnfa);
+
+  assert.equal(handler.initialize(null, null, geometry(9), null), true);
+});
+
+await runTest('initialize rejects a multi-segment NFA lacking the segment-break symbol', () => {
+  // A plain regex has no segment-break symbol, so numSymbols (2) < numValues + 1.
+  // Assembling it across two segments must be rejected.
+  const cnfa = compressNFA(regexToNFA('12', 9));
+  const handler = new NFAConstraint([[0], [1]], cnfa);
+
+  assert.throws(
+    () => handler.initialize(null, null, geometry(9), null),
+    /multiSegment/);
+});
+
+await runTest('initialize accepts a correctly compiled multi-segment NFA', () => {
+  const spec = {
+    startState: 0,
+    transition: (s, v) => (v === SEGMENT_BREAK ? 0 : (v > s ? v : [])),
+    accept: () => true,
+  };
+  // multiSegment adds the segment-break symbol at index numValues, so
+  // numSymbols == numValues + 1.
+  const cnfa = compressNFA(javascriptSpecToNFA(spec, 4, { multiSegment: true }));
+  assert.equal(cnfa.numSymbols, 5);
+  const handler = new NFAConstraint([[0], [1]], cnfa);
+
+  assert.equal(handler.initialize(null, null, geometry(4), null), true);
 });
 
 // =============================================================================
