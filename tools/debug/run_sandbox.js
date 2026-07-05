@@ -30,14 +30,8 @@
 //       --max-backtracks none --input-file /dev/stdin --solutions 2
 
 import { readFileSync } from 'node:fs';
-import { ensureGlobalEnvironment } from '../../tests/helpers/test_env.js';
 import { runAsCli } from '../lib/cli_entry.js';
-
-ensureGlobalEnvironment();
-
-const env = await import('../../js/sandbox/env.js' + self.VERSION_PARAM);
-
-const AsyncFunction = Object.getPrototypeOf(async function () { }).constructor;
+import { runSandboxScript, serialize } from '../lib/sandbox_runner.js';
 
 const parseArgs = (argv) => {
   const args = { file: null, code: null, current: null, raw: false, help: false };
@@ -68,20 +62,6 @@ Options:
   --raw              Print the return value as-is instead of serializing it.
   -h, --help         Print this help and exit.`);
 
-// Serialize a returned value into a constraint string. Constraints (and arrays
-// of them, and raw strings) are accepted; each constraint's toString() defers to
-// its class serializer. One constraint per line (the parser ignores whitespace).
-const serialize = (value) => {
-  const flatten = (v) => {
-    if (v == null) return [];
-    if (Array.isArray(v)) return v.flatMap(flatten);
-    if (typeof v === 'string') return [v];
-    if (typeof v.toString === 'function') return [v.toString()];
-    return [];
-  };
-  return flatten(value).join('\n');
-};
-
 export const main = async (argv) => {
   const args = parseArgs(argv);
   if (args.help) { printUsage(); return; }
@@ -91,13 +71,7 @@ export const main = async (argv) => {
   else if (args.file !== null) source = readFileSync(args.file, 'utf8');
   else throw new Error('No script specified. Use --file or --code (or --help).');
 
-  const globals = {
-    ...env.SANDBOX_GLOBALS,
-    ...env.getSandboxExtraGlobals(args.current),
-  };
-
-  const fn = new AsyncFunction(...Object.keys(globals), source);
-  const result = await fn(...Object.values(globals));
+  const result = await runSandboxScript(source, args.current);
 
   if (args.raw) {
     console.log(result);

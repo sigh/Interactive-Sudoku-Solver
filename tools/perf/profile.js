@@ -41,8 +41,9 @@
 //   node tools/perf/profile.js --max-backtracks 50000 --summary --puzzles "ladder:Chaos Construction"
 
 import {
-  resolvePuzzles, parseBacktrackLimit, parseSolutionLimit, warnIfFirstSolution,
-  runSolve, applyAblations, validateAblations, HANDLERS, handlerMethodNames,
+  resolvePuzzles, materializePuzzles, parseBacktrackLimit, parseSolutionLimit,
+  warnIfFirstSolution, runSolve, applyAblations, validateAblations, HANDLERS,
+  handlerMethodNames,
 } from '../lib/solver_analysis.js';
 
 const parseList = (value) => (value ?? '').split(',').map(v => v.trim()).filter(Boolean);
@@ -110,7 +111,7 @@ const installProfiler = (HandlerClass, methods) => {
   return { stats, restore };
 };
 
-const main = () => {
+const main = async () => {
   const args = parseArgs(process.argv);
   if (args.help) { usage(); return; }
   if (args.listHandlers) { console.log(Object.keys(HANDLERS).sort().join('\n')); return; }
@@ -124,7 +125,7 @@ const main = () => {
   warnIfFirstSolution(maxSolutions);
   validateAblations(args.ablate);
   const methods = args.methods ?? handlerMethodNames(HandlerClass);
-  const puzzles = resolvePuzzles(args.puzzles);
+  const puzzles = await materializePuzzles(resolvePuzzles(args.puzzles));
 
   const restoreAblations = args.ablate.length ? applyAblations(args.ablate) : null;
   try {
@@ -154,9 +155,7 @@ const main = () => {
   } finally { restoreAblations?.(); }
 };
 
-try {
-  main();
-} catch (e) {
+main().catch((e) => {
   console.error(`error: ${e.message}\n(run with --help for usage)`);
   process.exit(1);
-}
+});

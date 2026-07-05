@@ -24,6 +24,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ensureGlobalEnvironment } from '../../tests/helpers/test_env.js';
 import { runAsCli } from '../lib/cli_entry.js';
+import { runSandboxToConstraint } from '../lib/sandbox_runner.js';
 
 ensureGlobalEnvironment();
 
@@ -192,21 +193,24 @@ const findPuzzle = (query) => {
   return matches[0];
 };
 
-// Some collection puzzles store `input` as a "/data/*.iss" path rather than a
-// constraint string (the app fetches it lazily); resolve those to file text.
-// SudokuParser strips the file's leading `#` comments.
-const resolveFileInput = (input) =>
-  input.startsWith('/') ? readFileSync(join(PROJECT_ROOT, input), 'utf8') : input;
+// A puzzle's `input` may be a file path (leading '/'): a '.js' sandbox script
+// that generates the constraint (executed here, once), or a raw constraint-text
+// file. SudokuParser strips a text file's leading `#` comments.
+const resolveFileInput = async (input) => {
+  if (!input.startsWith('/')) return input;
+  const text = readFileSync(join(PROJECT_ROOT, input), 'utf8');
+  return input.endsWith('.js') ? runSandboxToConstraint(text) : text;
+};
 
-const loadPuzzle = (args) => {
+const loadPuzzle = async (args) => {
   if (args.input === '-') return { name: 'stdin', input: readFileSync(0, 'utf8') };
-  if (args.input !== null) return { name: 'custom', input: resolveFileInput(args.input) };
+  if (args.input !== null) return { name: 'custom', input: await resolveFileInput(args.input) };
   if (args.inputFile !== null) {
     return { name: args.inputFile, input: readFileSync(args.inputFile, 'utf8') };
   }
   if (args.puzzle !== null) {
     const puzzle = findPuzzle(args.puzzle);
-    return { ...puzzle, input: resolveFileInput(puzzle.input) };
+    return { ...puzzle, input: await resolveFileInput(puzzle.input) };
   }
   throw new Error('No puzzle specified. Use --puzzle, --input, or --input-file (or --list).');
 };
@@ -692,7 +696,7 @@ const valuesString_fromSet = (set) => [...set].sort((a, b) => a - b).join('') ||
 // Main
 // ============================================================================
 
-export const main = (argv) => {
+export const main = async (argv) => {
   const args = parseArgs(argv);
   if (args.help) { printUsage(); return; }
   if (args.list) {
@@ -705,7 +709,7 @@ export const main = (argv) => {
   // stderr; printStateString writes the constraint to stdout directly.
   if (args.dumpState) console.log = (...a) => console.error(...a);
 
-  const puzzle = loadPuzzle(args);
+  const puzzle = await loadPuzzle(args);
   const constraint = SudokuParser.parseText(puzzle.input);
   // logLevel 1 enables the engine's per-step propagation log (handler prunings
   // and refuter). Always on so a conflict can be explained automatically;

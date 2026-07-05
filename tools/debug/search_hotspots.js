@@ -40,7 +40,7 @@ import { runAsCli } from '../lib/cli_entry.js';
 
 ensureGlobalEnvironment();
 
-const { resolvePuzzles, runSolve, parseBacktrackLimit, parseSolutionLimit } =
+const { resolvePuzzles, materializePuzzles, runSolve, parseBacktrackLimit, parseSolutionLimit } =
   await import('../lib/solver_analysis.js' + self.VERSION_PARAM);
 const { LookupTables } = await import('../../js/solver/lookup_tables.js' + self.VERSION_PARAM);
 
@@ -79,7 +79,7 @@ Options:
   --top <n>             Rows to show per ranking. Default 20.
   -h, --help            Print this help and exit.`);
 
-export const main = (argv) => {
+export const main = async (argv) => {
   const args = parseArgs(argv);
   if (args.help) { printUsage(); return; }
 
@@ -87,7 +87,7 @@ export const main = (argv) => {
   if (!selector) throw new Error('No puzzle specified. Use --puzzle or --input.');
   const maxBacktracks = parseBacktrackLimit(args.maxBacktracksRaw);
   const maxSolutions = parseSolutionLimit(args.solutionsRaw);
-  const [puzzle] = resolvePuzzles([selector]);
+  const [puzzle] = await materializePuzzles(resolvePuzzles([selector]));
 
   // Accumulated per-node branch stats; populated by the selector wrapper.
   const churn = new Map();           // cell -> Set of values branched on it

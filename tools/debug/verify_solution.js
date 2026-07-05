@@ -73,7 +73,7 @@ Options:
 
 Prints "Result: ACCEPTED" (exit 0) or "Result: REJECTED" (exit non-zero).`);
 
-export const main = (argv) => {
+export const main = async (argv) => {
   const args = parseArgs(argv);
   if (args.help) { printUsage(); return; }
   if (args.list) { for (const p of allPuzzles()) console.log(p.name); return; }
@@ -81,7 +81,7 @@ export const main = (argv) => {
     throw new Error('No solution given. Pass --solution <digits> (or --help).');
   }
 
-  const puzzle = loadPuzzle(args);
+  const puzzle = await loadPuzzle(args);
   const input = injectSolutionGivens(puzzle.input, args.solution);
   const { internal } = buildSolver(input);
 

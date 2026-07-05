@@ -101,12 +101,12 @@ To check a known answer is accepted, use tools/debug/verify_solution.js.`);
 // Solving
 // ============================================================================
 
-export const main = (argv) => {
+export const main = async (argv) => {
   const args = parseArgs(argv);
   if (args.help) { printUsage(); return; }
   if (args.list) { for (const p of allPuzzles()) console.log(p.name); return; }
 
-  const puzzle = loadPuzzle(args);
+  const puzzle = await loadPuzzle(args);
   const { internal, geometry } = buildSolver(puzzle.input);
 
   const maxBacktracks = parseBacktrackLimit(args.maxBacktracksRaw);

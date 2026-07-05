@@ -32,8 +32,10 @@ const argv = (script, ...args) => ['node', script, ...args];
 
 // Run a tool's main() with output captured and any throw caught. Captures
 // console.log (stdout), console.error (stderr), and direct process.stdout.write
-// (used by --dump-state to emit the bare constraint string).
-const capture = (fn) => {
+// (used by --dump-state to emit the bare constraint string). Async because the
+// tool mains are async (they may run a sandbox script to materialize a puzzle);
+// tests run sequentially, so the global console swap is never contended.
+const capture = async (fn) => {
   const out = [], err = [];
   const { log, error } = console;
   const stdoutWrite = process.stdout.write;
@@ -41,35 +43,35 @@ const capture = (fn) => {
   console.error = (...a) => err.push(a.join(' '));
   process.stdout.write = (s) => { out.push(String(s).replace(/\n+$/, '')); return true; };
   let thrown = null;
-  try { fn(); } catch (e) { thrown = e; } finally {
+  try { await fn(); } catch (e) { thrown = e; } finally {
     Object.assign(console, { log, error });
     process.stdout.write = stdoutWrite;
   }
   return { stdout: out.join('\n'), stderr: err.join('\n'), thrown };
 };
 
-await runTest('solve.js prints a solution', () => {
-  const { stdout, thrown } = capture(() =>
+await runTest('solve.js prints a solution', async () => {
+  const { stdout, thrown } = await capture(() =>
     solveMain(argv('solve.js', '--max-backtracks', '5000', '--puzzle', PUZZLE)));
   assert.equal(thrown, null, thrown?.message);
   assert.match(stdout, /Solution 1/);
 });
 
-await runTest('solve.js requires an explicit --max-backtracks', () => {
-  const { thrown } = capture(() => solveMain(argv('solve.js', '--puzzle', PUZZLE)));
+await runTest('solve.js requires an explicit --max-backtracks', async () => {
+  const { thrown } = await capture(() => solveMain(argv('solve.js', '--puzzle', PUZZLE)));
   assert.match(thrown?.message ?? '', /backtrack limit is required/);
 });
 
-await runTest('verify_solution.js accepts the correct solution', () => {
-  const { stdout, thrown } = capture(() =>
+await runTest('verify_solution.js accepts the correct solution', async () => {
+  const { stdout, thrown } = await capture(() =>
     verifyMain(argv('verify_solution.js', '--puzzle', VERIFY_PUZZLE, '--solution', VERIFY_SOLUTION)));
   assert.equal(thrown, null, thrown?.message);
   assert.match(stdout, /Result: ACCEPTED/);
 });
 
-await runTest('verify_solution.js rejects a wrong solution (throws non-zero)', () => {
+await runTest('verify_solution.js rejects a wrong solution (throws non-zero)', async () => {
   const wrong = '6' + VERIFY_SOLUTION.slice(1); // duplicate a digit in row 1 → conflict
-  const { stdout, thrown } = capture(() =>
+  const { stdout, thrown } = await capture(() =>
     verifyMain(argv('verify_solution.js', '--puzzle', VERIFY_PUZZLE, '--solution', wrong)));
   assert.match(thrown?.message ?? '', /rejected/);
   assert.match(stdout, /Result: REJECTED/);
@@ -79,8 +81,8 @@ await runTest('verify_solution.js rejects a wrong solution (throws non-zero)', (
 // candidate-selector instrumentation (--explain, the path that silently broke
 // when _selectBestCandidate changed geometry), pencilmarks/var cells, and the
 // per-step propagation log (--log).
-await runTest('step_analysis.js walk + explain + grid + vars + log', () => {
-  const { stdout, thrown } = capture(() => stepMain(argv('step_analysis.js',
+await runTest('step_analysis.js walk + explain + grid + vars + log', async () => {
+  const { stdout, thrown } = await capture(() => stepMain(argv('step_analysis.js',
     '--puzzle', PUZZLE, '--steps', '2', '--explain', '--grid', '--vars', '--log')));
   assert.equal(thrown, null, thrown?.message);
   assert.match(stdout, /step\tguess/);
@@ -92,14 +94,14 @@ await runTest('step_analysis.js walk + explain + grid + vars + log', () => {
 
 // --dump-state must write ONLY the constraint string to stdout (human output to
 // stderr), and that string must parse and re-propagate.
-await runTest('step_analysis.js --dump-state round-trips', () => {
-  const dump = capture(() => stepMain(argv('step_analysis.js', '--puzzle', PUZZLE, '--steps', '4', '--dump-state')));
+await runTest('step_analysis.js --dump-state round-trips', async () => {
+  const dump = await capture(() => stepMain(argv('step_analysis.js', '--puzzle', PUZZLE, '--steps', '4', '--dump-state')));
   assert.equal(dump.thrown, null, dump.thrown?.message);
   const stateString = dump.stdout.trim();
   assert.ok(stateString.startsWith('.'), `expected a bare constraint on stdout, got: ${JSON.stringify(stateString)}`);
   assert.equal(stateString.split('\n').length, 1, 'stdout must be a single constraint line');
   assert.match(dump.stderr, /state at step 4/);  // the human summary went to stderr
-  const back = capture(() => stepMain(argv('step_analysis.js', '--input', stateString, '--steps', '2')));
+  const back = await capture(() => stepMain(argv('step_analysis.js', '--input', stateString, '--steps', '2')));
   assert.equal(back.thrown, null, back.thrown?.message);
 });
 
@@ -117,20 +119,20 @@ await runTest('step_analysis.js --dump-state | --input - pipe', () => {
   assert.match(back.stdout, /step\tguess/);
 });
 
-await runTest('step_analysis.js --compare <ablation> runs', () => {
-  const { stdout, thrown } = capture(() => stepMain(argv('step_analysis.js',
+await runTest('step_analysis.js --compare <ablation> runs', async () => {
+  const { stdout, thrown } = await capture(() => stepMain(argv('step_analysis.js',
     '--puzzle', PUZZLE, '--steps', '8', '--compare', 'chaos-bottlenecks')));
   assert.equal(thrown, null, thrown?.message);
   assert.match(stdout, /Compare vs --ablate chaos-bottlenecks/);
 });
 
-await runTest('step_analysis.js --compare rejects an unknown ablation', () => {
-  const { thrown } = capture(() => stepMain(argv('step_analysis.js', '--puzzle', PUZZLE, '--compare', 'nonexistent')));
+await runTest('step_analysis.js --compare rejects an unknown ablation', async () => {
+  const { thrown } = await capture(() => stepMain(argv('step_analysis.js', '--puzzle', PUZZLE, '--compare', 'nonexistent')));
   assert.match(thrown?.message ?? '', /unknown ablation/);
 });
 
-await runTest('search_hotspots.js runs', () => {
-  const { stdout, thrown } = capture(() =>
+await runTest('search_hotspots.js runs', async () => {
+  const { stdout, thrown } = await capture(() =>
     hotspotsMain(argv('search_hotspots.js', '--max-backtracks', '5000', '--puzzle', PUZZLE)));
   assert.equal(thrown, null, thrown?.message);
   assert.match(stdout, /CONFLICT/);
@@ -138,8 +140,8 @@ await runTest('search_hotspots.js runs', () => {
   assert.match(stdout, /PROPAGATION YIELD/);
 });
 
-await runTest('search_hotspots.js requires --max-backtracks', () => {
-  const { thrown } = capture(() => hotspotsMain(argv('search_hotspots.js', '--puzzle', PUZZLE)));
+await runTest('search_hotspots.js requires --max-backtracks', async () => {
+  const { thrown } = await capture(() => hotspotsMain(argv('search_hotspots.js', '--puzzle', PUZZLE)));
   assert.match(thrown?.message ?? '', /backtrack limit is required/);
 });
 

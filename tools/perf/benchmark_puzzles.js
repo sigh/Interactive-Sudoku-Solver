@@ -44,8 +44,8 @@
 //       --compare chaos-hidden-singles
 
 import {
-  resolvePuzzles, parseBacktrackLimit, parseSolutionLimit, warnIfFirstSolution,
-  runSolve, applyAblations, validateAblations, ABLATIONS,
+  resolvePuzzles, materializePuzzles, parseBacktrackLimit, parseSolutionLimit,
+  warnIfFirstSolution, runSolve, applyAblations, validateAblations, ABLATIONS,
 } from '../lib/solver_analysis.js';
 
 const parseList = (value) => (value ?? '').split(',').map(v => v.trim()).filter(Boolean);
@@ -155,7 +155,7 @@ const renderTable = (headerCols, rows) => {
   return matrix.map(formatRow).join('\n');
 };
 
-const main = () => {
+const main = async () => {
   const args = parseArgs(process.argv);
   if (args.help) { usage(); return; }
   if (args.listAblations) {
@@ -168,7 +168,7 @@ const main = () => {
   warnIfFirstSolution(maxSolutions);
   validateAblations([...args.ablate, ...args.compare]);
   const repeat = Number.isInteger(args.repeat) && args.repeat > 0 ? args.repeat : 1;
-  const puzzles = resolvePuzzles(args.puzzles);
+  const puzzles = await materializePuzzles(resolvePuzzles(args.puzzles));
   const budgets = { maxBacktracks, maxSolutions };
 
   // Buffer rows; render the aligned table (or JSON) once the run completes.
@@ -200,9 +200,7 @@ const main = () => {
   else console.log(renderTable(headerCols, rows));
 };
 
-try {
-  main();
-} catch (e) {
+main().catch((e) => {
   console.error(`error: ${e.message}\n(run with --help for usage)`);
   process.exit(1);
-}
+});

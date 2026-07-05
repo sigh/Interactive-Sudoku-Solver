@@ -19,16 +19,26 @@ import { fileURLToPath } from 'node:url';
 
 import { ensureGlobalEnvironment } from '../../tests/helpers/test_env.js';
 import { buildSolutionGivenLadder, DEFAULT_LADDER_COUNTS } from './ladder.js';
+import { runSandboxToConstraint } from './sandbox_runner.js';
 
 ensureGlobalEnvironment();
 
 const PROJECT_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
-// Some collection puzzles store `input` as a "/data/*.iss" file path (the app
-// fetches it lazily); resolve those to the file text. SudokuParser strips the
-// file's leading `#` comments.
-const resolveInput = (input) =>
-  input.startsWith('/') ? readFileSync(join(PROJECT_ROOT, input), 'utf8') : input;
+// A puzzle's `input` may be a file path (leading '/'): a '.js' sandbox script
+// that generates the constraint, or a raw constraint-text file. Script inputs
+// are executed once by materializePuzzles() before solving; a '.js' path reaching
+// here means that step was skipped, so fail loudly rather than parse JS as
+// constraint text.
+const resolveInput = (input) => {
+  if (!input.startsWith('/')) return input;
+  if (input.endsWith('.js')) {
+    throw new Error(
+      `script puzzle '${input}' must be materialized before solving ` +
+      `(call materializePuzzles on resolved puzzles first)`);
+  }
+  return readFileSync(join(PROJECT_ROOT, input), 'utf8');
+};
 
 const COLLECTIONS = await import('../../data/collections.js' + self.VERSION_PARAM);
 const { PUZZLE_INDEX } = await import('../../data/example_puzzles.js' + self.VERSION_PARAM);
@@ -128,6 +138,21 @@ export const resolvePuzzles = (selectors) => selectors.flatMap((selector) => {
   }
   return [findExample(selector)];
 });
+
+// Resolve any script-file puzzle (`input` is a '/…/*.js' sandbox script) to the
+// constraint string it generates, replacing `input` with that string. Done once,
+// up front: the script runs outside the timed solve, and the generated
+// constraint is reused across every repeat. Non-script puzzles pass through
+// untouched. Async because sandbox scripts may await.
+export const materializePuzzles = async (puzzles) => Promise.all(
+  puzzles.map(async (puzzle) => {
+    const { input } = puzzle;
+    if (typeof input === 'string' && input.startsWith('/') && input.endsWith('.js')) {
+      const source = readFileSync(join(PROJECT_ROOT, input), 'utf8');
+      return { ...puzzle, input: await runSandboxToConstraint(source) };
+    }
+    return puzzle;
+  }));
 
 // --- Backtrack / solution budgets --------------------------------------------
 
