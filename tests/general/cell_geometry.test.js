@@ -269,23 +269,54 @@ await runTest('parseCellId is inverse of makeCellId', () => {
   }
 });
 
-await runTest('parseCellId documents current fixed-width parsing behavior', () => {
+await runTest('parseCellId rejects trailing characters (F-01)', () => {
   const geometry = CellGeometry.fromGridSize(9);
 
-  assert.deepEqual(geometry.parseCellId('R1C10'), { cell: 0, row: 0, col: 0 });
-  assert.deepEqual(geometry.parseCellId('R9C9extra'), { cell: 80, row: 8, col: 8 });
+  // Previously 'R1C10' silently parsed as R1C1 and 'R9C9extra' as R9C9.
+  assert.throws(() => geometry.parseCellId('R1C10'), /Invalid cell ID/);
+  assert.throws(() => geometry.parseCellId('R9C9extra'), /Invalid cell ID/);
+  assert.throws(() => geometry.parseCellId('R1C1 '), /Invalid cell ID/);
   assert.throws(() => geometry.parseCellId('R0C1'), /Invalid cell ID/);
   assert.throws(() => geometry.parseCellId('R1C0'), /Invalid cell ID/);
 });
 
-await runTest('parseValueId documents current permissive parseInt behavior', () => {
-  const geometry = CellGeometry.fromGridSize(9);
-  const parsed = geometry.parseValueId('R1C1_2x_x_99');
+await runTest('parseCellId still accepts well-formed 16x16 coordinates', () => {
+  const geometry = CellGeometry.fromGridSize(16);
+  // Base-17: 'g' == 16, so RgCg is the bottom-right cell of a 16x16 grid.
+  assert.deepEqual(geometry.parseCellId('RgCg'), { cell: 255, row: 15, col: 15 });
+  assert.deepEqual(geometry.parseCellId('rGcG'), { cell: 255, row: 15, col: 15 });
+});
 
-  assert.equal(parsed.cellId, 'R1C1');
-  assert.equal(parsed.values[0], 2);
-  assert.ok(Number.isNaN(parsed.values[1]));
-  assert.equal(parsed.values[2], 99);
+await runTest('parseValueId rejects NaN, out-of-range, and trailing garbage (F-02)', () => {
+  const geometry = CellGeometry.fromGridSize(9);
+
+  assert.throws(() => geometry.parseValueId('R1C1_99'), /Invalid value ID/);  // out of range
+  assert.throws(() => geometry.parseValueId('R1C1_0'), /Invalid value ID/);   // below min
+  assert.throws(() => geometry.parseValueId('R1C1_x'), /Invalid value ID/);   // NaN
+  assert.throws(() => geometry.parseValueId('R1C1_2x'), /Invalid value ID/);  // trailing garbage
+});
+
+await runTest('parseValueId accepts valid single and multi-value ids', () => {
+  const geometry = CellGeometry.fromGridSize(9);
+
+  assert.deepEqual(geometry.parseValueId('R1C1_5'), { cellId: 'R1C1', values: [5] });
+  assert.deepEqual(geometry.parseValueId('R1C1_1_3_9'),
+    { cellId: 'R1C1', values: [1, 3, 9] });
+  // No values is a valid (empty candidate set) parse.
+  assert.deepEqual(geometry.parseValueId('R1C1'), { cellId: 'R1C1', values: [] });
+});
+
+await runTest('parseValueId honours the geometry value range', () => {
+  // 0-based 9x9 grid: valid values are 0..8.
+  const geometry = CellGeometry.fromGridSize(9, 9, null, -1);
+  assert.deepEqual(geometry.parseValueId('R1C1_0'), { cellId: 'R1C1', values: [0] });
+  assert.deepEqual(geometry.parseValueId('R1C1_8'), { cellId: 'R1C1', values: [8] });
+  assert.throws(() => geometry.parseValueId('R1C1_9'), /Invalid value ID/);
+
+  // Extended-value grid: values up to numValues are accepted.
+  const extended = CellGeometry.fromShapeSpec('9x9~10');
+  assert.deepEqual(extended.parseValueId('R1C1_10'), { cellId: 'R1C1', values: [10] });
+  assert.throws(() => extended.parseValueId('R1C1_11'), /Invalid value ID/);
 });
 
 await runTest('makeCellId works for rectangular grids', () => {

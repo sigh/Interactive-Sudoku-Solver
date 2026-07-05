@@ -230,15 +230,23 @@ export class CellGeometry {
   }
 
   parseValueId = (valueId) => {
-    let [cellId, ...values] = valueId.split('_');
-    return {
-      values: values.map(v => parseInt(v)),
-      cellId: cellId,
-    };
+    let [cellId, ...valueStrs] = valueId.split('_');
+    const minValue = this.minValue();
+    const maxValue = this.maxValue();
+    const values = valueStrs.map(v => {
+      const n = parseInt(v, 10);
+      // Reject NaN, out-of-range values, and trailing garbage (e.g. '2x').
+      if (!(n >= minValue && n <= maxValue) || `${n}` !== v) {
+        throw new Error('Invalid value ID: ' + valueId);
+      }
+      return n;
+    });
+    return { values, cellId };
   }
 
   parseCellId = (cellId) => {
-    if ((cellId[0] === 'R' || cellId[0] === 'r') &&
+    if (cellId.length === 4 &&
+      (cellId[0] === 'R' || cellId[0] === 'r') &&
       (cellId[2] === 'C' || cellId[2] === 'c')) {
       const row = CELL_ID_CHAR[cellId.charCodeAt(1)];
       const col = CELL_ID_CHAR[cellId.charCodeAt(3)];
