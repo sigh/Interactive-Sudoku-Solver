@@ -63,7 +63,7 @@ const enforce = (context) => {
 
 const makeShardArrow = (context, controlCell, regionRunArms) => {
   const regionArms = regionRunArms.map(arm => arm.map(c => context.regionCells[c]));
-  const handler = new ChaosArrow(controlCell, regionArms, regionRunArms, 0);
+  const handler = new ChaosArrow(controlCell, regionArms, regionRunArms, 0, context.geometry.numValues);
   handler.attachRegionShardState(context.handler.regionShardState());
   assert.equal(handler.initialize(
     context.grid, context.cellExclusions, context.geometry, context.stateAllocator), true);

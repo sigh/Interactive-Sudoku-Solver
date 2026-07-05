@@ -546,6 +546,17 @@ the cell just past the end is not already fixed to `r` (otherwise the run would 
 longer). Cells already in the same shard as the start are forced to share `r`,
 which gives a cheap lower bound on the run length.
 
+**Off-arm budget.** Once the start cell's region is fixed to `r`, count the
+off-arm cells already fixed to `r`. The length-`L` run and those `offArmFixed`
+cells are disjoint members of `r`, so `L + offArmFixed ≤ s` — the control is
+clamped to run lengths `≤ s − offArmFixed`. Conversely `r` has at least `L ≥
+Lmin` arm cells, hence at most `s − Lmin` off them; when `offArmFixed` reaches
+`s − Lmin` those are all of `r`'s off-arm cells, so `r` is removed from every
+other off-arm cell. The earlier "run fills the whole region" case is just this
+with `Lmin = s` (budget zero). The symmetric lower bound on `L` from off-arm
+*availability* is **not** sound: too few off-arm candidates forces extra arm
+cells into `r`, but they may sit past the run's break rather than lengthen it.
+
 `initialize` also clamps the control to feasible run lengths `[minLength,
 maxLength]`. Length 0 never occurs (the start is in its own region). And since
 regions have size ≥ 2, the start shares its region with an orthogonal neighbour;

@@ -271,7 +271,8 @@ export class SudokuBuilder {
             }
             const regionRunArms = chaosArms.map(arm => arm.map(c => c - regionCellOffset));
             yield new ChaosHandlerModule.ChaosArrow(
-              controlCell, chaosArms, regionRunArms, constraint.offset);
+              controlCell, chaosArms, regionRunArms, constraint.offset,
+              this._regionSize(constraintMap, geometry));
           }
           break;
 

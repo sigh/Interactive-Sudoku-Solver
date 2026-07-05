@@ -1117,7 +1117,7 @@ export class ChaosConstruction extends SudokuConstraintHandler {
 }
 
 export class ChaosArrow extends SudokuConstraintHandler {
-  constructor(controlCell, regionArms, regionRunArms, offset) {
+  constructor(controlCell, regionArms, regionRunArms, offset, regionSize) {
     const startCell = regionArms[0][0];
     if (regionArms.some(arm => arm[0] !== startCell)) {
       throw new InvalidConstraintError('ChaosArrow arms must share their first region cell.');
@@ -1141,6 +1141,13 @@ export class ChaosArrow extends SudokuConstraintHandler {
     // Per arm position, the region labels that support a run ending there.
     this._armRunSupportMasks = activeRegionArms.map(arm => new Uint16Array(arm.length));
     this._regionRunArms = activeRegionRunArms.map(arm => Uint16Array.from(arm));
+    this._regionSize = regionSize;
+    // Region-lane cells off every arm, precomputed in initialize; the scan target
+    // of the off-arm budget rule.
+    this._offArmRegionCells = null;
+    // Branch-state flag: set once the off-arm cells have been excluded, so the
+    // scan runs at most once per branch and re-arms on backtrack.
+    this._excludedFlagOffset = 0;
     this._canMergeRegionShards = false;
     this._regionShardState = null;
     this._offset = +offset;
@@ -1166,6 +1173,18 @@ export class ChaosArrow extends SudokuConstraintHandler {
       }
       return true;
     });
+
+    const regionCellOffset = this._regionArms[0][0] - this._regionRunArms[0][0];
+    const armCells = new Set();
+    for (const arm of this._regionRunArms) {
+      for (let i = 0; i < arm.length; i++) armCells.add(arm[i]);
+    }
+    const offArmRegionCells = [];
+    for (let i = 0; i < geometry.numGridCells; i++) {
+      if (!armCells.has(i)) offArmRegionCells.push(regionCellOffset + i);
+    }
+    this._offArmRegionCells = Uint16Array.from(offArmRegionCells);
+    this._excludedFlagOffset = stateAllocator.allocate(new Uint16Array(1));
 
     // Connectivity: If every orthogonal/ neighbour is the first step of an arm
     // (e.g. arrows in all four directions),
@@ -1378,7 +1397,65 @@ export class ChaosArrow extends SudokuConstraintHandler {
       pQueue.addForCell(controlCell);
     }
 
-    return this._applySupportedCellMasks(grid, pQueue);
+    if (!this._applySupportedCellMasks(grid, pQueue)) return false;
+
+    // Region-subset rule: with the start cell's region r fixed, enforce the
+    // off-arm budget below. Skip once r has been resolved off-arm on this branch.
+    const startRegionBit = grid[this._regionArms[0][0]];
+    if (startRegionBit && !(startRegionBit & (startRegionBit - 1))
+      && !grid[this._excludedFlagOffset]) {
+      if (!this._enforceOffArmBudget(grid, pQueue, startRegionBit, offset)) return false;
+    }
+
+    return true;
+  }
+
+  // With the start cell's region r fixed, region r contains the length-L run
+  // along the arms (L = the control value) plus at least the off-arm cells fixed
+  // to r; those two disjoint sets cap the run at regionSize - offArmFixed. And
+  // because r has at least L arm cells, it has at most regionSize - L off them —
+  // so once the fixed off-arm cells reach regionSize - Lmin, no other off-arm
+  // cell can join r.
+  _enforceOffArmBudget(grid, pQueue, regionBit, offset) {
+    const offArmRegionCells = this._offArmRegionCells;
+    const numOffArm = offArmRegionCells.length;
+    const regionSize = this._regionSize;
+    const controlCell = this._controlCell;
+
+    let offArmFixed = 0;
+    for (let i = 0; i < numOffArm; i++) {
+      if (grid[offArmRegionCells[i]] === regionBit) offArmFixed++;
+    }
+
+    // Run length L = control value + offset. Run cells and off-arm fixed cells
+    // are disjoint members of r, so L + offArmFixed <= regionSize.
+    const control = grid[controlCell];
+    const minLength = LookupTables.minValue(control) + offset;
+    const maxLength = regionSize - offArmFixed;
+    if (maxLength < minLength) return false;
+
+    // Drop control values whose run length exceeds maxLength.
+    const keepMask = (1 << (maxLength - offset)) - 1;
+    if (control & ~keepMask) {
+      grid[controlCell] = control & keepMask;
+      pQueue.addForCell(controlCell);
+    }
+
+    // r has at least minLength arm cells, so at most regionSize - minLength off
+    // them; if the fixed off-arm cells already reach that, no other off-arm cell
+    // can be r.
+    if (offArmFixed === regionSize - minLength) {
+      for (let i = 0; i < numOffArm; i++) {
+        const regionCell = offArmRegionCells[i];
+        const mask = grid[regionCell];
+        if (mask === regionBit || !(mask & regionBit)) continue;
+        grid[regionCell] = mask & ~regionBit;
+        pQueue.addForCell(regionCell);
+      }
+      grid[this._excludedFlagOffset] = 1;
+    }
+
+    return true;
   }
 }
 
