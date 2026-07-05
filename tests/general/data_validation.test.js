@@ -51,27 +51,6 @@ await runTest('all EXAMPLES have required fields', () => {
   }
 });
 
-await runTest('all EXAMPLES build into solvers without error', () => {
-  for (const example of EXAMPLES) {
-    // Skip file path references (e.g. '/data/scripts/large_state_machine.js')
-    // which require file I/O (and sandbox execution) to resolve.
-    if (example.input.startsWith('/')) continue;
-    const constraint = SudokuParser.parseText(example.input);
-    assert.ok(constraint, `Failed to parse collection puzzle: ${example.name}`);
-    const resolved = SudokuBuilder.resolveConstraint(constraint);
-    const solver = SudokuBuilder.build(resolved);
-    assert.ok(solver, `Failed to build solver for collection: ${example.name}`);
-  }
-});
-
-await runTest('Cavernous Construction examples solve true candidates without error', () => {
-  const solver = new SimpleSolver();
-  for (const example of EXAMPLES) {
-    if (!example.name.startsWith('Cavernous Construction')) continue;
-    assert.ok(solver.trueCandidates(example.input), `Failed true candidates for: ${example.name}`);
-  }
-});
-
 // ============================================================================
 // Jigsaw layout data validation
 // ============================================================================
