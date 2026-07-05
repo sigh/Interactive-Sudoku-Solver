@@ -5,7 +5,7 @@ Static data files used by the UI and tests: example puzzles, puzzle collections 
 ## Files
 
 | File | Purpose |
-|------|---------|
+| --- | --- |
 | [example_puzzles.js](example_puzzles.js) | Puzzle definitions for the UI example selector. Exports `PUZZLE_INDEX` (lookup by ID) and `DISPLAYED_EXAMPLES` (showcase list). Each entry has `name`, `input` (constraint string), `solution`, and optional `src` (attribution link). Covers 40+ variants (classic, thermo, killer, arrow, jigsaw, whisper, etc.). |
 | [collections.js](collections.js) | Puzzle collections for benchmarking and testing. Used by the debug panel's benchmark runner and by end-to-end tests. Path-input entries (`.iss`/`.js`) carry an explicit `constraintTypes` tag list; [`tools/dev/fix_constraint_types.js`](../tools/dev/README.md) keeps it in sync. |
 | [jigsaw_layouts.js](jigsaw_layouts.js) | Valid and easily-invalid jigsaw region layouts for 9×9 grids. Each layout is an 81-character string where each character is a region ID. |
@@ -14,6 +14,16 @@ Static data files used by the UI and tests: example puzzles, puzzle collections 
 | [scripts/](scripts/) | Sandbox scripts (`.js`) referenced as puzzle inputs. Loaded by running them through the sandbox to generate the constraint, rather than reading a pre-expanded string. |
 
 ## Formats
+
+**Puzzle entry** (the objects in `example_puzzles.js` and `collections.js`):
+
+| Field | Required | Notes |
+| --- | --- | --- |
+| `name` | yes | Display name; also the lookup key in `PUZZLE_INDEX`. |
+| `input` | yes | The puzzle: a constraint string (see below), **or** a `/…` path to a `.iss` file or a `.js` sandbox script under [scripts/](scripts/). Path inputs are resolved at load time (a `.js` is executed to produce its constraints). |
+| `solution` | recommended | 81-char row-major digit string; used by tests and `verify_solution.js`. |
+| `src` | optional | Attribution link(s) — a single URL or an **array**. Ideally provide two: a machine-decodable puzzle link (SudokuPad / f-puzzles / Penpa, extractable by the decode tooling) and a step-by-step solution (usually a YouTube solve). Put the **YouTube link first** — the UI surfaces only the first source, and the walkthrough is the more useful one to open. |
+| `constraintTypes` | only for path inputs | Constraint-type tags for the selector. Derived automatically via `SudokuParser.extractConstraintTypes(input)` for inline constraint strings, but a `.iss`/`.js` path can't be parsed that way, so those entries must list them explicitly — kept equal to the extractor's output by [`tools/dev/fix_constraint_types.js`](../tools/dev/README.md) (`--dry-run` to check). |
 
 **Constraint strings** (in `input` fields): The same `.Type~arg1~cell1~cell2` serialization format described in [js/README.md](../js/README.md).
 

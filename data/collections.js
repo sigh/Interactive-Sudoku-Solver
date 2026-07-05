@@ -1,4 +1,7 @@
 // Sets of puzzles, used for testing, benchmarks, etc.
+//
+// Each entry is a puzzle config { name, input, solution?, src?, constraintTypes? };
+// see data/README.md ("Puzzle entry") for the field spec.
 const { PUZZLE_INDEX } = await import('./example_puzzles.js' + self.VERSION_PARAM);
 
 export const EXAMPLES = [
@@ -471,14 +474,14 @@ export const EXAMPLES = [
   },
   {
     name: '9x9 Loop: Nordschleife',
-    src: 'https://www.youtube.com/watch?v=A8GBl5GGypA',
+    src: ['https://www.youtube.com/watch?v=A8GBl5GGypA', 'https://sudokupad.app/0pshsj5ykr'],
     input: '/data/scripts/nordschleife.js',
     solution: '526973148384165972917824356145782693279436581638519724793648215852391467461257839',
     constraintTypes: ['Var', 'NFA'],
   },
   {
     name: '9x9 Loop: Wendezäune',
-    src: 'https://www.youtube.com/watch?v=bhKtKFEy0AM',
+    src: ['https://www.youtube.com/watch?v=bhKtKFEy0AM', 'https://sudokupad.app/uevzycz28t'],
     input: '/data/scripts/wendezaune.js',
     solution: '617349582382715469945682731596134278834527916271896345129463857763958124458271693',
     constraintTypes: ['Var', 'NFA', 'Quad'],
@@ -501,7 +504,7 @@ export const EXAMPLES = [
   {
     // Two NFAs share a period across both lines to decipher n (sum) and m (diff).
     name: 'Sums and Differences',
-    src: 'https://sudokupad.app/qj4kzxhp02',
+    src: ['https://www.youtube.com/watch?v=a-jajrZJXr0', 'https://sudokupad.app/qj4kzxhp02'],
     input: '/data/scripts/sums_and_differences.js',
     solution: '149876523356421978287953164895742631714639852623185749538297416471368295962514387',
     constraintTypes: ['NFA', 'Thermo', 'BlackDot', 'LittleKiller'],
@@ -1183,7 +1186,7 @@ export const EXAMPLES = [
   },
   {
     name: 'Circus Maximus',
-    src: 'https://www.youtube.com/watch?v=DVy_zGc9UQI',
+    src: ['https://www.youtube.com/watch?v=DVy_zGc9UQI', 'https://sudokupad.app/cg5wlayzuj'],
     input: '/data/scripts/circus_maximum.js',
     solution: '251487369638219754794653218329164875175938642486572193912846537543721986867395421',
     constraintTypes: ['Renban', 'Var', 'And', 'Pair', 'NFA'],

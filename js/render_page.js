@@ -316,7 +316,7 @@ class ExampleHandler {
       if (exampleSelect.selectedIndex) {
         const exampleName = exampleSelect.options[exampleSelect.selectedIndex].text;
         const example = PUZZLE_INDEX.get(exampleName);
-        link.href = example.src;
+        link.href = Array.isArray(example.src) ? example.src[0] : example.src;
         link.style.display = 'inline-block';
 
         this._ignoreConstraintChanges = true;

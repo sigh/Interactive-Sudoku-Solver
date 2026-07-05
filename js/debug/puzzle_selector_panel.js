@@ -346,6 +346,7 @@ export class PuzzleSelectorPanel {
   // A small link icon that opens the puzzle's source, or an empty placeholder
   // (so labels stay aligned) when there is no source.
   _makeSrcIcon(src) {
+    if (Array.isArray(src)) src = src[0];
     if (!src) {
       const placeholder = document.createElement('span');
       placeholder.className = 'puzzle-item-src';
