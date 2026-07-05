@@ -133,21 +133,31 @@ export const createAccumulator = () => {
 
 export const createStateAllocator = (grid, startOffset = grid.length) => {
   let nextOffset = startOffset;
-  return {
-  allocate(state) {
-    const offset = nextOffset;
-    if (grid.set) {
-      if (offset + state.length > grid.length) {
-        throw new Error('Typed test grid is too small for state allocation');
+  let bitWordOffset = 0;
+  let bitCursor = 16;
+  const allocator = {
+    allocate(state) {
+      const offset = nextOffset;
+      if (grid.set) {
+        if (offset + state.length > grid.length) {
+          throw new Error('Typed test grid is too small for state allocation');
+        }
+        grid.set(state, offset);
+      } else {
+        for (let i = 0; i < state.length; i++) grid[offset + i] = state[i];
       }
-      grid.set(state, offset);
-    } else {
-      for (let i = 0; i < state.length; i++) grid[offset + i] = state[i];
-    }
-    nextOffset += state.length;
-    return offset;
-  },
+      nextOffset += state.length;
+      return offset;
+    },
+    allocateBit() {
+      if (bitCursor === 16) {
+        bitWordOffset = allocator.allocate(new Uint16Array(1));
+        bitCursor = 0;
+      }
+      return { offset: bitWordOffset, mask: 1 << bitCursor++ };
+    },
   };
+  return allocator;
 };
 
 export const createCellExclusions = ({ allUnique = true, numCells = DEFAULT_NUM_CELLS } = {}) => {

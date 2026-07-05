@@ -1437,6 +1437,10 @@ export class CellExclusions {
 class GridStateAllocator {
   constructor(geometry, numSearchCells) {
     this._extraState = [];
+    // Current word being handed out one bit at a time by allocateBit; 16 forces
+    // a fresh word on the first request.
+    this._bitWordOffset = 0;
+    this._bitCursor = 16;
 
     this._gridCells = new Uint16Array(numSearchCells);
     const allValues = LookupTables.get(geometry.numValues).allValues
@@ -1447,6 +1451,16 @@ class GridStateAllocator {
     const start = this._gridCells.length + this._extraState.length;
     this._extraState.push(...state);
     return start;
+  }
+
+  // Reserve a single branch-state bit. Returns { offset, mask }
+  // Read with `grid[offset] & mask`, set with `grid[offset] |= mask`.
+  allocateBit() {
+    if (this._bitCursor === 16) {
+      this._bitWordOffset = this.allocate(new Uint16Array(1));
+      this._bitCursor = 0;
+    }
+    return { offset: this._bitWordOffset, mask: 1 << this._bitCursor++ };
   }
 
   mutableGridCells() {

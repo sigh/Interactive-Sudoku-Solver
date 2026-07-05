@@ -1145,9 +1145,10 @@ export class ChaosArrow extends SudokuConstraintHandler {
     // Region-lane cells off every arm, precomputed in initialize; the scan target
     // of the off-arm budget rule.
     this._offArmRegionCells = null;
-    // Branch-state flag: set once the off-arm cells have been excluded, so the
+    // Branch-state bit: set once the off-arm cells have been excluded, so the
     // scan runs at most once per branch and re-arms on backtrack.
     this._excludedFlagOffset = 0;
+    this._excludedFlagMask = 0;
     this._canMergeRegionShards = false;
     this._regionShardState = null;
     this._offset = +offset;
@@ -1184,7 +1185,8 @@ export class ChaosArrow extends SudokuConstraintHandler {
       if (!armCells.has(i)) offArmRegionCells.push(regionCellOffset + i);
     }
     this._offArmRegionCells = Uint16Array.from(offArmRegionCells);
-    this._excludedFlagOffset = stateAllocator.allocate(new Uint16Array(1));
+    ({ offset: this._excludedFlagOffset, mask: this._excludedFlagMask } =
+      stateAllocator.allocateBit());
 
     // Connectivity: If every orthogonal/ neighbour is the first step of an arm
     // (e.g. arrows in all four directions),
@@ -1403,7 +1405,7 @@ export class ChaosArrow extends SudokuConstraintHandler {
     // off-arm budget below. Skip once r has been resolved off-arm on this branch.
     const startRegionBit = grid[this._regionArms[0][0]];
     if (startRegionBit && !(startRegionBit & (startRegionBit - 1))
-      && !grid[this._excludedFlagOffset]) {
+      && !(grid[this._excludedFlagOffset] & this._excludedFlagMask)) {
       if (!this._enforceOffArmBudget(grid, pQueue, startRegionBit, offset)) return false;
     }
 
@@ -1452,7 +1454,7 @@ export class ChaosArrow extends SudokuConstraintHandler {
         grid[regionCell] = mask & ~regionBit;
         pQueue.addForCell(regionCell);
       }
-      grid[this._excludedFlagOffset] = 1;
+      grid[this._excludedFlagOffset] |= this._excludedFlagMask;
     }
 
     return true;
