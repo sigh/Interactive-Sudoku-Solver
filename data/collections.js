@@ -39,7 +39,7 @@ export const EXAMPLES = [
   //////////////////////////////////////////////////////////////////////////////
   {
     name: 'Anti-knights move',
-    src: 'https://www.youtube.com/watch?v=mTdhTfAhOI8',
+    src: ['https://www.youtube.com/watch?v=mTdhTfAhOI8', 'https://sudokupad.app/RPBnQFRLR8'],
     input:
       '.AntiKnight.~R1C2_3~R1C5_4~R1C6_1~R1C9_7~R2C4_5~R3C4_8~R3C6_9~R4C1_6~R4C8_7~R5C9_4~R6C2_4~R7C1_3~R8C5_6~R8C8_5~R9C2_6~R9C3_4~R9C4_3',
     solution: '536241897978536241421879635613485972789623514245917368357198426892764153164352789',
@@ -67,7 +67,7 @@ export const EXAMPLES = [
   },
   {
     name: '3-digit pill arrow',
-    src: 'https://www.youtube.com/watch?v=kkHNFAFyAJ8',
+    src: ['https://www.youtube.com/watch?v=kkHNFAFyAJ8', 'https://sudokupad.app/L82RmGGrD7'],
     input: '.PillArrow~3~R1C1~R1C2~R1C3~R1C4~R1C5~R1C6~R1C7~R1C8~R1C9~R2C9~R2C8~R2C7~R2C6~R2C5~R2C4~R2C3~R2C2~R2C1~R3C1~R3C2~R3C3~R3C4~R3C5~R3C6~R3C7~R3C8~R3C9~R4C9~R4C8~R4C7~R4C6~R4C5~R4C4~R4C3~R4C2~R4C1~R5C1~R5C2~R5C3~R5C4~R5C5~R5C6~R5C7~R5C8~R5C9~R6C9~R6C8~R6C7~R6C6~R6C5~R6C4~R6C3~R6C2~R6C1~R7C1~R7C2~R7C3~R7C4~R7C5~R7C6~R7C7~R7C8~R7C9~R8C9~R8C8~R8C7~R8C6~R8C5~R8C4~R8C3~R8C2~R8C1~R9C1~R9C2~R9C3~R9C4~R9C5~R9C6~R9C7~R9C8~R9C9.X~R1C4~R1C5.X~R2C5~R2C6.X~R2C3~R3C3.X~R4C2~R5C2.X~R7C3~R8C3.X~R8C2~R8C1.X~R7C5~R8C5.X~R7C7~R7C8.X~R7C9~R6C9.X~R5C6~R5C5.X~R4C4~R4C5.V~R1C9~R2C9.V~R3C8~R3C7.V~R4C7~R4C8.V~R6C1~R6C2.StrictXV.~R9C9_9',
     solution: '387194562451628793269357148978465231635219487142783956796531824824976315513842679',
   },
@@ -79,7 +79,7 @@ export const EXAMPLES = [
   },
   {
     name: 'Arrow killer sudoku',
-    src: 'https://www.youtube.com/watch?v=MAxNNVEs7cE',
+    src: ['https://www.youtube.com/watch?v=MAxNNVEs7cE', 'https://sudokupad.app/M83Hj6DRQh'],
     input:
       '.Cage~35~R1C3~R1C2~R1C1~R2C1~R3C1~R3C2~R3C3.Cage~31~R4C3~R4C2~R4C1~R5C2~R6C2.Cage~36~R7C4~R7C3~R7C2~R8C2~R9C2~R9C3~R9C4.Cage~14~R5C4~R5C5.Cage~10~R9C8~R9C9.Thermo~R1C3~R1C2.Thermo~R8C8~R7C9~R8C9.Arrow~R2C2~R2C3~R2C4~R2C5.Arrow~R3C4~R4C4~R5C3~R6C4.Arrow~R9C6~R8C7~R8C8.Arrow~R7C6~R6C7~R5C7.Arrow~R4C6~R3C7~R2C7~R1C7.Arrow~R4C9~R5C9~R6C9.Arrow~R4C9~R3C8~R2C9.Arrow~R8C6~R8C5~R8C4',
     solution: '364792158982154673751863249618349527273685491495271386546917832839426715127538964',
@@ -94,7 +94,7 @@ export const EXAMPLES = [
   // This is the same as the 'Little Killer' above, but the 23 LK is replaced with a Sum.
   {
     name: 'Little killer - Sum',
-    src: 'https://www.youtube.com/watch?v=y4eKdI3ZJ78',
+    src: ['https://www.youtube.com/watch?v=y4eKdI3ZJ78', 'https://sudokupad.app/nQHjr7Ggpg'],
     input:
       '.LittleKiller~22~R1C1.LittleKiller~28~R2C1.LittleKiller~26~R3C1.LittleKiller~34~R1C7.LittleKiller~40~R1C8.LittleKiller~42~R1C9.~R3C2_5~R3C7_2~R5C4_3~R5C5_7.Sum~23~R1C5~R2C4~R3C3~R4C2~R5C1',
     solution: '198235764427968531653714289732186945541379826986542173865421397279653418314897652',
@@ -103,7 +103,7 @@ export const EXAMPLES = [
   // paths.
   {
     name: 'Little killer 2',
-    src: 'https://www.youtube.com/watch?v=Kn-EI9ItMoU',
+    src: ['https://www.youtube.com/watch?v=Kn-EI9ItMoU', 'https://git.io/JUmXc'],
     input: '.LittleKiller~12~R9C8.LittleKiller~21~R9C7.LittleKiller~16~R9C6.LittleKiller~38~R9C5.LittleKiller~3~R2C9.LittleKiller~20~R3C9.LittleKiller~38~R5C9.LittleKiller~14~R1C2.LittleKiller~6~R1C3.LittleKiller~19~R1C4.LittleKiller~38~R1C5.LittleKiller~6~R8C1.LittleKiller~17~R7C1.LittleKiller~38~R5C1.~R1C1_4~R1C9_6~R2C8_7~R4C4_1~R5C5_2~R6C6_3~R8C2_4~R9C1_3~R9C9_2',
     solution: '483571926625948371179362854257189463834627519961453287798214635542736198316895742',
   },
@@ -115,7 +115,7 @@ export const EXAMPLES = [
   },
   {
     name: 'Irregular region sum line',
-    src: 'https://www.youtube.com/watch?v=TWqp1DDue4k',
+    src: ['https://www.youtube.com/watch?v=TWqp1DDue4k', 'https://sudokupad.app/7x6m1b5hw8'],
     input: '.RegionSumLine~R4C1~R3C1~R2C1~R3C2~R4C2~R5C2~R6C3~R5C4~R4C4~R4C3~R3C4~R2C3~R2C4~R1C4~R1C5~R2C6~R3C6~R4C6~R5C6~R6C7~R5C7.Jigsaw~1112222111122233334443334444556667755666775556777.~R1C1_4~R3C5_4~R4C7_6~R6C4_4.Shape~7x7',
     solution: '4532167726154363754211427356375621456147322143675',
   },
@@ -127,13 +127,13 @@ export const EXAMPLES = [
   },
   {
     name: 'Strict kropki',
-    src: 'https://www.youtube.com/watch?v=z6S0Dmc1EZA',
+    src: ['https://www.youtube.com/watch?v=z6S0Dmc1EZA', 'https://sudokupad.app/j29FBRt4f6'],
     input: '.BlackDot~R1C6~R1C7~R2C7~R4C9~R4C8~R5C8~R8C7~R9C7~R9C6~R7C4~R7C5~R6C5~R6C6~R9C4~R9C3~R8C3~R5C1~R5C2.BlackDot~R4C5~R5C5.WhiteDot~R3C9~R4C9~R4C7~R5C7~R5C6~R7C8~R7C9~R1C8~R2C8~R1C6~R2C6~R3C5~R3C4~R4C4~R5C3~R5C2~R6C2~R8C2~R8C3~R8C5~R8C6.WhiteDot~R8C8~R8C9~R5C8~R5C9~R6C2~R6C3~R4C4~R4C5~R7C1~R8C1.WhiteDot~R1C2~R1C1.WhiteDot~R5C1~R6C1~R2C1~R2C2.StrictKropki',
     solution: '983162475451793862627458319169325748845917623732684951316249587298576134574831296',
   },
   {
     name: 'Strict XV',
-    src: 'https://www.youtube.com/watch?v=1lMgsCRoD2g',
+    src: ['https://www.youtube.com/watch?v=1lMgsCRoD2g', 'https://sudokupad.app/2J2fRGP4Tn'],
     input: '.~R2C5_1~R8C5_2.X~R1C3~R2C3~R2C1~R3C1~R1C8~R1C9~R3C9~R3C8~R5C6~R5C5~R6C3~R6C4~R8C4~R9C4~R7C8~R8C8.X~R6C2~R7C2~R7C4~R7C5~R7C9~R8C9~R3C7~R3C6.X~R7C3~R8C3.V~R7C3~R7C4~R4C1~R5C1~R2C8~R2C9~R5C7~R5C8.StrictXV',
     solution: '683472519947516832152983764361849275295637148478251396834195627516724983729368451',
   },
@@ -257,14 +257,14 @@ export const EXAMPLES = [
   },
   {
     name: 'Event horizon',
-    src: 'https://www.youtube.com/watch?v=gBXJpnHyZfE',
+    src: ['https://www.youtube.com/watch?v=gBXJpnHyZfE', 'https://sudokupad.app/giuk6t4rfg'],
     input: '.Cage~20~R1C2~R2C2~R2C1.Cage~20~R4C2~R4C3~R4C4~R4C4.Cage~20~R8C2~R8C1~R9C1.Cage~10~R1C8~R2C8~R2C9.Cage~0~R6C6~R6C7~R6C8.Cage~70~R8C5~R7C5~R6C5~R5C5~R5C4~R4C5~R3C5~R2C5~R4C5~R5C5~R5C4~R6C5~R5C6~R5C6.Sum~30~R1C9~R2C8~R3C7~R7C3~R8C2~R9C1~R4C6~R5C5~R6C4~R4C6~R5C5~R6C4.Sum~30~R1C2~R2C3~R3C4~R4C5~R5C6~R6C7~R7C8~R8C9~R4C5~R5C6.LittleKiller~30~R1C6.BinaryX~eoH75ev378GvwD~_Renban%20-%20double~R4C6~R5C6~R5C5~R6C4~R6C5.BinaryX~_v-7-_v-7-_v-D~_Renban%20-%20single~R6C2~R7C3~R7C4~R3C6~R2C5.Binary~fwD-oH-ZP-7e-H~_Renban%20-%20mixed~R6C2~R4C6~~R6C2~R5C6~~R6C2~R5C5~~R6C2~R6C4~~R6C2~R6C5~~R7C3~R4C6~~R7C3~R5C6~~R7C3~R5C5~~R7C3~R6C4~~R7C3~R6C5~~R7C4~R4C6~~R7C4~R5C6~~R7C4~R5C5~~R7C4~R6C4~~R7C4~R6C5~~R3C6~R4C6~~R3C6~R5C6~~R3C6~R5C5~~R3C6~R6C4~~R3C6~R6C5~~R2C5~R4C6~~R2C5~R5C6~~R2C5~R5C5~~R2C5~R6C4~~R2C5~R6C5.',
     solution: '136847952892635714754129386415763298283914675679258143341576829967482531528391467',
   },
   {
     name: 'Duplicate cell sums',
     // Simplified 'Event Horizon' without renban.
-    src: 'https://www.youtube.com/watch?v=gBXJpnHyZfE',
+    src: ['https://www.youtube.com/watch?v=gBXJpnHyZfE', 'https://sudokupad.app/giuk6t4rfg'],
     input: '.Cage~20~R1C2~R2C2~R2C1.Cage~20~R4C2~R4C3~R4C4~R4C4.Cage~20~R8C2~R8C1~R9C1.Cage~10~R1C8~R2C8~R2C9.Cage~0~R6C6~R6C7~R6C8.Cage~70~R8C5~R7C5~R6C5~R5C5~R5C4~R4C5~R3C5~R2C5~R4C5~R5C5~R5C4~R6C5~R5C6~R5C6.Sum~30~R1C9~R2C8~R3C7~R7C3~R8C2~R9C1~R4C6~R5C5~R6C4~R4C6~R5C5~R6C4.Sum~30~R1C2~R2C3~R3C4~R4C5~R5C6~R6C7~R7C8~R8C9~R4C5~R5C6.LittleKiller~30~R1C6.~R4C5_6~R7C4_5~R2C5_3~R3C6_9',
     solution: '136847952892635714754129386415763298283914675679258143341576829967482531528391467',
   },
@@ -334,13 +334,13 @@ export const EXAMPLES = [
   },
   {
     name: 'Start with 1, not 0!',
-    src: 'https://app.crackingthecryptic.com/2ng0dky96e',
+    src: 'https://sudokupad.app/2ng0dky96e',
     input: '.Cage~12~R1C1~R2C1~R3C1.Cage~12~R3C2~R3C3.Cage~8~R1C5~R1C6.Cage~18~R4C5~R5C5~R6C5.Cage~12~R4C4~R5C4.Cage~6~R4C2~R4C3.Cage~10~R5C1~R5C2.Cage~9~R7C1~R7C2.Cage~11~R9C1~R9C2.Cage~13~R7C4~R8C4~R9C4.Cage~8~R1C8~R2C8.Cage~13~R5C8~R5C9.Cage~17~R7C9~R8C9~R9C9..Indexing~C~R9C9~R8C9~R7C9~R6C9~R5C9~R4C9~R3C9~R2C9~R1C9~R1C5~R2C5~R3C5~R4C5~R5C5~R6C5~R7C5~R8C5~R9C5~R9C1~R8C1~R7C1~R6C1~R5C1~R4C1~R3C1~R2C1~R1C1',
     solution: '758926134162384957493157862924865371371492685685731429546213798219678543837549216',
   },
   {
     name: 'Papier-mache',
-    src: 'https://www.youtube.com/watch?v=R6eWBSTcBOE',
+    src: ['https://www.youtube.com/watch?v=R6eWBSTcBOE', 'https://sudokupad.app/NfPFf8BFnd'],
     input: '.BlackDot~R3C1~R3C2.BlackDot~R2C5~R3C5.BlackDot~R3C8~R3C9.BlackDot~R6C2~R6C1.BlackDot~R7C1~R6C1.BlackDot~R9C2~R9C3.BlackDot~R8C3~R8C4.BlackDot~R8C6~R8C7.BlackDot~R6C7~R6C8.BlackDot~R6C9~R7C9.~R2C7_5.Indexing~R~R3C1~R3C2~R2C5~R3C5~R3C8~R3C9~R6C7~R6C8~R6C9~R7C9~R8C7~R8C6~R8C4~R8C3~R9C3~R9C2~R7C1~R6C1~R6C2',
     solution: '715634892693728541482519763369841257857263419241957638176385924538492176924176385',
   },
@@ -496,7 +496,7 @@ export const EXAMPLES = [
   {
     // Segmented state machine (arrows count cells per ring).
     name: 'Hit, Reveal, Solve',
-    src: 'https://www.youtube.com/watch?v=vspwP6DlQik',
+    src: ['https://www.youtube.com/watch?v=vspwP6DlQik', 'https://sudokupad.app/99c09jh573'],
     input: '/data/scripts/hit_reveal_solve.js',
     solution: '751392468283614795964578312326857149478961523195243687542139876837426951619785234',
     constraintTypes: ['NFA'],
@@ -546,7 +546,7 @@ export const EXAMPLES = [
   },
   {
     name: 'Rectangle Sums',
-    src: 'https://www.youtube.com/watch?v=T03vUTiJBjk',
+    src: ['https://www.youtube.com/watch?v=T03vUTiJBjk', 'https://sudokupad.app/xqqerfk832'],
     input: '/data/scripts/rectangle_sums.js',
     solution: 'BFGDAHEICCEAFBIHDGDHIEGCABFACHIEFDGBFGEHDBICAIBDGCAFEHGIFCHEBADHDBAIGCFEEACBFDGHI',
     constraintTypes: ['Shape', 'Var', 'AllDifferent', 'Or', 'And', 'Sum'],
@@ -565,7 +565,7 @@ export const EXAMPLES = [
   },
   {
     name: 'Hazy Rellik',
-    src: 'https://www.youtube.com/watch?v=1FUYKL7WQO0',
+    src: ['https://www.youtube.com/watch?v=1FUYKL7WQO0', 'https://sudokupad.app/869hsb49kn'],
     input: '.RellikCage~8~R1C1~R2C1~R3C1~R3C2~R3C3.RellikCage~7~R1C2~R1C3~R2C2~R2C3~R2C4.RellikCage~5~R1C4~R1C5~R1C6~R2C5~R2C6.RellikCage~8~R3C4~R3C5~R3C6~R4C4~R4C5.RellikCage~6~R5C4~R5C5~R6C4~R6C5.RellikCage~11~R4C6~R5C6~R5C7~R6C6.RellikCage~10~R4C7~R4C8~R4C9.RellikCage~11~R5C8~R5C9~R6C7~R6C8~R6C9.RellikCage~7~R1C8~R1C9~R2C9.RellikCage~10~R4C1~R4C2~R5C1~R5C2~R6C1.RellikCage~7~R6C2~R7C1~R7C2~R7C3~R8C2.RellikCage~6~R7C4~R8C3~R8C4~R8C5~R9C4.RellikCage~8~R9C7~R9C8.RellikCage~7~R7C7~R7C8~R8C8~R8C9~R9C9.WhiteDot~R5C6~R5C7.WhiteDot~R3C8~R4C8.WhiteDot~R8C8~R9C8',
     solution: '438617592521938674769254831854791326392546718617382945945163287283475169176829453',
   },
@@ -621,7 +621,7 @@ export const EXAMPLES = [
   },
   {
     name: 'Little killer, slow',
-    src: 'https://www.youtube.com/watch?v=RjznoTdOHRM',
+    src: ['https://www.youtube.com/watch?v=RjznoTdOHRM', 'https://sudokupad.app/BppQhB6fLJ'],
     input: `.LittleKiller~20~R1C4.LittleKiller~10~R1C5.LittleKiller~21~R1C6.LittleKiller~5~R2C9.LittleKiller~12~R3C9.LittleKiller~13~R8C1.LittleKiller~16~R7C1.LittleKiller~31~R9C3.LittleKiller~15~R9C4.LittleKiller~16~R9C5`,
   },
   {
@@ -783,7 +783,7 @@ export const EXAMPLES = [
   },
   {
     name: '6x6: Little Killer',
-    src: 'https://www.youtube.com/watch?v=V-iY2ISw6tE',
+    src: ['https://www.youtube.com/watch?v=V-iY2ISw6tE', 'https://sudokupad.app/LnRH9mpjh4'],
     input: '.LittleKiller~8~R1C4.LittleKiller~9~R3C1.LittleKiller~26~R5C6.LittleKiller~17~R6C2..Shape~6x6',
     solution: '462135513624236541145362321456654213',
   },
@@ -865,7 +865,7 @@ export const EXAMPLES = [
   },
   {
     name: '6x6: Con-set-cutive',
-    src: 'https://www.youtube.com/watch?v=G3rxwq4_RqU',
+    src: ['https://www.youtube.com/watch?v=G3rxwq4_RqU', 'https://sudokupad.app/LFB3qhjfNB'],
     input: '.Shape~6x6~9.Cage~10~R1C2~R2C2.Cage~8~R3C1~R4C1.Renban~R4C1~R5C1.Renban~R2C1~R2C2.Renban~R3C4~R4C4~R5C4~R6C4.Whisper~5~R4C3~R4C4~R4C5.Whisper~5~R2C4~R2C5.Arrow~R6C4~R6C3~R6C2~R6C1.RegionSize~6.RegionSameValues',
     solution: '627198981276198762762819879621216987',
   },
@@ -943,7 +943,7 @@ export const EXAMPLES = [
   },
   {
     name: 'City Planning',
-    src: 'https://www.youtube.com/watch?v=-StX1t2laPE',
+    src: ['https://www.youtube.com/watch?v=-StX1t2laPE', 'https://sudokupad.app/th7jjqF7hL'],
     input: '.Or.~R5C2_5.Skyscraper~C2~5~.End.Or.~R3C3_3.Skyscraper~C3~3~.End.Or.~R3C3_7.Skyscraper~C3~~7.End.Or.~R1C4_1.Skyscraper~C4~1~.End.Or.~R3C4_7.Skyscraper~C4~~7.End.Or.~R9C7_9.Skyscraper~C7~9~.End.Or.~R4C9_4.Skyscraper~C9~4~.End.Or.~R7C9_3.Skyscraper~C9~~3.End.Or.~R3C1_9.Skyscraper~R3~~9.End.Or.~R6C9_1.Skyscraper~R6~~1.End.Or.~R6C8_8.Skyscraper~R6~8~.End.Or.~R7C4_6.Skyscraper~R7~~6.End.Or.~R7C6_6.Skyscraper~R7~6~.End.Or.~R8C6_4.Skyscraper~R8~~4.End.Or.~R2C6_8.Skyscraper~C6~~8.End.Or.~R9C5_5.Skyscraper~R9~5~.End.Or.~R4C2_2.Skyscraper~R4~2~.End.Or.~R2C2_2.Skyscraper~R2~2~.End.Or.~R1C4_1.~R6C9_1.End.Or.Skyscraper~C4~1~.Skyscraper~R6~~1.End.Or.~R4C2_2.~R2C2_2.End.Or.Skyscraper~R4~2~.Skyscraper~R2~2~.End.Or.~R3C3_3.~R7C9_3.End.Or.Skyscraper~C3~3~.Skyscraper~C9~~3.End.Or.~R4C9_4.~R8C6_4.End.Or.Skyscraper~C9~4~.Skyscraper~R8~~4.End.Or.~R5C2_5.~R9C5_5.End.Or.Skyscraper~C2~5~.Skyscraper~R9~5~.End.Or.~R7C4_6.~R7C6_6.End.Or.Skyscraper~R7~~6.Skyscraper~R7~6~.End.Or.~R3C3_7.~R3C4_7.End.Or.Skyscraper~C3~~7.Skyscraper~C4~~7.End.Or.~R6C8_8.~R2C6_8.End.Or.Skyscraper~R6~8~.Skyscraper~C6~~8.End.Or.~R9C7_9.~R3C1_9.End.Or.Skyscraper~C7~9~.Skyscraper~R3~~9.End',
     solution: '563127498412938675987654321726819534859743216134562789298476153671395842345281967',
   },
@@ -1063,20 +1063,20 @@ export const EXAMPLES = [
   },
   {
     name: '0-indexed: A very full quiver',
-    src: 'https://www.youtube.com/watch?v=rQPGrmzGc7Q',
+    src: ['https://www.youtube.com/watch?v=rQPGrmzGc7Q', 'https://sudokupad.app/gd4b2rpP4p'],
     input: '.Shape~9x9~0-8.Arrow~R1C1~R1C2~R1C3~R1C4.Arrow~R1C9~R1C8~R1C7~R1C6.Arrow~R4C1~R3C1~R2C1.Arrow~R4C2~R3C3~R2C2.Arrow~R3C2~R2C3~R2C4~R2C5.Arrow~R2C6~R3C6~R4C7~R5C7.Arrow~R2C7~R2C8~R3C7~R4C6.Arrow~R2C9~R3C9~R3C8.Arrow~R3C4~R3C5~R4C5.Arrow~R6C3~R6C2~R5C2~R4C3.Arrow~R8C1~R7C1~R6C1~R5C1.Arrow~R9C3~R9C2~R9C1.Arrow~R8C5~R8C4~R8C3~R8C2.Arrow~R6C4~R7C3~R7C2.Arrow~R7C4~R7C5~R8C6~R8C7.Arrow~R9C7~R9C6~R9C5~R9C4.Arrow~R7C9~R8C9~R9C9~R9C8.Arrow~R4C8~R5C8~R6C9~R7C8.Arrow~R6C8~R5C9~R4C9.Arrow~R5C6~R6C7~R6C6~R6C5.Arrow~R5C5~R4C4~R5C4~R5C3.Arrow~R8C8~R7C7~R7C6',
     solution: '834162507520347816176850324682034175015278643347615280451726038703581462268403751',
   },
   {
     name: '0-indexed: Lets build a snowman',
     // Modified to avoid the domino constraint.
-    src: 'https://www.youtube.com/watch?v=L-cbtgqTE9M',
+    src: ['https://www.youtube.com/watch?v=L-cbtgqTE9M', 'https://sudokupad.app/HmMdQDq98p'],
     input: '.Shape~9x9~0-8.BlackDot~R4C5~R5C5~R6C5.BlackDot~R6C5~R7C5.Whisper~5~R6C7~R5C8~R4C9.Whisper~5~R4C8~R5C8.Whisper~5~R4C1~R5C2~R6C3.Whisper~5~R5C1~R5C2.Thermo~R3C5~R3C6.Arrow~R7C7~R8C6~R8C5~R8C4~R7C3.Arrow~R5C3~R4C4~R3C3~R2C3~R1C4~R1C5~R1C6~R2C7~R3C7~R4C6~R5C7.WhiteDot~R2C4~R2C5~R2C6.~R7C8_4~R1C4_2~R2C3_0~R6C8_3~R3C2_5',
     solution: '374201658280456173651378024523180467708643215146527830032815746467032581815764302',
   },
   {
     name: '0-indexed: +-Information',
-    src: 'https://www.youtube.com/watch?v=bKmmldIq3Lk',
+    src: ['https://www.youtube.com/watch?v=bKmmldIq3Lk', 'https://sudokupad.app/gx4cd1q3zo'],
     input: '.Shape~9x9~0-8.Diagonal~1.Diagonal~-1.StrictXV.V~R1C1~R1C2.V~R2C1~R2C2.V~R3C1~R3C2.V~R1C8~R1C9.V~R2C8~R2C9.V~R3C8~R3C9.V~R5C6~R5C5.V~R7C7~R7C8.V~R8C7~R8C8.V~R9C7~R9C8.V~R7C5~R7C4.V~R8C5~R8C4.V~R9C5~R9C4.Renban~R5C3~R6C3.Renban~R1C7~R2C7.Renban~R8C7~R8C8.Renban~R9C9~R9C8',
     solution: '058362741236174805147085632725843160813650274604721583362507418580416327471238056',
   },
@@ -1111,7 +1111,7 @@ export const EXAMPLES = [
   },
   {
     name: '0-indexed: Counting circles',
-    src: 'https://www.youtube.com/watch?v=utCq4OFN5bQ',
+    src: ['https://www.youtube.com/watch?v=utCq4OFN5bQ', 'https://sudokupad.app/blobz/hippo-birdie'],
     input: '.Shape~9x9~0-8.~R6C5_6~R6C6_0.Whisper~5~R9C3~R9C4.Whisper~5~R3C5~R2C4~R2C3~R3C2~R4C2~R5C2~R6C2~R7C2~R8C3~R8C4~R7C5~R6C5~R5C5~R4C4~R4C3.Whisper~5~R4C3~R5C2.Whisper~5~R1C7~R1C8.Whisper~5~R3C6~R4C6~R5C6~R6C6~R7C6~R8C7~R8C8~R7C9~R6C9~R5C9~R4C9~R3C9~R2C8~R2C7.Whisper~5~R3C6~R2C7.CountingCircles~R9C2~R9C5~R7C3~R6C4~R6C1~R6C7~R8C8~R4C9~R3C8~R4C5~R3C2~R1C5~R1C7~R1C9',
     solution: '825036714430751286176428530503842167684517302712360458367205841251684073048173625',
   },
@@ -1156,13 +1156,13 @@ export const EXAMPLES = [
   },
   {
     name: 'Bates Motel',
-    src: 'https://www.youtube.com/watch?v=tKGjkTJj9lU',
+    src: ['https://www.youtube.com/watch?v=tKGjkTJj9lU', 'https://sudokupad.app/zyxp8ylq4g'],
     input: '.Shape~6x6.Var~A~NumberedRooms~8.AllDifferent~VA1~R1C1~R1C2~R1C3~R2C3~VA2.AllDifferent~VA3~VA4~R2C6~R1C6~R1C5~R1C4.AllDifferent~R2C4~R2C5~R3C5~R4C5~R4C4~R4C6.AllDifferent~VA5~VA6~R6C5~R5C5~R5C6~R6C6.AllDifferent~VA7~R6C2~R5C2~R4C2~R5C1~R6C1.AllDifferent~R4C3~R3C3~R3C2~R2C2~R2C1~VA8.ValueIndexing~VA1~R1C1~R1C1~R1C2~R1C3~R1C4~R1C5~R1C6.ValueIndexing~VA2~R1C3~R1C3~R2C3~R3C3~R4C3~R5C3~R6C3.ValueIndexing~VA3~R1C6~R1C6~R1C5~R1C4~R1C3~R1C2~R1C1.ValueIndexing~VA4~R2C6~R2C6~R2C5~R2C4~R2C3~R2C2~R2C1.ValueIndexing~VA5~R6C5~R6C5~R5C5~R4C5~R3C5~R2C5~R1C5.ValueIndexing~VA6~R6C6~R6C6~R5C6~R4C6~R3C6~R2C6~R1C6.ValueIndexing~VA7~R6C2~R6C2~R5C2~R4C2~R3C2~R2C2~R1C2.ValueIndexing~VA8~R2C1~R2C1~R2C2~R2C3~R2C4~R2C5~R2C6',
     solution: '625314431562312645546123263451154236',
   },
   {
     name: 'The good, the bad and the ugly',
-    src: 'https://www.youtube.com/watch?v=NRFfM16q7MY',
+    src: ['https://www.youtube.com/watch?v=NRFfM16q7MY', 'https://sudokupad.app/4ljh14tybv'],
     input: '.Var~A~Outside~3.Arrow~VA2~R6C9~R7C8~R8C7~R9C6.Arrow~VA3~R9C3~R8C2~R7C1.BlackDot~R8C5~R9C5.WhiteDot~R2C9~R3C9.SameValues~2~VA1~R1C1.NFA~UgIn-GQpjoSqAiF_wiEIQhCD_1jGMYxjX_2EIQhCEZ_2lKUpSlb_3GMYxjGd_3nOc5znf_4IQhCEIh_4pSlKUpj_5KUpSlKlAxhHBSBJCyrCWLmYsJpedrFhPX0OaxYUb9L3NYsKb-qD3NYtQA~_Sandwich~VA1~R2C1~R2C2~R2C3~R2C4~R2C5~R2C6~R2C7~R2C8~R2C9~~VA2~R5C9~R5C8~R5C7~R5C6~R5C5~R5C4~R5C3~R5C2~R5C1~~VA3~R9C4~R8C4~R7C4~R6C4~R5C4~R4C4~R3C4~R2C4~R1C4.NFA~UgIX9EMhTHQn_hCEIQhCEAhAQgEoDLYBmuBz4RB0p0D1bXwAggQIBECAgNQggEDrUIAsEAQe1ahANzCAEPvatQgPBzADEA~_XSum~VA1~R2C1~R2C2~R2C3~R2C4~R2C5~R2C6~R2C7~R2C8~R2C9~~VA2~R5C9~R5C8~R5C7~R5C6~R5C5~R5C4~R5C3~R5C2~R5C1~~VA3~R9C4~R8C4~R7C4~R6C4~R5C4~R4C4~R3C4~R2C4~R1C4.NFA~VgEl_yizDTj0EUgCCAwggOGGGDxBBBA-KKKKKPxhhhhhj-OOOOOOO_yCCCCCCCP-SSSSSSSST_wQgxBRhyCX-moqsuwy0f23HXn4IR_FHJLNOH6Kaq7AfbdfgB8cswHpqAdv-mEGIKMOQT_1FAxBRhyCf-qqqIKMOQT_1lllhRhyCf-uuuuuMOQT_2GGGGGByCf-yyyyyyyQT_2mmmmmmmiX-2oqsuwy0_3HFVl2GWn-666suwy0_3nnnl2GWn------wy0_4IIIIIGWn_DDDDDDC0f4nHXn4IT_HG68_BCf5JJHn4IT_LLLK_BCf5ppppoIT_PPPPPPCP6I5JZpx_TTJLNOP6qqpZpx_XXXXNOP7LLLLJw_bTVXYH7rqq7A_fffXYH8MMMLAfjdfgD8sr8AfnnngB9MswPrrmA9tQ~_Skyscraper~VA1~R2C1~R2C2~R2C3~R2C4~R2C5~R2C6~R2C7~R2C8~R2C9~~VA2~R5C9~R5C8~R5C7~R5C6~R5C5~R5C4~R5C3~R5C2~R5C1~~VA3~R9C4~R8C4~R7C4~R6C4~R5C4~R4C4~R3C4~R2C4~R1C4',
     solution: '567384219234159876819672345372915468951846732486723951148597623625438197793261584'
   },
@@ -1174,13 +1174,13 @@ export const EXAMPLES = [
   },
   {
     name: 'House of Cards',
-    src: 'https://www.youtube.com/watch?v=PRavHFxxZ7Y',
+    src: ['https://www.youtube.com/watch?v=PRavHFxxZ7Y', 'https://sudokupad.app/nam4l5oykp'],
     input: '.Shape~6x6.Var~S~Skyscraper~24.NFA~UUJn50JUtgIQxCHGMZ5CEI-UpSl_MYxjG_CIZCmfa58InynSo9r4DzoHf7RDIU37nDIU373vIU38IQgU38YxjEz8nPhF-c3wi_SlIRfrWtYn2nSp970qfjGKj5vgfWsB70A~_Skyscraper~VS1~R1C1~R1C2~R1C3~R1C4~R1C5~R1C6~~VS2~R2C1~R2C2~R2C3~R2C4~R2C5~R2C6~~VS3~R3C1~R3C2~R3C3~R3C4~R3C5~R3C6~~VS4~R4C1~R4C2~R4C3~R4C4~R4C5~R4C6~~VS5~R5C1~R5C2~R5C3~R5C4~R5C5~R5C6~~VS6~R6C1~R6C2~R6C3~R6C4~R6C5~R6C6~~VS7~R1C1~R2C1~R3C1~R4C1~R5C1~R6C1~~VS8~R1C2~R2C2~R3C2~R4C2~R5C2~R6C2~~VS9~R1C3~R2C3~R3C3~R4C3~R5C3~R6C3~~VS10~R1C4~R2C4~R3C4~R4C4~R5C4~R6C4~~VS11~R1C5~R2C5~R3C5~R4C5~R5C5~R6C5~~VS12~R1C6~R2C6~R3C6~R4C6~R5C6~R6C6~~VS13~R1C6~R1C5~R1C4~R1C3~R1C2~R1C1~~VS14~R2C6~R2C5~R2C4~R2C3~R2C2~R2C1~~VS15~R3C6~R3C5~R3C4~R3C3~R3C2~R3C1~~VS16~R4C6~R4C5~R4C4~R4C3~R4C2~R4C1~~VS17~R5C6~R5C5~R5C4~R5C3~R5C2~R5C1~~VS18~R6C6~R6C5~R6C4~R6C3~R6C2~R6C1~~VS19~R6C1~R5C1~R4C1~R3C1~R2C1~R1C1~~VS20~R6C2~R5C2~R4C2~R3C2~R2C2~R1C2~~VS21~R6C3~R5C3~R4C3~R3C3~R2C3~R1C3~~VS22~R6C4~R5C4~R4C4~R3C4~R2C4~R1C4~~VS23~R6C5~R5C5~R4C5~R3C5~R2C5~R1C5~~VS24~R6C6~R5C6~R4C6~R3C6~R2C6~R1C6.Pair~961rXv~_non-consecutive~R3C1~R3C2.EqualSum~R1C3~R1C2~R2C2~-~R2C3~R2C4~R2C5~-~R2C6~R3C6~R4C6~-~R4C2~R4C3~R5C3~R5C2~-~VS1~VS2~VS3~VS4~VS5~VS6~-~VS7~VS8~VS9~VS10~VS11~VS12~-~VS13~VS14~VS15~VS16~VS17~VS18~-~VS19~VS20~VS21~VS22~VS23~VS24',
     solution: '326514154362642135531246263451415623',
   },
   {
     name: '6x6 Miracle Sudoku',
-    src: 'https://www.youtube.com/watch?v=suGppTiRORk',
+    src: ['https://www.youtube.com/watch?v=suGppTiRORk', 'https://sudokupad.app/bcurd4y01m?setting-nogrid=1'],
     input: '.Shape~6x6~0-9.Var~A~~2.Var~B~~2.Var~C~~2.Var~D~~2.Var~E~~2.Thermo~R1C2~R1C1.Sum~0_=_1_1_1_1_1_-10_-1~R2C1~R3C2~R4C3~R5C4~R6C5~VA1~VA2.Sum~0_=_1_1_1_1_1_1_-10_-1~R1C1~R2C2~R3C3~R4C4~R5C5~R6C6~VB1~VB2.Sum~0_=_1_1_1_1_1_-10_-1~R1C2~R2C3~R3C4~R4C5~R5C6~VC1~VC2.Sum~0_=_1_1_1_1_-10_-1~R1C3~R2C4~R3C5~R4C6~VD1~VD2.Sum~0_=_1_1_1_-10_-1~R1C4~R2C5~R3C6~VE1~VE2.Replicate~______.~R1C1_1_2_3_4_5_6.End.NFA~TkRf-RorPE1f_kaKzxNX_4CIiIiI_8AiIiIj_gCIiIj_ACIiI_gAiIj8ACIj4ACI8AAjgADAAA~_~VA1~VB1~VA2~VB2~~VB1~VC1~VB2~VC2~~VC1~VD1~VC2~VD2~~VD1~VE1~VD2~VE2',
     solution: '316542245163421356653214162435534621',
   },
@@ -1241,13 +1241,13 @@ export const EXAMPLES = [
   },
   {
     name: 'Chaos Construction: killer',
-    src: 'https://www.youtube.com/watch?v=MyyjOPJyzr0',
+    src: ['https://www.youtube.com/watch?v=MyyjOPJyzr0', 'https://sudokupad.app/fqm7gDbF4j'],
     input: '.ChaosConstruction.NoBoxes.Cage~18~R1C1~R1C2~R2C2.Cage~4~R1C8~R1C9.Cage~27~R2C3~R3C3~R4C3~R4C2~R4C1.Cage~6~R2C4~R2C5.Cage~28~R2C6~R3C6~R4C6~R3C5.Cage~15~R3C9~R4C9.Cage~17~R4C7~R4C8~R5C8~R5C9.Cage~16~R5C5~R5C6~R5C7~R6C6.Cage~12~R3C4~R4C4~R5C4~R4C5.Cage~17~R5C1~R5C2.Cage~8~R6C1~R6C2.Cage~21~R7C3~R7C4~R8C4.Cage~5~R8C3~R9C3.Cage~15~R9C4~R9C5.Cage~11~R9C6~R9C7.Cage~10~R8C7~R8C8~R9C8.Cage~19~R7C7~R7C6~R8C6.Cage~8~R7C5~R8C5.Cage~8~R2C1~R3C1~R3C2.SameValues~3~CC11~CC2~CC1.SameValues~5~CC12~CC21~CC30~CC29~CC28.SameValues~2~CC13~CC14.SameValues~4~CC22~CC31~CC40~CC32.SameValues~2~CC8~CC9.SameValues~2~CC27~CC36.SameValues~4~CC45~CC44~CC35~CC34.SameValues~4~CC15~CC24~CC33~CC23.SameValues~4~CC41~CC42~CC43~CC51.SameValues~2~CC66~CC75.SameValues~2~CC37~CC38.SameValues~2~CC46~CC47.SameValues~3~CC57~CC58~CC67.SameValues~2~CC59~CC68.SameValues~2~CC76~CC77.SameValues~2~CC78~CC79.SameValues~3~CC70~CC71~CC80.SameValues~3~CC61~CC60~CC69.SameValues~3~CC10~CC19~CC20',
     solution: '967485213238154697152397486476218359893641572719536824685923741524769138341872965',
   },
   {
     name: 'Chaos Construction: x-sums',
-    src: 'https://www.youtube.com/watch?v=WXeJLzFoshY',
+    src: ['https://www.youtube.com/watch?v=WXeJLzFoshY', 'https://sudokupad.app/3bJgQPpDdj'],
     input: '.ChaosConstruction.NoBoxes.XSum~C7~11~.XSum~R4~~20.XSum~R5~19~23.XSum~C6~~28.XSum~R8~24~.ChaosArrow~R1C7~~CC7~CC16~CC25~CC34~CC43~CC52~CC61~CC70~CC79.ChaosArrow~R1C2~~CC2~CC11~CC20~CC29~CC38~CC47~CC56~CC65~CC74.ChaosArrow~R1C4~~CC4~CC13~CC22~CC31~CC40~CC49~CC58~CC67~CC76.ChaosArrow~R9C2~~CC74~CC65~CC56~CC47~CC38~CC29~CC20~CC11~CC2.ChaosArrow~R9C5~~CC77~CC68~CC59~CC50~CC41~CC32~CC23~CC14~CC5.ChaosArrow~R9C6~~CC78~CC69~CC60~CC51~CC42~CC33~CC24~CC15~CC6.ChaosArrow~R8C9~~CC72~CC71~CC70~CC69~CC68~CC67~CC66~CC65~CC64.ChaosArrow~R7C9~~CC63~CC62~CC61~CC60~CC59~CC58~CC57~CC56~CC55.ChaosArrow~R5C9~~CC45~CC44~CC43~CC42~CC41~CC40~CC39~CC38~CC37.ChaosArrow~R4C9~~CC36~CC35~CC34~CC33~CC32~CC31~CC30~CC29~CC28.ChaosArrow~R3C9~~CC27~CC26~CC25~CC24~CC23~CC22~CC21~CC20~CC19.ChaosArrow~R5C1~~CC37~CC38~CC39~CC40~CC41~CC42~CC43~CC44~CC45.ChaosArrow~R8C1~~CC64~CC65~CC66~CC67~CC68~CC69~CC70~CC71~CC72.ChaosArrow~R9C1~~CC73~CC74~CC75~CC76~CC77~CC78~CC79~CC80~CC81',
     solution: '938156247724583916863942175645721893397215684271369458186497532459678321512834769',
   },
@@ -1260,25 +1260,25 @@ export const EXAMPLES = [
   },
   {
     name: 'Chaos Construction: Sunblock',
-    src: 'https://www.youtube.com/watch?v=wmd78ZbRXrI',
+    src: ['https://www.youtube.com/watch?v=wmd78ZbRXrI', 'https://sudokupad.app/yeb6vd8pem'],
     input: '.ChaosConstruction.NoBoxes.ChaosCount~R2C2.ChaosCount~R2C3.ChaosCount~R2C4.ChaosCount~R2C5.ChaosCount~R2C6.ChaosCount~R2C7.ChaosCount~R2C9.ChaosCount~R3C3.ChaosCount~R3C4.ChaosCount~R3C5.ChaosCount~R1C6.ChaosCount~R4C4.ChaosCount~R4C6.ChaosCount~R4C1.ChaosCount~R4C9.ChaosCount~R5C8.ChaosCount~R6C8.ChaosCount~R6C1.ChaosCount~R6C2.ChaosCount~R6C3.ChaosCount~R7C3.ChaosCount~R7C2.ChaosCount~R7C1.ChaosCount~R7C6.ChaosCount~R7C5.ChaosCount~R8C5.ChaosCount~R9C3.ChaosCount~R8C9.ChaosCount~R2C1~0~CC10~CC1~CC2~CC11~CC20~CC19',
     solution: '679214358458726913936458721581673294124897536345982167267135849792341685813569472',
   },
   {
     name: 'Chaos Construction: Calm Construction',
-    src: 'https://www.youtube.com/watch?v=iOD6yayIVCo',
+    src: ['https://www.youtube.com/watch?v=iOD6yayIVCo', 'https://sudokupad.app/4jw7hz9rd1'],
     input: '.ChaosConstruction.~R6C5_9.ChaosCount~R1C1~0~CC1~CC2~CC3~CC12~CC11~CC10~CC19~CC20~CC21.ChaosCount~R1C2~0~CC2~CC1~CC10~CC19~CC20~CC11~CC3~CC12~CC21.ChaosCount~R2C2~0~CC11~CC1~CC2~CC3~CC12~CC21~CC20~CC19~CC10.ChaosCount~R2C4~0~CC13~CC4~CC5~CC6~CC15~CC14~CC22~CC23~CC24.ChaosCount~R2C5~0~CC14~CC4~CC5~CC6~CC15~CC24~CC23~CC22~CC13.ChaosCount~R2C6~0~CC15~CC6~CC5~CC13~CC14~CC4~CC22~CC23~CC24.ChaosCount~R1C7~0~CC7~CC8~CC9~CC18~CC17~CC16~CC25~CC27~CC26.ChaosCount~R1C8~0~CC8~CC7~CC16~CC25~CC26~CC17~CC9~CC18~CC27.ChaosCount~R1C9~0~CC9~CC8~CC7~CC16~CC17~CC18~CC27~CC26~CC25.ChaosCount~R4C2~0~CC29~CC30~CC39~CC38~CC37~CC28~CC46~CC47~CC48.ChaosCount~R5C2~0~CC38~CC30~CC29~CC28~CC37~CC46~CC47~CC48~CC39.ChaosCount~R4C5~0~CC32~CC33~CC42~CC51~CC50~CC41~CC31~CC40~CC49.ChaosCount~R4C6~0~CC33~CC42~CC51~CC50~CC41~CC32~CC31~CC40~CC49.ChaosCount~R4C9~0~CC36~CC35~CC34~CC43~CC44~CC45~CC54~CC53~CC52.ChaosCount~R9C9~0~CC81~CC80~CC79~CC70~CC61~CC62~CC71~CC72~CC63.ChaosCount~R8C1~0~CC64~CC55~CC56~CC57~CC66~CC65~CC75~CC74~CC73',
     solution: '428679153739521648615483297951362784246758931387194562562837419894216375173945826',
   },
   {
     name: 'Chaos Construction: The Fountain',
-    src: 'https://www.youtube.com/watch?v=s-YGS4KO_M0',
+    src: ['https://www.youtube.com/watch?v=s-YGS4KO_M0', 'https://sudokupad.app/g9NB728Tgp'],
     input: '.ChaosConstruction.NoBoxes.~R5C5_1.Whisper~5~R4C4~R5C5~R4C6.Whisper~5~R5C1~R6C1~R7C2~R8C3.Whisper~5~R6C3~R7C3~R7C4~R7C5~R7C6~R7C7~R6C7.Whisper~5~R9C5~R8C5~R8C6~R8C7~R7C8~R6C9~R5C9.CountDistinct~R5C1~CC37~CC28~CC29~CC38~CC47~CC46.CountDistinct~R2C5~CC14~CC4~CC5~CC6~CC15~CC24~CC23~CC22~CC13.CountDistinct~R2C6~CC15~CC5~CC6~CC7~CC16~CC25~CC24~CC23~CC14.CountDistinct~R5C9~CC45~CC36~CC35~CC44~CC53~CC54.CountDistinct~R6C5~CC50~CC40~CC41~CC42~CC51~CC60~CC59~CC58~CC49.CountDistinct~R7C5~CC59~CC49~CC50~CC51~CC60~CC69~CC68~CC67~CC58.CountDistinct~R8C5~CC68~CC58~CC59~CC60~CC69~CC78~CC77~CC76~CC67',
     solution: '851467392495632187683294715136748259278915643912356478547183926329571864764829531',
   },
   {
     name: 'Chaos Construction: Thermo Knots',
-    src: 'https://www.youtube.com/watch?v=Er6e0ODkVYg',
+    src: ['https://www.youtube.com/watch?v=Er6e0ODkVYg', 'https://sudokupad.app/4geira1lnl'],
     input: '/data/thermo_knots.iss',
     solution: '728316459816594723397425816563281974471968235934657182152743698689132547245879361',
     constraintTypes: ['ChaosConstruction', 'NoBoxes', 'WhiteDot', 'AllDifferent', 'Var', 'And', 'ChaosArrow', 'NFA'],
