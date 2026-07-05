@@ -481,4 +481,78 @@ await runTest('LinesAndSets: ChaosArrow validates grid-only and CC-arm selection
   assert.equal(SudokuConstraint.ChaosArrow.VALIDATE_CELLS_FN(['R2C1', 'CC6', 'R2C3'], geometry), false);
 });
 
+// ============================================================================
+// MultiCellInput._handleSelection (bug #2: submit threw uncaught)
+// ============================================================================
+
+// Build a bare LinesAndSets with just the fields _handleSelection reads,
+// plus a mock error notice so we can observe surfaced errors.
+const createMultiCellInput = (typeMap) => {
+  const collection = createMockCollection();
+  const errorElem = { textContent: '', style: { display: 'none' } };
+  const input = Object.create(ConstraintCategoryInput.LinesAndSets.prototype);
+  input.collection = collection;
+  input._geometry = CellGeometry.fromGridSize(9);
+  input._updateCallback = () => { };
+  input._typeMap = typeMap;
+  input._errorElem = errorElem;
+  return { input, collection, errorElem };
+};
+
+const handleSelection = (input, type, cells) => {
+  const selectionForm = {
+    'constraint-type': { value: type },
+    [`${type}-value`]: { value: '10' },
+  };
+  const inputManager = { getSelection: () => cells, setSelection: () => { } };
+  withMockFormData(() => {
+    // Runs from form.onsubmit in production, so it must never throw.
+    assert.doesNotThrow(
+      () => input._handleSelection(selectionForm, inputManager));
+  });
+};
+
+await runTest('_handleSelection: empty selection shows error, adds nothing', () => {
+  const { input, collection, errorElem } = createMultiCellInput(
+    new Map([['Cage', { elem: { disabled: false } }]]));
+
+  handleSelection(input, 'Cage', []);
+
+  assert.equal(collection.constraints.length, 0);
+  assert.equal(errorElem.textContent, 'Selection too short.');
+  input._clearError();  // Cancel the pending auto-clear timer.
+});
+
+await runTest('_handleSelection: disabled type shows error, adds nothing', () => {
+  const { input, collection, errorElem } = createMultiCellInput(
+    new Map([['Cage', { elem: { disabled: true } }]]));
+
+  handleSelection(input, 'Cage', ['R1C1', 'R1C2']);
+
+  assert.equal(collection.constraints.length, 0);
+  assert.equal(errorElem.textContent, 'Invalid selection for Cage');
+  input._clearError();
+});
+
+await runTest('_handleSelection: unknown type shows error, adds nothing', () => {
+  const { input, collection, errorElem } = createMultiCellInput(new Map());
+
+  handleSelection(input, 'NotARealType', ['R1C1', 'R1C2']);
+
+  assert.equal(collection.constraints.length, 0);
+  assert.equal(errorElem.textContent, 'Unknown constraint type: NotARealType');
+  input._clearError();
+});
+
+await runTest('_handleSelection: valid selection adds constraint and clears stale error', () => {
+  const { input, collection, errorElem } = createMultiCellInput(
+    new Map([['Cage', { elem: { disabled: false } }]]));
+  errorElem.textContent = 'stale';
+
+  handleSelection(input, 'Cage', ['R1C1', 'R1C2']);
+
+  assert.equal(collection.constraints.length, 1);
+  assert.equal(errorElem.textContent, '');
+});
+
 logSuiteComplete('ConstraintCategoryInput.GivenCandidates');

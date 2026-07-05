@@ -123,6 +123,25 @@ export class ConstraintCategoryInput {
     this._updateCallback();
   }
 
+  static _ERROR_TIMEOUT_MS = 6000;
+
+  // Surface a transient error in this category's error notice, if it has one.
+  _showError(message) {
+    if (!this._errorElem) return;
+    this._errorElem.textContent = message;
+    this._errorElem.style.display = '';
+    clearTimeout(this._errorTimeout);
+    this._errorTimeout = setTimeout(
+      () => this._clearError(), ConstraintCategoryInput._ERROR_TIMEOUT_MS);
+  }
+
+  _clearError() {
+    if (!this._errorElem) return;
+    clearTimeout(this._errorTimeout);
+    this._errorElem.textContent = '';
+    this._errorElem.style.display = 'none';
+  }
+
   // Returns the input element for a constraint type, or null if not found.
   getConstraintInputElement(constraintClass) {
     return null;
@@ -558,22 +577,6 @@ class CheckboxCategoryInput extends ConstraintCategoryInput {
     container.appendChild(this._errorElem);
   }
 
-  static _ERROR_TIMEOUT_MS = 6000;
-
-  _showError(message) {
-    this._errorElem.textContent = message;
-    this._errorElem.style.display = '';
-    clearTimeout(this._errorTimeout);
-    this._errorTimeout = setTimeout(
-      () => this._clearError(), CheckboxCategoryInput._ERROR_TIMEOUT_MS);
-  }
-
-  _clearError() {
-    clearTimeout(this._errorTimeout);
-    this._errorElem.textContent = '';
-    this._errorElem.style.display = 'none';
-  }
-
   onAddConstraint(c) {
     const checkbox = this._checkboxes.get(c.toString());
     if (checkbox) {
@@ -718,6 +721,17 @@ class MultiCellInput extends ConstraintCategoryInput {
   }
 
   _handleSelection(selectionForm, inputManager) {
+    // Runs from form.onsubmit, so any throw here would be uncaught. Surface it
+    // as a form error instead.
+    try {
+      this._clearError();
+      this._addSelectedConstraint(selectionForm, inputManager);
+    } catch (e) {
+      this._showError(e.message || e);
+    }
+  }
+
+  _addSelectedConstraint(selectionForm, inputManager) {
     const formData = new FormData(selectionForm);
     const type = formData.get('constraint-type');
 
@@ -759,6 +773,7 @@ class MultiCellInput extends ConstraintCategoryInput {
   _setUp(selectionForm, constraintClasses, inputManager) {
     const selectElem = selectionForm['constraint-type'];
     selectionForm.classList.add('disabled');
+    this._errorElem = selectionForm.querySelector('.notice-error');
     const valueContainer = selectionForm.querySelector('.constraint-value');
     const valueElems = [];
 
@@ -894,6 +909,7 @@ class MultiCellInput extends ConstraintCategoryInput {
 
   _onNewSelection(selection, selectionForm) {
     const type = selectionForm['constraint-type'].value;
+    this._clearError();
 
     // Only enable the selection panel if the selection is long enough.
     const disabled = (selection.length === 0);
