@@ -1277,11 +1277,12 @@ export const EXAMPLES = [
     solution: '851467392495632187683294715136748259278915643912356478547183926329571864764829531',
   },
   {
+    // Very slow. Needs extra same value hint to be fast.
     name: 'Chaos Construction: Thermo Knots',
     src: ['https://www.youtube.com/watch?v=Er6e0ODkVYg', 'https://sudokupad.app/4geira1lnl'],
-    input: '/data/thermo_knots.iss',
+    input: '/data/scripts/thermo_knots.js',
     solution: '728316459816594723397425816563281974471968235934657182152743698689132547245879361',
-    constraintTypes: ['ChaosConstruction', 'NoBoxes', 'WhiteDot', 'AllDifferent', 'Var', 'And', 'ChaosArrow', 'NFA'],
+    constraintTypes: ['ChaosConstruction', 'NoBoxes', 'WhiteDot', 'AllDifferent', 'NFA', 'SameValues'],
   },
   {
     name: 'Inset',
