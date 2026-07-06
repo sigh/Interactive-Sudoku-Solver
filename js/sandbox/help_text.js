@@ -64,10 +64,12 @@ CELL GEOMETRY
 
   The cell geometry is configured by the Shape and Var constraints.
 
-    cellGeometry('6x6')  => CellGeometry (also accepts a Shape constraint, a
-                            CellGeometry, or nothing for the default grid)
+    cellGeometry('6x6')  => CellGeometry. Also accepts a grid size (cellGeometry(9),
+                            cellGeometry(6, 9) = rows x cols), a Shape constraint, a
+                            CellGeometry, or nothing for the default grid.
     cellGraph('6x6')     => cell graph for the geometry (same argument as cellGeometry()).
-                            Its methods all work in cell ids:
+                            Most methods work in cell ids:
+      .gridGeometry()          the underlying CellGeometry (numRows, numValues, ...)
       .cells()                 all cells of the main grid
       .neighbours(cell)        orthogonally-adjacent in-grid cells
       .kingNeighbours(cell)    the up-to-8 in-grid king-move neighbours
@@ -78,7 +80,8 @@ CELL GEOMETRY
       .connected(cells)        is the set one orthogonally-connected group?
       .makeOverlay(prefix[, cells])  a cell graph over a var group (e.g. 'CC',
                             'VL'), connected as its paired grid cells are; adds
-                            .at(cell) / .gridAt(varCell), each null if unpaired
+                            .at(cell) / .gridAt(varCell), each null if unpaired,
+                            and .toVar(label) -> the matching Var (V-prefix only)
 
 STATE MACHINES (NFA)
 

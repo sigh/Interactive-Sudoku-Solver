@@ -25,8 +25,8 @@ const OFF = 2;
 const bandOf = digit => (digit - 1) >> 1;
 const ALL_BANDS = 0b111;
 
-const gridShape = cellGeometry('6x6');
-const graph = cellGraph(gridShape);
+const graph = cellGraph('6x6');
+const geometry = graph.gridGeometry();
 
 // The loop-membership Var cell paired with each grid cell (VL1..VL36, in grid order).
 const loop = graph.makeOverlay('VL');
@@ -34,13 +34,15 @@ const loopCell = cell => loop.at(cell);
 
 const gridCells = graph.cells();
 
-const constraints = [new Shape('6x6'), new Var('L', 'loop', gridShape.numGridCells)];
+const constraints = [new Shape('6x6'), loop.toVar('loop')];
 const add = (...newConstraints) => constraints.push(...newConstraints);
 
 // --- Loop membership: every cell is on (1) or off (2); circles on, squares off.
 const circles = ['R1C1', 'R1C4'];
 const squares = ['R1C5', 'R4C5', 'R5C2'];
-for (const cell of gridCells) add(new Given(loopCell(cell), ON, OFF));
+const originCell = loop.cells()[0];
+add(new Replicate([new Given(originCell, ON, OFF)],
+  Replicate.encodeTargetCells(loop.cells(), originCell, loop), originCell));
 for (const cell of circles) add(new Given(loopCell(cell), ON));
 for (const cell of squares) add(new Given(loopCell(cell), OFF));
 
@@ -57,7 +59,7 @@ const degreeMachine = NFA.encodeSpec({
     return count > 2 ? undefined : { phase: 'on', onNeighbours: count };
   },
   accept: ({ phase, onNeighbours }) => phase === 'off' || onNeighbours === 2,
-}, gridShape.numValues);
+}, geometry.numValues);
 for (const cell of gridCells) {
   add(new NFA(degreeMachine, 'degree',
     loopCell(cell), ...graph.neighbours(cell).map(loopCell)));
@@ -80,7 +82,7 @@ const noDiagonalTouchMachine = NFA.encodeSpec({
     return diagonalOnly ? undefined : { block: null };
   },
   accept: ({ block }) => block === null,
-}, gridShape.numValues);
+}, geometry.numValues);
 for (const cell of gridCells) {
   const block = graph.block(cell, 2, 2);
   if (block) add(new NFA(noDiagonalTouchMachine, 'no-touch', ...block.map(loopCell)));
@@ -110,7 +112,7 @@ const entropicMachine = NFA.encodeSpec({
   },
   accept: ({ phase, bands }) => phase === 'off' ||
     (phase === 'membership' && bands === ALL_BANDS),
-}, gridShape.numValues);
+}, geometry.numValues);
 for (const cell of gridCells) {
   const cells = [loopCell(cell), cell];
   for (const neighbour of graph.neighbours(cell)) cells.push(loopCell(neighbour), neighbour);
@@ -145,7 +147,7 @@ const visionMachine = NFA.encodeSpec({
     return next > need ? [] : { type, need, seen: next, blocked: false };
   },
   accept: ({ need, seen }) => seen === need,
-}, gridShape.numValues, { multiSegment: true });
+}, geometry.numValues, { multiSegment: true });
 
 // Circles count loop cells, squares count non-loop; the machine reads the type
 // from each clue's own membership.

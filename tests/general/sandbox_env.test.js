@@ -353,6 +353,19 @@ await runTest('cellGeometry defaults with no/empty argument', () => {
   assert.equal(cellGeometry({}).numGridCells, expected);
 });
 
+await runTest('cellGeometry accepts a numeric grid size', () => {
+  const square = cellGeometry(6);
+  assert.deepEqual([square.numRows, square.numCols], [6, 6]);
+  const rect = cellGeometry(6, 9);   // rows x cols
+  assert.deepEqual([rect.numRows, rect.numCols], [6, 9]);
+  assert.throws(() => cellGeometry(0), /Invalid grid size/);
+});
+
+await runTest('cellGraph accepts a numeric grid size too', () => {
+  assert.equal(cellGraph(4).cells().length, 16);
+  assert.deepEqual(cellGraph(6, 9).block('R1C1', 1, 9).length, 9);
+});
+
 // ============================================================================
 // cellGraph: SandboxCellGraph over the main grid
 // ============================================================================
@@ -363,6 +376,17 @@ await runTest('cells() returns every grid cell row-major', () => {
   assert.equal(cells[0], 'R1C1');
   assert.equal(cells[80], 'R9C9');
   assert.equal(cells[9], 'R2C1');
+});
+
+await runTest('graph.gridGeometry() exposes the underlying geometry', () => {
+  const g = cellGraph('6x9');   // rows x cols
+  const geo = g.gridGeometry();
+  assert.equal(geo.numRows, 6);
+  assert.equal(geo.numCols, 9);
+  assert.equal(geo.numGridCells, 54);
+  assert.equal(geo.numValues, 9);
+  // An overlay shares the one grid geometry (no separate handle to drift).
+  assert.equal(g.makeOverlay('VL').gridGeometry(), geo);
 });
 
 await runTest('neighbours() gives orthogonal in-grid cells', () => {
@@ -476,6 +500,25 @@ await runTest('a sparse overlay is the induced subgraph', () => {
 await runTest('overlay graph methods throw for a foreign cell', () => {
   const cc = cellGraph('4x4').makeOverlay('CC');
   assert.throws(() => cc.neighbours('R1C1'), /not in overlay/);
+});
+
+await runTest('overlay toVar() derives the matching Var constraint', () => {
+  // Dense: name is the prefix minus its leading 'V', count is the cell count.
+  const dense = cellGraph('4x4').makeOverlay('VL').toVar('loop');
+  assert.equal(dense.type, 'Var');
+  assert.deepEqual(dense.args, ['L', 'loop', 16]);
+
+  // Sparse: count follows the overlay, not the grid.
+  const sparse = cellGraph('4x4').makeOverlay('VC', ['R1C1', 'R2C2', 'R3C3']);
+  assert.deepEqual(sparse.toVar('Color').args, ['C', 'Color', 3]);
+
+  // Label defaults to the name.
+  assert.deepEqual(cellGraph('4x4').makeOverlay('VS').toVar().args, ['S', 'S', 16]);
+});
+
+await runTest('overlay toVar() rejects a non-var prefix', () => {
+  // 'CC' is a chaos-construction group, registered by its own constraint.
+  assert.throws(() => cellGraph('4x4').makeOverlay('CC').toVar(), /'V'-prefixed/);
 });
 
 // ============================================================================

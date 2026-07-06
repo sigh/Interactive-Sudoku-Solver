@@ -14,8 +14,8 @@
 const ON = 1;                  // loop-membership values, stored in the Var cells
 const OFF = 2;
 
-const gridShape = cellGeometry('9x9');
-const graph = cellGraph(gridShape);
+const graph = cellGraph('9x9');
+const geometry = graph.gridGeometry();
 
 // The loop-membership Var cell paired with each grid cell (VL1..VL81, in grid order).
 const loop = graph.makeOverlay('VL');
@@ -23,14 +23,16 @@ const loopCell = cell => loop.at(cell);
 
 const gridCells = graph.cells();
 
-const constraints = [new Shape('9x9'), new Var('L', 'loop', gridShape.numGridCells)];
+const constraints = [new Shape('9x9'), loop.toVar('loop')];
 const add = (...newConstraints) => constraints.push(...newConstraints);
 
 const circles = ['R2C8', 'R1C2', 'R2C1', 'R1C6', 'R2C6', 'R4C2', 'R8C7', 'R9C4'];
 const rectangle = 'R6C1';
 
 // --- Loop membership: every cell is on (1) or off (2); circles off, rectangle on.
-for (const cell of gridCells) add(new Given(loopCell(cell), ON, OFF));
+const originCell = loop.cells()[0];
+add(new Replicate([new Given(originCell, ON, OFF)],
+  Replicate.encodeTargetCells(loop.cells(), originCell, loop), originCell));
 for (const cell of circles) add(new Given(loopCell(cell), OFF));
 add(new Given(loopCell(rectangle), ON));
 
@@ -47,7 +49,7 @@ const degreeMachine = NFA.encodeSpec({
     return count > 2 ? undefined : { phase: 'on', onNeighbours: count };
   },
   accept: ({ phase, onNeighbours }) => phase === 'off' || onNeighbours === 2,
-}, gridShape.numValues);
+}, geometry.numValues);
 for (const cell of gridCells) {
   add(new NFA(degreeMachine, 'degree',
     loopCell(cell), ...graph.neighbours(cell).map(loopCell)));
@@ -70,7 +72,7 @@ const noDiagonalTouchMachine = NFA.encodeSpec({
     return diagonalOnly ? undefined : { block: null };
   },
   accept: ({ block }) => block === null,
-}, gridShape.numValues);
+}, geometry.numValues);
 for (const cell of gridCells) {
   const block = graph.block(cell, 2, 2);
   if (block) add(new NFA(noDiagonalTouchMachine, 'no-touch', ...block.map(loopCell)));
@@ -86,7 +88,7 @@ const countMachine = NFA.encodeSpec({
     return next > target ? [] : { target, count: next };
   },
   accept: ({ target, count }) => target !== null && count === target,
-}, gridShape.numValues);
+}, geometry.numValues);
 for (const cell of circles) {
   add(new NFA(countMachine, 'count', cell, ...graph.kingNeighbours(cell).map(loopCell)));
 }
@@ -116,7 +118,7 @@ const multipleMachine = NFA.encodeSpec({
     }
   },
   accept: ({ phase }) => phase === 'done',
-}, gridShape.numValues);
+}, geometry.numValues);
 for (const cell of gridCells) {
   for (const [dR, dC] of [[0, 1], [1, 0]]) {
     const other = graph.step(cell, dR, dC);

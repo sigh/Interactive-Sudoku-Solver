@@ -109,11 +109,19 @@ const parseCellId = (cellId) => {
 const makeCellId = (row, col) => GEOMETRY_MAX.makeCellId(row - 1, col - 1);
 
 // Resolve a lenient shape argument to a CellGeometry:
+//   - a grid size: cellGeometry(9) => 9x9, cellGeometry(6, 9) => 6 rows x 9 cols
 //   - a CellGeometry                       (returned as-is)
 //   - a shape spec string, e.g. '6x6'
 //   - a Shape constraint (or any object carrying a shapeSpec)
 //   - nothing                           (the default grid)
-const cellGeometry = (geometrySource) => {
+const cellGeometry = (geometrySource, numCols) => {
+  if (typeof geometrySource === 'number') {
+    const geometry = CellGeometry.fromGridSize(geometrySource, numCols);
+    if (!geometry) {
+      throw new Error(`Invalid grid size: ${geometrySource}x${numCols ?? geometrySource}`);
+    }
+    return geometry;
+  }
   if (geometrySource && typeof geometrySource.cellGraph === 'function') return geometrySource;
   const spec = typeof geometrySource === 'string' ? geometrySource
     : geometrySource && typeof geometrySource === 'object' ? geometrySource.shapeSpec ?? null
@@ -140,6 +148,9 @@ class SandboxCellGraph {
   // CellLocator: id <-> index over this graph's own cells.
   parseCellId(cell) { return { cell: this._index(cell) }; }
   makeCellIdFromIndex(index) { return this._cell(index); }
+
+  // The underlying grid CellGeometry
+  gridGeometry() { return this._geometry; }
 
   // Every cell of the main grid, row-major, excluding var cells.
   cells() {
@@ -234,6 +245,7 @@ class SandboxOverlay extends SandboxCellGraph {
 
     // Everything is indexed by position: the nth grid cell and nth var cell are a
     // pair. Two arrays (pos -> cell) and two maps (cell -> pos) give O(1) both ways.
+    this._prefix = prefix;
     this._gridCells = gridCells;
     this._cells = gridCells.map((_, i) => `${prefix}${i + 1}`);
     this._gridPos = new Map(gridCells.map((cell, i) => [cell, i]));
@@ -272,11 +284,21 @@ class SandboxOverlay extends SandboxCellGraph {
     const pos = this._varPos.get(varCell);
     return pos === undefined ? null : this._gridCells[pos];
   }
+
+  // The Var constraint that registers this overlay's cells.
+  toVar(label) {
+    if (this._prefix[0] !== 'V' || this._prefix.length < 2) {
+      throw new Error(`toVar() needs a 'V'-prefixed overlay, got: '${this._prefix}'`);
+    }
+    const name = this._prefix.slice(1);
+    return new SudokuConstraint.Var(name, label ?? name, this._cells.length);
+  }
 }
 
 // A SandboxCellGraph for a geometry. The argument is passed through cellGeometry(), so
 // it accepts a shape spec, Shape constraint, CellGeometry, or nothing for the default.
-const cellGraph = (geometryLike) => new SandboxCellGraph(cellGeometry(geometryLike));
+const cellGraph = (geometryLike, numCols) =>
+  new SandboxCellGraph(cellGeometry(geometryLike, numCols));
 
 const parseConstraint = (str) => {
   const parsed = SudokuParser.parseString(str);

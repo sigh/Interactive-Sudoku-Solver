@@ -22,14 +22,13 @@ const usesLeft = s => s === HORIZ || s === UL || s === DL;
 const usesRight = s => s === HORIZ || s === UR || s === DR;
 const isTurn = s => s >= UL;   // the four corners
 
-const gridShape = cellGeometry('9x9');
-const graph = cellGraph(gridShape);
+const graph = cellGraph('9x9');
+const geometry = graph.gridGeometry();
 const shape = graph.makeOverlay('VS');
 const shapeCell = cell => shape.at(cell);
 const gridCells = graph.cells();
 
-const constraints = [new Shape('9x9'), new Given('R1C1', 6),
-new Var('S', 'shape', gridShape.numGridCells)];
+const constraints = [new Shape('9x9'), new Given('R1C1', 6), shape.toVar('shape')];
 const add = (...newConstraints) => constraints.push(...newConstraints);
 
 // Each circle sits on a grid vertex, keyed by the top-left cell of the 2x2 it
@@ -45,8 +44,8 @@ const ALL_SHAPES = [OFF, HORIZ, VERT, UL, UR, DL, DR];
 for (const cell of gridCells) {
   const { row, col } = parseCellId(cell);
   const allowed = ALL_SHAPES.filter(s =>
-    !(row === 1 && usesUp(s)) && !(row === gridShape.numRows && usesDown(s)) &&
-    !(col === 1 && usesLeft(s)) && !(col === gridShape.numCols && usesRight(s)));
+    !(row === 1 && usesUp(s)) && !(row === geometry.numRows && usesDown(s)) &&
+    !(col === 1 && usesLeft(s)) && !(col === geometry.numCols && usesRight(s)));
   add(new Given(shapeCell(cell), ...allowed));
 }
 
@@ -59,7 +58,7 @@ const edgeAgree = (toB, toA) => NFA.encodeSpec({
     ? { aUses: toB(value) }
     : (aUses === toA(value) ? { done: true } : undefined),
   accept: ({ done }) => done === true,
-}, gridShape.numValues);
+}, geometry.numValues);
 
 // --- Loop differences: two cells joined by a loop edge differ by at least 5.
 // Reads [shapeA, digitA, digitB]; `toB` says whether A uses the edge to B (edge
@@ -73,7 +72,7 @@ const diffEdge = (toB) => NFA.encodeSpec({
     return Math.abs(state.digitA - value) >= 5 ? { done: true } : undefined;
   },
   accept: ({ done }) => done === true,
-}, gridShape.numValues);
+}, geometry.numValues);
 
 // Apply both to every right and down neighbour pair.
 const edgeRight = edgeAgree(usesRight, usesLeft), edgeDown = edgeAgree(usesDown, usesUp);
@@ -102,7 +101,7 @@ const turnsExactly = memo((target) => NFA.encodeSpec({
     return next > target ? [] : { count: next };
   },
   accept: ({ count }) => count === target,
-}, gridShape.numValues));
+}, geometry.numValues));
 for (const [topLeft, d] of Object.entries(circleClues)) {
   add(new Quad(topLeft, d));
   add(new NFA(turnsExactly(d), 'circle-turns',

@@ -94,7 +94,7 @@ function colorDigitNFAs() {
 return [
   ...base,
   includeHint ? additionalHint : '',
-  new Var("C", "Color", circleCells.length),
+  color.toVar("Color"),
   ...circleCells.map(colorCandidates),
   new And([
     ...circleAdjacencies().map(cells => new Pair(
