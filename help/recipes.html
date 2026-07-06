@@ -1,0 +1,601 @@
+---
+layout: null
+---
+<html>
+
+<head>
+  <title>Recipes - Interactive Sudoku Solver</title>
+  <meta name="description"
+    content="Recipes for constructing constraints that aren't directly supported in Interactive Sudoku Solver.">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="{{ 'img/favicon.png' | relative_url }}">
+  <link rel="canonical" href="https://sigh.github.io/Interactive-Sudoku-Solver/help/recipes" />
+  <link rel="stylesheet" href="{{ 'css/style.css?v=' | append: site.github.build_revision | relative_url }}">
+  <link rel="stylesheet" href="{{ 'css/help.css?v=' | append: site.github.build_revision | relative_url }}">
+
+  <script type="module">
+    // Use a VERSION_PARAM for cache busting.
+    self.VERSION_PARAM = '?v=' + ('{{ site.github.build_revision }}' || Math.random());
+
+    const module = import('../js/help/copy_buttons.js' + self.VERSION_PARAM);
+    window.addEventListener(
+      'load', async () => (await module).addCopyButtonsToCodeBlocks());
+  </script>
+</head>
+
+<body>
+  <header id="page-header" class="hstack">
+    <h1 class="page-header-logo">ISS</h1>
+    <h1 class="page-header-title">Help &gt; Recipes</h1>
+    <a class="page-header-link hstack-push-right" href=".." aria-label="Back to Solver">
+      <span>&larr;</span>
+      <span>Back to Solver</span>
+    </a>
+    <a class="page-header-link" href="https://github.com/sigh/Interactive-Sudoku-Solver/issues" target="_blank"
+      rel="noopener">
+      <img src="../img/bug-48.png" alt="File a bug">
+      <span>File a bug</span>
+    </a>
+    <a class="page-header-link" href="https://github.com/sigh/Interactive-Sudoku-Solver" target="_blank" rel="noopener">
+      <img src="../img/github-mark.png" alt="Github repo">
+      <span>Source code</span>
+    </a>
+  </header>
+
+  <div class="help-container">
+    <div class="toc">
+      <div class="toc-title">Contents</div>
+      <!-- When adding/removing a recipe, also update the summary list in help/index.html. -->
+      <ul>
+        <li><a href="#clone">Clone</a></li>
+        <li><a href="#magic-square">3x3 Magic Square</a></li>
+        <li><a href="#thermo-variants">Thermometer Variants</a></li>
+        <li><a href="#nabner-line">Nabner Line</a></li>
+        <li><a href="#not-renban">Not Renban</a></li>
+        <li><a href="#arithmetic-progression">Arithmetic Progression</a></li>
+        <li><a href="#successor-arrow">Successor Arrow</a></li>
+        <li><a href="#flatmates">Flatmates</a></li>
+        <li><a href="#odd-even-lots">Odd/Even Lots</a></li>
+        <li><a href="#sum-variants">Sum Variants</a></li>
+        <li><a href="#general-skyscraper">General Skyscraper</a></li>
+        <li><a href="#ambiguous-arrow">Ambiguous Arrow</a></li>
+        <li><a href="#generalized-entropic-line">Generalized Entropic Line</a></li>
+        <li><a href="#index-line">Index Line</a></li>
+        <li><a href="#magnet-sum">Magnet Sum</a></li>
+      </ul>
+      <div class="toc-pages">
+        <div class="toc-title">Other Help Pages</div>
+        <a href=".">Help</a>
+        <a href="custom-constraints">Custom Constraints</a>
+      </div>
+    </div>
+
+    <div class="help-content">
+      <h2 id="recipes">Recipes</h2>
+      <div class="recipes-content">
+        <p>Some constraint types aren't directly supported but can be constructed using combinations of available
+          constraints. Many of these use the Custom JavaScript constraints panel &mdash;
+          see the <a href="custom-constraints">Custom Constraints</a> help page for
+          a full guide.</p>
+
+        <h3 id="clone">Clone</h3>
+        <p>
+          <b>Description:</b> Two regions of the same shape and size,
+          which must have the same values in corresponding cells.
+        </p>
+        <p>
+          Use the <code>Same Value Sets</code> on every pair of corresponding
+          cells to mark them as equal. Each pair must be a separate constraint.
+        </p>
+
+        <h3 id="magic-square">3x3 Magic Square</h3>
+        <p>
+          <b>Description:</b>
+          A square of cells, where the sum of the values in each row, column,
+          and diagonal is the same.
+        </p>
+        <p>
+          Use the <code>Cage</code> constraint on each row, column, and diagonal
+          to sum to 15.
+        </p>
+
+        <h3 id="thermo-variants">Thermometer Variants</h3>
+        <p>
+          <b>Description:</b>
+          A thermometer is a line where values are strictly increasing.
+          Some variants modify this basic rule.
+        </p>
+        <p>
+          Most Thermometer variants can be created with pairwise constraints
+          in the "Custom JavaScript constraints" panel, with an appropriate
+          condition.
+        </p>
+        <p>
+          For an <b>Odd/Even Thermometer</b>, where the values must be all
+          odd or all even, use the following condition:
+        <pre>a &lt; b &amp;&amp; (a % 2 == b % 2)</pre>
+        </p>
+        <p>
+          For a <b>Slow Thermometer</b>, where the values don't need to be
+          strictly increasing, use the following condition:
+        <pre>a &lt;= b</pre>
+        </p>
+
+        <h3 id="nabner-line">Nabner Line</h3>
+        <p>
+          <b>Description:</b>
+          No two digits along the line may be be consecutive.
+          ("Nabner" is "Renban" spelled backwards.)
+        </p>
+        <p>
+          Create a pairwise constraint in the "Custom JavaScript constraints"
+          panel with "Chain handling" set to "All pairs" and use the following
+          condition:
+        </p>
+        <p>
+        <pre>Math.abs(a - b) &gt; 1</pre>
+        </p>
+
+        <h3 id="not-renban">Not Renban</h3>
+        <p>
+          <b>Description:</b>
+          Unlike Nabner, this is how to create a set where all the values taken
+          together are not consecutive.
+        </p>
+
+        <p>
+          Implement this by configuring a state machine in the
+          "Custom JavaScript constraints" panel. The NFA tracks the minimum and
+          maximum values seen, accepting if <code>max - min != count - 1</code>
+          (i.e., the values are not all consecutive). If you know all the
+          <b>values are distinct</b>, then this is sufficient:
+        <pre>
+NUM_CELLS = 3;  // Number of cells in the set
+startState = { min: 16, max: -1 };
+
+function transition({ min, max }, value) {
+  return {
+    min: Math.min(min, value),
+    max: Math.max(max, value),
+  };
+}
+
+function accept({ min, max }) {
+  return max - min !== NUM_CELLS - 1;
+}</pre>
+        </p>
+        <p>
+          If the values may not be distinct, then you need to also need to check
+          for duplicates. This can be done efficiently by using non-deterministic
+          branches to check each digit:
+        <pre>
+NUM_CELLS = 3;  // Number of cells in the set
+startState = { type: 'start' };
+
+function transition({ type, min, max, value: trackedValue }, value) {
+  if (type === 'start') {
+    return [
+      { type: 'rangeCheck', min: value, max: value },
+      { type: 'duplicateCheck', value },
+    ];
+  }
+  if (type === 'rangeCheck') {
+    return [{
+      type: 'rangeCheck',
+      min: Math.min(min, value),
+      max: Math.max(max, value),
+    }];
+  }
+  if (type === 'duplicateCheck') {
+    if (value === trackedValue) {
+      return [{ type: 'hasDuplicate' }];
+    }
+    return [
+      { type: 'duplicateCheck', value: trackedValue },
+      { type: 'duplicateCheck', value }
+    ];
+  }
+  if (type === 'hasDuplicate') return [{ type: 'hasDuplicate' }];
+}
+
+function accept({ type, min, max }) {
+  if (type === 'rangeCheck') {
+    return max - min !== NUM_CELLS - 1;
+  }
+  return type === 'hasDuplicate';
+}</pre>
+        </p>
+
+        <p>
+          You can generalize this to a single state machine that works for any
+          number of cells, but it becomes a larger and less efficient.
+        </p>
+
+        <h3 id="arithmetic-progression">Arithmetic Progression</h3>
+        <p>
+          <b>Description:</b>
+          Digits along the line must form an arithmetic progression. That is,
+          the difference between all consecutive digits is same.
+        </p>
+
+        <p>
+          Implement this by configuring a state machine in the
+          "Custom JavaScript constraints" panel:
+        <pre>
+startState = { lastVal: null, diff: null };
+
+function transition({ lastVal, diff }, value) {
+  if (lastVal === null) {
+    return { lastVal: value, diff };
+  }
+
+  const nextDiff = value - lastVal;
+
+  if (diff === null || diff === nextDiff) {
+    return { lastVal: value, diff: nextDiff };
+  }
+}
+
+function accept(state) {
+  return true;
+}</pre>
+        </p>
+
+        <h3 id="successor-arrow">Successor Arrow</h3>
+        <p>
+          <b>Description:</b>
+          If a digit <code>N</code> is placed in an arrow cell, the digit
+          <code>N + 1</code> must appear exactly <code>N</code> cells away in the
+          arrow's direction.
+        </p>
+
+        <p>
+          Select the arrow cells and all the cells along the arrow's direction,
+          then add a <code>Regex</code> constraint from "Line and Sets" panel.
+          The regex pattern should alternate over each possible starting digit:
+        </p>
+        <pre>(12|2.3|3.{2}4|4.{3}5|5.{4}6|6.{5}7|7.{6}8|8.{7}9).*</pre>
+
+        <h3 id="flatmates">Flatmates</h3>
+
+        <p>
+          <b>Description:</b>
+          Generalize the "Dutch Flatmates" constraint to apply to an arbitrary
+          center digit <code>D</code>, which must have either digit <code>A</code>
+          above it or digit <code>B</code> below it (or both).
+        </p>
+
+        <p>
+          Use a <code>Regex</code> constraint from the "Line and Sets" panel,
+          applied to every column (replace <code>A</code>, <code>B</code> and
+          <code>D</code>):
+        </p>
+        <pre>.*(AD|DB).*</pre>
+
+        <p>
+          Note: This assumes that <code>D</code> must exist in the line. This
+          might not be the case in non-standard grid. In that case,
+          then you can modify the regex as follows:
+        </p>
+        <pre>[^D]*(AD|DB)?[^D]*</pre>
+
+        <h3 id="odd-even-lots">Odd/Even Lots</h3>
+
+        <p>
+          <b>Description:</b>
+          A digit in a marked cell indicates the number of Odd/Even digits which
+          appear along the attached line, including itself.
+        </p>
+
+        <p>
+          Implement this by configuring a state machine in the
+          "Custom JavaScript constraints" panel. Select the cells in the line
+          so that the marked cell is first, the order of the rest don't matter.
+          The following code implements Odd Lots, but change to the
+          <code>isEven</code> function for Even Lots:
+        <pre>
+startState = { remaining: null };
+
+function transition({ remaining }, value) {
+  const isOdd = x => x % 2 === 1;
+  const isEven = x => x % 2 === 0;
+
+  // If we are starting, then initialize the count of remaining values.
+  if (remaining === null) remaining = value;
+
+  // Update remaining count if we see a matching value.
+  if (isOdd(value)) remaining = remaining - 1;
+
+  // Only return a new state if it is valid.
+  if (remaining >= 0) return { remaining };
+}
+
+function accept({ remaining }) {
+  return remaining === 0;
+}</pre>
+        </p>
+
+        <h3 id="sum-variants">Sum Variants</h3>
+        <p>
+          <b>Description:</b>
+          A set of cells where the sum must satisfy a custom condition.
+          Use this when you need sum constraints beyond what the built-in
+          <code>Cage</code> supports — such as parity, ranges, or multiple
+          possible totals.
+        </p>
+
+        <p>
+          Implement this by configuring a state machine in the
+          "Custom JavaScript constraints" panel. Select the cells in the set.
+          The <code>transition</code> function accumulates the sum, and the
+          <code>accept</code> function defines your condition:
+        <pre>
+startState = 0;
+
+function transition(state, value) {
+  // Limit avoids infinite states (max sum in a 9-cell region)
+  // Increase if you need to support larger regions
+  if (state <= 45) return state + value;
+}
+
+function accept(state) {
+  // Customize this condition (see examples below)
+  return state < 10;
+}</pre>
+        </p>
+        <p>
+          Examples of <code>accept</code> conditions:
+        </p>
+        <pre>
+// Sum within a range
+return state >= 10 && state <= 20;
+
+// One of several possible sums
+return [15, 20, 25].includes(state);
+
+// Even sum
+return state % 2 === 0;
+
+// Odd sum
+return state % 2 === 1;</pre>
+        <p>
+          This allows duplicate values. If you need all values to be
+          distinct, overlay an <code>All Different</code> constraint from the
+          "Lines & Sets" panel on the same cells.
+        </p>
+
+        <p>
+          If you want the values to be restricted as well, then you can filter
+          out unwanted values in the <code>transition</code> function.
+        </p>
+
+        <p>
+          In some cases, it can be easier to count down from a target sum,
+          especially if the target sum needs to be determined. In this case,
+          start with the remainingSum as <code>null</code> to indicate that it
+          is not yet known.
+          For example, to simulate a <code>Sandwich</code> constraint where
+          the first cell is the clue cell:
+        </p>
+        <pre>
+startState = { remainingSum: null, inside: false };
+
+function transition({ remainingSum, inside }, value) {
+  if (remainingSum === null) {
+    return { remainingSum: value, inside };
+  }
+  if (value === 1 || value === 9) {
+    return { remainingSum, inside: !inside };
+  }
+  if (inside) {
+    remainingSum -= value;
+  }
+  if (remainingSum >= 0) {
+    return { remainingSum, inside };
+  }
+}
+
+function accept({ remainingSum }) {
+  return remainingSum === 0;
+}</pre>
+
+        <p>Likewise for <code>XSum</code>:</p>
+        <pre>
+startState = { remainingCount: null, remainingSum: null };
+
+function transition({ remainingCount, remainingSum, done }, value) {
+  if (done === true) return { done };
+  if (remainingSum === null) {
+    return { remainingCount, remainingSum: value };
+  }
+  remainingSum -= value;
+  if (remainingCount === null) {
+    remainingCount = value;
+  }
+  remainingCount--;
+  if (remainingCount === 0 && remainingSum === 0) {
+    return { done: true };
+  }
+  if (remainingCount > 0 && remainingSum > 0) {
+    return { remainingCount, remainingSum };
+  }
+}
+
+function accept({ done }) {
+  return done === true;
+}</pre>
+
+        <h3 id="general-skyscraper">General Skyscraper</h3>
+        <p>
+          <b>Description:</b>
+          Generalize the skyscraper constraint to apply along any line of cells
+          (for example, a diagonal).
+          From the start of the line, there is a target indicate how many
+          "buildings" are visible, where taller buildings block the view of
+          shorter ones behind them.
+        </p>
+        <p>
+          Implement this by configuring a state machine in the
+          "Custom JavaScript constraints" panel. Change <code>TARGET</code>
+          to set the target number of visible buildings:
+        <pre>
+TARGET = 5;  // Change to target number of visible buildings
+startState = { max: 0, remaining: TARGET };
+
+function transition({ max, remaining }, value) {
+  return {
+    max: Math.max(max, value),
+    remaining: remaining - (value > max),
+  }
+}
+
+function accept({ remaining }) {
+  return remaining === 0;
+}</pre>
+        </p>
+
+        <p>
+          If the first cell is the clue cell, <code>remaining</code> can be set
+          to <code>null</code> and initialized on the first transition.
+        </p>
+
+        <h3 id="ambiguous-arrow">Ambiguous Arrow</h3>
+        <p>
+          <b>Description:</b>
+          The greatest cell value must equal the sum of the remaining cells.
+          When applied to a 2x2 square, this is also known as the
+          <b>Quad Sum</b> constraint.
+        </p>
+        <p>
+          Implement this by configuring a state machine in the
+          "Custom JavaScript constraints" panel. This checks that the total
+          sum is twice the maximum value:
+        <pre>
+startState = { max: 0, sum: 0 };
+
+function transition({ max, sum }, value) {
+  if (sum > 18) return;
+
+  return {
+    max: Math.max(max, value),
+    sum: sum + value
+  }
+}
+
+function accept({ max, sum }) {
+  return sum === 2*max;
+}</pre>
+        </p>
+
+        <h3 id="generalized-entropic-line">Generalized Entropic Line</h3>
+        <p>
+          <b>Description:</b>
+          An entropic line requires that every consecutive group of N cells
+          (where N is the number of sets) contains one digit from each set.
+          The standard entropic line uses low (1–3), mid (4–6), and
+          high (7–9), but this recipe generalizes it to any custom
+          partitioning of the digits.
+        </p>
+        <p>
+          Implement this by configuring a state machine in the
+          "Custom JavaScript constraints" panel. Customize the
+          <code>sets</code> variable to define your own partitioning:
+        <pre>
+sets = [[1, 2, 3], [4, 5, 6], [7, 8, 9]];
+
+startState = { window: [] };
+
+function transition({ window }, value) {
+  const index = sets.findIndex(s => s.includes(value));
+  if (index < 0) return;
+  const nextWindow = [...window, index].slice(-sets.length);
+  if (new Set(nextWindow).size < nextWindow.length) return;
+  return { window: nextWindow };
+}
+
+function accept(state) {
+  return true;
+}</pre>
+        </p>
+
+        <h3 id="index-line">Index Line</h3>
+        <p>
+          <b>Description:</b>
+          On an index line, the digit in the Nth cell
+          indicates the position along the line where the digit N
+          appears. For example, <code>3 2 1 4</code> is valid: the 1st digit
+          is 3, so digit 1 appears at position 3; and the 3rd digit is 1, so
+          digit 3 appears at position 1.
+        </p>
+        <p>
+          Implement this by configuring a state machine in the
+          "Custom JavaScript constraints" panel. The state tracks the current
+          <code>position</code> and a <code>futures</code> map of
+          unsatisfied digits.
+          if the current position already has an expectation, it is checked and
+          cleared. If the current digit refers to a future position, that
+          expectation is recorded. The line is valid when all expectations have
+          been satisfied:
+        <pre>
+startState = { position: 0, futures: {} };
+
+function transition({ position, futures }, value) {
+  position++;
+
+  if (value &lt; position || futures[position] !== undefined) {
+    if (futures[position] !== value) return;
+    delete futures[position];
+  }
+  if (value &gt; position) {
+    if (futures[value] !== undefined) return;
+    futures[value] = position;
+  }
+
+  return { position, futures };
+}
+
+function accept({ futures }) {
+  return Object.keys(futures).length === 0;
+}</pre>
+        </p>
+
+        <h3 id="magnet-sum">Magnet Sum</h3>
+        <p>
+          <b>Description:</b>
+          In a magnet clue cell, let the clue value be <code>M</code>. Moving
+          in the indicated direction, sum digits until the first digit greater
+          than <code>M</code> is encountered. The sum of those seen digits must
+          equal <code>M</code>.
+        </p>
+        <p>
+          Implement this by configuring a state machine in the
+          "Custom JavaScript constraints" panel. Select the clue cell first,
+          followed by all the cells in the indicated direction:
+        <pre>
+startState = { first: null, sum: 0, done: false };
+
+function transition({ first, sum, done }, value) {
+  if (done) {
+    return { first, sum, done };
+  }
+  if (first === null) {
+    return { first: value, sum, done };
+  }
+  if (value &gt; first) {
+    return sum !== first ? [] :
+      { first: 0, sum: 0, done: true };
+  }
+  sum += value;
+  return sum &gt; first ? [] : { first, sum, done };
+}
+
+function accept({ first, sum }) {
+  return first === sum;
+}</pre>
+        </p>
+      </div>
+    </div>
+  </div>
+</body>
+
+</html>

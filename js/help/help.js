@@ -1,6 +1,7 @@
 const { SudokuConstraint } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
-const { clearDOMNode, copyToClipboard } = await import('../util.js' + self.VERSION_PARAM);
+const { clearDOMNode } = await import('../util.js' + self.VERSION_PARAM);
 const { SANDBOX_HELP_TEXT } = await import('../sandbox/help_text.js' + self.VERSION_PARAM);
+const { addCopyButtonsToCodeBlocks } = await import('./copy_buttons.js' + self.VERSION_PARAM);
 
 const getAllConstraintClasses = () => {
   const classes = [];
@@ -139,29 +140,6 @@ const createCategorySection = (category, constraints) => {
   categorySection.appendChild(constraintList);
 
   return categorySection;
-};
-
-const addCopyButtonsToCodeBlocks = () => {
-  const codeBlocks = document.querySelectorAll('.help-content pre');
-  for (const pre of codeBlocks) {
-    if (pre.querySelector('button.copy-button')) continue;
-
-    pre.classList.add('code-with-copy');
-
-    const copyBtn = document.createElement('button');
-    copyBtn.className = 'copy-button plain-button';
-    copyBtn.title = 'Copy to clipboard';
-
-    const copyIcon = document.createElement('img');
-    copyIcon.src = '../img/copy-48.png';
-    copyBtn.appendChild(copyIcon);
-
-    copyBtn.addEventListener('click', (e) => {
-      copyToClipboard(pre.textContent, copyBtn);
-    });
-
-    pre.insertBefore(copyBtn, pre.firstChild);
-  }
 };
 
 const CATEGORY_CONFIGS = {
