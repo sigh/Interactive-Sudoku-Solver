@@ -381,6 +381,7 @@ export class CellGraph {
   static RIGHT = 1;
   static UP = 2;
   static DOWN = 3;
+  static _OPPOSITE = [this.RIGHT, this.LEFT, this.DOWN, this.UP];
 
   static _gridGraph = memoize(
     (geometry) => {
@@ -434,16 +435,41 @@ export class CellGraph {
     return this._graph[cell][dir];
   }
 
+  // Step |dRow| rows then |dCol| cols from cell (sign gives direction).
+  // Returns null on stepping past a boundary.
   traverse(cell, dRow, dCol) {
-    const rowDir = dRow > 0 ? CellGraph.DOWN : CellGraph.UP;
-    const colDir = dCol > 0 ? CellGraph.RIGHT : CellGraph.LEFT;
-    for (let i = Math.abs(dRow); i > 0; i--) {
-      cell = this._graph[cell][rowDir];
-      if (cell === null) return null;
-    }
-    for (let i = Math.abs(dCol); i > 0; i--) {
-      cell = this._graph[cell][colDir];
-      if (cell === null) return null;
+    return this._traverse(cell, dRow, dCol, false);
+  }
+
+  // Like traverse, but stepping past a boundary wraps to the opposite edge of
+  // the row/column within the same subgraph rather than returning null.
+  wrappingTraverse(cell, dRow, dCol) {
+    return this._traverse(cell, dRow, dCol, true);
+  }
+
+  _traverse(cell, dRow, dCol, wrap) {
+    cell = this._traverseAxis(
+      cell, dRow > 0 ? CellGraph.DOWN : CellGraph.UP, Math.abs(dRow), wrap);
+    if (cell === null) return null;
+    return this._traverseAxis(
+      cell, dCol > 0 ? CellGraph.RIGHT : CellGraph.LEFT, Math.abs(dCol), wrap);
+  }
+
+  // Step `count` times along dir. At a boundary: return null, or if wrap, keep
+  // going from the far cell on the opposite edge of this line.
+  _traverseAxis(cell, dir, count, wrap) {
+    for (; count > 0; count--) {
+      const next = this._graph[cell][dir];
+      if (next !== null) {
+        cell = next;
+      } else if (wrap) {
+        const back = CellGraph._OPPOSITE[dir];
+        for (let n = this._graph[cell][back]; n !== null; n = this._graph[cell][back]) {
+          cell = n;
+        }
+      } else {
+        return null;
+      }
     }
     return cell;
   }

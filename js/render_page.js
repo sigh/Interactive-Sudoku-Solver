@@ -1757,13 +1757,10 @@ class GridInputManager {
       if (!cell) return;
 
       const geometry = this._geometry;
-      let { row, col } = geometry.parseCellId(cell);
-      const numRows = geometry.numRows;
-      const numCols = geometry.numCols;
-      row = (row + dr + numRows) % numRows;
-      col = (col + dc + numCols) % numCols;
+      const { cell: cellIndex } = geometry.parseCellId(cell);
 
-      this._selection.setCells([geometry.makeCellId(row, col)]);
+      const next = geometry.cellGraph().wrappingTraverse(cellIndex, dr, dc);
+      this._selection.setCells([geometry.makeCellIdFromIndex(next)]);
     };
 
     let fakeInput = this._fakeInput;

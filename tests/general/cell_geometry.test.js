@@ -539,6 +539,64 @@ await runTest('CellGraph.cellPosition computes lazily and caches per cell', () =
   assert.equal(graph._positionCache[cell], pos0);
 });
 
+await runTest('CellGraph.traverse steps rows then cols, null past an edge', () => {
+  const geometry = CellGeometry.fromGridSize(9);
+  const graph = geometry.cellGraph();
+  const at = (r, c) => geometry.cellIndex(r, c);
+
+  assert.equal(graph.traverse(at(4, 4), 0, 0), at(4, 4));
+  assert.equal(graph.traverse(at(4, 4), 1, 0), at(5, 4));
+  assert.equal(graph.traverse(at(4, 4), -2, 3), at(2, 7));
+  // Stepping off the grid returns null (no wrap).
+  assert.equal(graph.traverse(at(8, 8), 1, 0), null);
+  assert.equal(graph.traverse(at(0, 0), 0, -1), null);
+});
+
+await runTest('CellGraph.wrappingTraverse wraps to the opposite edge', () => {
+  const geometry = CellGeometry.fromGridSize(9);
+  const graph = geometry.cellGraph();
+  const at = (r, c) => geometry.cellIndex(r, c);
+
+  // Interior moves behave like traverse.
+  assert.equal(graph.wrappingTraverse(at(4, 4), 0, 1), at(4, 5));
+  // Each edge wraps within the same row/column.
+  assert.equal(graph.wrappingTraverse(at(4, 8), 0, 1), at(4, 0));
+  assert.equal(graph.wrappingTraverse(at(4, 0), 0, -1), at(4, 8));
+  assert.equal(graph.wrappingTraverse(at(0, 4), -1, 0), at(8, 4));
+  assert.equal(graph.wrappingTraverse(at(8, 4), 1, 0), at(0, 4));
+});
+
+await runTest('CellGraph.neighborCountIn counts orthogonal neighbors in a set', () => {
+  const geometry = CellGeometry.fromGridSize(9);
+  const graph = geometry.cellGraph();
+  const at = (r, c) => geometry.cellIndex(r, c);
+
+  const allFour = new Set([at(3, 4), at(5, 4), at(4, 3), at(4, 5)]);
+  assert.equal(graph.neighborCountIn(at(4, 4), allFour), 4);
+  // Diagonal and self are not orthogonal neighbors, so they don't count.
+  assert.equal(graph.neighborCountIn(at(4, 4), new Set([at(3, 3), at(4, 4)])), 0);
+  // Only two of the four are present.
+  assert.equal(graph.neighborCountIn(at(4, 4), new Set([at(3, 4), at(4, 5)])), 2);
+  // A corner has at most two neighbors; the off-grid directions are skipped.
+  assert.equal(graph.neighborCountIn(at(0, 0), new Set([at(0, 1), at(1, 0)])), 2);
+});
+
+await runTest('CellGraph.cellsAreConnected works for grid cells', () => {
+  const geometry = CellGeometry.fromGridSize(9);
+  const graph = geometry.cellGraph();
+  const at = (r, c) => geometry.cellIndex(r, c);
+
+  // A single cell is trivially connected.
+  assert.ok(graph.cellsAreConnected(new Set([at(2, 2)])));
+  // An orthogonally connected L-shape.
+  assert.ok(graph.cellsAreConnected(
+    new Set([at(0, 0), at(0, 1), at(1, 1), at(2, 1)])));
+  // Diagonal adjacency does not connect cells.
+  assert.ok(!graph.cellsAreConnected(new Set([at(0, 0), at(1, 1)])));
+  // Two separate cells are disconnected.
+  assert.ok(!graph.cellsAreConnected(new Set([at(0, 0), at(4, 4)])));
+});
+
 logSuiteComplete('CellGraph');
 
 // ============================================================================
@@ -641,6 +699,37 @@ await runTest('cellGraph: cellPosition tracks row, col, and origin within var-ce
   assert.equal(graph.cellPosition(aCells[3])[2], aCells[0]);
   assert.equal(graph.cellPosition(bCells[2])[2], bCells[0]);
   assert.notEqual(graph.cellPosition(aCells[3])[2], graph.cellPosition(bCells[2])[2]);
+});
+
+await runTest('cellGraph: wrappingTraverse stays within a var-cell group', () => {
+  // 7 cells in 3 columns => rows [0,1,2], [3,4,5], [6].
+  const geometry = makeShapeWithGroups(9, [
+    { prefix: 'T', label: 'test', count: 7, columns: 3 },
+  ]);
+  const graph = geometry.cellGraph();
+  const cells = geometry.varCellsForGroup('T');
+
+  // Row wrap.
+  assert.equal(graph.wrappingTraverse(cells[2], 0, 1), cells[0]);
+  assert.equal(graph.wrappingTraverse(cells[0], 0, -1), cells[2]);
+  // Column wrap, including a partial last row.
+  assert.equal(graph.wrappingTraverse(cells[4], 1, 0), cells[1]);
+  assert.equal(graph.wrappingTraverse(cells[0], -1, 0), cells[6]);
+  // A cell alone in its row wraps to itself.
+  assert.equal(graph.wrappingTraverse(cells[6], 0, 1), cells[6]);
+  // traverse (no wrap) stops at the group boundary.
+  assert.equal(graph.traverse(cells[4], 1, 0), null);
+});
+
+await runTest('cellGraph: wrappingTraverse in a single-cell group returns itself', () => {
+  const geometry = makeShapeWithGroups(9, [
+    { prefix: 'S', label: 'solo', count: 1 },
+  ]);
+  const graph = geometry.cellGraph();
+  const [cell] = geometry.varCellsForGroup('S');
+
+  assert.equal(graph.wrappingTraverse(cell, 0, 1), cell);
+  assert.equal(graph.wrappingTraverse(cell, 1, 0), cell);
 });
 
 await runTest('cellGraph: no edges between different groups', () => {
