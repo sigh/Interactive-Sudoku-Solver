@@ -1,0 +1,351 @@
+// End-to-end puzzle manifest: which puzzles run in each solve group, plus the
+// test-only puzzle definitions. Bare strings are looked up in PUZZLE_INDEX
+// (data/collections.js, data/example_puzzles.js); objects are used as-is.
+// The runner lives in e2e.test.js.
+
+// Side-effect import: populates PUZZLE_INDEX so the bare-string names below resolve.
+await import('../../data/collections.js' + self.VERSION_PARAM);
+
+const {
+  VALID_JIGSAW_LAYOUTS,
+  EASY_INVALID_JIGSAW_LAYOUTS,
+  FAST_INVALID_JIGSAW_LAYOUTS,
+} = await import('../../data/jigsaw_layouts.js' + self.VERSION_PARAM);
+const { VALID_JIGSAW_BOX_LAYOUTS } = await import('../../data/jigsaw_box_layouts.js' + self.VERSION_PARAM);
+
+// Classic 9x9 plus `numVars` var cells, so grid + var cells exceeds the old 256
+// limit. Var cells are excluded from the (grid-only) solution string but must be
+// uniquely determined, so each is pinned to a value.
+export const classicWithVarCells = (numVars) => {
+  // Classic 9x9 (Wikipedia), used as a base for >256-cell tests below.
+  const CLASSIC_9X9 =
+    '.~R1C1_5~R1C2_3~R1C5_7~R2C1_6~R2C4_1~R2C5_9~R2C6_5~R3C2_9~R3C3_8~R3C8_6~R4C1_8~R4C5_6~R4C9_3~R5C1_4~R5C4_8~R5C6_3~R5C9_1~R6C1_7~R6C5_2~R6C9_6~R7C2_6~R7C7_2~R7C8_8~R8C4_4~R8C5_1~R8C6_9~R8C9_5~R9C5_8~R9C8_7~R9C9_9';
+  return `.Var~X~~${numVars}` + CLASSIC_9X9 +
+    Array.from({ length: numVars }, (_, i) => `~VX${i + 1}_1`).join('');
+}
+
+const puzzles9x9 = [
+  'Thermosudoku',
+  'Classic sudoku',
+  'Classic sudoku, hard',
+  'Anti-knights move',
+  'Killer sudoku',
+  'Killer sudoku [overlap]',
+  'Killer sudoku [gaps]',
+  'Killer sudoku [0 cage]',
+  'Killer sudoku [alldiff]',
+  'Sudoku X',
+  'Anti-knight Anti-king',
+  'Anti-knight Anti-consecutive',
+  'Arrow sudoku',
+  'Double arrow',
+  'Pill arrow',
+  'I Bet Someone Did This Already',  // 3-digit pill arrow, strict XV
+  'CTC Tribute',  // arrow + killer cages
+  'Kropki sudoku',
+  'Little killer',
+  'Little killer [Sum clue]',
+  'Little killer 2',
+  'Sandwich sudoku',
+  'German whispers',
+  'International whispers',
+  'Renban',
+  'Between lines',
+  'Lockout lines',
+  'Palindromes',
+  'Modular lines',
+  'Entropic connections',  // Entropic Line, Pair
+  'Jigsaw',
+  'Jigsaw boxes, disconnected',
+  'Windoku',
+  'X-Windoku',
+  'Region sum lines',
+  'XV-sudoku',
+  'XV-kropki',
+  'Strict kropki',
+  'Strict XV',
+  'Hailstone - little killer [easier]',
+  'X-Sum little killer',
+  'Skyscraper',
+  'Skyscraper - all 6',
+  'Global entropy',  // Global entropy
+  'Global mod 3',  // Global mod
+  'Odd even',
+  'Quadruple X',
+  'Quadruple - repeated values',
+  'Odd-even thermo',  // Pair
+  'Nabner thermo - easy',  // PairX
+  'Knight-arrows',  // Binary (backward compatibility)
+  'Zipper lines - tutorial',  // Zipper both odd and even length.
+  'Ten Lines 01: Adding to Ten',  // sum lines
+  'Sum lines, with loop',
+  'Sum lines - long loop',
+  'Long sums 3',
+  'Indexing',
+  '2D 1-5-9',
+  'Full rank',
+  'Event Horizon [simplified]',
+  'Lunchbox',  // Lunchbox
+  'Killer lunchboxes [resolved]', // Lunchbox with 0
+  'Hidden skyscrapers',
+  'Unbidden First Hidden', // And constraint
+  'Look-and-say',
+  'Counting circles',
+  'Bubble Tornado',
+  'Anti-taxicab',
+  'Dutch Flatmates',  // Dutch Flatmates
+  'Fortress sudoku',  // GreaterThan
+  'Equality cages',  // EqualityCage
+  'Regex line',  // Regex
+  'Sequence sudoku', // NFA (simple transitions only)
+  'NFA: Equal sum parition', // NFA (with state bifurcation)
+  {
+    name: 'Hit, Reveal, Solve',
+    src: 'https://www.youtube.com/watch?v=vspwP6DlQik',
+    input: '.NFA~VkEk_5RZhpx6CKX_Aggggggghf6EEEEEEEEH_YYYYYYYYYn7iCCCCCCCC_eKKKKKKKKN74wwwwwwww_fjjjjjjjjkb-QQQQQQQQSAH_lFFFFFFFFJ_-WWWWWWWWWp_5hhhhhhhhiv_mmmmmmmmmrf-cccccccccv_5555555557H_oIIIIIIIIM_-iiiiiiiii1_6SSSSSSSSTb_gpppppppp_-moooooooo5_6iqqqqqqqrv_qrLLLLLLLPf-suuuuuuuu__67DDDDDDDEH_sMsssssssw_-y00000001F_7Tbbbbbbbcb_uBOOOOOOOf666666667J_7zjzzzzzz0v_vuvvvvvvvzf_A9BBBBBBBP_8L8MMMMMMNH_xQRRRRRRRU__HDHHHHHHHU_8kgckkkkkn9yyyyyyyy1_3NNNNNNNNZ_888k888889v_0US0UUUUUXf_TTNTTTTTTf_9VU9VVVVVWD_111iV1111_vZZZZZZZZj-9tttttttuX73XXXXXXXZ__fffXfffffo_-GGFmGGGGD_4444i4444_fllllllllr9-eeeeeeee336aaaaaaabv_rrrrqNrrr7-22222223Hv777777778v_xxxxxwPxx3_PPPPPPPPT_9ddddddEdAA~_HPA~R1C1~-~R2C1~-~R3C1~-~R4C1~-~R5C1~-~R6C1~-~R7C1~-~R8C1~-~R9C1~~R1C5~-~R2C5~-~R3C5~-~R4C5~-~R5C5~-~R6C5~-~R7C5~-~R8C5~-~R9C5~~R1C9~-~R2C9~-~R3C9~-~R4C9~-~R5C9~-~R6C9~-~R7C9~-~R8C9~-~R9C9~~R2C4~-~R2C5~-~R2C6~-~R2C7~-~R2C8~-~R2C9~~R2C6~-~R2C5~-~R2C4~-~R2C3~-~R2C2~-~R2C1~~R3C7~-~R2C7~R3C8~-~R1C7~R3C9~~R4C6~-~R3C6~R4C7~R5C6~R4C5~-~R2C6~R4C8~R6C6~R4C4~-~R1C6~R4C9~R7C6~R4C3~-~R8C6~R4C2~-~R9C6~R4C1~~R5C7~-~R4C7~R5C8~-~R3C7~R5C9~-~R2C7~-~R1C7~~R6C2~-~R6C3~-~R6C4~-~R6C5~-~R6C6~-~R6C7~-~R6C8~-~R6C9~~R6C9~-~R6C8~-~R6C7~-~R6C6~-~R6C5~-~R6C4~-~R6C3~-~R6C2~-~R6C1~~R7C5~-~R7C4~-~R7C3~-~R7C2~-~R7C1~~R7C6~-~R7C5~-~R7C4~-~R7C3~-~R7C2~-~R7C1.~R7C7_8~R3C4_5~R1C3_1~R1C8_6~R9C4_7~R8C2_3',
+    solution: '751392468283614795964578312326857149478961523195243687542139876837426951619785234',
+  }, // NFA (with segments)
+  'Full rank - 6 clue snipe',
+  'Septa',  // region sum line on irregular 7x7 jigsaw
+  'Embedded Squishdoku',
+  'Force non-unit coeff', // Sum with non-unit coeff
+  'Event horizon', // Duplicate cell in sum, BinaryPairwise optimization.
+  'Copycat [easy]',  // Same value - 2 sets, repeated values
+  'Clone sudoku', // Same value - single cell sets
+  'Slingshot sudoku', // ValueIndexing
+  'Numbered Rooms vs X-Sums', // Or constraint
+  'Count Different (Circles)',  // CountDistinct
+  {  // Or constraint (update watched cells)
+    name: 'Or with Givens',
+    input: '.~R1C1_5~R1C2_3~R2C1_6~R2C6_5~R3C2_9~R3C3_8~R3C8_6~R7C2_6~R8C6_9~R8C9_5~R9C8_7~R9C5_8~R8C4_4~R7C7_2~R7C8_8~R5C9_1~R4C9_3~R4C5_6~R6C5_2~R5C4_8~R5C1_4~R4C1_8.Or.~R6C1_7.~R6C1_1.End',
+    solution: '534678912672195348198342567859761423426853791713924856961537284287419635345286179',
+  },
+  {  // And constraint (with cellExclusions)
+    // Note: And needs to be inside an Or to not be elided.
+    name: 'And with AllDifferent',
+    input: '.~R1C1_5~R1C2_3~R2C1_6~R2C6_5~R3C2_9~R3C3_8~R7C2_6~R8C6_9~R8C9_5~R9C8_7~R9C5_8~R8C4_4~R7C7_2~R7C8_8~R5C9_1~R4C9_3~R4C5_6~R6C5_2~R5C4_8~R5C1_4~R4C1_8~R6C1_7~R1C5_9~R5C8_9~R7C4_5~R3C1_1~R1C4_2.Or.~R1C1_1.And.~R1C1_5.AllDifferent~R3C8~R4C7.End.End',
+    solution: '534298617672315948198746532859167423426853791713924856967531284281479365345682179',
+  },
+  {  // Or constraint (with cellExclusions)
+    // Note: Or needs multiple constraints to not be elided.
+    name: 'Or with AllDifferent',
+    input: '.Or.~R1C1_1.AllDifferent~R3C8~R4C7.End.~R1C1_5~R1C2_3~R2C1_6~R2C6_5~R3C2_9~R3C3_8~R7C2_6~R8C6_9~R8C9_5~R9C8_7~R9C5_8~R8C4_4~R7C7_2~R7C8_8~R5C9_1~R4C9_3~R4C5_6~R6C5_2~R5C4_8~R5C1_4~R4C1_8~R6C1_7~R1C5_9~R5C8_9~R7C4_5~R3C1_1~R1C4_2',
+    solution: '534298617672315948198746532859167423426853791713924856967531284281479365345682179',
+  },
+  {  // And and Or constraint which are both simplified out
+    name: 'Elided And and Or',
+    input: '.Or.And.AllDifferent~R3C8~R4C7.End.End.~R1C1_5~R1C2_3~R2C1_6~R2C6_5~R3C2_9~R3C3_8~R7C2_6~R8C6_9~R8C9_5~R9C8_7~R9C5_8~R8C4_4~R7C7_2~R7C8_8~R5C9_1~R4C9_3~R4C5_6~R6C5_2~R5C4_8~R5C1_4~R4C1_8~R6C1_7~R1C5_9~R5C8_9~R7C4_5~R3C1_1~R1C4_2',
+    solution: '534298617672315948198746532859167423426853791713924856967531284281479365345682179',
+  },
+  {
+    // Randomly added constraints until unique.
+    name: 'Contain At Least',  // ContainAtLeast
+    input: '.ContainAtLeast~1_1_2_3~R3C4~R3C5~R3C6~R4C6~R5C6~R6C6.ContainAtLeast~1_1_2_3~R7C4~R7C3~R7C2~R6C2~R5C2.ContainAtLeast~1_1_2_3~R5C7~R5C8~R4C9~R3C9~R2C9.ContainAtLeast~1_1_2_3~R8C7~R9C7~R9C6~R9C5.ContainAtLeast~4_4_6_9_5~R2C4~R2C3~R2C2~R2C1~R3C1.ContainAtLeast~4_4_6_9_5~R4C5~R5C5~R6C5~R7C5~R7C6~R7C7~R6C7.ContainAtLeast~2_3_8_7~R5C9~R6C9~R6C8~R7C8~R8C8~R9C8.ContainAtLeast~9_5_4~R7C9~R8C9~R9C9.ContainAtLeast~4_5~R5C3~R6C3.ContainAtLeast~2_3_7_8~R7C1~R8C1~R8C2~R8C3~R8C4.ContainAtLeast~6_8~R1C9~R1C8~R2C8~R3C8.ContainAtLeast~6_2~R4C8~R4C7~R3C7~R2C7.ContainAtLeast~9_3~R1C1~R1C2~R1C3~R1C4.ContainAtLeast~7_9~R9C1~R9C2~R9C3.ContainAtLeast~3_7~R4C2~R3C2~R3C3~R4C3',
+    solution: '132985746596437281487126953873541692925673418614298537251364879368759124749812365',
+  },
+  {
+    name: 'Stepped Thermos - nested replicate', // Using nested Replicate
+    src: 'https://sudokupad.app/g21db32fo4',
+    input: '.Replicate~JBAAIJAAAJB.Replicate~BIAB.NFA~UgMP_CIZCmOhP_CGKlKUpX_CJclKUpX_isbJqUpX_VJhG0UpX_UqbSuqpX_UpVHGfZX_UpSqvPC__UpSlWghP_UpSlKulP_UpSlKUpX_itclKUpX_VJjJqUpX_UqbW0UpX_UpVHOqpX_UpSqvfZX_UpSlWhC__jGKlKUpX_VKUlKUpX_Uqc5qUpX_UpVKUUpX_UpSq1qpX_UpSlWtZX_UpSlKve4~_~R1C1~R1C2~R1C3.End.Replicate~H.NFA~UgMP_CIZCmOhP_CGKlKUpX_CJclKUpX_isbJqUpX_VJhG0UpX_UqbSuqpX_UpVHGfZX_UpSqvPC__UpSlWghP_UpSlKulP_UpSlKUpX_itclKUpX_VJjJqUpX_UqbW0UpX_UpVHOqpX_UpSqvfZX_UpSlWhC__jGKlKUpX_VKUlKUpX_Uqc5qUpX_UpVKUUpX_UpSq1qpX_UpSlWtZX_UpSlKve4~_~R1C1~R2C1~R3C1.End.End.~R8C1_7~R9C3_9.Thermo~R6C4~R7C4~R7C3~R8C3~R8C2~R9C2.Thermo~R6C6~R6C7~R7C7~R7C8~R8C8~R8C9.Thermo~R4C6~R3C6~R3C7~R2C7~R2C8~R1C8.Thermo~R4C4~R4C3~R3C3~R3C2~R2C2~R2C1',
+    solution: '541627893982531674376984521625493718137865942498172356813259467754316289269748135',
+  },
+  {
+    // Regex over a subset of digits ([1-5]*), so the compiled NFA uses
+    // fewer symbols than numValues.
+    name: 'Classic sudoku with subset regex',  // Regex
+    input: '.~R1C5_7~R2C4_1~R2C5_9~R2C6_5~R3C8_6~R4C5_6~R5C4_8~R5C9_1~R6C5_2~R7C7_2~R7C8_8~R8C6_9~R8C9_5~R9C8_7~R8C4_4~R7C2_6~R5C1_4~R4C1_8~R3C3_8~R1C1_5~R1C2_3.Regex~WzEtNV0q~R7C3~R7C4~R7C5~R6C5~R5C6~R4C6~R3C6~R2C6',
+    solution: '534678912672195348198342567859761423426853791713924856961537284287419635345286179',
+  },
+];
+
+const puzzles16x16 = [
+  '16x16',
+  '16x16: Sudoku X',
+  '16x16: Sudoku X, hard',
+  '16x16: Jigsaw',
+];
+
+const puzzlesOtherSizes = [
+  '6x6',
+  '6x6: Numbered rooms',
+  '6x6: Between Odd and Even',
+  '6x6: Little Killer',
+  '4x4: Counting circles',
+  '6x6: Rellik cages',  // Rellik cages
+  /* 6x6 */ 'Successor Arrows',  // Regex
+  '6x6: Full rank',  // Full rank (requires enforcing no ties)
+  '4x4: Full Rank - no ties',
+  '4x4: Full Rank - with ties',
+  '4x4: Full Rank - unclued ties',
+  '4x4: Full Rank - tied clues',
+];
+
+const puzzlesNonSquareGrids = [
+  '6x8: Plain',
+  '5x10: Killer Sudoku',  // Killer cages (tests sum optimizer on non-square grids)
+  '6x9: Postcard',  // Indexing, Anti-knight, Whisper
+  '4x7: Jigsaw',  // Jigsaw
+  '4x6: Skyscraper',  // Skyscraper
+  '9x8: Plain boxless',  // Boxless rectangular grid
+  /* 5x5 */ 'The Whirlpool',  // non-standard numValues, Arrows and Thermo
+  '7x7: Killer Squishdoku',  // non-standard numValues
+  /* 6x6 */ 'Con-Set-Cutive',  // non-standard numValues, RegionSize, region-sized boxes
+  /* 7x7 */ 'Buy Or Rent? (Skyscraper Version)',  // non-standard numValues, Skyscraper
+  /* 7x7 */ 'Buy Or Rent? (Numbered Rooms Version)',  // non-standard numValues, Numbered Rooms
+  /* 6x6 */ 'Hidden Hostility', // non-standard numValues, Diagonal, region-sized boxes
+  /* 6x6 */ 'Order From Chaos', // non-standard numValues, Global Entropy, NFA, region-sized boxes
+  '6x6: Irregular Quadro Quadri', // non-standard numValues, Jigsaw
+  '7x7: Dutch Flat Mate Squishdoku', // non-standard numValues, Dutch Flatmates
+  '7x7: Buggy NR Squishdoku',  // non-standard numValues, Numbered Rooms
+  '6x6: 9-value disjoint sets',  // non-standard numValues, DisjointSets
+];
+
+const puzzles0Indexed = [
+  '0-indexed: Classic sudoku',
+  '0-indexed: Sudoku X',
+  '0-indexed: Anti-knight Anti-king',
+  '0-indexed: Jigsaw',
+  '0-indexed: Windoku',
+  '0-indexed: Odd even',  // Pencilmark
+  '0-indexed: 6x6',
+  '0-indexed: 4x4 Full Rank',
+  '0-indexed: 6x8 Plain',
+  '0-indexed: 4x7 Jigsaw',
+  '0-indexed: 9x8 Plain boxless',
+  '0-indexed: 6x6 9-value disjoint sets',
+  '0-indexed: Thermo SameValues',  // Thermo, SameValues
+  '0-indexed: Whisper GreaterThan',  // Whisper, GreaterThan
+  '0-indexed: 0-sensitive pairwise', // Pair with 0-sensitive fn
+  '0-indexed: 0-8 Killer',  // Cage
+  '0-indexed: Killer sudoku, with 0 cage, hard',  // Cage (with 0-sum cages)
+  'Zeroed In',  // RegionSumLine
+  'A Very Full Quiver', // Arrow
+  "Let's Build a Snowman [0-indexed]",  // Arrow, BlackDot, WhiteDot, Thermo, Whisper
+  '± Information',  // V, StrictXV, Diagonal
+  '0-indexed: Hidden skyscrapers',  // HiddenSkyscraper
+  '0-indexed: Quadruple X',  // Quad, Diagonal
+  '0-indexed: Look-and-say',  // ContainExact
+  '0-indexed: Equality cages',  // EqualityCage
+  '0-indexed: Skyscraper',  // Skyscraper
+  'Hippo Birdie',  // CountingCircles
+  '0-indexed: Sequence sudoku',  // NFA
+  'Regex Line [0-indexed]',  // Regex
+  '0-indexed: Sums and indexing',  // SumLine, XSum, Rellik, Lunchbox, Sandwich, Indexing, ValueIndexing, NumberedRoom
+  {
+    name: 'Jigsaw with extended range',  // Jigsaw with extended value range (0-10) but restricted grid. Tests optimizer.
+    input: '.Shape~9x9~0-10.NoBoxes.Jigsaw~AAAAAAABCDEFFAFABCDEFFFFBBCDEFFBBBBCDEEEGGCBCDDEGGGCCCDDEEGGGGHDIIIIHHHHIIIIIHHHH.~R9C9_1_2_3_4_5_6_7_8_9~R7C9_1_2_3_4_5_6_7_8_9~R5C9_1_2_3_4_5_6_7_8_9~R4C9_1_2_3_4_5_6_7_8_9~R3C9_1_2_3_4_5_6_7_8_9~R1C8_1_2_3_4_5_6_7_8_9~R2C8_1_2_3_4_5_6_7_8_9~R3C8_1_2_3_4_5_6_7_8_9~R4C8_1_2_3_4_5_6_7_8_9~R5C8_1_2_3_4_5_6_7_8_9~R6C8_1_2_3_4_5_6_7_8_9~R7C8_1_2_3_4_5_6_7_8_9~R8C8_1_2_3_4_5_6_7_8_9~R9C7_1_2_3_4_5_6_7_8_9~R8C7_1_2_3_4_5_6_7_8_9~R7C7_1_2_3_4_5_6_7_8_9~R6C7_1_2_3_4_5_6_7_8_9~R5C7_1_2_3_4_5_6_7_8_9~R4C7_1_2_3_4_5_6_7_8_9~R3C7_1_2_3_4_5_6_7_8_9~R2C7_1_2_3_4_5_6_7_8_9~R1C7_1_2_3_4_5_6_7_8_9~R1C6_1_2_3_4_5_6_7_8_9~R2C6_1_2_3_4_5_6_7_8_9~R5C6_1_2_3_4_5_6_7_8_9~R6C6_1_2_3_4_5_6_7_8_9~R9C6_1_2_3_4_5_6_7_8_9~R9C5_1_2_3_4_5_6_7_8_9~R7C5_1_2_3_4_5_6_7_8_9~R6C5_1_2_3_4_5_6_7_8_9~R5C5_1_2_3_4_5_6_7_8_9~R2C5_1_2_3_4_5_6_7_8_9~R1C5_1_2_3_4_5_6_7_8_9~R1C4_1_2_3_4_5_6_7_8_9~R2C4_1_2_3_4_5_6_7_8_9~R3C4_1_2_3_4_5_6_7_8_9~R4C4_1_2_3_4_5_6_7_8_9~R6C4_1_2_3_4_5_6_7_8_9~R7C4_1_2_3_4_5_6_7_8_9~R9C4_1_2_3_4_5_6_7_8_9~R9C3_1_2_3_4_5_6_7_8_9~R8C3_1_2_3_4_5_6_7_8_9~R7C3_1_2_3_4_5_6_7_8_9~R6C3_1_2_3_4_5_6_7_8_9~R5C3_1_2_3_4_5_6_7_8_9~R3C3_1_2_3_4_5_6_7_8_9~R2C3_1_2_3_4_5_6_7_8_9~R1C2_1_2_3_4_5_6_7_8_9~R1C3_1_2_3_4_5_6_7_8_9~R2C2_1_2_3_4_5_6_7_8_9~R3C2_1_2_3_4_5_6_7_8_9~R4C2_1_2_3_4_5_6_7_8_9~R5C2_1_2_3_4_5_6_7_8_9~R6C2_1_2_3_4_5_6_7_8_9~R7C2_1_2_3_4_5_6_7_8_9~R8C2_1_2_3_4_5_6_7_8_9~R9C2_1_2_3_4_5_6_7_8_9~R9C1_1_2_3_4_5_6_7_8_9~R8C1_1_2_3_4_5_6_7_8_9~R6C1_1_2_3_4_5_6_7_8_9~R5C1_1_2_3_4_5_6_7_8_9~R4C1_1_2_3_4_5_6_7_8_9~R3C1_1_2_3_4_5_6_7_8_9~R1C1_3~R2C1_1~R1C9_7~R2C9_5~R3C5_6~R3C6_8~R4C5_1~R4C6_9~R4C3_5~R5C4_9~R8C4_2~R8C5_3~R7C6_3~R8C6_5~R7C1_8~R9C8_9~R8C9_1~R6C9_2',
+    solution: '364891527189374265542168739625719843213987456937456182876523914498235671751642398',
+  },
+  {
+    name: 'Killer sudoku with extended range',  // Killer sudoku with extended value range (0-10) but restricted grid.
+    input: '.Shape~9x9~0-10.Cage~3~R1C1~R1C2.Cage~15~R1C3~R1C4~R1C5.Cage~25~R2C1~R2C2~R3C1~R3C2.Cage~17~R2C3~R2C4.Cage~9~R3C3~R3C4~R4C4.Cage~22~R1C6~R2C5~R2C6~R3C5.Cage~4~R1C7~R2C7.Cage~16~R1C8~R2C8.Cage~15~R1C9~R2C9~R3C9~R4C9.Cage~20~R3C7~R3C8~R4C7.Cage~8~R3C6~R4C6~R5C6.Cage~17~R4C5~R5C5~R6C5.Cage~20~R5C4~R6C4~R7C4.Cage~14~R4C2~R4C3.Cage~6~R4C1~R5C1.Cage~13~R5C2~R5C3~R6C2.Cage~6~R6C3~R7C2~R7C3.Cage~17~R4C8~R5C7~R5C8.Cage~27~R6C1~R7C1~R8C1~R9C1.Cage~8~R8C2~R9C2.Cage~16~R8C3~R9C3.Cage~10~R7C5~R8C4~R8C5~R9C4.Cage~12~R5C9~R6C9.Cage~6~R6C7~R6C8.Cage~20~R6C6~R7C6~R7C7.Cage~15~R8C6~R8C7.Cage~14~R7C8~R7C9~R8C8~R8C9.Cage~13~R9C5~R9C6~R9C7.Cage~17~R9C8~R9C9.~R9C9_1_2_3_4_5_6_7_8_9~R7C9_1_2_3_4_5_6_7_8_9~R5C9_1_2_3_4_5_6_7_8_9~R4C9_1_2_3_4_5_6_7_8_9~R3C9_1_2_3_4_5_6_7_8_9~R1C8_1_2_3_4_5_6_7_8_9~R2C8_1_2_3_4_5_6_7_8_9~R3C8_1_2_3_4_5_6_7_8_9~R4C8_1_2_3_4_5_6_7_8_9~R5C8_1_2_3_4_5_6_7_8_9~R6C8_1_2_3_4_5_6_7_8_9~R7C8_1_2_3_4_5_6_7_8_9~R9C7_1_2_3_4_5_6_7_8_9~R8C7_1_2_3_4_5_6_7_8_9~R7C7_1_2_3_4_5_6_7_8_9~R6C7_1_2_3_4_5_6_7_8_9~R5C7_1_2_3_4_5_6_7_8_9~R4C7_1_2_3_4_5_6_7_8_9~R3C7_1_2_3_4_5_6_7_8_9~R2C7_1_2_3_4_5_6_7_8_9~R1C7_1_2_3_4_5_6_7_8_9~R1C6_1_2_3_4_5_6_7_8_9~R2C6_1_2_3_4_5_6_7_8_9~R5C6_1_2_3_4_5_6_7_8_9~R6C6_1_2_3_4_5_6_7_8_9~R9C6_1_2_3_4_5_6_7_8_9~R9C5_1_2_3_4_5_6_7_8_9~R7C5_1_2_3_4_5_6_7_8_9~R6C5_1_2_3_4_5_6_7_8_9~R5C5_1_2_3_4_5_6_7_8_9~R2C5_1_2_3_4_5_6_7_8_9~R1C5_1_2_3_4_5_6_7_8_9~R1C4_1_2_3_4_5_6_7_8_9~R2C4_1_2_3_4_5_6_7_8_9~R3C4_1_2_3_4_5_6_7_8_9~R4C4_1_2_3_4_5_6_7_8_9~R6C4_1_2_3_4_5_6_7_8_9~R7C4_1_2_3_4_5_6_7_8_9~R9C4_1_2_3_4_5_6_7_8_9~R9C3_1_2_3_4_5_6_7_8_9~R8C3_1_2_3_4_5_6_7_8_9~R7C3_1_2_3_4_5_6_7_8_9~R6C3_1_2_3_4_5_6_7_8_9~R5C3_1_2_3_4_5_6_7_8_9~R3C3_1_2_3_4_5_6_7_8_9~R2C3_1_2_3_4_5_6_7_8_9~R1C2_1_2_3_4_5_6_7_8_9~R1C3_1_2_3_4_5_6_7_8_9~R2C2_1_2_3_4_5_6_7_8_9~R3C2_1_2_3_4_5_6_7_8_9~R4C2_1_2_3_4_5_6_7_8_9~R5C2_1_2_3_4_5_6_7_8_9~R6C2_1_2_3_4_5_6_7_8_9~R7C2_1_2_3_4_5_6_7_8_9~R8C2_1_2_3_4_5_6_7_8_9~R9C2_1_2_3_4_5_6_7_8_9~R9C1_1_2_3_4_5_6_7_8_9~R8C1_1_2_3_4_5_6_7_8_9~R6C1_1_2_3_4_5_6_7_8_9~R5C1_1_2_3_4_5_6_7_8_9~R4C1_1_2_3_4_5_6_7_8_9~R3C1_1_2_3_4_5_6_7_8_9~R3C6_1_2_3_4_5_6_7_8_9~R3C5_1_2_3_4_5_6_7_8_9~R4C5_1_2_3_4_5_6_7_8_9~R4C6_1_2_3_4_5_6_7_8_9~R4C3_1_2_3_4_5_6_7_8_9~R5C4_1_2_3_4_5_6_7_8_9~R7C6_1_2_3_4_5_6_7_8_9~R8C5_1_2_3_4_5_6_7_8_9~R8C6_1_2_3_4_5_6_7_8_9~R8C4_1_2_3_4_5_6_7_8_9~R9C8_1_2_3_4_5_6_7_8_9~R8C8_1_2_3_4_5_6_7_8_9~R8C9_1_2_3_4_5_6_7_8_9~R6C9_1_2_3_4_5_6_7_8_9~R2C9_1_2_3_4_5_6_7_8_9~R1C9_1_2_3_4_5_6_7_8_9~R1C1_1_2_3_4_5_6_7_8_9~R2C1_1_2_3_4_5_6_7_8_9~R7C1_1_2_3_4_5_6_7_8_9',
+    solution: '215647398368952174794381652586274931142593867973816425821739546659428713437165289',
+  },
+  {
+    name: 'Killer sudoku (hard) with extended range',  // Killer sudoku with extended value range (0-10) but restricted grid.
+    input: '.Shape~9x9~0-10.Cage~28~R1C1~R1C2~R2C2~R2C3~R2C4.Cage~19~R1C3~R1C4~R1C5~R2C5~R2C6.Cage~24~R1C6~R1C7~R1C8~R2C7.Cage~20~R1C9~R2C8~R2C9~R3C8~R4C8.Cage~19~R2C1~R3C1~R3C2~R4C1.Cage~23~R3C3~R3C4~R3C5~R3C6~R4C3.Cage~19~R3C7~R4C5~R4C6~R4C7~R5C7.Cage~26~R3C9~R4C9~R5C8~R5C9~R6C8.Cage~28~R4C2~R5C1~R5C2~R6C1~R7C1.Cage~24~R4C4~R5C4~R5C5~R5C6~R6C6.Cage~32~R5C3~R6C3~R6C4~R6C5~R7C3.Cage~24~R6C2~R7C2~R8C1~R8C2~R9C1.Cage~29~R6C7~R7C4~R7C5~R7C6~R7C7.Cage~19~R6C9~R7C8~R7C9~R8C9.Cage~22~R8C3~R9C2~R9C3~R9C4.Cage~21~R8C4~R8C5~R9C5~R9C6~R9C7.Cage~28~R8C6~R8C7~R8C8~R9C8~R9C9.~R1C9_1_2_3_4_5_6_7_8_9~R2C9_1_2_3_4_5_6_7_8_9~R3C9_1_2_3_4_5_6_7_8_9~R4C9_1_2_3_4_5_6_7_8_9~R5C9_1_2_3_4_5_6_7_8_9~R6C9_1_2_3_4_5_6_7_8_9~R7C9_1_2_3_4_5_6_7_8_9~R8C9_1_2_3_4_5_6_7_8_9~R9C9_1_2_3_4_5_6_7_8_9~R9C8_1_2_3_4_5_6_7_8_9~R7C8_1_2_3_4_5_6_7_8_9~R6C8_1_2_3_4_5_6_7_8_9~R5C8_1_2_3_4_5_6_7_8_9~R4C8_1_2_3_4_5_6_7_8_9~R3C8_1_2_3_4_5_6_7_8_9~R2C8_1_2_3_4_5_6_7_8_9~R1C8_1_2_3_4_5_6_7_8_9~R8C8_1_2_3_4_5_6_7_8_9~R8C7_1_2_3_4_5_6_7_8_9~R9C7_1_2_3_4_5_6_7_8_9~R6C7_1_2_3_4_5_6_7_8_9~R4C7_1_2_3_4_5_6_7_8_9~R3C7_1_2_3_4_5_6_7_8_9~R2C7_1_2_3_4_5_6_7_8_9~R1C7_1_2_3_4_5_6_7_8_9~R5C7_1_2_3_4_5_6_7_8_9~R7C7_1_2_3_4_5_6_7_8_9~R8C6_1_2_3_4_5_6_7_8_9~R9C6_1_2_3_4_5_6_7_8_9~R7C6_1_2_3_4_5_6_7_8_9~R6C6_1_2_3_4_5_6_7_8_9~R5C6_1_2_3_4_5_6_7_8_9~R4C6_1_2_3_4_5_6_7_8_9~R3C6_1_2_3_4_5_6_7_8_9~R2C6_1_2_3_4_5_6_7_8_9~R1C6_1_2_3_4_5_6_7_8_9~R1C5_1_2_3_4_5_6_7_8_9~R2C5_1_2_3_4_5_6_7_8_9~R3C5_1_2_3_4_5_6_7_8_9~R4C5_1_2_3_4_5_6_7_8_9~R5C5_1_2_3_4_5_6_7_8_9~R6C5_1_2_3_4_5_6_7_8_9~R7C5_1_2_3_4_5_6_7_8_9~R8C5_1_2_3_4_5_6_7_8_9~R9C5_1_2_3_4_5_6_7_8_9~R9C4_1_2_3_4_5_6_7_8_9~R8C4_1_2_3_4_5_6_7_8_9~R7C4_1_2_3_4_5_6_7_8_9~R6C4_1_2_3_4_5_6_7_8_9~R5C4_1_2_3_4_5_6_7_8_9~R4C4_1_2_3_4_5_6_7_8_9~R3C4_1_2_3_4_5_6_7_8_9~R1C4_1_2_3_4_5_6_7_8_9~R2C4_1_2_3_4_5_6_7_8_9~R1C3_1_2_3_4_5_6_7_8_9~R2C3_1_2_3_4_5_6_7_8_9~R3C3_1_2_3_4_5_6_7_8_9~R4C3_1_2_3_4_5_6_7_8_9~R5C2_1_2_3_4_5_6_7_8_9~R6C2_1_2_3_4_5_6_7_8_9~R7C2_1_2_3_4_5_6_7_8_9~R8C3_1_2_3_4_5_6_7_8_9~R7C3_1_2_3_4_5_6_7_8_9~R6C3_1_2_3_4_5_6_7_8_9~R5C3_1_2_3_4_5_6_7_8_9~R9C3_1_2_3_4_5_6_7_8_9~R9C2_1_2_3_4_5_6_7_8_9~R8C2_1_2_3_4_5_6_7_8_9~R8C1_1_2_3_4_5_6_7_8_9~R9C1_1_2_3_4_5_6_7_8_9~R7C1_1_2_3_4_5_6_7_8_9~R6C1_1_2_3_4_5_6_7_8_9~R5C1_1_2_3_4_5_6_7_8_9~R4C1_1_2_3_4_5_6_7_8_9~R4C2_1_2_3_4_5_6_7_8_9~R3C2_1_2_3_4_5_6_7_8_9~R2C2_1_2_3_4_5_6_7_8_9~R1C2_1_2_3_4_5_6_7_8_9~R1C1_1_2_3_4_5_6_7_8_9~R2C1_1_2_3_4_5_6_7_8_9~R3C1_1_2_3_4_5_6_7_8_9',
+    solution: '283197546967542813415368729591726384876439152324851967149275638752683491638914275',
+  },
+];
+
+const puzzlesExtraVariables = [
+  'Doppelganger',  // Doppelganger
+  'Dutch-pelgänger [easier]',  // Doppelganger, Whisper on state cells
+  'Bates Motel',  // Var, ValueIndexing, 6x6
+  'The good, the bad and the ugly',  // Var, NFA, SameValues, Arrow, NFA (for sandwich, xsum, skyscraper)
+  'Letter Little Killer',  // Var, Sum (with coeffs)
+  'Hailstorm',  // 6x6, Var, Sum (with coeffs), NFA (comparing sums), Replicate, PerfectAllDifferent optimization
+  {  // Var cells inside Or composite
+    name: 'Or with extra cells',
+    input: '.Var~X~X.Or.And.~R1C1_1~VX_1~R4C4_1.End.And.~R1C1_2~VX_2~R4C4_2.End.End.~R2C5_1~R5C3_3~R7C7_4~R8C2_5~R3C2_6~R1C8_7~R9C9_8~R6C6_9~R5C9_1~R9C3_2~R7C1_3~R6C4_4~R3C6_5~R2C7_6~R7C9_7~R8C5_8~R1C3_9~R5C1_5~R6C8_6~R3C4_8~R9C1_7~R3C7_9',
+    solution: '139642875825917634467835912674153289593268741218479563386521497951784326742396158',
+  },
+  {
+    name: 'Extra var with Quad',  // Var, Quad
+    input: '.Var~X~X~27.BlackDot~VX1~VX2~VX3~VX10.Quad~VX13~1~2~3~4.AntiKnight.AntiConsecutive.Thermo~VX22~VX13~VX4~R9C4~R8C4~R7C4.Thermo~VX19~VX10~VX1~R9C1~R8C1.Thermo~VX22~VX23~VX24~VX25~VX26~VX27~VX18~VX17.Thermo~VX16~VX15~VX14~VX5~VX6~VX7~VX8~VX9.Thermo~VX12~VX21~VX20~VX11~VX2.~VX12_4~VX16_2~R5C3_1~R2C2_2~R6C7_5~R4C6_6',
+    solution: '384629157629157384157384629573846291291573846846291573462915738915738462738462915',
+  },
+  {
+    name: 'House of cards - with extra givens',  // EqualSum, NFA, Pair, Var
+    src: 'https://www.youtube.com/watch?v=PRavHFxxZ7Y',
+    input: '.Shape~6x6.Var~S~Skyscraper~24.NFA~UUJn50JUtgIQxCHGMZ5CEI-UpSl_MYxjG_CIZCmfa58InynSo9r4DzoHf7RDIU37nDIU373vIU38IQgU38YxjEz8nPhF-c3wi_SlIRfrWtYn2nSp970qfjGKj5vgfWsB70A~_Skyscraper~VS1~R1C1~R1C2~R1C3~R1C4~R1C5~R1C6~~VS2~R2C1~R2C2~R2C3~R2C4~R2C5~R2C6~~VS3~R3C1~R3C2~R3C3~R3C4~R3C5~R3C6~~VS4~R4C1~R4C2~R4C3~R4C4~R4C5~R4C6~~VS5~R5C1~R5C2~R5C3~R5C4~R5C5~R5C6~~VS6~R6C1~R6C2~R6C3~R6C4~R6C5~R6C6~~VS7~R1C1~R2C1~R3C1~R4C1~R5C1~R6C1~~VS8~R1C2~R2C2~R3C2~R4C2~R5C2~R6C2~~VS9~R1C3~R2C3~R3C3~R4C3~R5C3~R6C3~~VS10~R1C4~R2C4~R3C4~R4C4~R5C4~R6C4~~VS11~R1C5~R2C5~R3C5~R4C5~R5C5~R6C5~~VS12~R1C6~R2C6~R3C6~R4C6~R5C6~R6C6~~VS13~R1C6~R1C5~R1C4~R1C3~R1C2~R1C1~~VS14~R2C6~R2C5~R2C4~R2C3~R2C2~R2C1~~VS15~R3C6~R3C5~R3C4~R3C3~R3C2~R3C1~~VS16~R4C6~R4C5~R4C4~R4C3~R4C2~R4C1~~VS17~R5C6~R5C5~R5C4~R5C3~R5C2~R5C1~~VS18~R6C6~R6C5~R6C4~R6C3~R6C2~R6C1~~VS19~R6C1~R5C1~R4C1~R3C1~R2C1~R1C1~~VS20~R6C2~R5C2~R4C2~R3C2~R2C2~R1C2~~VS21~R6C3~R5C3~R4C3~R3C3~R2C3~R1C3~~VS22~R6C4~R5C4~R4C4~R3C4~R2C4~R1C4~~VS23~R6C5~R5C5~R4C5~R3C5~R2C5~R1C5~~VS24~R6C6~R5C6~R4C6~R3C6~R2C6~R1C6.Pair~961rXv~_non-consecutive~R3C1~R3C2.EqualSum~R1C3~R1C2~R2C2~-~R2C3~R2C4~R2C5~-~R2C6~R3C6~R4C6~-~R4C2~R4C3~R5C3~R5C2~-~VS1~VS2~VS3~VS4~VS5~VS6~-~VS7~VS8~VS9~VS10~VS11~VS12~-~VS13~VS14~VS15~VS16~VS17~VS18~-~VS19~VS20~VS21~VS22~VS23~VS24.~R1C1_3~R3C2_4~R6C3_5~R4C4_2~R6C4_6~R1C5_1',
+    solution: '326514154362642135531246263451415623',
+  },
+  'Cavernous Construction: 6x6',  // ChaosConstruction, multi-arm ChaosArrow
+  'Chaos Construction: 6x6',  // ChaosConstruction, NFA
+  {  // ChaosConstruction with numValues > regionSize, cells restricted back to {1..6}
+    name: 'Chaos Construction: 6x6 with extra numValues',
+    input: '.Shape~6x6~7.ChaosConstruction.NoBoxes.ChaosArrow~R1C2~~CC2~CC3~CC4~CC5~CC6.ChaosArrow~R2C2~~CC8~CC9~CC10~CC11~CC12.ChaosArrow~R3C1~~CC13~CC14~CC15~CC16~CC17~CC18.ChaosArrow~R6C1~~CC31~CC32~CC33~CC34~CC35~CC36.ChaosArrow~R3C2~~CC14~CC20~CC26~CC32.ChaosArrow~R4C2~~CC20~CC19.ChaosArrow~R5C3~~CC27~CC21~CC15~CC9~CC3.ChaosArrow~R6C3~~CC33~CC32~CC31.ChaosArrow~R1C4~~CC4~CC10~CC16~CC22~CC28~CC34.ChaosArrow~R5C4~~CC28~CC22~CC16~CC10~CC4.ChaosArrow~R6C4~~CC34~CC33~CC32~CC31.ChaosArrow~R2C5~~CC11~CC10~CC9~CC8~CC7.ChaosArrow~R4C5~~CC23~CC17~CC11~CC5.ChaosArrow~R6C5~~CC35~CC34~CC33~CC32~CC31.ChaosArrow~R2C6~~CC12~CC6.ChaosArrow~R2C6~~CC12~CC11~CC10~CC9~CC8~CC7.ChaosArrow~R4C6~~CC24~CC18~CC12~CC6.ChaosArrow~R5C6~~CC30~CC29~CC28~CC27~CC26~CC25.~R3C2_1~R4C3_6~R1C1_1_2_3_4_5_6~R1C2_1_2_3_4_5_6~R1C3_1_2_3_4_5_6~R1C4_1_2_3_4_5_6~R1C5_1_2_3_4_5_6~R1C6_1_2_3_4_5_6~R2C1_1_2_3_4_5_6~R2C2_1_2_3_4_5_6~R2C3_1_2_3_4_5_6~R2C4_1_2_3_4_5_6~R2C5_1_2_3_4_5_6~R2C6_1_2_3_4_5_6~R3C1_1_2_3_4_5_6~R3C3_1_2_3_4_5_6~R3C4_1_2_3_4_5_6~R3C5_1_2_3_4_5_6~R3C6_1_2_3_4_5_6~R4C1_1_2_3_4_5_6~R4C2_1_2_3_4_5_6~R4C4_1_2_3_4_5_6~R4C5_1_2_3_4_5_6~R4C6_1_2_3_4_5_6~R5C1_1_2_3_4_5_6~R5C2_1_2_3_4_5_6~R5C3_1_2_3_4_5_6~R5C4_1_2_3_4_5_6~R5C5_1_2_3_4_5_6~R5C6_1_2_3_4_5_6~R6C1_1_2_3_4_5_6~R6C2_1_2_3_4_5_6~R6C3_1_2_3_4_5_6~R6C4_1_2_3_4_5_6~R6C5_1_2_3_4_5_6~R6C6_1_2_3_4_5_6',
+    solution: '345126634512213654526431451263162345',
+  },
+  'Chaos Construction: cell count', // ChaosConstruction, ChaosCount
+  {
+    name: 'Chaos Construction: cell count - expanded',
+    src: 'https://www.gmpuzzles.com/blog/2025/06/chaos-construction-sudoku-cell-count-by-clover/',
+    input: '.Shape~6x6.ChaosConstruction.NoBoxes.~R1C2_6~R1C4_4~R1C6_3~R2C1_3~R6C1_4~R6C3_2~R6C5_6~R5C6_5.ChaosCount~R1C2~~CC2~CC1~CC7~CC8~CC9~CC3.ChaosCount~R1C4~~CC4~CC3~CC9~CC10~CC11~CC5.ChaosCount~R1C6~~CC6~CC5~CC11~CC12.ChaosCount~R2C6~~CC12~CC6~CC5~CC11~CC17~CC18.ChaosCount~R5C1~~CC25~CC19~CC20~CC26~CC32~CC31.ChaosCount~R6C1~~CC31~CC25~CC26~CC32.ChaosCount~R6C3~~CC33~CC32~CC26~CC27~CC28~CC34.ChaosCount~R6C5~~CC35~CC34~CC28~CC29~CC30~CC36',
+    solution: '265413314652543126126534631245452361',
+  },
+  {
+    name: 'Chaos Construction: Uncovering tunnels - easy',
+    src: 'https://sudokupad.app/y323plq5im', // With extra gives to make it faster
+    input: '.ChaosConstruction.NoBoxes.ChaosArrow~R6C1~1~CC46~CC37~CC28~CC19~CC10~CC1.ChaosArrow~R3C2~1~CC20~CC29~CC38~CC47~CC56~CC65~CC74.ChaosArrow~R3C3~1~CC21~CC30~CC39~CC48~CC57~CC66~CC75.ChaosArrow~R1C3~1~CC3~CC4~CC5~CC6~CC7~CC8~CC9.ChaosArrow~R1C4~1~CC4~CC12~CC20~CC28.ChaosArrow~R3C5~1~CC23~CC14~CC5.ChaosArrow~R3C5~1~CC23~CC15~CC7.ChaosArrow~R2C8~1~CC17~CC16~CC15~CC14~CC13~CC12~CC11~CC10.ChaosArrow~R4C7~1~CC34~CC33~CC32~CC31~CC30~CC29~CC28.ChaosArrow~R5C4~1~CC40~CC49~CC58~CC67~CC76.ChaosArrow~R7C5~1~CC59~CC68~CC77.ChaosArrow~R7C5~1~CC59~CC67~CC75.ChaosArrow~R8C7~1~CC70~CC71~CC72.ChaosArrow~R7C9~1~CC63~CC54~CC45~CC36~CC27~CC18~CC9.ChaosArrow~R6C6~1~CC51~CC52~CC53~CC54.NFA~UgIn_GQpjoSpdVCEIQqoQhC_4wjCMIwj_7CMIwjCM_5WlaVpWl_7jOM4zjO_53ned53n_8EQRBEEQ_6YpimKYp_8lSVJUlS_65rmua5r_4mCYJgmC_7RtG0bRt_5HEcRxHE_7yvK8ryv_5oGgaBoG_8TxPE8Tx_6JIkiSJI_80zTNM0z~_ParityCount~R6C1~R5C1~R4C1~R3C1~R2C1~R1C1~~R3C2~R4C2~R5C2~R6C2~R7C2~R8C2~R9C2~~R3C3~R4C3~R5C3~R6C3~R7C3~R8C3~R9C3~~R1C3~R1C4~R1C5~R1C6~R1C7~R1C8~R1C9~~R1C4~R2C3~R3C2~R4C1~~R3C5~R2C5~R1C5~~R3C5~R2C6~R1C7~~R2C8~R2C7~R2C6~R2C5~R2C4~R2C3~R2C2~R2C1~~R4C7~R4C6~R4C5~R4C4~R4C3~R4C2~R4C1~~R5C4~R6C4~R7C4~R8C4~R9C4~~R7C5~R8C5~R9C5~~R7C5~R8C4~R9C3~~R8C7~R8C8~R8C9~~R7C9~R6C9~R5C9~R4C9~R3C9~R2C9~R1C9~~R6C6~R6C7~R6C8~R6C9.Whisper~4~R6C1~R6C2.Whisper~4~R2C7~R3C7.Whisper~4~R3C6~R4C6.Whisper~4~R4C7~R5C6.Whisper~4~R4C9~R5C8.Whisper~4~R6C5~R7C6.Whisper~4~R7C7~R7C8.Whisper~4~R7C3~R8C3.AllDifferent~CC46~CC47.AllDifferent~CC16~CC25.AllDifferent~CC24~CC33.AllDifferent~CC34~CC42.AllDifferent~CC36~CC44.AllDifferent~CC50~CC60.AllDifferent~CC61~CC62.AllDifferent~CC57~CC66.~R2C3_9~R7C7_9~R6C2_9~R3C4_9~R5C6_9~R9C5_9~R8C9_9~R4C1_9~R9C2_1~R7C3_1~R1C6_6~R5C7_6~R4C3_2~R1C1_5~R9C7_5~R6C4_5~R3C8_8~R2C7_7~R7C1_3',
+    solution: '524176398159864732643915287932781465785249613496532871371628954268357149817493526',
+  },
+  {
+    name: 'Chaos Construction: Calm Construction - with extra givens', // ChaosConstruction, with boxes
+    src: 'https://www.youtube.com/watch?v=iOD6yayIVCo',
+    input: '.ChaosConstruction.~R6C5_9~R1C7_1~R8C2_9~R8C8_7~R4C6_2~R1C2_2~R9C9_6~R5C2_4~R1C9_3~R8C5_1~R7C3_2~R2C5_2~R8C1_8~R7C6_7~R5C7_9~R4C9_4~R1C5_7~R6C1_3~R9C4_9~R3C7_2~R3C3_5~R6C3_7~R9C6_5~R9C3_3~R2C8_4~R6C8_6~R3C1_6~R4C8_8.ChaosCount~R1C1~0~CC1~CC2~CC3~CC12~CC11~CC10~CC19~CC20~CC21.ChaosCount~R1C2~0~CC2~CC1~CC10~CC19~CC20~CC11~CC3~CC12~CC21.ChaosCount~R2C2~0~CC11~CC1~CC2~CC3~CC12~CC21~CC20~CC19~CC10.ChaosCount~R2C4~0~CC13~CC4~CC5~CC6~CC15~CC14~CC22~CC23~CC24.ChaosCount~R2C5~0~CC14~CC4~CC5~CC6~CC15~CC24~CC23~CC22~CC13.ChaosCount~R2C6~0~CC15~CC6~CC5~CC13~CC14~CC4~CC22~CC23~CC24.ChaosCount~R1C7~0~CC7~CC8~CC9~CC18~CC17~CC16~CC25~CC27~CC26.ChaosCount~R1C8~0~CC8~CC7~CC16~CC25~CC26~CC17~CC9~CC18~CC27.ChaosCount~R1C9~0~CC9~CC8~CC7~CC16~CC17~CC18~CC27~CC26~CC25.ChaosCount~R4C2~0~CC29~CC30~CC39~CC38~CC37~CC28~CC46~CC47~CC48.ChaosCount~R5C2~0~CC38~CC30~CC29~CC28~CC37~CC46~CC47~CC48~CC39.ChaosCount~R4C5~0~CC32~CC33~CC42~CC51~CC50~CC41~CC31~CC40~CC49.ChaosCount~R4C6~0~CC33~CC42~CC51~CC50~CC41~CC32~CC31~CC40~CC49.ChaosCount~R4C9~0~CC36~CC35~CC34~CC43~CC44~CC45~CC54~CC53~CC52.ChaosCount~R9C9~0~CC81~CC80~CC79~CC70~CC61~CC62~CC71~CC72~CC63.ChaosCount~R8C1~0~CC64~CC55~CC56~CC57~CC66~CC65~CC75~CC74~CC73',
+    solution: '428679153739521648615483297951362784246758931387194562562837419894216375173945826',
+  },
+  {
+    // 81 grid + 919 var = 1000 cells: the MAX_SEARCH_CELLS limit.
+    name: 'Classic 9x9 + var cells (1000 total, at the limit)',
+    input: classicWithVarCells(919),
+    solution: '534678912672195348198342567859761423426853791713924856961537284287419635345286179',
+  },
+  {
+    // 15x15 Doppelganger: 225 grid + 46 doppelganger cells = 271 (> 256 cells),
+    // Arbitrary grid with givens to make it unique.
+    name: 'Doppelganger 15x15',
+    input: '.Shape~15x15~0-15.Doppelganger.~R1C1_1~R1C4_9~R1C5_12~R1C6_2~R1C7_8~R1Ca_14~R1Cb_6~R1Cd_15~R2C1_4~R2C5_8~R2C9_12~R2Ca_7~R2Ce_10~R3C1_6~R3C3_2~R3C6_11~R3C7_1~R4C1_8~R4C2_12~R4C5_3~R4C6_15~R4C7_0~R4C9_7~R4Ca_9~R4Cb_5~R4Ce_4~R4Cf_2~R5C1_14~R5C5_6~R5C6_4~R5C9_2~R5Ca_1~R5Cb_12~R5Cd_8~R6C2_2~R6C3_1~R6C4_5~R6C7_3~R6C8_6~R6C9_13~R6Cc_9~R7C1_5~R7C4_13~R7C9_1~R7Cb_2~R7Cc_15~R8C3_15~R8C4_8~R8C6_13~R8C8_9~R8Ca_5~R8Cb_10~R8Cd_4~R8Ce_1~R8Cf_6~R9C2_4~R9C3_12~R9C7_2~R9Ca_15~R9Cf_3~RaC1_11~RaC2_3~RaC7_12~RaCb_1~RaCe_6~RbC3_9~RbCa_11~RbCc_14~RbCe_12~RcC2_5~RcC6_7~RcC7_6~RcCb_4~RcCf_9~RdC2_1~RdC3_5~RdC5_2~RdC6_3~RdC7_14~RdC9_0~RdCd_6~RdCe_13~RdCf_15~ReC9_11~ReCb_8~ReCc_12~RfC1_15~RfC6_8~RfC7_13~RfC8_10~RfCa_12~RfCc_1~RfCd_3~RfCe_2~RfCf_5~R2C3_3~DGR7_4~DGC13_8~DGR15_13~DGB15_7~RaC5_15~DGB6_11~RcC4_1~R2Cc_2~R1C2_7~R8C9_3~RbC7_5~RbC4_6',
+    solution: 'AG0ILBHMJNFCOEKDKCNHFIELG0BMJAFMBJEKA0OCGDLIHHLMKCO0NGIEFADBNIGOFDJKBALMHC00BAEDLCFMHOIJGNEFKMI0GDAJBONHLBNOHGMKICEJ0DAFJDL0ANBHFOMEGKCKCDGOILBN0AHEFJMHIF0JEODKCNBLGLEJANGFCHMDK0OIIAELBCNG0DKJFMOGJNCMEOAKBHLI0DO0FDKHMJILNACBE',
+  },
+  {
+    // 16x16 ChaosConstruction: 256 grid + 256 region cells = 512 (> 256),
+    // Based off '16x16: Jigsaw' but converted to chaos construction with
+    // extra givens.
+    name: 'Chaos Construction 16x16',
+    input: '.Shape~16x16.ChaosConstruction.NoBoxes.SameValues~16~CC6~CC7~CC8~CC9~CC10~CC22~CC23~CC24~CC25~CC26~CC39~CC40~CC52~CC53~CC54~CC55.SameValues~16~CC11~CC27~CC42~CC43~CC58~CC59~CC60~CC74~CC75~CC76~CC91~CC92~CC107~CC108~CC123~CC124.SameValues~16~CC19~CC35~CC51~CC67~CC68~CC69~CC70~CC71~CC72~CC84~CC85~CC86~CC87~CC88~CC101~CC103.SameValues~16~CC48~CC63~CC64~CC78~CC79~CC80~CC94~CC95~CC96~CC110~CC111~CC112~CC127~CC128~CC144~CC160.SameValues~16~CC65~CC66~CC81~CC82~CC83~CC97~CC98~CC99~CC100~CC113~CC114~CC115~CC116~CC117~CC129~CC132.SameValues~16~CC77~CC93~CC106~CC109~CC121~CC122~CC125~CC126~CC137~CC138~CC139~CC140~CC141~CC142~CC153~CC154.SameValues~16~CC130~CC131~CC133~CC134~CC145~CC146~CC147~CC148~CC149~CC161~CC162~CC163~CC164~CC165~CC166~CC177.SameValues~16~CC152~CC167~CC168~CC169~CC170~CC171~CC179~CC180~CC181~CC182~CC183~CC184~CC185~CC187~CC188~CC195.SameValues~16~CC178~CC193~CC194~CC196~CC209~CC210~CC211~CC212~CC213~CC225~CC226~CC227~CC228~CC241~CC242~CC243.SameValues~16~CC203~CC216~CC217~CC218~CC219~CC220~CC232~CC233~CC234~CC235~CC236~CC248~CC249~CC250~CC251~CC252.SameValues~16~CC204~CC205~CC206~CC207~CC221~CC222~CC223~CC224~CC237~CC238~CC239~CC240~CC253~CC254~CC255~CC256.~R1C2_12~R1C4_3~R1C7_7~R1C9_13~R1Ca_9~R1Cb_10~R1Cc_8~R1Ce_4~R1Cf_16~R1Cg_1~R2C7_3~R2Ca_15~R2Cb_12~R2Cd_13~R2Cg_2~R3C1_7~R3C6_13~R3C7_1~R3Ca_14~R3Cg_6~R4C1_10~R4C2_9~R4C3_13~R4C4_12~R4C5_14~R4C6_8~R4C8_11~R4C9_7~R4Cb_4~R4Cc_2~R4Ce_3~R4Cf_1~R4Cg_15~R5C2_15~R5C3_4~R5C5_16~R5C6_6~R5Ca_3~R5Ce_11~R5Cf_9~R6C4_5~R6C7_11~R6C8_3~R6C9_16~R6Ca_1~R6Cc_6~R6Cd_8~R6Ce_13~R6Cf_2~R7C3_7~R7C4_8~R7C5_12~R7C6_4~R7C7_2~R7C8_13~R7Cb_15~R7Cc_1~R7Cd_3~R7Ce_16~R7Cg_10~R8C1_3~R8C3_10~R8C4_16~R8C5_1~R8C7_15~R8Ca_13~R8Cc_11~R8Cd_6~R8Ce_9~R9C1_13~R9C3_3~R9C5_5~R9C6_12~R9C7_9~R9C8_6~R9C9_15~R9Cb_1~R9Cd_16~R9Ce_14~RaC4_9~RaC6_10~RaC7_8~RaC8_7~RaCa_5~RaCb_6~RaCd_2~RaCe_15~RbC1_4~RbC2_8~RbC3_2~RbC4_6~RbC6_7~RbC7_10~RbCb_14~RbCc_3~RbCe_1~RcC1_16~RcC3_1~RcC6_9~RcC9_8~RcCa_6~RcCb_2~RcCc_4~RcCg_14~RdC1_5~RdC3_6~RdC6_1~RdC8_8~RdCb_3~RdCc_14~RdCd_12~RdCe_2~RdCg_11~ReC4_14~ReC5_9~ReC7_4~ReCa_7~ReCf_3~ReCg_13~RfC2_7~RfC7_12~RfC9_2~RfCb_13~RfCd_1~RfCg_9~RgC1_1~RgC2_3~RgC3_12~RgC4_15~RgC5_2~RgC8_9~RgC9_6~RgCb_11~RgCc_5~RgCd_4~RgCe_7~RgCf_10',
+    solution: 'OLECFKGBMIJHNDPAKNHADPCEJOLIMFGBGPIBHMADCNEJOLKFJIMLNHFKGPDBECAOBODGPFNAECHMJKILLDNEJOKCPAIFHMBGIFGHLDBMNKOACPEJCEJPABOLDMGKFINHMJCKELIFOBAGPNHDNAKIMJHGLEFPBODCDHBFOGJPKLNCIAMEPKAMCIEOHFBDGJLNEMFDGAPHIJCNLBOKFBONIEDJAGPLKHCMHGPJKCLNBDMOAEFIACLOBNMIFHKEDGJP',
+  },
+  {
+    // Test >16 CountingCircles in Var cells
+    name: 'Counting Killers',  // CountingCircles, NFA, Var, Cage, Replicate
+    src: 'https://www.youtube.com/watch?v=xzXnxCeFSt4',
+    input: '.Shape~9x9~16.Var~X~X~22.Replicate~_____________H.~R1C1_1_2_3_4_5_6_7_8_9.End.Cage~~R1C8~R2C8.Cage~~R3C4~R3C3.Cage~~R4C1~R5C1.Cage~~R1C7~R1C6.Cage~~R2C2~R3C2.Cage~~R4C7~R4C6.Cage~~R5C6~R5C5.Cage~~R8C9~R8C8.Cage~~R8C2~R9C2.Cage~~R1C4~R2C4.Cage~~R1C5~R2C5.Cage~~R2C9~R3C9~R4C9.Cage~~R5C3~R6C3~R6C4.Cage~~R7C1~R7C2~R7C3.Cage~~R8C1~R9C1.Cage~~R8C3~R9C3.Cage~~R7C4~R8C4~R9C4.Cage~~R6C6~R7C6~R7C5.Cage~~R8C6~R9C6~R9C5.Cage~~R7C7~R8C7~R9C7.Cage~~R7C9~R7C8.Cage~~R9C8~R9C9.And.Arrow~VX1~R1C8~R2C8.Arrow~VX2~R3C4~R3C3.Arrow~VX3~R4C1~R5C1.Arrow~VX4~R1C7~R1C6.Arrow~VX5~R2C2~R3C2.Arrow~VX6~R4C7~R4C6.Arrow~VX7~R5C6~R5C5.Arrow~VX8~R8C9~R8C8.Arrow~VX9~R8C2~R9C2.Arrow~VX10~R1C4~R2C4.Arrow~VX11~R1C5~R2C5.Arrow~VX12~R2C9~R3C9~R4C9.Arrow~VX13~R5C3~R6C3~R6C4.Arrow~VX14~R7C1~R7C2~R7C3.Arrow~VX15~R8C1~R9C1.Arrow~VX16~R8C3~R9C3.Arrow~VX17~R7C4~R8C4~R9C4.Arrow~VX18~R6C6~R7C6~R7C5.Arrow~VX19~R8C6~R9C6~R9C5.Arrow~VX20~R7C7~R8C7~R9C7.Arrow~VX21~R7C9~R7C8.Arrow~VX22~R9C8~R9C9.End.CountingCircles~VX1~VX2~VX3~VX4~VX5~VX6~VX7~VX8~VX9~VX10~VX11~VX12~VX13~VX14~VX15~VX16~VX17~VX18~VX19~VX20~VX21~VX22.~R2C2_1~R4C4_8~R2C8_2~R9C8_4~R7C1_9~R8C4_2',
+    solution: '367982415819456723452137986273865194196724538584391672931548267648279351725613849',
+  },
+];
+
+export const solveCollections = [
+  { collection: '9x9', puzzles: puzzles9x9 },
+  { collection: '16x16', puzzles: puzzles16x16 },
+  { collection: 'Other sizes', puzzles: puzzlesOtherSizes },
+  { collection: 'Non-square grids', puzzles: puzzlesNonSquareGrids },
+  { collection: '0-indexed', puzzles: puzzles0Indexed },
+  { collection: 'Extra Variables', puzzles: puzzlesExtraVariables },
+];
+
+export const layoutCases = [
+  ...VALID_JIGSAW_LAYOUTS.slice(0, 20),
+  ...EASY_INVALID_JIGSAW_LAYOUTS,
+  ...FAST_INVALID_JIGSAW_LAYOUTS.slice(0, 20),
+  ...VALID_JIGSAW_BOX_LAYOUTS.slice(0, 10),
+  // Add non-standard grid tests.
+  { input: '.Shape~7x7', solution: true },
+  { input: '.Shape~6x6~9', solution: true },
+  { input: '.Shape~6x6~9.NoBoxes', solution: true },
+  { input: '.Shape~6x6~9.RegionSize~6', solution: true },
+  { input: '.Shape~7x6~9', solution: true },
+  { input: '.Shape~7x6~9.RegionSize~7', solution: true },
+];
