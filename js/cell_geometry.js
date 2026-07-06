@@ -204,32 +204,32 @@ export class CellGeometry {
     return [null, null];
   }
 
-  makeValueId = (cellIndex, n) => {
+  makeValueId(cellIndex, n) {
     const cellId = this.makeCellIdFromIndex(cellIndex);
     return `${cellId}_${n}`;
   }
 
-  makeCellId = (row, col) => {
+  makeCellId(row, col) {
     const base = VALUE_BASE;
     return `R${(row + 1).toString(base)}C${(col + 1).toString(base)}`;
   }
 
-  makeCellIdFromIndex = (cellIndex) => {
+  makeCellIdFromIndex(cellIndex) {
     const namedId = this._varCellRegistry.getCellId(cellIndex);
     if (namedId) return namedId;
     if (cellIndex >= this.numGridCells) return `$${cellIndex - this.numGridCells}`;
     return this.makeCellId(...this.splitCellIndex(cellIndex));
   }
 
-  cellIndex = (row, col) => {
+  cellIndex(row, col) {
     return row * this.numCols + col;
   }
 
-  splitCellIndex = (cellIndex) => {
+  splitCellIndex(cellIndex) {
     return [cellIndex / this.numCols | 0, cellIndex % this.numCols | 0];
   }
 
-  parseValueId = (valueId) => {
+  parseValueId(valueId) {
     let [cellId, ...valueStrs] = valueId.split('_');
     const minValue = this.minValue();
     const maxValue = this.maxValue();
@@ -244,7 +244,7 @@ export class CellGeometry {
     return { values, cellId };
   }
 
-  parseCellId = (cellId) => {
+  parseCellId(cellId) {
     if (cellId.length === 4 &&
       (cellId[0] === 'R' || cellId[0] === 'r') &&
       (cellId[2] === 'C' || cellId[2] === 'c')) {
