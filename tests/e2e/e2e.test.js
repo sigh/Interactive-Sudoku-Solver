@@ -8,6 +8,7 @@ ensureGlobalEnvironment();
 const { SimpleSolver } = await import('../../js/sandbox/simple_solver.js' + self.VERSION_PARAM);
 const { SolverStats } = await import('../../js/sandbox/solver_stats.js' + self.VERSION_PARAM);
 const { resolvePuzzleConfig } = await import('../../data/example_puzzles.js' + self.VERSION_PARAM);
+const { SudokuParser } = await import('../../js/sudoku_parser.js' + self.VERSION_PARAM);
 await import('../../data/collections.js' + self.VERSION_PARAM);
 const {
   VALID_JIGSAW_LAYOUTS,
@@ -46,8 +47,8 @@ const solveCollections = [
       'Arrow sudoku',
       'Double arrow',
       'Pill arrow',
-      '3-digit pill arrow',
-      'Arrow killer sudoku',
+      'I Bet Someone Did This Already',  // 3-digit pill arrow, strict XV
+      'CTC Tribute',  // arrow + killer cages
       'Kropki sudoku',
       'Little killer',
       'Little killer [Sum clue]',
@@ -83,7 +84,7 @@ const solveCollections = [
       'Nabner thermo - easy',  // PairX
       'Knight-arrows',  // Binary (backward compatibility)
       'Zipper lines - tutorial',  // Zipper both odd and even length.
-      'Sum lines',
+      'Ten Lines 01: Adding to Ten',  // sum lines
       'Sum lines, with loop',
       'Sum lines - long loop',
       'Long sums 3',
@@ -112,7 +113,7 @@ const solveCollections = [
         solution: '751392468283614795964578312326857149478961523195243687542139876837426951619785234',
       }, // NFA (with segments)
       'Full rank - 6 clue snipe',
-      'Irregular region sum line',
+      'Septa',  // region sum line on irregular 7x7 jigsaw
       'Embedded Squishdoku',
       'Force non-unit coeff', // Sum with non-unit coeff
       'Event horizon', // Duplicate cell in sum, BinaryPairwise optimization.
@@ -120,7 +121,7 @@ const solveCollections = [
       'Clone sudoku', // Same value - single cell sets
       'Slingshot sudoku', // ValueIndexing
       'Numbered Rooms vs X-Sums', // Or constraint
-      'Count Different',  // CountDistinct
+      'Count Different (Circles)',  // CountDistinct
       {  // Or constraint (update watched cells)
         name: 'Or with Givens',
         input: '.~R1C1_5~R1C2_3~R2C1_6~R2C6_5~R3C2_9~R3C3_8~R3C8_6~R7C2_6~R8C6_9~R8C9_5~R9C8_7~R9C5_8~R8C4_4~R7C7_2~R7C8_8~R5C9_1~R4C9_3~R4C5_6~R6C5_2~R5C4_8~R5C1_4~R4C1_8.Or.~R6C1_7.~R6C1_1.End',
@@ -367,19 +368,29 @@ const loadInput = async (puzzle) => {
   return puzzle.input;
 };
 
+// Extra context appended to failure messages to aid debugging: the entry's
+// comment and its constraint types (declared, else derived from the input).
+const puzzleDebugInfo = (puzzle) => {
+  const types = puzzle.constraintTypes ?? SudokuParser.extractConstraintTypes(puzzle.input);
+  const parts = [];
+  if (puzzle.comment) parts.push(`comment: ${puzzle.comment}`);
+  if (types?.length) parts.push(`constraints: ${types.join(', ')}`);
+  return parts.length ? ` (${parts.join('; ')})` : '';
+};
+
 const assertPuzzleSolution = (puzzle, solution, solutionCount) => {
   if (puzzle.solution === undefined) return;
   if (!puzzle.solution) {
-    if (solution) throw new Error(`Puzzle ${puzzle.name} failed: ${solution}`);
+    if (solution) throw new Error(`Puzzle ${puzzle.name} failed: ${solution}${puzzleDebugInfo(puzzle)}`);
   } else if (puzzle.solution === true) {
-    if (!solution) throw new Error(`Puzzle ${puzzle.name} failed: ${solution}`);
+    if (!solution) throw new Error(`Puzzle ${puzzle.name} failed: ${solution}${puzzleDebugInfo(puzzle)}`);
   } else {
     if (solution !== puzzle.solution) {
-      throw new Error(`Puzzle ${puzzle.name} failed: ${solution}`);
+      throw new Error(`Puzzle ${puzzle.name} failed: ${solution}${puzzleDebugInfo(puzzle)}`);
     }
     if (solutionCount !== undefined && solutionCount !== 1) {
       throw new Error(
-        `Puzzle ${puzzle.name} failed: solution is not unique (found ${solutionCount})`);
+        `Puzzle ${puzzle.name} failed: solution is not unique (found ${solutionCount})${puzzleDebugInfo(puzzle)}`);
     }
   }
 };
