@@ -327,7 +327,7 @@ export class TrueCandidates {
 // Convert cell reference to cell index.
 const cellIndex = (geometry, cellIdOrRow, col) => {
   if (typeof cellIdOrRow === 'string') {
-    return geometry.parseCellId(cellIdOrRow).cell;
+    return geometry.parseCellId(cellIdOrRow).cellIndex;
   }
   // Convert 1-indexed row/col to 0-indexed
   return geometry.cellIndex(cellIdOrRow - 1, col - 1);

@@ -378,7 +378,7 @@ export class SolutionController {
       const target = clickInterceptor.cellAt(e.offsetX, e.offsetY);
       if (target === null) return;
 
-      const cellIndex = this._geometry.parseCellId(target).cell;
+      const cellIndex = this._geometry.parseCellId(target).cellIndex;
       this._solverRunner.handleAltClick(cellIndex);
       e.preventDefault();
     });

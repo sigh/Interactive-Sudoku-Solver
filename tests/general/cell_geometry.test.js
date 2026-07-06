@@ -264,7 +264,7 @@ await runTest('parseCellId is inverse of makeCellId', () => {
       const parsed = geometry.parseCellId(cellId);
       assert.equal(parsed.row, r);
       assert.equal(parsed.col, c);
-      assert.equal(parsed.cell, geometry.cellIndex(r, c));
+      assert.equal(parsed.cellIndex, geometry.cellIndex(r, c));
     }
   }
 });
@@ -283,8 +283,8 @@ await runTest('parseCellId rejects trailing characters (F-01)', () => {
 await runTest('parseCellId still accepts well-formed 16x16 coordinates', () => {
   const geometry = CellGeometry.fromGridSize(16);
   // Base-17: 'g' == 16, so RgCg is the bottom-right cell of a 16x16 grid.
-  assert.deepEqual(geometry.parseCellId('RgCg'), { cell: 255, row: 15, col: 15 });
-  assert.deepEqual(geometry.parseCellId('rGcG'), { cell: 255, row: 15, col: 15 });
+  assert.deepEqual(geometry.parseCellId('RgCg'), { cellIndex: 255, row: 15, col: 15 });
+  assert.deepEqual(geometry.parseCellId('rGcG'), { cellIndex: 255, row: 15, col: 15 });
 });
 
 await runTest('parseValueId rejects NaN, out-of-range, and trailing garbage (F-02)', () => {

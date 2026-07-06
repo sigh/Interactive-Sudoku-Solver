@@ -327,9 +327,9 @@ export class SudokuParser {
 
     let fixedValues = [];
     for (let i = 0; i < numParts; i++) {
-      const cell = parts[i][0];
-      if (cell === '.') continue;
-      fixedValues.push(geometry.makeValueId(i, cell));
+      const value = parts[i][0];
+      if (value === '.') continue;
+      fixedValues.push(geometry.makeValueId(i, value));
     }
 
     return AstNode.makeRoot(

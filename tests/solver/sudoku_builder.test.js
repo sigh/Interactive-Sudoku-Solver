@@ -657,7 +657,7 @@ await runTest('Replicate works with var cells in the same subgraph', () => {
   ]);
   const setupGeometry = setupRoot.getGeometry();
   setupGeometry.addVarCellsForConstraints([new SudokuConstraint.Var('X', 'X', 2)]);
-  const vx2Idx = setupGeometry.parseCellId('VX2').cell;
+  const vx2Idx = setupGeometry.parseCellId('VX2').cellIndex;
   const bitset = SudokuConstraint.Replicate.encodeTargetCells(
     ['VX2'], 'VX1', setupGeometry);
   const constraint = new SudokuConstraint.Container([

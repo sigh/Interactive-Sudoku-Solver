@@ -138,16 +138,16 @@ class SandboxCellGraph {
     this._graph = geometry.cellGraph();
   }
 
-  _index(cell) {
-    return this._geometry.parseCellId(cell).cell;
+  _index(cellId) {
+    return this._geometry.parseCellId(cellId).cellIndex;
   }
-  _cell(index) {
-    return index == null ? null : this._geometry.makeCellIdFromIndex(index);
+  _cell(cellIndex) {
+    return cellIndex == null ? null : this._geometry.makeCellIdFromIndex(cellIndex);
   }
 
   // CellLocator: id <-> index over this graph's own cells.
-  parseCellId(cell) { return { cell: this._index(cell) }; }
-  makeCellIdFromIndex(index) { return this._cell(index); }
+  parseCellId(cellId) { return { cellIndex: this._index(cellId) }; }
+  makeCellIdFromIndex(cellIndex) { return this._cell(cellIndex); }
 
   // The underlying grid CellGeometry
   gridGeometry() { return this._geometry; }
@@ -208,11 +208,11 @@ class SandboxCellGraph {
     const cells = [];
     let rowStart = this._index(topLeft);
     for (let r = 0; r < numRows; r++) {
-      let cell = rowStart;
+      let cellIndex = rowStart;
       for (let c = 0; c < numCols; c++) {
-        if (cell == null) return null;
-        cells.push(this._cell(cell));
-        cell = this._graph.traverse(cell, 0, 1);    // step right
+        if (cellIndex == null) return null;
+        cells.push(this._cell(cellIndex));
+        cellIndex = this._graph.traverse(cellIndex, 0, 1);    // step right
       }
       rowStart = this._graph.traverse(rowStart, 1, 0);   // step down
     }
@@ -261,13 +261,13 @@ class SandboxOverlay extends SandboxCellGraph {
 
   // Translate ids for the inherited graph methods, which run over the overlay's
   // own cells indexed by position.
-  _index(cell) {
-    const pos = this._varPos.get(cell);
-    if (pos === undefined) throw new Error(`Cell not in overlay: ${cell}`);
+  _index(cellId) {
+    const pos = this._varPos.get(cellId);
+    if (pos === undefined) throw new Error(`Cell not in overlay: ${cellId}`);
     return pos;
   }
-  _cell(index) {
-    return index == null ? null : this._cells[index];
+  _cell(cellIndex) {
+    return cellIndex == null ? null : this._cells[cellIndex];
   }
 
   // The overlay's cells (the var cells), in grid order.

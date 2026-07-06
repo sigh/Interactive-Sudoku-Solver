@@ -77,7 +77,7 @@ class BaseConstraintDisplayItem extends DisplayItem {
   makeIcon(constraint, options) {
     const cells = constraint.getCells(this._geometry);
     if (!cells.length) return null;
-    const cellIds = cells.map(c => this._geometry.parseCellId(c).cell);
+    const cellIds = cells.map(c => this._geometry.parseCellId(c).cellIndex);
 
     const g = createSvgElement('g');
 
@@ -264,7 +264,7 @@ class Jigsaw extends BaseConstraintDisplayItem {
   drawItem(constraint, _) {
     const region = constraint.cells;
     const geometry = this._geometry;
-    const cellSet = new Set(region.map(c => geometry.parseCellId(c).cell));
+    const cellSet = new Set(region.map(c => geometry.parseCellId(c).cellIndex));
     const graph = geometry.cellGraph();
 
     const g = this._makeRegionBorder(cellSet, geometry, /* cornerCut= */ false);
@@ -304,7 +304,7 @@ class Jigsaw extends BaseConstraintDisplayItem {
     const missingCells = new Set();
     for (let i = 0; i < this._geometry.numGridCells; i++) missingCells.add(i);
     this._regionElems.forEach(
-      cs => cs.forEach(c => missingCells.delete(this._geometry.parseCellId(c).cell)));
+      cs => cs.forEach(c => missingCells.delete(this._geometry.parseCellId(c).cellIndex)));
 
     // Shade in the missing cells.
     for (const cell of missingCells) {
@@ -325,7 +325,7 @@ class Indexing extends BaseConstraintDisplayItem {
 
     for (const cellId of cells) {
       const path = this._makeCellSquare(
-        this._geometry.parseCellId(cellId).cell);
+        this._geometry.parseCellId(cellId).cellIndex);
       path.setAttribute('fill', fill);
       path.setAttribute('opacity', '0.2');
 
@@ -401,7 +401,7 @@ export class Chaos extends BaseConstraintDisplayItem {
     if (!regionCells) return g;
 
     const controlCellId = constraint.cells[0];
-    const controlCellIndex = geometry.parseCellId(controlCellId).cell;
+    const controlCellIndex = geometry.parseCellId(controlCellId).cellIndex;
 
     g.append(this._makeCircle(this.cellIdCenter(controlCellId)));
 
@@ -434,13 +434,13 @@ export class Chaos extends BaseConstraintDisplayItem {
     for (const arm of arms) {
       const group = [controlCell];
       for (const cellId of arm) {
-        group.push(geometry.makeCellIdFromIndex(geometry.parseCellId(cellId).cell - regionCellOffset));
+        group.push(geometry.makeCellIdFromIndex(geometry.parseCellId(cellId).cellIndex - regionCellOffset));
       }
       const item = this._makeArrowLine(group, regionCellOffset);
       if (item) g.append(item);
     }
 
-    const controlCellIndex = geometry.parseCellId(controlCell).cell;
+    const controlCellIndex = geometry.parseCellId(controlCell).cellIndex;
     if (includeRegionCells
       && controlCellIndex < geometry.numGridCells
       && regionCells.length === geometry.numGridCells) {
@@ -454,14 +454,14 @@ export class Chaos extends BaseConstraintDisplayItem {
 
   _makeArrowLine(cells, regionCellOffset, startMarkerDashed = false) {
     const points = [];
-    let lastCell = null;
+    let lastCellIndex = null;
     for (const cellId of cells) {
-      const cell = this._geometry.parseCellId(cellId).cell;
-      const point = this.cellIndexCenter(cell);
+      const cellIndex = this._geometry.parseCellId(cellId).cellIndex;
+      const point = this.cellIndexCenter(cellIndex);
       if (points.length === 1 && point[0] === points[0][0] && point[1] === points[0][1]) continue;
 
       points.push(point);
-      lastCell = cell < this._geometry.numGridCells ? cell : cell - regionCellOffset;
+      lastCellIndex = cellIndex < this._geometry.numGridCells ? cellIndex : cellIndex - regionCellOffset;
     }
     if (points.length < 2) return null;
 
@@ -474,7 +474,7 @@ export class Chaos extends BaseConstraintDisplayItem {
       width: LineOptions.THIN_LINE_WIDTH,
     };
     const direction = this._straightArmDirection(points);
-    if (!direction || !this._reachesGridEdge(lastCell, direction)) {
+    if (!direction || !this._reachesGridEdge(lastCellIndex, direction)) {
       return this._makeConstraintLineFromPoints(points, { ...lineOptions, dashed: true });
     }
 
@@ -490,7 +490,7 @@ export class Chaos extends BaseConstraintDisplayItem {
     if (constraint.cells.length < 2) return;
     const geometry = this._geometry;
     const color = this.constructor.COLOR;
-    const cellSet = new Set(constraint.cells.slice(1).map(c => geometry.parseCellId(c).cell));
+    const cellSet = new Set(constraint.cells.slice(1).map(c => geometry.parseCellId(c).cellIndex));
     const border = this._makeRegionBorder(cellSet, geometry, /* cornerCut= */ true, /* inset= */ 3);
     border.setAttribute('stroke', color);
     border.setAttribute('stroke-width', '5');
@@ -785,7 +785,7 @@ class ShadedRegion extends BaseConstraintDisplayItem {
 
     const region = createSvgElement('g');
 
-    const cellIndexes = cells.map(c => this._geometry.parseCellId(c).cell);
+    const cellIndexes = cells.map(c => this._geometry.parseCellId(c).cellIndex);
     const color = colorOverride || this._chooseCellColor(cellIndexes);
 
     let patternId = null;
@@ -1148,7 +1148,7 @@ class BorderedRegion extends BaseConstraintDisplayItem {
     const cellOpacity = fillOpacity === undefined
       ? undefined : Math.min(1, fillOpacity / groupOpacity);
     for (const group of groups) {
-      const cellSet = new Set(group.map(c => geometry.parseCellId(c).cell));
+      const cellSet = new Set(group.map(c => geometry.parseCellId(c).cellIndex));
 
       if (cellOpacity !== undefined) {
         for (const cell of cellSet) {
@@ -1321,7 +1321,7 @@ class OutsideClue extends BaseConstraintDisplayItem {
 
     this._outsideArrowMap.set(
       arrowId,
-      { svg: arrowSvg, cells: parsedCells.map(p => p.cell) });
+      { svg: arrowSvg, cells: parsedCells.map(p => p.cellIndex) });
     arrowSvg.onclick = () => this._handleClick(arrowId, cells);
     arrowSvg.classList.add(arrowType);
   };
@@ -1400,7 +1400,7 @@ class Givens extends BaseConstraintDisplayItem {
   drawItem(constraint) {
     const values = constraint.values;
     const item = this._cellDisplay.makeGridValue(
-      this._geometry.parseCellId(constraint.cell).cell,
+      this._geometry.parseCellId(constraint.cell).cellIndex,
       values.length === 1 ? values[0] : values);
     this._svg.append(item);
 

@@ -214,19 +214,19 @@ export class CellGeometry {
     return `R${(row + 1).toString(base)}C${(col + 1).toString(base)}`;
   }
 
-  makeCellIdFromIndex = (i) => {
-    const namedId = this._varCellRegistry.getCellId(i);
+  makeCellIdFromIndex = (cellIndex) => {
+    const namedId = this._varCellRegistry.getCellId(cellIndex);
     if (namedId) return namedId;
-    if (i >= this.numGridCells) return `$${i - this.numGridCells}`;
-    return this.makeCellId(...this.splitCellIndex(i));
+    if (cellIndex >= this.numGridCells) return `$${cellIndex - this.numGridCells}`;
+    return this.makeCellId(...this.splitCellIndex(cellIndex));
   }
 
   cellIndex = (row, col) => {
     return row * this.numCols + col;
   }
 
-  splitCellIndex = (cell) => {
-    return [cell / this.numCols | 0, cell % this.numCols | 0];
+  splitCellIndex = (cellIndex) => {
+    return [cellIndex / this.numCols | 0, cellIndex % this.numCols | 0];
   }
 
   parseValueId = (valueId) => {
@@ -251,15 +251,15 @@ export class CellGeometry {
       const row = CELL_ID_CHAR[cellId.charCodeAt(1)];
       const col = CELL_ID_CHAR[cellId.charCodeAt(3)];
       if (row < this.numRows && col < this.numCols) {
-        return { cell: this.cellIndex(row, col), row, col };
+        return { cellIndex: this.cellIndex(row, col), row, col };
       }
       throw new Error('Invalid cell ID: ' + cellId);
     }
     if (cellId[0] === '$') {
-      return { cell: this.numGridCells + parseInt(cellId.substring(1)) };
+      return { cellIndex: this.numGridCells + parseInt(cellId.substring(1)) };
     }
     const registryCell = this._varCellRegistry.getCellIndex(cellId);
-    if (registryCell !== null) return { cell: registryCell };
+    if (registryCell !== null) return { cellIndex: registryCell };
     throw new Error('Invalid cell ID: ' + cellId);
   }
 

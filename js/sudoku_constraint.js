@@ -36,7 +36,7 @@ export class CellArgs {
   }
 
   cellIds(geometry) {
-    return this._cells.map(c => geometry.parseCellId(c).cell);
+    return this._cells.map(c => geometry.parseCellId(c).cellIndex);
   }
 }
 
@@ -176,12 +176,12 @@ export class SudokuConstraintBase {
     const cells = this.getCells(geometry);
     if (cells.length === 0) return this;
     const graph = geometry.cellGraph();
-    const baseCell = geometry.parseCellId(cells[0]).cell;
-    const targetCell = geometry.parseCellId(baseCellId).cell;
+    const baseCell = geometry.parseCellId(cells[0]).cellIndex;
+    const targetCell = geometry.parseCellId(baseCellId).cellIndex;
     if (baseCell === targetCell) return this;
     const basePos = graph.cellPosition(baseCell);
     return this.makeShifted(cellId => {
-      const cell = geometry.parseCellId(cellId).cell;
+      const cell = geometry.parseCellId(cellId).cellIndex;
       const cellPos = graph.cellPosition(cell);
       if (!cellPos || cellPos[2] !== basePos[2]) {
         throw new Error('Cannot shift cell: ' + cellId);
@@ -320,7 +320,7 @@ export class SudokuConstraintBase {
 
   static _hasAdjacentCells(cells, geometry) {
     const graph = geometry.cellGraph();
-    const cellIndices = cells.map(c => geometry.parseCellId(c).cell);
+    const cellIndices = cells.map(c => geometry.parseCellId(c).cellIndex);
     const cellSet = new Set(cellIndices);
 
     for (const cell of cellIndices) {
@@ -332,7 +332,7 @@ export class SudokuConstraintBase {
 
   static _adjacentCellPairs(cells, geometry) {
     const graph = geometry.cellGraph();
-    const cellIndices = cells.map(c => geometry.parseCellId(c).cell);
+    const cellIndices = cells.map(c => geometry.parseCellId(c).cellIndex);
     const cellSet = new Set(cellIndices);
     const pairs = [];
     for (const cell of cellIndices) {
@@ -349,7 +349,7 @@ export class SudokuConstraintBase {
   static _cellsAre2x2Square(cells, geometry) {
     if (cells.length !== 4) return false;
     const graph = geometry.cellGraph();
-    const cellIndices = new Set(cells.map(c => geometry.parseCellId(c).cell));
+    const cellIndices = new Set(cells.map(c => geometry.parseCellId(c).cellIndex));
 
     for (const cell of cellIndices) {
       if (graph.neighborCountIn(cell, cellIndices) !== 2) return false;
@@ -581,12 +581,12 @@ class ChaosConstraintBase extends SudokuConstraintBase {
 
     const regionCellOffset = regionCells[0];
     const regionCellLimit = regionCellOffset + regionCells.length;
-    const controlCell = geometry.parseCellId(cells[0]).cell;
+    const controlCell = geometry.parseCellId(cells[0]).cellIndex;
     if (controlCell >= regionCellOffset && controlCell < regionCellLimit) return false;
 
     let kind = 0;
     for (let i = 1; i < cells.length; i++) {
-      const cell = geometry.parseCellId(cells[i]).cell;
+      const cell = geometry.parseCellId(cells[i]).cellIndex;
       const cellKind = cell < geometry.numGridCells ? 1
         : cell >= regionCellOffset && cell < regionCellLimit ? 2
           : 0;
@@ -633,7 +633,7 @@ class ChaosConstraintBase extends SudokuConstraintBase {
     const regionCellOffset = regionCells[0];
     const ccCells = this.expandedRegionCells(geometry);
     const gridCells = ccCells.map(cellId => geometry.makeCellIdFromIndex(
-      geometry.parseCellId(cellId).cell - regionCellOffset));
+      geometry.parseCellId(cellId).cellIndex - regionCellOffset));
     return [this.cells[0], ...gridCells, ...ccCells];
   }
 }
@@ -762,7 +762,7 @@ export class SudokuConstraint {
 
     static decodeTargetCells(encoded, origin, locator) {
       if (!encoded) return [];
-      const originIdx = locator.parseCellId(origin).cell;
+      const originIdx = locator.parseCellId(origin).cellIndex;
       const str = String(encoded);
       const numWords = str.length;
       const arr = new Uint8Array(numWords);
@@ -780,8 +780,8 @@ export class SudokuConstraint {
 
     static encodeTargetCells(cellIds, origin, locator) {
       if (!cellIds.length) return '';
-      const originIdx = locator.parseCellId(origin).cell;
-      const offsets = cellIds.map(id => locator.parseCellId(id).cell - originIdx);
+      const originIdx = locator.parseCellId(origin).cellIndex;
+      const offsets = cellIds.map(id => locator.parseCellId(id).cellIndex - originIdx);
       if (offsets.some(o => o < 0)) {
         throw new Error('Replicate targets must not precede the origin in the group.');
       }
@@ -893,8 +893,8 @@ export class SudokuConstraint {
       const partsGrid = new Array(geometry.numGridCells).fill(null);
       for (const part of parts) {
         for (const cellId of part.cells) {
-          const { cell } = geometry.parseCellId(cellId);
-          partsGrid[cell] = part;
+          const { cellIndex } = geometry.parseCellId(cellId);
+          partsGrid[cellIndex] = part;
         }
       }
 
@@ -1454,7 +1454,7 @@ export class SudokuConstraint {
 
       const regionCells = geometry.varCellsForGroup('CC');
       const graph = geometry.cellGraph();
-      const controlCell = geometry.parseCellId(this.cells[0]).cell;
+      const controlCell = geometry.parseCellId(this.cells[0]).cellIndex;
       return [CellGraph.LEFT, CellGraph.RIGHT, CellGraph.UP, CellGraph.DOWN].map(direction => {
         const arm = [];
         for (let cell = controlCell; cell !== null; cell = graph.adjacent(cell, direction)) {
@@ -1488,7 +1488,7 @@ export class SudokuConstraint {
 
       const regionCells = geometry.varCellsForGroup('CC');
       const graph = geometry.cellGraph();
-      const controlCell = geometry.parseCellId(this.cells[0]).cell;
+      const controlCell = geometry.parseCellId(this.cells[0]).cellIndex;
       const neighbors = [
         controlCell,
         graph.adjacent(controlCell, CellGraph.UP),
@@ -2560,9 +2560,9 @@ export class SudokuConstraint {
 
     static cells(topLeftCell, geometry = GEOMETRY_MAX) {
       const graph = geometry.cellGraph();
-      const { cell } = geometry.parseCellId(topLeftCell);
-      const topRight = graph.adjacent(cell, CellGraph.RIGHT);
-      const bottomLeft = graph.adjacent(cell, CellGraph.DOWN);
+      const { cellIndex } = geometry.parseCellId(topLeftCell);
+      const topRight = graph.adjacent(cellIndex, CellGraph.RIGHT);
+      const bottomLeft = graph.adjacent(cellIndex, CellGraph.DOWN);
       const bottomRightFromTop = topRight === null
         ? null : graph.adjacent(topRight, CellGraph.DOWN);
       const bottomRightFromLeft = bottomLeft === null
@@ -2575,7 +2575,7 @@ export class SudokuConstraint {
       }
 
       return [
-        cell,
+        cellIndex,
         topRight,
         bottomLeft,
         bottomRightFromTop,

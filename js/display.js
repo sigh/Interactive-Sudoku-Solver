@@ -35,7 +35,7 @@ export class DisplayItem {
   }
 
   cellIdCenter(cellId) {
-    return this.cellIndexCenter(this._geometry.parseCellId(cellId).cell);
+    return this.cellIndexCenter(this._geometry.parseCellId(cellId).cellIndex);
   }
 
   cellIdTopLeftCorner(cellId) {
@@ -421,8 +421,8 @@ export class CellValueDisplay extends DisplayItem {
   maskCell(cellId) {
     const mask = document.getElementById(this.constructor.GIVENS_MASK_ID);
 
-    const { cell } = this._geometry.parseCellId(cellId);
-    const square = this._makeCellSquare(cell);
+    const { cellIndex } = this._geometry.parseCellId(cellId);
+    const square = this._makeCellSquare(cellIndex);
     square.setAttribute('fill', 'black');
     mask.append(square);
     return square;
@@ -834,7 +834,7 @@ export class HighlightDisplay extends DisplayItem {
 
   highlightCell(cellId, cssClass) {
     const parsed = this._geometry.parseCellId(cellId);
-    const path = this._makeCellSquare(parsed.cell);
+    const path = this._makeCellSquare(parsed.cellIndex);
     if (!path) return null;
 
     const svg = cssClass ? this._getGroup(cssClass) : this._svg;
@@ -848,7 +848,7 @@ export class HighlightDisplay extends DisplayItem {
   // BorderedRegion constraints are drawn), returning the element for removal.
   highlightRegion(cellIds, cssClass, inset = 0) {
     const cellSet = new Set(
-      cellIds.map(id => this._geometry.parseCellId(id).cell));
+      cellIds.map(id => this._geometry.parseCellId(id).cellIndex));
     const region = this._makeRegionBorder(
       cellSet, this._geometry, /* cornerCut= */ true, inset);
     // Shade the interior, behind the border.

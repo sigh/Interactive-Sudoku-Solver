@@ -527,26 +527,26 @@ await runTest('overlay toVar() rejects a non-var prefix', () => {
 
 await runTest('grid graph is a locator over its grid cells', () => {
   const g = cellGraph('9x9');
-  assert.deepEqual(g.parseCellId('R1C1'), { cell: 0 });
-  assert.deepEqual(g.parseCellId('R2C1'), { cell: 9 });
+  assert.deepEqual(g.parseCellId('R1C1'), { cellIndex: 0 });
+  assert.deepEqual(g.parseCellId('R2C1'), { cellIndex: 9 });
   assert.equal(g.makeCellIdFromIndex(0), 'R1C1');
   assert.equal(g.makeCellIdFromIndex(9), 'R2C1');
-  const { cell } = g.parseCellId('R7C2');
-  assert.equal(g.makeCellIdFromIndex(cell), 'R7C2');
+  const { cellIndex } = g.parseCellId("R7C2");
+  assert.equal(g.makeCellIdFromIndex(cellIndex), "R7C2");
 });
 
 await runTest('overlay is a locator over group-local dense positions', () => {
   const cc = cellGraph('9x9').makeOverlay('CC');
   // The nth var cell has group-local index n-1, independent of grid indices.
-  assert.deepEqual(cc.parseCellId('CC1'), { cell: 0 });
-  assert.deepEqual(cc.parseCellId('CC10'), { cell: 9 });
+  assert.deepEqual(cc.parseCellId('CC1'), { cellIndex: 0 });
+  assert.deepEqual(cc.parseCellId('CC10'), { cellIndex: 9 });
   assert.equal(cc.makeCellIdFromIndex(0), 'CC1');
   assert.equal(cc.makeCellIdFromIndex(9), 'CC10');
 });
 
 await runTest('a sparse overlay locator indexes only its members', () => {
   const sparse = cellGraph('9x9').makeOverlay('VC', ['R1C1', 'R5C5', 'R9C9']);
-  assert.deepEqual(sparse.parseCellId('VC2'), { cell: 1 });
+  assert.deepEqual(sparse.parseCellId('VC2'), { cellIndex: 1 });
   assert.equal(sparse.makeCellIdFromIndex(2), 'VC3');
   assert.throws(() => sparse.parseCellId('VC9'), /not in overlay/);
 });

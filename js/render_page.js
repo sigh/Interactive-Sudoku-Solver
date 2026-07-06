@@ -1757,7 +1757,7 @@ class GridInputManager {
       if (!cell) return;
 
       const geometry = this._geometry;
-      const { cell: cellIndex } = geometry.parseCellId(cell);
+      const { cellIndex } = geometry.parseCellId(cell);
 
       const next = geometry.cellGraph().wrappingTraverse(cellIndex, dr, dc);
       this._selection.setCells([geometry.makeCellIdFromIndex(next)]);

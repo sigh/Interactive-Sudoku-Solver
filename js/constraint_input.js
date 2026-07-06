@@ -408,7 +408,7 @@ ConstraintCategoryInput.Composite = class Composite extends ConstraintCategoryIn
         collection.addConstraint(new SudokuConstraint.Replicate([]));
         return false;
       }
-      const originIdx = this._geometry.parseCellId(selectedCells[0]).cell;
+      const originIdx = this._geometry.parseCellId(selectedCells[0]).cellIndex;
       const origin = this._geometry.makeCellIdFromIndex(
         this._geometry.cellGraph().cellPosition(originIdx)[2]);
       const bitset = SudokuConstraint.Replicate.encodeTargetCells(
@@ -965,7 +965,7 @@ ConstraintCategoryInput.LinesAndSets = class LinesAndSets extends MultiCellInput
       if (!values.length) return;
       if (constraintClass === SudokuConstraint.Quad) {
         const topLeftCell = this._geometry.makeCellIdFromIndex(Math.min(
-          ...cells.map(c => this._geometry.parseCellId(c).cell)));
+          ...cells.map(c => this._geometry.parseCellId(c).cellIndex)));
         this.collection.addConstraint(new SudokuConstraint.Quad(topLeftCell, ...values));
       } else {
         this.collection.addConstraint(new constraintClass(values.join('_'), ...cells));
@@ -989,15 +989,15 @@ ConstraintCategoryInput.ChaosConstruction = class ChaosConstruction extends Mult
   }
 
   _toRegionCell(cellId) {
-    const cell = this._geometry.parseCellId(cellId).cell;
-    if (cell >= this._geometry.numGridCells) return cellId;
+    const cellIndex = this._geometry.parseCellId(cellId).cellIndex;
+    if (cellIndex >= this._geometry.numGridCells) return cellId;
     return this._geometry.makeCellIdFromIndex(
-      this._geometry.varCellsForGroup('CC')[cell]);
+      this._geometry.varCellsForGroup('CC')[cellIndex]);
   }
 
   _translateToCCCells(cells) {
     if (cells.some(
-      c => this._geometry.parseCellId(c).cell >= this._geometry.numGridCells)) {
+      c => this._geometry.parseCellId(c).cellIndex >= this._geometry.numGridCells)) {
       return cells;
     }
     return [cells[0], ...cells.map(c => this._toRegionCell(c))];

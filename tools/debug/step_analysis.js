@@ -348,7 +348,7 @@ const parseGuideSpec = (geometry, spec) => {
   if (!m) throw new Error(`Bad --guide "${spec}". Expected STEP:CELL[=VALUE].`);
   return {
     step: +m[1],
-    cell: geometry.parseCellId(m[2]).cell,
+    cell: geometry.parseCellId(m[2]).cellIndex,
     value: m[3] !== undefined ? +m[3] : null,
   };
 };
@@ -398,7 +398,7 @@ const buildStepRecord = (geometry, stepIndex, step, decision) => {
   const eliminated = step.diffPencilmarks
     ? step.diffPencilmarks.reduce((sum, set) => sum + set.size, 0)
     : 0;
-  const guessCellIndex = step.guessCell ? geometry.parseCellId(step.guessCell).cell : null;
+  const guessCellIndex = step.guessCell ? geometry.parseCellId(step.guessCell).cellIndex : null;
   const matched = decisionMatchesGuess(decision, guessCellIndex);
   return {
     step: stepIndex,
@@ -677,7 +677,7 @@ const printPriorities = (geometry, internal) => {
 };
 
 const printCellTracking = (geometry, cellSpec, records, solver, guides) => {
-  const cellIndex = geometry.parseCellId(cellSpec).cell;
+  const cellIndex = geometry.parseCellId(cellSpec).cellIndex;
   console.log(`\n=== Tracking ${cellId(geometry, cellIndex)} ===`);
   console.log('step\tcandidates\tguessedHere');
   for (const r of records) {
