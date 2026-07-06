@@ -36,10 +36,10 @@ const solveCollections = [
       'Classic sudoku, hard',
       'Anti-knights move',
       'Killer sudoku',
-      'Killer sudoku, with overlap',
-      'Killer sudoku, with gaps',
-      'Killer sudoku, with 0 cage',
-      'Killer sudoku, with alldiff',
+      'Killer sudoku [overlap]',
+      'Killer sudoku [gaps]',
+      'Killer sudoku [0 cage]',
+      'Killer sudoku [alldiff]',
       'Sudoku X',
       'Anti-knight Anti-king',
       'Anti-knight Anti-consecutive',
@@ -50,7 +50,7 @@ const solveCollections = [
       'Arrow killer sudoku',
       'Kropki sudoku',
       'Little killer',
-      'Little killer - Sum',
+      'Little killer [Sum clue]',
       'Little killer 2',
       'Sandwich sudoku',
       'German whispers',
@@ -70,7 +70,7 @@ const solveCollections = [
       'XV-kropki',
       'Strict kropki',
       'Strict XV',
-      'Hailstone (easier) - little killer',
+      'Hailstone - little killer [easier]',
       'X-Sum little killer',
       'Skyscraper',
       'Skyscraper - all 6',
@@ -90,9 +90,9 @@ const solveCollections = [
       'Indexing',
       '2D 1-5-9',
       'Full rank',
-      'Duplicate cell sums',
+      'Event Horizon [simplified]',
       'Lunchbox',  // Lunchbox
-      'Killer lunchboxes, resolved', // Lunchbox with 0
+      'Killer lunchboxes [resolved]', // Lunchbox with 0
       'Hidden skyscrapers',
       'Unbidden First Hidden', // And constraint
       'Look-and-say',
@@ -116,7 +116,7 @@ const solveCollections = [
       'Embedded Squishdoku',
       'Force non-unit coeff', // Sum with non-unit coeff
       'Event horizon', // Duplicate cell in sum, BinaryPairwise optimization.
-      'Copycat, easy',  // Same value - 2 sets, repeated values
+      'Copycat [easy]',  // Same value - 2 sets, repeated values
       'Clone sudoku', // Same value - single cell sets
       'Slingshot sudoku', // ValueIndexing
       'Numbered Rooms vs X-Sums', // Or constraint
@@ -182,7 +182,7 @@ const solveCollections = [
       '6x6: Little Killer',
       '4x4: Counting circles',
       '6x6: Rellik cages',  // Rellik cages
-      '6x6: Successor Arrows',  // Regex
+      /* 6x6 */ 'Successor Arrows',  // Regex
       '6x6: Full rank',  // Full rank (requires enforcing no ties)
       '4x4: Full Rank - no ties',
       '4x4: Full Rank - with ties',
@@ -199,13 +199,13 @@ const solveCollections = [
       '4x7: Jigsaw',  // Jigsaw
       '4x6: Skyscraper',  // Skyscraper
       '9x8: Plain boxless',  // Boxless rectangular grid
-      '5x5: Squishtroquadri',  // non-standard numValues, Arrows and Thermo
+      /* 5x5 */ 'The Whirlpool',  // non-standard numValues, Arrows and Thermo
       '7x7: Killer Squishdoku',  // non-standard numValues
-      '6x6: Con-set-cutive',  // non-standard numValues, RegionSize, region-sized boxes
-      '7x7: Skyscraper Squishdoku',  // non-standard numValues, Skyscraper
-      '7x7: Numbered Rooms Squishdoku',  // non-standard numValues, Numbered Rooms
-      '6x6: Hidden Hostility', // non-standard numValues, Diagonal, region-sized boxes
-      '6x6: Order from Chaos', // non-standard numValues, Global Entropy, NFA, region-sized boxes
+      /* 6x6 */ 'Con-Set-Cutive',  // non-standard numValues, RegionSize, region-sized boxes
+      /* 7x7 */ 'Buy Or Rent? (Skyscraper Version)',  // non-standard numValues, Skyscraper
+      /* 7x7 */ 'Buy Or Rent? (Numbered Rooms Version)',  // non-standard numValues, Numbered Rooms
+      /* 6x6 */ 'Hidden Hostility', // non-standard numValues, Diagonal, region-sized boxes
+      /* 6x6 */ 'Order From Chaos', // non-standard numValues, Global Entropy, NFA, region-sized boxes
       '6x6: Irregular Quadro Quadri', // non-standard numValues, Jigsaw
       '7x7: Dutch Flat Mate Squishdoku', // non-standard numValues, Dutch Flatmates
       '7x7: Buggy NR Squishdoku',  // non-standard numValues, Numbered Rooms
@@ -232,18 +232,18 @@ const solveCollections = [
       '0-indexed: 0-sensitive pairwise', // Pair with 0-sensitive fn
       '0-indexed: 0-8 Killer',  // Cage
       '0-indexed: Killer sudoku, with 0 cage, hard',  // Cage (with 0-sum cages)
-      '0-indexed: Region sum lines',  // RegionSumLine
-      '0-indexed: A very full quiver', // Arrow
-      '0-indexed: Lets build a snowman',  // Arrow, BlackDot, WhiteDot, Thermo, Whisper
-      '0-indexed: +-Information',  // V, StrictXV, Diagonal
+      'Zeroed In',  // RegionSumLine
+      'A Very Full Quiver', // Arrow
+      "Let's Build a Snowman [0-indexed]",  // Arrow, BlackDot, WhiteDot, Thermo, Whisper
+      '± Information',  // V, StrictXV, Diagonal
       '0-indexed: Hidden skyscrapers',  // HiddenSkyscraper
       '0-indexed: Quadruple X',  // Quad, Diagonal
       '0-indexed: Look-and-say',  // ContainExact
       '0-indexed: Equality cages',  // EqualityCage
       '0-indexed: Skyscraper',  // Skyscraper
-      '0-indexed: Counting circles',  // CountingCircles
+      'Hippo Birdie',  // CountingCircles
       '0-indexed: Sequence sudoku',  // NFA
-      '0-indexed: Regex line',  // Regex
+      'Regex Line [0-indexed]',  // Regex
       '0-indexed: Sums and indexing',  // SumLine, XSum, Rellik, Lunchbox, Sandwich, Indexing, ValueIndexing, NumberedRoom
       {
         name: 'Jigsaw with extended range',  // Jigsaw with extended value range (0-10) but restricted grid. Tests optimizer.
@@ -266,11 +266,11 @@ const solveCollections = [
     collection: 'Extra Variables',
     puzzles: [
       'Doppelganger',  // Doppelganger
-      'Dutch-pelganger - easier',  // Doppelganger, Whisper on state cells
+      'Dutch-pelgänger [easier]',  // Doppelganger, Whisper on state cells
       'Bates Motel',  // Var, ValueIndexing, 6x6
       'The good, the bad and the ugly',  // Var, NFA, SameValues, Arrow, NFA (for sandwich, xsum, skyscraper)
       'Letter Little Killer',  // Var, Sum (with coeffs)
-      '6x6 Miracle Sudoku',  // Var, Sum (with coeffs), NFA (comparing sums), Replicate, PerfectAllDifferent optimization
+      'Hailstorm',  // 6x6, Var, Sum (with coeffs), NFA (comparing sums), Replicate, PerfectAllDifferent optimization
       {  // Var cells inside Or composite
         name: 'Or with extra cells',
         input: '.Var~X~X.Or.And.~R1C1_1~VX_1~R4C4_1.End.And.~R1C1_2~VX_2~R4C4_2.End.End.~R2C5_1~R5C3_3~R7C7_4~R8C2_5~R3C2_6~R1C8_7~R9C9_8~R6C6_9~R5C9_1~R9C3_2~R7C1_3~R6C4_4~R3C6_5~R2C7_6~R7C9_7~R8C5_8~R1C3_9~R5C1_5~R6C8_6~R3C4_8~R9C1_7~R3C7_9',

@@ -19,11 +19,22 @@ Static data files used by the UI and tests: example puzzles, puzzle collections 
 
 | Field | Required | Notes |
 | --- | --- | --- |
-| `name` | yes | Display name; also the lookup key in `PUZZLE_INDEX`. |
+| `name` | yes | Display name; also the lookup key in `PUZZLE_INDEX`. Prefer the puzzle's real (source) title. When an entry is a deliberate **variant** of another puzzle, suffix a `[label]` — see "Variant naming" below. |
 | `input` | yes | The puzzle: a constraint string (see below), **or** a `/…` path to a `.iss` file or a `.js` sandbox script under [scripts/](scripts/). Path inputs are resolved at load time (a `.js` is executed to produce its constraints). |
 | `solution` | recommended | 81-char row-major digit string; used by tests and `verify_solution.js`. |
 | `src` | optional | Attribution link(s) — a single URL or an **array**. Ideally provide two: a machine-decodable puzzle link (SudokuPad / f-puzzles / Penpa, extractable by the decode tooling) and a step-by-step solution (usually a YouTube solve). Put the **YouTube link first** — the UI surfaces only the first source, and the walkthrough is the more useful one to open. |
 | `constraintTypes` | only for path inputs | Constraint-type tags for the selector. Derived automatically via `SudokuParser.extractConstraintTypes(input)` for inline constraint strings, but a `.iss`/`.js` path can't be parsed that way, so those entries must list them explicitly — kept equal to the extractor's output by [`tools/dev/fix_constraint_types.js`](../tools/dev/README.md) (`--dry-run` to check). |
+| `comment` | optional | Free-text note about the entry — why it is a variant/re-encoding, what solver feature it exercises, or any caveat. Not parsed; for humans. |
+
+**Variant naming**: when an entry is a modified or re-encoded version of a puzzle
+(so its `name` would otherwise collide with, or misrepresent itself as, the
+faithful puzzle), keep the source title as the base and append a single
+`[label]` suffix — e.g. `Event Horizon [simplified]`, `Regex Line [0-indexed]`.
+The label is free-form (aim for consistency: `easier`, `simplified`,
+`0-indexed`, …) and is purely a convention to keep names unique and readable —
+nothing parses it. Faithful re-encodings (same puzzle and solution, only the ISS
+encoding differs) take the plain source title and put the encoding note in
+`comment`.
 
 **Constraint strings** (in `input` fields): The same `.Type~arg1~cell1~cell2` serialization format described in [js/README.md](../js/README.md).
 

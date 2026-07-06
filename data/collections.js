@@ -1,7 +1,8 @@
 // Sets of puzzles, used for testing, benchmarks, etc.
 //
-// Each entry is a puzzle config { name, input, solution?, src?, constraintTypes? };
-// see data/README.md ("Puzzle entry") for the field spec.
+// Each entry is a puzzle config { name, input, solution?, src?, constraintTypes?, comment? };
+// see data/README.md ("Puzzle entry") for the field spec. A variant of another
+// puzzle keeps the source title and adds a `[label]` suffix (e.g. `[easier]`).
 const { PUZZLE_INDEX } = await import('./example_puzzles.js' + self.VERSION_PARAM);
 
 export const EXAMPLES = [
@@ -45,15 +46,15 @@ export const EXAMPLES = [
     solution: '536241897978536241421879635613485972789623514245917368357198426892764153164352789',
   },
   {
-    name: 'Killer sudoku, with overlap',
-    // Same as 'Killer sudoku, but with overlapping (redundant) sums.
+    name: 'Killer sudoku [overlap]',
+    comment: "Same as 'Killer sudoku' but with overlapping (redundant) sums.",
     input:
       '.Cage~3~R1C1~R1C2.Cage~15~R1C3~R1C4~R1C5.Cage~25~R2C1~R2C2~R3C1~R3C2.Cage~17~R2C3~R2C4.Cage~9~R3C3~R3C4~R4C4.Cage~22~R1C6~R2C5~R2C6~R3C5.Cage~4~R1C7~R2C7.Cage~16~R1C8~R2C8.Cage~15~R1C9~R2C9~R3C9~R4C9.Cage~20~R3C7~R3C8~R4C7.Cage~8~R3C6~R4C6~R5C6.Cage~17~R4C5~R5C5~R6C5.Cage~20~R5C4~R6C4~R7C4.Cage~14~R4C2~R4C3.Cage~6~R4C1~R5C1.Cage~13~R5C2~R5C3~R6C2.Cage~6~R6C3~R7C2~R7C3.Cage~17~R4C8~R5C7~R5C8.Cage~27~R6C1~R7C1~R8C1~R9C1.Cage~8~R8C2~R9C2.Cage~16~R8C3~R9C3.Cage~10~R7C5~R8C4~R8C5~R9C4.Cage~12~R5C9~R6C9.Cage~6~R6C7~R6C8.Cage~20~R6C6~R7C6~R7C7.Cage~15~R8C6~R8C7.Cage~14~R7C8~R7C9~R8C8~R8C9.Cage~13~R9C5~R9C6~R9C7.Cage~17~R9C8~R9C9.Cage~9~R1C5~R2C5.',
     solution: '215647398368952174794381652586274931142593867973816425821739546659428713437165289',
   },
   {
-    name: 'Killer sudoku, with gaps',
-    // Same as 'Killer sudoku, but with gaps for the optimizer to fill.
+    name: 'Killer sudoku [gaps]',
+    comment: "Same as 'Killer sudoku' but with gaps for the optimizer to fill.",
     input:
       '.Cage~17~R2C3~R2C4.Cage~9~R3C3~R3C4~R4C4.Cage~22~R1C6~R2C5~R2C6~R3C5.Cage~4~R1C7~R2C7.Cage~16~R1C8~R2C8.Cage~15~R1C9~R2C9~R3C9~R4C9.Cage~20~R3C7~R3C8~R4C7.Cage~17~R4C5~R5C5~R6C5.Cage~20~R5C4~R6C4~R7C4.Cage~14~R4C2~R4C3.Cage~6~R4C1~R5C1.Cage~13~R5C2~R5C3~R6C2.Cage~6~R6C3~R7C2~R7C3.Cage~17~R4C8~R5C7~R5C8.Cage~27~R6C1~R7C1~R8C1~R9C1.Cage~8~R8C2~R9C2.Cage~16~R8C3~R9C3.Cage~10~R7C5~R8C4~R8C5~R9C4.Cage~12~R5C9~R6C9.Cage~6~R6C7~R6C8.Cage~20~R6C6~R7C6~R7C7.Cage~15~R8C6~R8C7.Cage~14~R7C8~R7C9~R8C8~R8C9.Cage~13~R9C5~R9C6~R9C7.Cage~17~R9C8~R9C9.',
     solution: '215647398368952174794381652586274931142593867973816425821739546659428713437165289',
@@ -91,9 +92,9 @@ export const EXAMPLES = [
       '.WhiteDot~R1C2~R1C3.WhiteDot~R1C4~R1C5.WhiteDot~R2C5~R3C5.WhiteDot~R2C1~R2C2.WhiteDot~R3C2~R2C2.WhiteDot~R4C4~R4C3.WhiteDot~R5C3~R4C3.WhiteDot~R4C1~R4C2.WhiteDot~R5C1~R6C1.WhiteDot~R5C2~R6C2.WhiteDot~R7C2~R7C3.WhiteDot~R8C1~R8C2.WhiteDot~R8C3~R8C4.WhiteDot~R7C5~R7C6.WhiteDot~R8C6~R9C6.WhiteDot~R9C6~R9C7.WhiteDot~R7C8~R8C8.WhiteDot~R6C7~R6C8.WhiteDot~R4C7~R5C7.WhiteDot~R4C8~R5C8.WhiteDot~R3C9~R4C9.WhiteDot~R2C9~R3C9.WhiteDot~R5C9~R6C9.BlackDot~R1C5~R1C6.BlackDot~R2C2~R2C3.BlackDot~R4C1~R5C1.BlackDot~R9C4~R9C5.BlackDot~R6C6~R7C6.BlackDot~R5C4~R5C5.BlackDot~R8C7~R9C7.BlackDot~R5C8~R6C8.BlackDot~R4C9~R5C9.BlackDot~R2C8~R3C8.BlackDot~R3C7~R4C7',
     solution: '167324958542869731839175462674518293395247186281693547723956814458731629916482375',
   },
-  // This is the same as the 'Little Killer' above, but the 23 LK is replaced with a Sum.
   {
-    name: 'Little killer - Sum',
+    name: 'Little killer [Sum clue]',
+    comment: "Same as 'Little killer' but the 23 little-killer clue is replaced with a Sum constraint.",
     src: ['https://www.youtube.com/watch?v=y4eKdI3ZJ78', 'https://sudokupad.app/nQHjr7Ggpg'],
     input:
       '.LittleKiller~22~R1C1.LittleKiller~28~R2C1.LittleKiller~26~R3C1.LittleKiller~34~R1C7.LittleKiller~40~R1C8.LittleKiller~42~R1C9.~R3C2_5~R3C7_2~R5C4_3~R5C5_7.Sum~23~R1C5~R2C4~R3C3~R4C2~R5C1',
@@ -144,7 +145,7 @@ export const EXAMPLES = [
     solution: '815432976763918245942567318278351694154896732396274581437685129681729453529143867',
   },
   {
-    name: 'Hailstone (easier) - little killer',
+    name: 'Hailstone - little killer [easier]',
     src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=0008H3',
     input: '..Cage~14~R5C3~R5C4~R6C4.Cage~19~R6C6~R6C5~R7C5.Cage~14~R4C4~R4C5~R3C5.Cage~14~R4C6~R5C6~R5C7.Diagonal~1.Diagonal~-1.LittleKiller~47~R3C1.LittleKiller~49~R2C1.LittleKiller~30~R8C9.LittleKiller~45~R7C9.LittleKiller~43~R1C7.LittleKiller~44~R1C8.LittleKiller~34~R9C2.LittleKiller~52~R9C3.~R1C5_3~R9C5_4~R5C1_1~R5C9_2',
     solution: '815432976763918245942567318278351694154896732396274581437685129681729453529143867',
@@ -209,7 +210,8 @@ export const EXAMPLES = [
     solution: '814576293379142586256938174741653829928417365563829741437295618182364957695781432',
   },
   {
-    name: 'Beauty mark - nabner',
+    name: 'Beauty Mark',
+    comment: 'Nabner lines, encoded via BinaryX.',
     src: 'https://sudokupad.app/TnR9996Ltn',
     input: '.RegionSumLine~R2C1~R3C1~R4C1~R5C1~R6C1.RegionSumLine~R3C2~R3C3~R2C3~R1C4~R1C5~R1C6~R2C6~R3C6~R4C6~R4C5~R4C4.RegionSumLine~R6C5~R6C6~R7C6~R8C6.RegionSumLine~R6C8~R6C9~R7C9~R8C9~R9C9.BlackDot~R2C6~R2C7.RegionSumLine~R8C2~R7C3~R6C3~R5C3~R4C3.BinaryX~8H-xf8H-xf8H-B~_Nabner~R1C1~R1C2~R1C3~R2C2~~R2C4~R2C5~R3C4~R3C5~~R5C2~R6C2~R7C2~R8C1~~R6C4~R7C4~R8C3~R9C2~~R7C8~R7C7~R8C7~R9C7~~R5C4~R5C5~R5C6~R6C7~~R1C7~R2C8~~R3C9~R4C9~R4C8~R4C7.',
     solution: '753418629218956347649732158382579416495163872176824935837645291564291783921387564',
@@ -239,7 +241,7 @@ export const EXAMPLES = [
   },
   {
     name: 'Sum lines - long loop',
-    // This puzzle broke when SumLine couldn't handle long loops.
+    comment: "This puzzle broke when SumLine couldn't handle long loops.",
     input: '.SumLine~10~R1C2~R1C3~R1C4~R1C5~R1C6~R2C6~R2C7~R2C8~R2C9~R3C9~R4C9~R4C8~R5C7~R5C6~R5C5~R6C5~R6C6~R6C7~R6C8~R6C9~R7C9~R8C9~R8C8~R8C7~R8C6~R9C6~R9C5~R9C4~R9C3~R8C3~R8C2~R8C1~R7C1~R7C2~R7C3~R7C4~R6C4~R5C4~R5C3~R5C2~R4C2~R4C1~R3C1~R3C2~R3C3~R3C4~R3C5~R2C5~R2C4~R2C3~R2C2~R2C1~R1C1~LOOP.~R4C5_2~R9C7_8~R1C8_1~R1C4_2~R1C5_7~R7C5_8~R7C6_4~R7C7_2~R3C9_2~R4C9_3~R6C2_5',
     solution: '648273519192856437537419682416928753723541968859367124361784295284695371975132846',
   },
@@ -262,8 +264,8 @@ export const EXAMPLES = [
     solution: '136847952892635714754129386415763298283914675679258143341576829967482531528391467',
   },
   {
-    name: 'Duplicate cell sums',
-    // Simplified 'Event Horizon' without renban.
+    name: 'Event Horizon [simplified]',
+    comment: "Simplified 'Event Horizon' with the renban lines removed.",
     src: ['https://www.youtube.com/watch?v=gBXJpnHyZfE', 'https://sudokupad.app/giuk6t4rfg'],
     input: '.Cage~20~R1C2~R2C2~R2C1.Cage~20~R4C2~R4C3~R4C4~R4C4.Cage~20~R8C2~R8C1~R9C1.Cage~10~R1C8~R2C8~R2C9.Cage~0~R6C6~R6C7~R6C8.Cage~70~R8C5~R7C5~R6C5~R5C5~R5C4~R4C5~R3C5~R2C5~R4C5~R5C5~R5C4~R6C5~R5C6~R5C6.Sum~30~R1C9~R2C8~R3C7~R7C3~R8C2~R9C1~R4C6~R5C5~R6C4~R4C6~R5C5~R6C4.Sum~30~R1C2~R2C3~R3C4~R4C5~R5C6~R6C7~R7C8~R8C9~R4C5~R5C6.LittleKiller~30~R1C6.~R4C5_6~R7C4_5~R2C5_3~R3C6_9',
     solution: '136847952892635714754129386415763298283914675679258143341576829967482531528391467',
@@ -281,17 +283,17 @@ export const EXAMPLES = [
     solution: '792861534463975218158423796327196485945382671681547329539214867874639152216758943',
   },
   {
-    name: 'Killer sudoku, with 0 cage',
+    name: 'Killer sudoku [0 cage]',
     input: '.Cage~3~R1C1~R1C2.Cage~15~R1C3~R1C4~R1C5.Cage~17~R2C3~R2C4.Cage~22~R1C6~R2C5~R2C6~R3C5.Cage~4~R1C7~R2C7.Cage~16~R1C8~R2C8.Cage~15~R1C9~R2C9~R3C9~R4C9.Cage~8~R3C6~R4C6~R5C6.Cage~6~R4C1~R5C1.Cage~6~R6C3~R7C2~R7C3.Cage~27~R6C1~R7C1~R8C1~R9C1.Cage~8~R8C2~R9C2.Cage~16~R8C3~R9C3.Cage~10~R7C5~R8C4~R8C5~R9C4.Cage~12~R5C9~R6C9.Cage~6~R6C7~R6C8.Cage~20~R6C6~R7C6~R7C7.Cage~15~R8C6~R8C7.Cage~14~R7C8~R7C9~R8C8~R8C9.Cage~13~R9C5~R9C6~R9C7.Cage~17~R9C8~R9C9.Cage~0~R5C4~R5C3~R5C2~R6C2.Cage~0~R3C7~R3C8~R4C8.',
     solution: '215647398368952174794381652586274931142593867973816425821739546659428713437165289',
   },
   {
-    name: 'Killer sudoku, with alldiff',
+    name: 'Killer sudoku [alldiff]',
     input: '.Cage~3~R1C1~R1C2.Cage~15~R1C3~R1C4~R1C5.Cage~17~R2C3~R2C4.Cage~22~R1C6~R2C5~R2C6~R3C5.Cage~4~R1C7~R2C7.Cage~16~R1C8~R2C8.Cage~15~R1C9~R2C9~R3C9~R4C9.Cage~8~R3C6~R4C6~R5C6.Cage~6~R4C1~R5C1.Cage~6~R6C3~R7C2~R7C3.Cage~27~R6C1~R7C1~R8C1~R9C1.Cage~8~R8C2~R9C2.Cage~16~R8C3~R9C3.Cage~10~R7C5~R8C4~R8C5~R9C4.Cage~12~R5C9~R6C9.Cage~6~R6C7~R6C8.Cage~20~R6C6~R7C6~R7C7.Cage~15~R8C6~R8C7.Cage~14~R7C8~R7C9~R8C8~R8C9.Cage~13~R9C5~R9C6~R9C7.Cage~17~R9C8~R9C9.AllDifferent~R5C4~R5C3~R5C2~R6C2.Cage~0~R3C7~R3C8~R4C8.',
     solution: '215647398368952174794381652586274931142593867973816425821739546659428713437165289',
   },
   {
-    name: 'Killer sudoku, with 0 cage, hard',
+    name: 'Killer sudoku [0 cage, hard]',
     src: 'http://forum.enjoysudoku.com/fast-web-based-solver-for-sudoku-variants-t39332.html#p312474',
     input: 'Z<<<<W<<<^0<<>^X<T>^j>>>^>^c^^<<>>^T^<<<^>>>^^S<<^<<0^>^L<<<^^<^>^U<>>^Q>>>^>>>>^',
     solution: '458723196936185274271496583392547618867931452514268739783612945645379821129854367',
@@ -422,7 +424,8 @@ export const EXAMPLES = [
     solution: '276941358495238167138765249329486571547312986861597432983174625654829713712653894',
   },
   {
-    name: 'Copycat, easy',
+    name: 'Copycat [easy]',
+    comment: "Same as 'Copycat' but with an extra given to make it easier.",
     src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=000HGS',
     input: '.Palindrome~R9C1~R8C1~R8C2~R7C3~R6C3~R5C2~R4C2~R3C3~R2C4~R1C5~R1C6~R1C7~R1C8~R2C8~R2C9.WhiteDot~R5C6~R5C5.BlackDot~R2C5~R3C5.BlackDot~R3C7~R3C8.Zipper~R8C3~R7C4~R8C5~R9C6~R8C7~R7C7~R6C8~R5C8~R4C7~R3C7~R2C7~R3C6~R3C5~R3C4~R4C4.SameValues~2~R9C1~R8C1~R8C2~R7C3~R6C3~R5C2~R4C2~R3C3~R2C4~R1C5~R1C6~R1C7~R1C8~R2C8~R2C9~R8C3~R7C4~R8C5~R9C6~R8C7~R7C7~R6C8~R5C8~R4C7~R3C7~R2C7~R3C6~R3C5~R3C4~R4C4.~R2C2_9',
     solution: '276941358495238167138765249329486571547312986861597432983174625654829713712653894',
@@ -434,8 +437,8 @@ export const EXAMPLES = [
     solution: '327541968489276351561389472645892713712653894893417625974128536256934187138765249',
   },
   {
-    // Forces the non-unit branch in Sum._enforceOneRemainingCell
     name: 'Force non-unit coeff',
+    comment: 'Forces the non-unit branch in Sum._enforceOneRemainingCell.',
     input: '.PillArrow~2~R1C7~R1C6~R1C5~R1C4~R1C3~R1C2.~R1C2_3~R3C8_6~R1C5_2~R6C1_2~R1C3_4~R1C4_6~R1C7_5~R4C9_3~R5C9_1~R8C9_5~R9C9_9~R9C8_2~R8C5_1~R8C6_9~R8C4_4~R7C4_2~R6C4_1~R5C4_5~R5C6_3~R4C1_8~R3C2_5~R7C2_6~R8C2_2~R9C1_7',
     solution: '934621587682795134157348962815962743476583291293174856569237418328419675741856329',
   },
@@ -457,30 +460,32 @@ export const EXAMPLES = [
     solution: '534678912672195348198243567861954723429367851753821496915736284287419635346582179'
   },
   {
-    // Very large state machine
     name: 'How Shall We Split This?',
+    comment: 'Very large state machine.',
     src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?chlang=en&id=000MIE',
-    input: '/data/scripts/large_state_machine.js',
+    input: '/data/scripts/how_shall_we_split_this.js',
     solution: '138657429645298731792341568521934876879126354463875192954712683216583947387469215',
     constraintTypes: ['NFA'],
   },
   {
-    // Loop modelled with Var membership cells + state machines (no native loop).
-    name: '6x6 Loop: Entropic Lines',
+    name: 'Entropic Lines',
+    comment: 'Loop puzzle; the loop is modelled with Var membership cells + state machines',
     src: 'https://sudokupad.app/gdc/loop-pack/entropic',
     input: '/data/scripts/loop_entropic.js',
     solution: '641523253416362154514632136245425361',
     constraintTypes: ['6x6', 'Var', 'Replicate', 'NFA'],
   },
   {
-    name: '9x9 Loop: Nordschleife',
+    name: 'Nordschleife',
+    comment: 'Loop puzzle; the loop is modelled with state machines',
     src: ['https://www.youtube.com/watch?v=A8GBl5GGypA', 'https://sudokupad.app/0pshsj5ykr'],
     input: '/data/scripts/nordschleife.js',
     solution: '526973148384165972917824356145782693279436581638519724793648215852391467461257839',
     constraintTypes: ['Var', 'Replicate', 'NFA'],
   },
   {
-    name: '9x9 Loop: Wendezäune',
+    name: 'Wendezäune',
+    comment: 'Loop puzzle; the loop is modelled with state machines',
     src: ['https://www.youtube.com/watch?v=bhKtKFEy0AM', 'https://sudokupad.app/uevzycz28t'],
     input: '/data/scripts/wendezaune.js',
     solution: '617349582382715469945682731596134278834527916271896345129463857763958124458271693',
@@ -494,25 +499,24 @@ export const EXAMPLES = [
     constraintTypes: ['8x8', 'NoBoxes', 'ChaosConstruction', 'Var', 'CountDistinct', 'ChaosCount'],
   },
   {
-    // Segmented state machine (arrows count cells per ring).
     name: 'Hit, Reveal, Solve',
+    comment: 'Segmented state machine (arrows count cells per ring).',
     src: ['https://www.youtube.com/watch?v=vspwP6DlQik', 'https://sudokupad.app/99c09jh573'],
     input: '/data/scripts/hit_reveal_solve.js',
     solution: '751392468283614795964578312326857149478961523195243687542139876837426951619785234',
     constraintTypes: ['NFA'],
   },
   {
-    // Two NFAs share a period across both lines to decipher n (sum) and m (diff).
     name: 'Sums and Differences',
+    comment: 'Two NFAs share a period across both lines to decipher n (sum) and m (diff).',
     src: ['https://www.youtube.com/watch?v=a-jajrZJXr0', 'https://sudokupad.app/qj4kzxhp02'],
     input: '/data/scripts/sums_and_differences.js',
     solution: '149876523356421978287953164895742631714639852623185749538297416471368295962514387',
     constraintTypes: ['NFA', 'Thermo', 'BlackDot', 'LittleKiller'],
   },
   {
-    // Raised in https://github.com/sigh/Interactive-Sudoku-Solver/issues/10
     name: 'Stepped Thermos',
-    src: 'https://sudokupad.app/g21db32fo4',
+    src: ['https://sudokupad.app/g21db32fo4', 'https://github.com/sigh/Interactive-Sudoku-Solver/issues/10'],
     input: '.Replicate~JBAAIJAAAJB.NFA~UgMP_CIZCmOhP_CG6lKUpX_CKFlKUpX_vAb6qUpX_VZ5HUUpX_UqritmpX_UpVGmZJX_UpSpsOuP_UpSlSWhP_UpSlKilP_UpSlKUpX_UpSlSWuP_UpSpsZJX_UpVGtmpX_UqrnUUpX_VZ76qUpX_vCFlKUpX_UpSlKjGP_UpSlSlJX_UpSpzmpX_UpVKUUpX_UqtaqUpX_Va1lKUpX_ve6lKUpQ~_~R1C1~R1C2~R1C3~~R1C1~R2C1~R3C1~~R2C1~R2C2~R2C3~~R1C2~R2C2~R3C2~~R3C1~R3C2~R3C3~~R1C3~R2C3~R3C3.End.~R9C3_9~R8C1_7.Thermo~R6C4~R7C4~R7C3~R8C3~R8C2~R9C2.Thermo~R4C4~R4C3~R3C3~R3C2~R2C2~R2C1.Thermo~R4C6~R3C6~R3C7~R2C7~R2C8~R1C8.Thermo~R6C6~R6C7~R7C7~R7C8~R8C8~R8C9',
     solution: '541627893982531674376984521625493718137865942498172356813259467754316289269748135',
   },
@@ -594,16 +598,15 @@ export const EXAMPLES = [
   // Snipes
   //////////////////////////////////////////////////////////////////////////////
   {
-    // Full rank snipe by sigh: https://sudokutheory.com/wiki/index.php?title=Snipes#Full_Rank
     name: 'Full rank - 6 clue snipe',
-    src: 'https://discord.com/channels/709370620642852885/721090566481510732/1258800235594125352',
+    src: ['https://discord.com/channels/709370620642852885/721090566481510732/1258800235594125352', 'https://sudokutheory.com/wiki/index.php?title=Snipes#Full_Rank'],
+    comment: "Full rank snipe by sigh",
     input: '.FullRank~R5~17~.FullRank~R4~1~.FullRank~C2~32~.FullRank~C3~28~.FullRank~C4~23~.FullRank~R1~34~.',
     solution: '987624153654381972231975648179842536568793214423156789845267391396518427712439865',
   },
   {
-    // https://sudokutheory.com/wiki/index.php?title=Snipes#Sandwich
     name: 'Sandwich snipe 18',
-    src: 'https://www.f-puzzles.com/?load=N4IgzglgXgpiBcBOANCA5gJwgEwQbT2AF9ljSSzKLryBdZQmq8l54+x1p7rjtn/nQaCR3PgIm9hk0UM6zR4rssX1wAQwB22AO4QAxgAswAVwC2+UPpgAbGwhAAlAAwBhAIwhUAN3U2TcPAg7gAcIBQg1nYOLq4ATF4gvv6BwWERUfZBsQDMickBDqHhpJG2WU5uACz5foVBxRnlMW4ArLUpRemlmS2uAOwd9WklVs3Z7q7OQ6mNPeNOcVMzXaNl0dk5yz51s91jG05V20m7q02Hjq0nBXtrvdkAbDdnDfvrFbGIK2/htERAA',
+    src: ['https://sudokutheory.com/wiki/index.php?title=Snipes#Sandwich', 'https://www.f-puzzles.com/?load=N4IgzglgXgpiBcBOANCA5gJwgEwQbT2AF9ljSSzKLryBdZQmq8l54+x1p7rjtn/nQaCR3PgIm9hk0UM6zR4rssX1wAQwB22AO4QAxgAswAVwC2+UPpgAbGwhAAlAAwBhAIwhUAN3U2TcPAg7gAcIBQg1nYOLq4ATF4gvv6BwWERUfZBsQDMickBDqHhpJG2WU5uACz5foVBxRnlMW4ArLUpRemlmS2uAOwd9WklVs3Z7q7OQ6mNPeNOcVMzXaNl0dk5yz51s91jG05V20m7q02Hjq0nBXtrvdkAbDdnDfvrFbGIK2/htERAA'],
     input: '.Sandwich~18~C1.Sandwich~18~C2.Sandwich~18~C3.Sandwich~18~R1.Sandwich~18~R2.Sandwich~18~R3.Sandwich~18~R4.Sandwich~18~R5.Sandwich~18~R6.Sandwich~18~C4.Sandwich~18~C5.Sandwich~18~C7.Sandwich~18~C9.',
     solution: '584137269239684157167592843396751428845923671721846935952478316673219584418365792',
   },
@@ -639,18 +642,18 @@ export const EXAMPLES = [
     input: '.Cage~7~R2C2~R3C2~R4C2.Cage~5~R2C6~R2C7.Cage~6~R3C7~R3C8.Cage~6~R4C6~R4C7.Cage~15~R7C9~R6C9.Cage~3~R9C7~R9C6.Cage~17~R8C3~R7C3.Cage~23~R6C3~R6C4~R7C4.',
   },
   {
-    // From gracefu.
     name: 'Skyscaper 2-3',
+    src: 'gracefu',
     input: '.Skyscraper~C8~3~2.Skyscraper~R6~2~3.Skyscraper~R8~~3.Skyscraper~C7~~3.Skyscraper~C4~~3.Skyscraper~C5~~3.Skyscraper~C2~~3.Skyscraper~C3~3~2.Skyscraper~R2~3~2.Skyscraper~R1~3~3.Skyscraper~R4~3~.Skyscraper~C1~2~3.Skyscraper~R9~3~.Skyscraper~R7~2~3.Skyscraper~C6~3~.Skyscraper~C9~3~.Skyscraper~R5~~3.Skyscraper~R3~2~2.',
   },
   {
-    // From CTC discord discussion.
     name: 'Zero solution: Renban',
+    src: 'CTC discord discussion',
     input: '.Renban~R7C2~R8C1~R9C2~R8C3.Renban~R7C5~R8C6~R9C5~R8C4.Renban~R8C7~R9C8~R8C9~R7C8.Renban~R6C8~R5C9~R4C8~R5C7.Renban~R3C2~R2C1~R1C2~R2C3.Renban~R3C5~R2C4~R1C5~R2C6.Renban~R2C7~R1C8~R2C9~R3C8.Renban~R5C4~R4C5~R5C6~R6C5.Renban~R4C2~R5C1~R6C2~R5C3.',
   },
   {
-    // From CTC discord discussion.
     name: 'Zero solution: Little Killer',
+    src: 'CTC discord discussion',
     input: '.LittleKiller~49~R1C9.LittleKiller~49~R1C8.LittleKiller~49~R9C2.LittleKiller~49~R9C3.LittleKiller~49~R7C9.LittleKiller~49~R1C1.LittleKiller~49~R2C1.LittleKiller~49~R3C1.',
   },
 
@@ -664,13 +667,13 @@ export const EXAMPLES = [
     solution: '821376945795481362634529718183654297956712834247893156519267483478135629362948571',
   },
   {
-    name: 'Wecoc #1 mod A',
+    name: 'Wecoc #1 [mod A]',
     src: 'http://forum.enjoysudoku.com/killing-with-flowers-t36181-15.html#p279072',
     input: '3x3::k:6144:6144:6401:6401:6401:6658:6658:6658:6658:6144:6401:6401:5123:4868:4868:4868:6661:6658:6144:5126:5126:5123:5123:5123:4868:6661:6661:6144:5126:5127:3336:2313:2313:5130:5130:6661:6155:5126:5127:3336:1555:1555:5130:5133:6661:6155:5127:5127:4366:4366:1555:5130:5133:6671:6155:6155:5392:5137:5137:5137:5133:5133:6671:6162:6155:5392:5392:5392:5137:6412:6412:6671:6162:6162:6162:6162:6412:6412:6412:6671:6671:',
     solution: '821376945795481362634529718183654297956712834247893156519267483478135629362948571',
   },
   {
-    name: 'Wecoc #1 mod B',
+    name: 'Wecoc #1 [mod B]',
     src: 'http://forum.enjoysudoku.com/killing-with-flowers-t36181-15.html#p279072',
     input: '3x3::k:6144:6144:6401:6401:6401:6658:6658:6658:6658:6144:6401:6401:5123:4868:4868:4868:6661:6658:6144:5126:5126:5123:5123:5123:4868:6661:6661:6144:5126:5127:3342:2312:2312:5130:5130:6661:6155:5126:5127:3342:4627:1289:5130:5133:6661:6155:5127:5127:4627:4627:1289:5130:5133:6671:6155:6155:5392:5137:5137:5137:5133:5133:6671:6162:6155:5392:5392:5392:5137:6412:6412:6671:6162:6162:6162:6162:6412:6412:6412:6671:6671:',
   },
@@ -788,34 +791,34 @@ export const EXAMPLES = [
     solution: '462135513624236541145362321456654213',
   },
   {
-    name: '6x6: Successor Arrows',
+    name: 'Successor Arrows',
+    comment: 'Successor-arrow rule encoded as Regex constraints.',
     src: 'https://sudokupad.app/txrhj6jpls',
     input: `.Shape~6x6.Regex~KDEyfDIuM3wzLi40fDQuLi41fDUuLi4uNikuKg~R1C5~R1C4~R1C3~R1C2~R1C1~~R2C6~R2C5~R2C4~R2C3~R2C2~R2C1~~R4C1~R4C2~R4C3~R4C4~R4C5~R4C6~~R6C4~R6C5~R6C6~~R6C5~R6C4~R6C3~R6C2~R6C1.Regex~LiooMTJ8MjQpLio~R1C1~R2C1~R3C1~R4C1~R5C1~R6C1~~R1C2~R2C2~R3C2~R4C2~R5C2~R6C2~~R1C3~R2C3~R3C3~R4C3~R5C3~R6C3~~R1C4~R2C4~R3C4~R4C4~R5C4~R6C4~~R1C5~R2C5~R3C5~R4C5~R5C5~R6C5~~R1C6~R2C6~R3C6~R4C6~R5C6~R6C6`,
     solution: '146532253614635421412356324165561243',
   },
 
   {
-    // Requires allow ties in clues.
     name: '4x4: Full Rank - with ties',
+    comment: 'Requires allowing ties in clues.',
     input: '.Shape~4x4.FullRank~C1~10~.FullRank~C2~15~.FullRank~R4~5~.FullRankTies~any',
     solution: '3421124341322314',
   },
   {
-    // Requires allow ties in clues, with repeated ranks.
     name: '4x4: Full Rank - tied clues',
+    comment: 'Requires allowing ties in clues, with repeated ranks.',
     input: '.Shape~4x4.FullRank~C1~10~.FullRank~C2~15~.FullRank~R4~5~.FullRank~R3~~5.FullRankTies~any',
     solution: '3421124341322314',
   },
   {
-    // Requires no ties to have a unique solution.
     name: '4x4: Full Rank - no ties',
+    comment: 'Requires no ties to have a unique solution.',
     input: '.Shape~4x4.FullRank~C1~10~.~R3C4_2~R4C3_1.FullRankTies~none',
     solution: '3421213413424213',
   },
   {
-    // Requires clues to be unique, but to allow other ties to have a unique
-    // solution.
     name: '4x4: Full Rank - unclued ties',
+    comment: 'Requires clues to be unique but allows other ties, for a unique solution.',
     input: '.Shape~4x4.FullRank~R4~5~.~R3C2_1',
     solution: '3241143241232314',
   },
@@ -824,32 +827,32 @@ export const EXAMPLES = [
   // Non-rectangular grids
   //////////////////////////////////////////////////////////////////////////////
   {
-    // Added numbers randomly until it had a unique solution.
     name: '6x8: Plain',
+    comment: 'Added numbers randomly until it had a unique solution.',
     input: '.Shape~6x8.~R1C1_1~R3C3_2~R4C6_3~R6C8_4~R1C5_5~R6C2_6~R2C7_7~R5C4_8~R3C5_1~R5C2_2~R3C1_3~R1C6_4~R5C7_5~R3C8_6~R6C5_7~R1C3_8~R4C2_1~R1C8_2~R5C8_3~R3C2_5~R6C3_1~R2C3_4',
     solution: '178654322345867135241786816723454278615356137824',
   },
   {
-    // Added killer cages and adjusted clues until it had a unique solution.
     name: '5x10: Killer Sudoku',
+    comment: 'Added killer cages and adjusted clues until it had a unique solution.',
     input: '.Shape~5x10.Cage~16~R1C8~R1C9~R2C9.Cage~34~R2C1~R3C1~R4C1~R5C1.Cage~3~R1Ca~R2Ca.Cage~4~R5C6~R5C7.Cage~7~R2C2~R3C2~R3C3.Cage~13~R3C4~R4C4.Cage~20~R5C4~R5C5~R4C5.Cage~20~R4C2~R4C3~R5C2~R5C3.Cage~12~R1C2~R1C3~R2C3.Cage~21~R4C7~R4C6~R3C6~R2C6.Cage~20~R3Ca~R4Ca~R5Ca.Cage~10~R3C8~R3C9.Cage~12~R4C8~R5C9~R5C8.Cage~11~R1C7~R2C7.Cage~34~R1C4~R1C5~R2C5~R3C5~R2C4',
     solution: 'CFAJDIGHEBHBEIFGDJCAJADGECFBHIGECFHBIAJDIDHBJACEFG',
   },
   {
-    // Arbitrarily added jigsaw pieces and givens.
     name: '4x7: Jigsaw',
+    comment: 'Arbitrarily added jigsaw pieces and givens.',
     input: '.Shape~4x7.Jigsaw~1222222111113244441334443333.~R2C4_2~R3C6_3~R4C5_4~R3C1_5~R4C3_6~R1C7_7~R4C7_5~R1C1_3~R1C5_6~R2C2_1',
     solution: '3425617614257352147367361425',
   },
   {
-    // Arbitrarily added skyscraper clues.
     name: '4x6: Skyscraper',
+    comment: 'Arbitrarily added skyscraper clues.',
     input: '.Shape~4x6.Skyscraper~C1~1~4.Skyscraper~C2~2~3.Skyscraper~C3~3~.Skyscraper~C4~3~2.Skyscraper~C5~2~.Skyscraper~C6~1~.Skyscraper~R4~4~',
     solution: '531246462315346521125463',
   },
   {
-    // Added numbers randomly until it had a unique solution.
     name: '9x8: Plain boxless',
+    comment: 'Added numbers randomly until it had a unique solution.',
     input: '.Shape~9x8.~R1C1_1~R3C3_2~R6C4_3~R4C6_4~R8C7_5~R8C2_6~R2C5_7~R9C8_8~R5C2_9~R1C7_2~R9C5_9~R9C1_6~R3C7_7~R2C8_3~R4C1_2~R7C3_1~R7C6_9~R5C7_8~R4C4_5~R6C8_5~R1C3_8~R7C2_4~R6C1_8~R8C4_8~R9C3_5~R3C5_6~R2C2_5~R7C8_2~R5C5_4~R1C4_4~R8C5_1~R4C3_3~R4C8_6',
     solution: '138456279546781338296574213584967962438187932145541739624678125962519738',
   },
@@ -864,37 +867,44 @@ export const EXAMPLES = [
     solution: '9372514214986785613293428751179548642361755687293',
   },
   {
-    name: '6x6: Con-set-cutive',
+    name: 'Con-Set-Cutive',
+    comment: '9 values squished into a 6x6 grid via overlapping regions.',
     src: ['https://www.youtube.com/watch?v=G3rxwq4_RqU', 'https://sudokupad.app/LFB3qhjfNB'],
     input: '.Shape~6x6~9.Cage~10~R1C2~R2C2.Cage~8~R3C1~R4C1.Renban~R4C1~R5C1.Renban~R2C1~R2C2.Renban~R3C4~R4C4~R5C4~R6C4.Whisper~5~R4C3~R4C4~R4C5.Whisper~5~R2C4~R2C5.Arrow~R6C4~R6C3~R6C2~R6C1.RegionSize~6.RegionSameValues',
     solution: '627198981276198762762819879621216987',
   },
   {
-    name: '7x7: Skyscraper Squishdoku',
+    name: 'Buy Or Rent? (Skyscraper Version)',
+    comment: '9 values squished into a 7x7 grid.',
     src: 'https://sudokupad.app/c4femzsvd3',
     input: '.Shape~7x7~9.RegionSize~9.AllDifferent~R1C3~R2C3~R3C3~R3C4~R3C5~R2C5~R1C5~R1C4~R2C4.AllDifferent~R3C1~R3C2~R4C2~R3C3~R4C3~R5C3~R5C2~R5C1~R4C1.AllDifferent~R3C3~R4C3~R5C3~R5C4~R5C5~R4C5~R3C5~R3C4~R4C4.AllDifferent~R3C5~R4C5~R5C5~R5C6~R5C7~R4C7~R3C7~R3C6~R4C6.AllDifferent~R5C3~R5C4~R5C5~R6C5~R7C5~R7C4~R7C3~R6C3~R6C4.Skyscraper~C3~3~.Skyscraper~C4~3~.Skyscraper~C5~3~2.Skyscraper~C1~~5.Skyscraper~R7~3~.Skyscraper~R1~4~1.Skyscraper~R2~~1.Skyscraper~R4~~1.X~R4C1~R4C2.V~R5C7~R6C7.Jigsaw~1112333111233311123332222222444255544425554442555',
     solution: '2641378735821981976546435127572489349135623869741',
   },
   {
-    name: '7x7: Numbered Rooms Squishdoku',
+    name: 'Buy Or Rent? (Numbered Rooms Version)',
+    comment: '9 values squished into a 7x7 grid.',
     src: 'https://sudokupad.app/bwt9bku509',
     input: '.Shape~7x7~9.RegionSize~9.AllDifferent~R1C3~R2C3~R3C3~R3C4~R3C5~R2C5~R1C5~R1C4~R2C4.AllDifferent~R3C1~R3C2~R4C2~R3C3~R4C3~R5C3~R5C2~R5C1~R4C1.AllDifferent~R3C3~R4C3~R5C3~R5C4~R5C5~R4C5~R3C5~R3C4~R4C4.AllDifferent~R3C5~R4C5~R5C5~R5C6~R5C7~R4C7~R3C7~R3C6~R4C6.AllDifferent~R5C3~R5C4~R5C5~R6C5~R7C5~R7C4~R7C3~R6C3~R6C4.NumberedRoom~C3~3~.NumberedRoom~C4~3~.NumberedRoom~C5~3~2.NumberedRoom~C1~~5.NumberedRoom~R7~3~.NumberedRoom~R1~4~1.NumberedRoom~R2~~1.NumberedRoom~R4~~1.NumberedRoom~C7~~5.X~R4C1~R4C2.V~R5C7~R6C7.Jigsaw~1112333111233311123332222222444255544425554442555',
     solution: '3846271971836562579481934627748215351634922395786',
   },
   {
-    name: '6x6: Hidden Hostility',
+    name: 'Hidden Hostility',
+    comment: '9 values squished into a 6x6 grid.',
     src: 'https://sudokupad.app/8rw2twqz7p',
     input: '.Shape~6x6~9.RegionSize~9.Diagonal~-1.Cage~8~R1C2~R1C1~R2C1.Cage~7~R5C1~R6C1~R6C2.Cage~23~R4C2~R5C2~R5C3.Cage~22~R2C3~R2C2~R3C2.Cage~23~R2C4~R2C5~R3C5.Cage~21~R4C5~R5C5~R5C4.Cage~8~R5C6~R6C6~R6C5.Cage~7~R1C5~R1C6~R2C6.GreaterThan~R1C3~R1C4.GreaterThan~R6C3~R6C2.GreaterThan~R3C5~R3C6',
     solution: '348512179864562397795683286941413725',
   },
   {
-    name: '6x6: Order from Chaos',
+    name: 'Order From Chaos',
+    comment: '9 values squished into a 6x6 grid.',
     src: 'https://sudokupad.app/a3ur2w2dvp',
     input: '.Shape~6x6~9.RegionSize~9.~R3C1_3.GlobalEntropy.NFA~VgGv_wQgxBRhyCf-UWYaceeef_z0EUkzzzz_-eoqsuceef_zz2GWkzzz_-eeo246cef_zzz3n4ITz_-eeepFHIcf_zzzz3pZpz_-eeeepRTVWASgIiEFyAfADwAAkAQsIE0AeATwIqEGiAcAlAQyIHQIwEHCBCAjwQ2IIEAcBFAg-QJAQ8II0BOBDwhEQJoBWA~_Arith%2E%20Seq~R1C1~R1C2~R1C3~~R2C2~R3C2~R3C3~~R4C1~R5C1~R6C1~R6C2~~R4C2~R4C3~R5C3~R6C3~~R2C4~R3C4~R4C4~~R5C4~R5C5~R6C5~~R3C5~R3C6~R4C6',
     solution: '159482742163368597813925695748427316',
   },
   {
     name: '6x6: Irregular Quadro Quadri',
+    // TODO: wrong src — this link is a copy-paste of 'Successor Arrows' and
+    // decodes to that puzzle. Replace with the correct puzzle link.
     src: 'https://sudokupad.app/txrhj6jpls',
     input: '.Shape~6x6~9.RegionSize~9.NoBoxes.Renban~R5C1~R6C2.Renban~R4C2~R5C3.Renban~R2C1~R1C2.Renban~R3C2~R2C3.Renban~R1C5~R2C6.Renban~R2C4~R3C5.Renban~R4C5~R5C4.Renban~R5C6~R6C5.Quad~R1C5~1~2~4.Quad~R2C5~7~8.Quad~R1C1~1~2~3.Quad~R1C2~8~9.Quad~R3C3~1~2~3~4.Quad~R4C1~5~9.Quad~R5C1~2~3~4.Quad~R5C4~6~7.Quad~R5C5~1~3~4.Jigsaw~122222112223111233114333144433444443',
     solution: '829514318672972358561497495863236741',
@@ -906,7 +916,8 @@ export const EXAMPLES = [
     solution: '3617942725438194826752175493653912887465391928764',
   },
   {
-    name: '5x5: Squishtroquadri',
+    name: 'The Whirlpool',
+    comment: '9 values squished into a 5x5 grid.',
     src: 'https://sudokupad.app/79rm1eeek6',
     input: '.Shape~5x5~9.AllDifferent~R1C1~R1C2~R1C3~R2C3~R3C3~R3C2~R3C1~R2C1~R2C2.AllDifferent~R1C3~R2C3~R3C3~R3C4~R3C5~R2C5~R1C5~R1C4~R2C4.AllDifferent~R3C1~R3C2~R3C3~R4C3~R5C3~R5C2~R5C1~R4C1~R4C2.AllDifferent~R3C3~R4C3~R5C3~R5C4~R5C5~R4C5~R3C5~R4C4~R3C4.Arrow~R4C1~R3C1~R2C1~R2C2.Arrow~R1C2~R1C3~R1C4~R2C4.Arrow~R2C5~R3C5~R4C5~R4C4.Arrow~R5C4~R5C3~R5C2~R4C2.Thermo~R4C3~R3C2~R2C3~R3C4',
     solution: '6924714836375918162392478',
@@ -954,8 +965,8 @@ export const EXAMPLES = [
     solution: '974835216312976845568421379187653924456289731239147658625394187841762593793518462',
   },
   {
-    // As above, but 'Or' constraints have been resolved.
-    name: 'Killer lunchboxes, resolved',
+    name: 'Killer lunchboxes [resolved]',
+    comment: "Same as 'Killer lunchboxes' but with the Or constraints resolved.",
     src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?print=true&chlang=en&id=0003OO',
     input: '.Lunchbox~3~R1C1~R2C1~R2C2~R3C2~R4C2~R4C3.Lunchbox~8~R1C3~R1C4~R2C4.Cage~11~R1C5~R1C6~R1C7~R1C8.Cage~16~R4C4~R3C4~R3C5~R3C6~R4C6.Lunchbox~6~R5C2~R5C3~R6C3.Lunchbox~10~R6C4~R5C4~R5C5~R5C6.Lunchbox~7~R4C7~R5C7~R6C7.Cage~6~R4C8~R5C8~R5C9.Lunchbox~0~R9C7~R9C8~R9C9.Cage~13~R7C7~R7C6~R8C6~R8C5.Cage~8~R7C2~R7C3~R8C3.Lunchbox~15~R7C1~R8C1~R9C1~R9C2.Cage~7~R4C1~R5C1~R6C1.Lunchbox~0~R6C5~R7C5~R7C4~R8C4~R9C4.',
     solution: '974835216312976845568421379187653924456289731239147658625394187841762593793518462',
@@ -1056,26 +1067,26 @@ export const EXAMPLES = [
     solution: '347612085825074163160385472281436507756820341403157628672501834534268710018743256',
   },
   {
-    name: '0-indexed: Region sum lines',
+    name: 'Zeroed In',
     src: 'https://sudokupad.app/adventure/393-zeroed-in',
     input: '.Shape~6x6~0-5.RegionSumLine~R1C1~R2C1~R3C1~R2C2~R1C3.RegionSumLine~R1C5~R1C4~R2C5~R3C6~R2C6~R1C6.RegionSumLine~R3C5~R3C4~R4C3~R4C4~R4C5~R4C6.RegionSumLine~R6C5~R5C4~R5C3~R4C2~R5C2~R6C2',
     solution: '350412142503401235235041023154514320',
   },
   {
-    name: '0-indexed: A very full quiver',
+    name: 'A Very Full Quiver',
     src: ['https://www.youtube.com/watch?v=rQPGrmzGc7Q', 'https://sudokupad.app/gd4b2rpP4p'],
     input: '.Shape~9x9~0-8.Arrow~R1C1~R1C2~R1C3~R1C4.Arrow~R1C9~R1C8~R1C7~R1C6.Arrow~R4C1~R3C1~R2C1.Arrow~R4C2~R3C3~R2C2.Arrow~R3C2~R2C3~R2C4~R2C5.Arrow~R2C6~R3C6~R4C7~R5C7.Arrow~R2C7~R2C8~R3C7~R4C6.Arrow~R2C9~R3C9~R3C8.Arrow~R3C4~R3C5~R4C5.Arrow~R6C3~R6C2~R5C2~R4C3.Arrow~R8C1~R7C1~R6C1~R5C1.Arrow~R9C3~R9C2~R9C1.Arrow~R8C5~R8C4~R8C3~R8C2.Arrow~R6C4~R7C3~R7C2.Arrow~R7C4~R7C5~R8C6~R8C7.Arrow~R9C7~R9C6~R9C5~R9C4.Arrow~R7C9~R8C9~R9C9~R9C8.Arrow~R4C8~R5C8~R6C9~R7C8.Arrow~R6C8~R5C9~R4C9.Arrow~R5C6~R6C7~R6C6~R6C5.Arrow~R5C5~R4C4~R5C4~R5C3.Arrow~R8C8~R7C7~R7C6',
     solution: '834162507520347816176850324682034175015278643347615280451726038703581462268403751',
   },
   {
-    name: '0-indexed: Lets build a snowman',
-    // Modified to avoid the domino constraint.
+    name: "Let's Build a Snowman [0-indexed]",
+    comment: "0-based re-encoding; the domino clue was dropped because it doesn't work with shifted (0-based) indices.",
     src: ['https://www.youtube.com/watch?v=L-cbtgqTE9M', 'https://sudokupad.app/HmMdQDq98p'],
     input: '.Shape~9x9~0-8.BlackDot~R4C5~R5C5~R6C5.BlackDot~R6C5~R7C5.Whisper~5~R6C7~R5C8~R4C9.Whisper~5~R4C8~R5C8.Whisper~5~R4C1~R5C2~R6C3.Whisper~5~R5C1~R5C2.Thermo~R3C5~R3C6.Arrow~R7C7~R8C6~R8C5~R8C4~R7C3.Arrow~R5C3~R4C4~R3C3~R2C3~R1C4~R1C5~R1C6~R2C7~R3C7~R4C6~R5C7.WhiteDot~R2C4~R2C5~R2C6.~R7C8_4~R1C4_2~R2C3_0~R6C8_3~R3C2_5',
     solution: '374201658280456173651378024523180467708643215146527830032815746467032581815764302',
   },
   {
-    name: '0-indexed: +-Information',
+    name: '± Information',
     src: ['https://www.youtube.com/watch?v=bKmmldIq3Lk', 'https://sudokupad.app/gx4cd1q3zo'],
     input: '.Shape~9x9~0-8.Diagonal~1.Diagonal~-1.StrictXV.V~R1C1~R1C2.V~R2C1~R2C2.V~R3C1~R3C2.V~R1C8~R1C9.V~R2C8~R2C9.V~R3C8~R3C9.V~R5C6~R5C5.V~R7C7~R7C8.V~R8C7~R8C8.V~R9C7~R9C8.V~R7C5~R7C4.V~R8C5~R8C4.V~R9C5~R9C4.Renban~R5C3~R6C3.Renban~R1C7~R2C7.Renban~R8C7~R8C8.Renban~R9C9~R9C8',
     solution: '058362741236174805147085632725843160813650274604721583362507418580416327471238056',
@@ -1110,7 +1121,7 @@ export const EXAMPLES = [
     solution: '327085146104763852865142037246831570031257468758604213483570621672418305510326784',
   },
   {
-    name: '0-indexed: Counting circles',
+    name: 'Hippo Birdie',
     src: ['https://www.youtube.com/watch?v=utCq4OFN5bQ', 'https://sudokupad.app/blobz/hippo-birdie'],
     input: '.Shape~9x9~0-8.~R6C5_6~R6C6_0.Whisper~5~R9C3~R9C4.Whisper~5~R3C5~R2C4~R2C3~R3C2~R4C2~R5C2~R6C2~R7C2~R8C3~R8C4~R7C5~R6C5~R5C5~R4C4~R4C3.Whisper~5~R4C3~R5C2.Whisper~5~R1C7~R1C8.Whisper~5~R3C6~R4C6~R5C6~R6C6~R7C6~R8C7~R8C8~R7C9~R6C9~R5C9~R4C9~R3C9~R2C8~R2C7.Whisper~5~R3C6~R2C7.CountingCircles~R9C2~R9C5~R7C3~R6C4~R6C1~R6C7~R8C8~R4C9~R3C8~R4C5~R3C2~R1C5~R1C7~R1C9',
     solution: '825036714430751286176428530503842167684517302712360458367205841251684073048173625',
@@ -1122,7 +1133,8 @@ export const EXAMPLES = [
     solution: '483520617752461380016873245137052468865734021240618573324107856501286734678345102',
   },
   {
-    name: '0-indexed: Regex line',
+    name: 'Regex Line [0-indexed]',
+    comment: '0-based re-encoding of the 1-9 original; lines encoded as Regex constraints.',
     src: 'https://sudokupad.app/8fy259rt01',
     input: '.Shape~9x9~0-8.Regex~KFteMC0yXVszNl1bNThdfFszNl0wMTJbNThdKSo~R5C2~R4C1~R3C1~R2C1~R1C1~R1C2~R2C3~R3C3~R4C3~R4C4~R4C5~R4C6~R4C7~R3C7~R2C7~R1C8~R1C9~R2C9~R3C9~R4C9~R5C8~R6C8.Regex~KFteMTQ3XS5bMDIzNV0uWzAzNV18WzAyM10uLjQuLlsyMzVdKSouPw~R5C8~R6C9~R7C9~R8C9~R9C9~R9C8~R9C7~R8C7~R7C7~R6C7~R6C6~R6C5~R6C4~R6C3~R7C3~R8C3~R9C3~R9C2~R9C1~R8C1~R7C1~R6C1~R5C2~R4C2.Regex~Lj8oW14zNl18MzYwKSo~R5C1~R4C1~R3C2~R2C3~R2C4~R2C5~R2C6~R2C7~R3C8~R4C9~R5C9.WhiteDot~R4C6~R5C6',
     solution: '870413265246058713135762840027684351368105427514237086452376108781520634603841572',
@@ -1143,13 +1155,14 @@ export const EXAMPLES = [
     solution: '259638470403729618761540293096471385512806749874253061980362154325187906147095832',
   },
   {
-    name: 'Dutch-pelganger',
+    name: 'Dutch-pelgänger',
     src: 'https://sudokupad.app/t4fevoplnv',
     input: '.Shape~9x9~0-9.Doppelganger.Whisper~4~R1C2~R1C1~R2C1.Whisper~4~R2C1~R1C2.Whisper~4~R1C3~R2C2~R3C1.Whisper~4~R3C2~R2C3~R3C3.Whisper~4~R3C2~R3C3.Whisper~4~R2C5~R2C6~R3C6.Whisper~4~R2C5~R3C6.Whisper~4~R1C7~R2C7~R1C8.Whisper~4~R1C7~R1C8.Whisper~4~R2C9~R3C8~R3C9.Whisper~4~R2C9~R3C9.Whisper~4~R5C9~R5C8~R6C8.Whisper~4~R6C8~R5C9.Whisper~4~R7C7~R8C7~R9C7~R8C8.Whisper~4~R7C7~R8C8.Whisper~4~R7C6~R8C5~R9C4.Whisper~4~R9C5~R8C6~R9C6.Whisper~4~R9C5~R9C6.Whisper~4~R7C4~R7C5~R8C4.Whisper~4~R7C4~R8C4.Whisper~4~R7C3~R7C2~R8C2.Whisper~4~R8C2~R7C3.Whisper~4~R6C2~R5C1~R6C1.Whisper~4~R6C1~R6C2.Whisper~4~R5C4~R4C4~R5C5~R6C6~R5C6.Whisper~4~R5C4~R5C5~R5C6.Whisper~4~DGR3~DGR4~DGR5.Whisper~4~DGR6~DGR7~DGR8.Whisper~4~DGC2~DGC3~DGC4.Whisper~4~DGB2~DGB4~DGB5.Whisper~4~DGB5~DGB2',
     solution: '916837042520649831784210659172563480863904715045728396351082967298475103607391524',
   },
   {
-    name: 'Dutch-pelganger - easier',
+    name: 'Dutch-pelgänger [easier]',
+    comment: 'Easier cut with extra givens and a GreaterThan clue.',
     src: 'https://sudokupad.app/t4fevoplnv',
     input: '.Shape~9x9~0-9.Doppelganger.Whisper~4~R1C2~R1C1~R2C1.Whisper~4~R2C1~R1C2.Whisper~4~R1C3~R2C2~R3C1.Whisper~4~R3C2~R2C3~R3C3.Whisper~4~R3C2~R3C3.Whisper~4~R2C5~R2C6~R3C6.Whisper~4~R2C5~R3C6.Whisper~4~R1C7~R2C7~R1C8.Whisper~4~R1C7~R1C8.Whisper~4~R2C9~R3C8~R3C9.Whisper~4~R2C9~R3C9.Whisper~4~R5C9~R5C8~R6C8.Whisper~4~R6C8~R5C9.Whisper~4~R7C7~R8C7~R9C7~R8C8.Whisper~4~R7C7~R8C8.Whisper~4~R7C6~R8C5~R9C4.Whisper~4~R9C5~R8C6~R9C6.Whisper~4~R9C5~R9C6.Whisper~4~R7C4~R7C5~R8C4.Whisper~4~R7C4~R8C4.Whisper~4~R7C3~R7C2~R8C2.Whisper~4~R8C2~R7C3.Whisper~4~R6C2~R5C1~R6C1.Whisper~4~R6C1~R6C2.Whisper~4~R5C4~R4C4~R5C5~R6C6~R5C6.Whisper~4~R5C4~R5C5~R5C6.Whisper~4~DGR3~DGR4~DGR5.Whisper~4~DGR6~DGR7~DGR8.Whisper~4~DGC2~DGC3~DGC4.Whisper~4~DGB2~DGB4~DGB5.Whisper~4~DGB5~DGB2.GreaterThan~DGB9~DGB8~DGB6.~R8C3_8~R3C5_1',
     solution: '916837042520649831784210659172563480863904715045728396351082967298475103607391524',
@@ -1179,7 +1192,8 @@ export const EXAMPLES = [
     solution: '326514154362642135531246263451415623',
   },
   {
-    name: '6x6 Miracle Sudoku',
+    name: 'Hailstorm',
+    comment: 'Miracle-style constraints modelled with an NFA.',
     src: ['https://www.youtube.com/watch?v=suGppTiRORk', 'https://sudokupad.app/bcurd4y01m?setting-nogrid=1'],
     input: '.Shape~6x6~0-9.Var~A~~2.Var~B~~2.Var~C~~2.Var~D~~2.Var~E~~2.Thermo~R1C2~R1C1.Sum~0_=_1_1_1_1_1_-10_-1~R2C1~R3C2~R4C3~R5C4~R6C5~VA1~VA2.Sum~0_=_1_1_1_1_1_1_-10_-1~R1C1~R2C2~R3C3~R4C4~R5C5~R6C6~VB1~VB2.Sum~0_=_1_1_1_1_1_-10_-1~R1C2~R2C3~R3C4~R4C5~R5C6~VC1~VC2.Sum~0_=_1_1_1_1_-10_-1~R1C3~R2C4~R3C5~R4C6~VD1~VD2.Sum~0_=_1_1_1_-10_-1~R1C4~R2C5~R3C6~VE1~VE2.Replicate~______.~R1C1_1_2_3_4_5_6.End.NFA~TkRf-RorPE1f_kaKzxNX_4CIiIiI_8AiIiIj_gCIiIj_ACIiI_gAiIj8ACIj4ACI8AAjgADAAA~_~VA1~VB1~VA2~VB2~~VB1~VC1~VB2~VC2~~VC1~VD1~VC2~VD2~~VD1~VE1~VD2~VE2',
     solution: '316542245163421356653214162435534621',
@@ -1234,7 +1248,7 @@ export const EXAMPLES = [
     solution: '265413314652543126126534631245452361',
   },
   {
-    name: 'Chaos Construction: cell count - harder',
+    name: 'Chaos Construction: cell count [harder]',
     src: 'https://www.gmpuzzles.com/blog/2025/06/chaos-construction-sudoku-cell-count-by-clover/',  // modified
     input: '.Shape~6x6.ChaosConstruction.NoBoxes.~R5C6_5~R2C1_3~R6C4_3~R3C4_1~R4C2_2.ChaosCount~R1C2~~CC2~CC1~CC7~CC8~CC9~CC3.ChaosCount~R1C4~~CC4~CC3~CC9~CC10~CC11~CC5.ChaosCount~R1C6~~CC6~CC5~CC11~CC12.ChaosCount~R2C6~~CC12~CC6~CC5~CC11~CC17~CC18.ChaosCount~R5C1~~CC25~CC19~CC20~CC26~CC32~CC31.ChaosCount~R6C1~~CC31~CC25~CC26~CC32.ChaosCount~R6C3~~CC33~CC32~CC26~CC27~CC28~CC34.ChaosCount~R6C5~~CC35~CC34~CC28~CC29~CC30~CC36',
     solution: '265413314652543126126534631245452361',
@@ -1252,33 +1266,33 @@ export const EXAMPLES = [
     solution: '938156247724583916863942175645721893397215684271369458186497532459678321512834769',
   },
   {
-    name: 'Chaos Construction: Uncovering tunnels',
+    name: 'Uncovering Tunnels',
     src: 'https://sudokupad.app/y323plq5im',
     input: '/data/scripts/uncovering_tunnels.js',
     solution: '524176398159864732643915287932781465785249613496532871371628954268357149817493526',
     constraintTypes: ['ChaosConstruction', 'NoBoxes', 'ChaosArrow', 'NFA', 'Whisper', 'AllDifferent', 'CountDistinct'],
   },
   {
-    name: 'Chaos Construction: Sunblock',
+    name: 'Sunblock',
     src: ['https://www.youtube.com/watch?v=wmd78ZbRXrI', 'https://sudokupad.app/yeb6vd8pem'],
     input: '.ChaosConstruction.NoBoxes.ChaosCount~R2C2.ChaosCount~R2C3.ChaosCount~R2C4.ChaosCount~R2C5.ChaosCount~R2C6.ChaosCount~R2C7.ChaosCount~R2C9.ChaosCount~R3C3.ChaosCount~R3C4.ChaosCount~R3C5.ChaosCount~R1C6.ChaosCount~R4C4.ChaosCount~R4C6.ChaosCount~R4C1.ChaosCount~R4C9.ChaosCount~R5C8.ChaosCount~R6C8.ChaosCount~R6C1.ChaosCount~R6C2.ChaosCount~R6C3.ChaosCount~R7C3.ChaosCount~R7C2.ChaosCount~R7C1.ChaosCount~R7C6.ChaosCount~R7C5.ChaosCount~R8C5.ChaosCount~R9C3.ChaosCount~R8C9.ChaosCount~R2C1~0~CC10~CC1~CC2~CC11~CC20~CC19',
     solution: '679214358458726913936458721581673294124897536345982167267135849792341685813569472',
   },
   {
-    name: 'Chaos Construction: Calm Construction',
+    name: 'Calm Construction',
     src: ['https://www.youtube.com/watch?v=iOD6yayIVCo', 'https://sudokupad.app/4jw7hz9rd1'],
     input: '.ChaosConstruction.~R6C5_9.ChaosCount~R1C1~0~CC1~CC2~CC3~CC12~CC11~CC10~CC19~CC20~CC21.ChaosCount~R1C2~0~CC2~CC1~CC10~CC19~CC20~CC11~CC3~CC12~CC21.ChaosCount~R2C2~0~CC11~CC1~CC2~CC3~CC12~CC21~CC20~CC19~CC10.ChaosCount~R2C4~0~CC13~CC4~CC5~CC6~CC15~CC14~CC22~CC23~CC24.ChaosCount~R2C5~0~CC14~CC4~CC5~CC6~CC15~CC24~CC23~CC22~CC13.ChaosCount~R2C6~0~CC15~CC6~CC5~CC13~CC14~CC4~CC22~CC23~CC24.ChaosCount~R1C7~0~CC7~CC8~CC9~CC18~CC17~CC16~CC25~CC27~CC26.ChaosCount~R1C8~0~CC8~CC7~CC16~CC25~CC26~CC17~CC9~CC18~CC27.ChaosCount~R1C9~0~CC9~CC8~CC7~CC16~CC17~CC18~CC27~CC26~CC25.ChaosCount~R4C2~0~CC29~CC30~CC39~CC38~CC37~CC28~CC46~CC47~CC48.ChaosCount~R5C2~0~CC38~CC30~CC29~CC28~CC37~CC46~CC47~CC48~CC39.ChaosCount~R4C5~0~CC32~CC33~CC42~CC51~CC50~CC41~CC31~CC40~CC49.ChaosCount~R4C6~0~CC33~CC42~CC51~CC50~CC41~CC32~CC31~CC40~CC49.ChaosCount~R4C9~0~CC36~CC35~CC34~CC43~CC44~CC45~CC54~CC53~CC52.ChaosCount~R9C9~0~CC81~CC80~CC79~CC70~CC61~CC62~CC71~CC72~CC63.ChaosCount~R8C1~0~CC64~CC55~CC56~CC57~CC66~CC65~CC75~CC74~CC73',
     solution: '428679153739521648615483297951362784246758931387194562562837419894216375173945826',
   },
   {
-    name: 'Chaos Construction: The Fountain',
+    name: 'The Fountain',
     src: ['https://www.youtube.com/watch?v=s-YGS4KO_M0', 'https://sudokupad.app/g9NB728Tgp'],
     input: '.ChaosConstruction.NoBoxes.~R5C5_1.Whisper~5~R4C4~R5C5~R4C6.Whisper~5~R5C1~R6C1~R7C2~R8C3.Whisper~5~R6C3~R7C3~R7C4~R7C5~R7C6~R7C7~R6C7.Whisper~5~R9C5~R8C5~R8C6~R8C7~R7C8~R6C9~R5C9.CountDistinct~R5C1~CC37~CC28~CC29~CC38~CC47~CC46.CountDistinct~R2C5~CC14~CC4~CC5~CC6~CC15~CC24~CC23~CC22~CC13.CountDistinct~R2C6~CC15~CC5~CC6~CC7~CC16~CC25~CC24~CC23~CC14.CountDistinct~R5C9~CC45~CC36~CC35~CC44~CC53~CC54.CountDistinct~R6C5~CC50~CC40~CC41~CC42~CC51~CC60~CC59~CC58~CC49.CountDistinct~R7C5~CC59~CC49~CC50~CC51~CC60~CC69~CC68~CC67~CC58.CountDistinct~R8C5~CC68~CC58~CC59~CC60~CC69~CC78~CC77~CC76~CC67',
     solution: '851467392495632187683294715136748259278915643912356478547183926329571864764829531',
   },
   {
-    // Very slow. Needs extra same value hint to be fast.
     name: 'Chaos Construction: Thermo Knots',
+    comment: 'Very slow. Needs extra same-value hint to be fast.',
     src: ['https://www.youtube.com/watch?v=Er6e0ODkVYg', 'https://sudokupad.app/4geira1lnl'],
     input: '/data/scripts/thermo_knots.js',
     solution: '728316459816594723397425816563281974471968235934657182152743698689132547245879361',
@@ -1306,7 +1320,7 @@ export const HARD_THERMOS = [
 
 export const EXTREME_KILLERS = [
   'Wecoc #1',
-  'Wecoc #1 mod A',
+  'Wecoc #1 [mod A]',
   'Wecoc #2',
   'tarek unsolvable #41',
 ];
