@@ -95,6 +95,14 @@ STATE MACHINES (NFA)
 
     See help/custom-constraints.html for the full state-machine semantics.
 
+REPLICATE
+
+  Replicate stamps a template of child constraints onto many targets
+
+    Replicate.encodeTargetCells(targets, origin, locator)  => target bitset
+      locator: a cellGraph()/makeOverlay() (or CellGeometry) owning the cell ids;
+               origin must not come after any target.
+
 SOLVER
 
   makeSolver provides programmatic access to the solver:

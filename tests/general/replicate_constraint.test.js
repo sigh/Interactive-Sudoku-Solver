@@ -6,9 +6,12 @@ import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 ensureGlobalEnvironment();
 
 const { SudokuConstraint } = await import('../../js/sudoku_constraint.js');
-const { GEOMETRY_9x9 } = await import('../../js/cell_geometry.js');
+const { GEOMETRY_9x9, CellGeometry } = await import('../../js/cell_geometry.js');
 const { SudokuBuilder } = await import('../../js/solver/sudoku_builder.js');
+const { SANDBOX_GLOBALS } = await import('../../js/sandbox/env.js');
 const HandlerModule = await import('../../js/solver/handlers.js');
+
+const { cellGraph } = SANDBOX_GLOBALS;
 
 await runTest('Replicate.decodeTargetCells should decode base64 bitset', () => {
   const geometry = GEOMETRY_9x9;
@@ -107,6 +110,41 @@ await runTest('Replicate does not enforce template when target is not in bitset'
 
   assert.equal(cellToValues.get(0), undefined);
   assert.deepEqual(cellToValues.get(1), [5]);
+});
+
+await runTest('encodeTargetCells accepts a sandbox grid graph as the locator', () => {
+  const g = cellGraph('9x9');
+  const targets = g.block('R1C1', 8, 8);
+  const bitset = SudokuConstraint.Replicate.encodeTargetCells(targets, 'R1C1', g);
+
+  // A grid-graph locator agrees with the real geometry, so it round-trips.
+  const decoded = new SudokuConstraint.Replicate([], bitset, 'R1C1')
+    .getCells(GEOMETRY_9x9);
+  assert.deepEqual(decoded, targets);
+});
+
+await runTest('encodeTargetCells accepts a var-cell overlay as the locator', () => {
+  // The overlay's ids ('VY1'..) aren't in a bare geometry, but the overlay is
+  // itself a locator, so it can both mint and index them.
+  const y = cellGraph('9x9').makeOverlay('VY');
+  const targets = y.block('VY1', 8, 8);
+  const bitset = SudokuConstraint.Replicate.encodeTargetCells(targets, 'VY1', y);
+
+  // Decoding against a real geometry that has the group registered recovers the
+  // same var cells: within one group both index spaces are dense and aligned,
+  // so the origin-relative offsets are invariant.
+  const geometry = CellGeometry.newDefault();
+  geometry.addVarCellsForConstraints([new SudokuConstraint.Var('Y', 'Y', 81)]);
+  const decoded = new SudokuConstraint.Replicate([], bitset, 'VY1')
+    .getCells(geometry);
+  assert.deepEqual(decoded, targets);
+});
+
+await runTest('encodeTargetCells rejects targets before the origin', () => {
+  const y = cellGraph('9x9').makeOverlay('VY');
+  assert.throws(
+    () => SudokuConstraint.Replicate.encodeTargetCells(['VY1', 'VY5'], 'VY3', y),
+    /must not precede the origin/);
 });
 
 logSuiteComplete('Replicate constraint');

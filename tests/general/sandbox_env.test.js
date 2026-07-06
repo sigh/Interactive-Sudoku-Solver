@@ -479,6 +479,41 @@ await runTest('overlay graph methods throw for a foreign cell', () => {
 });
 
 // ============================================================================
+// CellLocator role: parseCellId / makeCellIdFromIndex over the graph's own cells
+// ============================================================================
+
+await runTest('grid graph is a locator over its grid cells', () => {
+  const g = cellGraph('9x9');
+  assert.deepEqual(g.parseCellId('R1C1'), { cell: 0 });
+  assert.deepEqual(g.parseCellId('R2C1'), { cell: 9 });
+  assert.equal(g.makeCellIdFromIndex(0), 'R1C1');
+  assert.equal(g.makeCellIdFromIndex(9), 'R2C1');
+  const { cell } = g.parseCellId('R7C2');
+  assert.equal(g.makeCellIdFromIndex(cell), 'R7C2');
+});
+
+await runTest('overlay is a locator over group-local dense positions', () => {
+  const cc = cellGraph('9x9').makeOverlay('CC');
+  // The nth var cell has group-local index n-1, independent of grid indices.
+  assert.deepEqual(cc.parseCellId('CC1'), { cell: 0 });
+  assert.deepEqual(cc.parseCellId('CC10'), { cell: 9 });
+  assert.equal(cc.makeCellIdFromIndex(0), 'CC1');
+  assert.equal(cc.makeCellIdFromIndex(9), 'CC10');
+});
+
+await runTest('a sparse overlay locator indexes only its members', () => {
+  const sparse = cellGraph('9x9').makeOverlay('VC', ['R1C1', 'R5C5', 'R9C9']);
+  assert.deepEqual(sparse.parseCellId('VC2'), { cell: 1 });
+  assert.equal(sparse.makeCellIdFromIndex(2), 'VC3');
+  assert.throws(() => sparse.parseCellId('VC9'), /not in overlay/);
+});
+
+await runTest('grid graph locator throws for an invalid cell', () => {
+  const g = cellGraph('9x9');
+  assert.throws(() => g.parseCellId('R9C99'), /Invalid cell ID/);
+});
+
+// ============================================================================
 // parseCellId / makeCellId  (1-based, over the max geometry)
 // ============================================================================
 

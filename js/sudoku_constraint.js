@@ -760,9 +760,9 @@ export class SudokuConstraint {
         .map(c => geometry.makeCellIdFromIndex(c));
     }
 
-    static decodeTargetCells(encoded, origin, geometry) {
+    static decodeTargetCells(encoded, origin, locator) {
       if (!encoded) return [];
-      const originIdx = geometry.parseCellId(origin).cell;
+      const originIdx = locator.parseCellId(origin).cell;
       const str = String(encoded);
       const numWords = str.length;
       const arr = new Uint8Array(numWords);
@@ -778,10 +778,13 @@ export class SudokuConstraint {
       return cells;
     }
 
-    static encodeTargetCells(cellIds, origin, geometry) {
+    static encodeTargetCells(cellIds, origin, locator) {
       if (!cellIds.length) return '';
-      const originIdx = geometry.parseCellId(origin).cell;
-      const offsets = cellIds.map(id => geometry.parseCellId(id).cell - originIdx);
+      const originIdx = locator.parseCellId(origin).cell;
+      const offsets = cellIds.map(id => locator.parseCellId(id).cell - originIdx);
+      if (offsets.some(o => o < 0)) {
+        throw new Error('Replicate targets must not precede the origin in the group.');
+      }
       const maxOffset = Math.max(...offsets);
       const len = Base64Codec.lengthOf6BitArray(maxOffset + 1);
       const arr = new Uint8Array(len);

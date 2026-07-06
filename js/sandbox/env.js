@@ -137,6 +137,10 @@ class SandboxCellGraph {
     return index == null ? null : this._geometry.makeCellIdFromIndex(index);
   }
 
+  // CellLocator: id <-> index over this graph's own cells.
+  parseCellId(cell) { return { cell: this._index(cell) }; }
+  makeCellIdFromIndex(index) { return this._cell(index); }
+
   // Every cell of the main grid, row-major, excluding var cells.
   cells() {
     const cells = [];
