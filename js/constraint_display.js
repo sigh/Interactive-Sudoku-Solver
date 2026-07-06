@@ -378,7 +378,7 @@ class GenericLine extends BaseConstraintDisplayItem {
 
 class Thermo extends GenericLine { }
 
-class Chaos extends BaseConstraintDisplayItem {
+export class Chaos extends BaseConstraintDisplayItem {
   static IS_DIMMABLE = true;
   static COLOR = 'rgb(140, 70, 220)';
   static SHORT_ARROW_LENGTH = DisplayItem.CELL_SIZE * 0.45;
@@ -501,11 +501,8 @@ class Chaos extends BaseConstraintDisplayItem {
   }
 
   _reachesGridEdge(cell, direction) {
-    const [row, col] = this._geometry.splitCellIndex(cell);
-    return (direction[0] < 0 && col === 0) ||
-      (direction[0] > 0 && col === this._geometry.numCols - 1) ||
-      (direction[1] < 0 && row === 0) ||
-      (direction[1] > 0 && row === this._geometry.numRows - 1);
+    return this._geometry.cellGraph().traverse(
+      cell, direction[1], direction[0]) === null;
   }
 
   _straightArmDirection(points) {
