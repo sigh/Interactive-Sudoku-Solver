@@ -187,10 +187,24 @@ export class EmbeddedSandbox {
 
   _copyShareableLink() {
     const code = this._jar.toString();
+    // Base64Codec relies on btoa, which corrupts (or throws on) any non-ASCII
+    // character, so reject those explicitly rather than share a broken link.
+    if (/[^\x00-\x7F]/.test(code)) {
+      this._setError('Cannot create link: code contains non-ASCII characters');
+      this._flashButtonError(this._shareBtn);
+      return;
+    }
     const encoded = Base64Codec.encodeString(code);
     const url = new URL(window.location.pathname, window.location.origin);
     url.searchParams.set('code', encoded);
     copyToClipboard(url.toString(), this._shareBtn);
+  }
+
+  _flashButtonError(button) {
+    if (!button) return;
+    const CLASSNAME = 'copy-to-clipboard-failed';
+    button.classList.add(CLASSNAME);
+    window.setTimeout(() => button.classList.remove(CLASSNAME), 1000);
   }
 
   _initExamples() {
