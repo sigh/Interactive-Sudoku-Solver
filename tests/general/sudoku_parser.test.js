@@ -621,6 +621,44 @@ await runTest('extractConstraintTypes should ignore the End composite marker', (
   assert.ok(!types.includes('End'));
 });
 
+await runTest('extractConstraintTypes omits Shape for the default grid', () => {
+  const types = SudokuParser.extractConstraintTypes('.Shape~9x9.AntiKnight.');
+  assert.deepEqual(types, ['AntiKnight']);
+});
+
+await runTest('extractConstraintTypes omits Shape for a bare default Shape', () => {
+  // A Shape with no spec means the default geometry (nothing to surface).
+  const types = SudokuParser.extractConstraintTypes('.Shape.AntiKnight.');
+  assert.deepEqual(types, ['AntiKnight']);
+});
+
+await runTest('extractConstraintTypes surfaces non-default dimensions', () => {
+  const types = SudokuParser.extractConstraintTypes('.Shape~6x6.NoBoxes.');
+  assert.ok(types.includes('6x6'));
+  assert.ok(!types.includes('Shape'));
+  assert.ok(types.includes('NoBoxes'));
+});
+
+await runTest('extractConstraintTypes surfaces a zero-based value range', () => {
+  const types = SudokuParser.extractConstraintTypes('.Shape~9x9~0-8.Arrow~R1C1~R1C2.');
+  // Default dimensions are omitted; only the value range is surfaced.
+  assert.ok(types.includes('0-8'));
+  assert.ok(!types.includes('9x9'));
+  assert.ok(!types.includes('Shape'));
+  assert.ok(types.includes('Arrow'));
+});
+
+await runTest('extractConstraintTypes surfaces an extended value range', () => {
+  const types = SudokuParser.extractConstraintTypes('.Shape~9x9~10.Cage~5~R1C1.');
+  assert.ok(types.includes('1-10'));
+});
+
+await runTest('extractConstraintTypes surfaces dimensions and range as leading entries', () => {
+  // Dimensions then value range, both ahead of the other constraint types.
+  const types = SudokuParser.extractConstraintTypes('.Shape~6x6~0-5.Var~R1C1.');
+  assert.deepEqual(types, ['6x6', '0-5', 'Var']);
+});
+
 //////////////////////////////////////////////////////////////////////////////
 // toShortSolution
 //////////////////////////////////////////////////////////////////////////////

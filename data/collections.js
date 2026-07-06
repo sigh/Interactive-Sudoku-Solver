@@ -470,14 +470,14 @@ export const EXAMPLES = [
     src: 'https://sudokupad.app/gdc/loop-pack/entropic',
     input: '/data/scripts/loop_entropic.js',
     solution: '641523253416362154514632136245425361',
-    constraintTypes: ['Shape', 'Var', 'NFA'],
+    constraintTypes: ['6x6', 'Var', 'Replicate', 'NFA'],
   },
   {
     name: '9x9 Loop: Nordschleife',
     src: ['https://www.youtube.com/watch?v=A8GBl5GGypA', 'https://sudokupad.app/0pshsj5ykr'],
     input: '/data/scripts/nordschleife.js',
     solution: '526973148384165972917824356145782693279436581638519724793648215852391467461257839',
-    constraintTypes: ['Var', 'NFA'],
+    constraintTypes: ['Var', 'Replicate', 'NFA'],
   },
   {
     name: '9x9 Loop: Wendezäune',
@@ -491,7 +491,7 @@ export const EXAMPLES = [
     src: 'https://sudokupad.app/ow89c0ugwr',
     input: '/data/scripts/atrocious_destruction.js',
     solution: '1536824772641853487536122348716556124738815324763781652464275381',
-    constraintTypes: ['Shape', 'NoBoxes', 'ChaosConstruction', 'Var', 'CountDistinct', 'ChaosCount'],
+    constraintTypes: ['8x8', 'NoBoxes', 'ChaosConstruction', 'Var', 'CountDistinct', 'ChaosCount'],
   },
   {
     // Segmented state machine (arrows count cells per ring).
@@ -549,7 +549,7 @@ export const EXAMPLES = [
     src: ['https://www.youtube.com/watch?v=T03vUTiJBjk', 'https://sudokupad.app/xqqerfk832'],
     input: '/data/scripts/rectangle_sums.js',
     solution: 'BFGDAHEICCEAFBIHDGDHIEGCABFACHIEFDGBFGEHDBICAIBDGCAFEHGIFCHEBADHDBAIGCFEEACBFDGHI',
-    constraintTypes: ['Shape', 'Var', 'AllDifferent', 'Or', 'And', 'Sum'],
+    constraintTypes: ['1-15', 'Var', 'AllDifferent', 'Or', 'And', 'Sum'],
   },
   {
     name: 'Embedded Squishdoku',
@@ -1288,7 +1288,7 @@ export const EXAMPLES = [
     name: 'Inset',
     src: 'https://sudokupad.app/nlmbdwt4wn',
     input: '/data/scripts/inset.js',
-    constraintTypes: ['Shape', 'NoBoxes', 'Var', 'AllDifferent', 'NFA'],
+    constraintTypes: ['6x6', 'NoBoxes', 'Var', 'AllDifferent', 'NFA'],
   },
 ];
 

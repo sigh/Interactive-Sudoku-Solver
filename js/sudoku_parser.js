@@ -495,16 +495,29 @@ export class SudokuParser {
   }
 
   static extractConstraintTypes(str) {
-    const types = str.matchAll(/[.]([^.~]+)/g);
     const uniqueTypes = new Set();
-    for (const type of types) {
+    for (const type of str.matchAll(/[.]([^.~]+)/g)) {
       const value = type[1].trim();
       if (SudokuConstraint[value]) {
         uniqueTypes.add(value);
       }
     }
     uniqueTypes.delete('End');  // End is not a real constraint
-    return [...uniqueTypes];
+
+    const shapeMatch = uniqueTypes.delete('Shape') && str.match(/[.]Shape~([^.\s]+)/);
+    if (!shapeMatch) return [...uniqueTypes];
+
+    // Surface Shape as its grid dimensions and/or value range (separate leading
+    // entries), omitting whichever matches the default 9x9 / 1-9 grid.
+    const geometry = CellGeometry.fromShapeSpec(shapeMatch[1]);
+    const shapeTypes = [];
+    if (geometry.gridDimsStr !== GEOMETRY_9x9.gridDimsStr) {
+      shapeTypes.push(geometry.gridDimsStr);
+    }
+    if (!geometry.isDefaultNumValues() || geometry.valueOffset !== 0) {
+      shapeTypes.push(`${geometry.minValue()}-${geometry.maxValue()}`);
+    }
+    return [...shapeTypes, ...uniqueTypes];
   }
 }
 
