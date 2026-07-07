@@ -1,8 +1,8 @@
 // fix_constraint_types.js — update the constraintTypes declared on puzzle entries
 // in data/collections.js so they match what the app would tag them with.
 //
-// The app tags un-declared puzzles automatically via
-// SudokuParser.extractConstraintTypes over their constraint string. That fallback
+// The app tags un-declared puzzles automatically via extractConstraintTypes
+// (js/debug/extract_constraint_types.js) over their constraint string. That fallback
 // only works when the `input` *is* the constraint string; a `/…` path input
 // (a `.iss` file, or a `.js` sandbox script) can't be parsed as-is, so those
 // entries must declare constraintTypes explicitly. This tool keeps those
@@ -30,7 +30,7 @@ import { runAsCli } from '../lib/cli_entry.js';
 ensureGlobalEnvironment();
 
 const env = await import('../../js/sandbox/env.js' + self.VERSION_PARAM);
-const { SudokuParser } = await import('../../js/sudoku_parser.js' + self.VERSION_PARAM);
+const { extractConstraintTypes } = await import('../../js/debug/extract_constraint_types.js' + self.VERSION_PARAM);
 const collections = await import('../../data/collections.js' + self.VERSION_PARAM);
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -64,7 +64,7 @@ const resolveInput = async (input) => {
 
 // The constraint types the app's automatic extraction would produce for this input.
 const actualTypesFor = async (input) =>
-  SudokuParser.extractConstraintTypes(await resolveInput(input));
+  extractConstraintTypes(await resolveInput(input));
 
 // Every object entry (across all exported collections) that carries an input.
 const collectEntries = () => {
@@ -80,11 +80,9 @@ const collectEntries = () => {
   return entries;
 };
 
-const sortedSet = (arr) => [...new Set(arr)].sort();
-const sameSet = (a, b) => {
-  const [x, y] = [sortedSet(a), sortedSet(b)];
-  return x.length === y.length && x.every((v, i) => v === y[i]);
-};
+// Order-sensitive: the declaration should match the extractor output exactly,
+// including its ordering (shape leading, named custom constraints trailing).
+const sameTypes = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
 
 // Rewrite one entry's constraintTypes in the source text, keyed on its (unique,
 // quote-free) input literal. Replaces an existing declaration or inserts one.
@@ -151,7 +149,7 @@ export const main = async (argv) => {
     }
 
     checked++;
-    if (sameSet(declared, actual)) continue;
+    if (sameTypes(declared, actual)) continue;
     // Never overwrite a real declaration with nothing: an empty result signals a
     // resolution/parse gap, not that the puzzle has no constraints.
     if (!actual.length) {

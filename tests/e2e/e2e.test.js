@@ -8,7 +8,7 @@ ensureGlobalEnvironment();
 const { SimpleSolver } = await import('../../js/sandbox/simple_solver.js' + self.VERSION_PARAM);
 const { SolverStats } = await import('../../js/sandbox/solver_stats.js' + self.VERSION_PARAM);
 const { resolvePuzzleConfig } = await import('../../data/example_puzzles.js' + self.VERSION_PARAM);
-const { SudokuParser } = await import('../../js/sudoku_parser.js' + self.VERSION_PARAM);
+const { extractConstraintTypes } = await import('../../js/debug/extract_constraint_types.js' + self.VERSION_PARAM);
 
 const { solveCollections, layoutCases } = await import('./e2e_puzzles.js' + self.VERSION_PARAM);
 
@@ -23,7 +23,7 @@ const loadInput = async (puzzle) => {
 // Extra context appended to failure messages to aid debugging: the entry's
 // comment and its constraint types (declared, else derived from the input).
 const puzzleDebugInfo = (puzzle) => {
-  const types = puzzle.constraintTypes ?? SudokuParser.extractConstraintTypes(puzzle.input);
+  const types = puzzle.constraintTypes ?? extractConstraintTypes(puzzle.input);
   const parts = [];
   if (puzzle.comment) parts.push(`comment: ${puzzle.comment}`);
   if (types?.length) parts.push(`constraints: ${types.join(', ')}`);

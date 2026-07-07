@@ -5,7 +5,7 @@ const {
 
 await dynamicCSSFileLoader('css/puzzle_selector.css' + self.VERSION_PARAM)();
 
-const { SudokuParser } = await import('../sudoku_parser.js' + self.VERSION_PARAM);
+const { extractConstraintTypes } = await import('./extract_constraint_types.js' + self.VERSION_PARAM);
 const { UserScriptExecutor } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
 const {
   PUZZLE_INDEX,
@@ -108,7 +108,7 @@ export class PuzzleSelectorPanel {
     const exampleItems = [];
     for (const puzzle of PUZZLE_INDEX.values()) {
       const types = puzzle.constraintTypes
-        || SudokuParser.extractConstraintTypes(puzzle.input);
+        || extractConstraintTypes(puzzle.input);
       exampleItems.push({
         puzzle,
         label: puzzle.name || '(unnamed)',
@@ -174,7 +174,6 @@ export class PuzzleSelectorPanel {
         row.append(label);
 
         if (item.tags?.length) {
-          // Constraint types as small chips, so they read as distinct tokens.
           const tags = document.createElement('span');
           tags.className = 'puzzle-item-tags';
           for (const type of item.tags) {

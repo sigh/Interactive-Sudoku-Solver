@@ -41,7 +41,7 @@
   border-top: 1px solid var(--color-border-light);
 }
 
-/* A single row: icon, name, then the type chips / detail. */
+/* A single row: icon, name, the type chips / detail, then the script button. */
 .puzzle-item {
   padding: 1px 8px;
   cursor: pointer;
@@ -59,12 +59,8 @@
   outline-offset: -2px;
 }
 
-/* The name takes whatever room is left and truncates rather than the chips. */
 .puzzle-item-label {
-  flex: 0 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  flex: 0 0 auto;
   white-space: nowrap;
 }
 
@@ -73,17 +69,23 @@
   font-size: var(--font-size-small);
 }
 
-/* Constraint types: each rendered as a small chip so they read as distinct
-   tokens without commas. */
+/* Constraint types, each a small chip. The container fills the space between the
+   name and the script button and clips its overflow, so a long list is cut off
+   at the right edge (full list in the row's title tooltip) without squashing the
+   chips or pushing the button out. */
 .puzzle-item-tags {
   display: flex;
-  flex: 0 0 auto;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
   column-gap: 5px;
 }
 
 /* Colour derived from a per-type hue (set inline) so each constraint type is
    consistently coloured and easy to scan for. */
 .puzzle-item-tag {
+  flex: 0 0 auto;
+  white-space: nowrap;
   padding: 0 5px;
   border-radius: 10px;
   font-size: var(--font-size-small);
@@ -92,8 +94,8 @@
   border: 1px solid hsl(var(--tag-hue, 0) 40% 82%);
 }
 
-/* "</>" button opening a script-built puzzle's source in the sandbox. Pushed to
-   the row's right edge */
+/* "</>" button opening a script-built puzzle's source in the sandbox, pinned to
+   the row's right edge. */
 .puzzle-item-script.plain-button {
   flex: 0 0 auto;
   margin-left: auto;

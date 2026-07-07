@@ -477,7 +477,7 @@ export const EXAMPLES = [
     src: 'https://sudokupad.app/gdc/loop-pack/entropic',
     input: '/data/scripts/loop_entropic.js',
     solution: '641523253416362154514632136245425361',
-    constraintTypes: ['6x6', 'Var', 'Replicate', 'NFA'],
+    constraintTypes: ['6x6', 'Var', 'Replicate', 'NFA: degree', 'NFA: no-touch', 'NFA: entropic', 'NFA: vision'],
   },
   {
     name: 'Nordschleife',
@@ -485,7 +485,7 @@ export const EXAMPLES = [
     src: ['https://www.youtube.com/watch?v=A8GBl5GGypA', 'https://sudokupad.app/0pshsj5ykr'],
     input: '/data/scripts/nordschleife.js',
     solution: '526973148384165972917824356145782693279436581638519724793648215852391467461257839',
-    constraintTypes: ['Var', 'Replicate', 'NFA'],
+    constraintTypes: ['Var', 'Replicate', 'NFA: degree', 'NFA: no-touch', 'NFA: count', 'NFA: mult'],
   },
   {
     name: 'Wendezäune',
@@ -493,7 +493,7 @@ export const EXAMPLES = [
     src: ['https://www.youtube.com/watch?v=bhKtKFEy0AM', 'https://sudokupad.app/uevzycz28t'],
     input: '/data/scripts/wendezaune.js',
     solution: '617349582382715469945682731596134278834527916271896345129463857763958124458271693',
-    constraintTypes: ['Var', 'NFA', 'Quad'],
+    constraintTypes: ['Var', 'Quad', 'NFA: edge-h', 'NFA: diff-h', 'NFA: edge-v', 'NFA: diff-v', 'NFA: circle-turns'],
   },
   {
     name: 'Atrocious Destruction',
@@ -508,7 +508,7 @@ export const EXAMPLES = [
     src: ['https://www.youtube.com/watch?v=vspwP6DlQik', 'https://sudokupad.app/99c09jh573'],
     input: '/data/scripts/hit_reveal_solve.js',
     solution: '751392468283614795964578312326857149478961523195243687542139876837426951619785234',
-    constraintTypes: ['NFA'],
+    constraintTypes: ['NFA: HPA'],
   },
   {
     name: 'Sums and Differences',
@@ -516,7 +516,7 @@ export const EXAMPLES = [
     src: ['https://www.youtube.com/watch?v=a-jajrZJXr0', 'https://sudokupad.app/qj4kzxhp02'],
     input: '/data/scripts/sums_and_differences.js',
     solution: '149876523356421978287953164895742631714639852623185749538297416471368295962514387',
-    constraintTypes: ['NFA', 'Thermo', 'BlackDot', 'LittleKiller'],
+    constraintTypes: ['Thermo', 'BlackDot', 'LittleKiller', 'NFA: sum-period', 'NFA: diff-period'],
   },
   {
     name: 'Stepped Thermos',
@@ -550,7 +550,7 @@ export const EXAMPLES = [
     src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=000JC4',
     input: '/data/scripts/factorial_cages.js',
     solution: '153827946274965813896431725415286397382794651769153284627549138538612479941378562',
-    constraintTypes: ['NFA'],
+    constraintTypes: ['NFA: 10 factorial cage', 'NFA: 7 factorial cage', 'NFA: 6 factorial cage', 'NFA: 9 factorial cage', 'NFA: 8 factorial cage', 'NFA: 2 factorial cage'],
   },
   {
     name: 'Rectangle Sums',
@@ -1207,7 +1207,7 @@ export const EXAMPLES = [
     src: ['https://www.youtube.com/watch?v=DVy_zGc9UQI', 'https://sudokupad.app/cg5wlayzuj'],
     input: '/data/scripts/circus_maximum.js',
     solution: '251487369638219754794653218329164875175938642486572193912846537543721986867395421',
-    constraintTypes: ['Renban', 'Var', 'And', 'Pair', 'NFA'],
+    constraintTypes: ['Renban', 'Var', 'And', 'Pair', 'NFA: B1', 'NFA: G1', 'NFA: R1', 'NFA: B4', 'NFA: G4', 'NFA: R4', 'NFA: B3', 'NFA: G3', 'NFA: R3', 'NFA: B2', 'NFA: G2', 'NFA: R2', 'NFA: B9', 'NFA: G9', 'NFA: R9', 'NFA: B8', 'NFA: G8', 'NFA: R8', 'NFA: B7', 'NFA: G7', 'NFA: R7', 'NFA: B6', 'NFA: G6', 'NFA: R6', 'NFA: B5', 'NFA: G5', 'NFA: R5'],
   },
   {
     name: 'Chaos Construction: Sack Lunch',
@@ -1274,7 +1274,7 @@ export const EXAMPLES = [
     src: 'https://sudokupad.app/y323plq5im',
     input: '/data/scripts/uncovering_tunnels.js',
     solution: '524176398159864732643915287932781465785249613496532871371628954268357149817493526',
-    constraintTypes: ['ChaosConstruction', 'NoBoxes', 'ChaosArrow', 'NFA', 'Whisper', 'AllDifferent', 'CountDistinct'],
+    constraintTypes: ['ChaosConstruction', 'NoBoxes', 'ChaosArrow', 'Whisper', 'AllDifferent', 'CountDistinct', 'NFA: ParityCount'],
   },
   {
     name: 'Sunblock',
@@ -1300,13 +1300,13 @@ export const EXAMPLES = [
     src: ['https://www.youtube.com/watch?v=Er6e0ODkVYg', 'https://sudokupad.app/4geira1lnl'],
     input: '/data/scripts/thermo_knots.js',
     solution: '728316459816594723397425816563281974471968235934657182152743698689132547245879361',
-    constraintTypes: ['ChaosConstruction', 'NoBoxes', 'WhiteDot', 'AllDifferent', 'NFA', 'SameValues'],
+    constraintTypes: ['ChaosConstruction', 'NoBoxes', 'WhiteDot', 'AllDifferent', 'SameValues', 'NFA: thermo'],
   },
   {
     name: 'Inset',
     src: 'https://sudokupad.app/nlmbdwt4wn',
     input: '/data/scripts/inset.js',
-    constraintTypes: ['6x6', 'NoBoxes', 'Var', 'AllDifferent', 'NFA'],
+    constraintTypes: ['6x6', 'NoBoxes', 'Var', 'AllDifferent', 'NFA: odd sum', 'NFA: even sum'],
   },
 ];
 
