@@ -1,23 +1,26 @@
-// fix_constraint_types.js — update the constraintTypes declared on puzzle entries
-// in data/collections.js so they match what the app would tag them with.
+// fix_constraint_types.js — declare constraintTypes on the example puzzle
+// entries (data/example_puzzles.js DISPLAYED_EXAMPLES and data/collections.js
+// EXAMPLES) so the puzzle selector tags them the same way the app would.
 //
-// The app tags un-declared puzzles automatically via extractConstraintTypes
-// (js/debug/extract_constraint_types.js) over their constraint string. That fallback
-// only works when the `input` *is* the constraint string; a `/…` path input
-// (a `.iss` file, or a `.js` sandbox script) can't be parsed as-is, so those
-// entries must declare constraintTypes explicitly. This tool keeps those
-// declarations equal to what the automatic extraction would produce.
+// The app tags an un-declared puzzle automatically via extractConstraintTypes
+// (js/debug/extract_constraint_types.js) over its raw `input`. That fallback only
+// works when `input` is already the dotted constraint string; it yields nothing
+// for a `/…` path input (a `.iss` file or `.js` sandbox script) or a non-native
+// format (compact killer, SudokuMaker `3x3::k:`, pencilmark grids). Those entries
+// need an explicit constraintTypes so the selector shows the right tags.
 //
-// Input is resolved exactly as the puzzle panel's _resolveInput does: a literal
-// passes through, a `/…` path is read from disk, and a `.js` path is executed
-// through the sandbox (like run_sandbox.js). Then extractConstraintTypes runs on
-// the result. Entries whose declared set already matches are left untouched
-// (order preserved, no churn).
+// For each entry we compute the true types by resolving the input exactly as the
+// puzzle panel's _resolveInput does (literal passes through, `/…` path is read
+// from disk, `.js` is executed through the sandbox) and then extracting. When the
+// raw extraction is empty we canonicalize through SudokuParser first, so a
+// non-native format tags the same as its dotted equivalent. An entry is declared
+// only when the app's automatic tagging wouldn't already match — native inline
+// puzzles keep tagging themselves and are left untouched (order preserved).
 //
 // Usage:
 //   node tools/dev/fix_constraint_types.js [--dry-run] [-h|--help]
 //
-//   (default)  Rewrite data/collections.js so declarations match the actual types.
+//   (default)  Rewrite the data files so declarations match the actual types.
 //   --dry-run  Report the entries that would change without writing; exits
 //              non-zero if any are out of sync (usable as a CI check).
 
@@ -31,10 +34,17 @@ ensureGlobalEnvironment();
 
 const env = await import('../../js/sandbox/env.js' + self.VERSION_PARAM);
 const { extractConstraintTypes } = await import('../../js/debug/extract_constraint_types.js' + self.VERSION_PARAM);
+const { SudokuParser } = await import('../../js/sudoku_parser.js' + self.VERSION_PARAM);
 const collections = await import('../../data/collections.js' + self.VERSION_PARAM);
+const examplePuzzles = await import('../../data/example_puzzles.js' + self.VERSION_PARAM);
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const COLLECTIONS_PATH = resolve(ROOT, 'data/collections.js');
+
+// The example libraries the selector surfaces, each paired with its source file.
+const SOURCES = [
+  { path: resolve(ROOT, 'data/example_puzzles.js'), entries: examplePuzzles.DISPLAYED_EXAMPLES },
+  { path: resolve(ROOT, 'data/collections.js'), entries: collections.EXAMPLES },
+];
 
 const AsyncFunction = Object.getPrototypeOf(async function () { }).constructor;
 
@@ -62,18 +72,32 @@ const resolveInput = async (input) => {
   return serialize(await fn(...Object.values(globals)));
 };
 
-// The constraint types the app's automatic extraction would produce for this input.
-const actualTypesFor = async (input) =>
-  extractConstraintTypes(await resolveInput(input));
+// The true constraint types for an input. Extraction over the resolved
+// constraint string is enough for native formats; when that comes back empty we
+// canonicalize through SudokuParser so non-native formats (compact killer,
+// SudokuMaker, pencilmark grids) tag the same as their dotted equivalent.
+const actualTypesFor = async (input) => {
+  const text = await resolveInput(input);
+  const direct = extractConstraintTypes(text);
+  if (direct.length) return direct;
+  try {
+    return extractConstraintTypes(SudokuParser.parseText(text).toString());
+  } catch {
+    return direct; // Unparseable (or genuinely no constraints): leave empty.
+  }
+};
 
-// Every object entry (across all exported collections) that carries an input.
+// What the app tags automatically with no declaration: extraction over the raw,
+// unresolved `input` — empty for path and non-native formats.
+const autoTypesFor = (input) => extractConstraintTypes(input);
+
+// Every named object entry across the example libraries, tagged with its file.
 const collectEntries = () => {
   const entries = [];
-  for (const value of Object.values(collections)) {
-    if (!Array.isArray(value)) continue;
-    for (const item of value) {
+  for (const { path, entries: list } of SOURCES) {
+    for (const item of list) {
       if (item && typeof item === 'object' && typeof item.input === 'string') {
-        entries.push(item);
+        entries.push({ item, path });
       }
     }
   }
@@ -84,14 +108,15 @@ const collectEntries = () => {
 // including its ordering (shape leading, named custom constraints trailing).
 const sameTypes = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
 
-// Rewrite one entry's constraintTypes in the source text, keyed on its (unique,
-// quote-free) input literal. Replaces an existing declaration or inserts one.
-const rewriteEntry = (text, input, types) => {
+// Rewrite one entry's constraintTypes in the source text, keyed on its unique
+// `name` (so it works regardless of the input's quote style). Replaces an
+// existing declaration or inserts one.
+const rewriteEntry = (text, name, types) => {
   const literal = `[${types.map(t => `'${t}'`).join(', ')}]`;
-  const at = text.indexOf(`'${input}'`);
-  if (at === -1) throw new Error(`could not locate input in source: ${input}`);
+  const at = text.indexOf(`name: '${name}'`);
+  if (at === -1) throw new Error(`could not locate entry by name: ${name}`);
   const end = text.indexOf('\n  }', at);
-  if (end === -1) throw new Error(`could not find entry end for: ${input}`);
+  if (end === -1) throw new Error(`could not find entry end for: ${name}`);
 
   const region = text.slice(at, end);
   const declRe = /constraintTypes:\s*\[[^\]]*\]/;
@@ -121,7 +146,7 @@ const parseArgs = (argv) => {
 const printUsage = () => console.log(`\
 Usage: node tools/dev/fix_constraint_types.js [--dry-run]
 
-  (default)  Rewrite data/collections.js so declarations match the actual types.
+  (default)  Rewrite the data files so declarations match the actual types.
   --dry-run  Report entries that would change without writing; exits non-zero if
              any are out of sync.`);
 
@@ -132,19 +157,17 @@ export const main = async (argv) => {
   const problems = [];
   const warnings = [];
   let checked = 0;
-  for (const item of collectEntries()) {
+  for (const { item, path } of collectEntries()) {
     const declared = item.constraintTypes;
-    const isPath = item.input.startsWith('/');
-
-    // Inline entries without a declaration are tagged automatically by the app,
-    // so there is nothing to keep in sync. Everything else we resolve and check.
-    if (!isPath && declared === undefined) continue;
-
     const actual = await actualTypesFor(item.input);
 
     if (declared === undefined) {
-      // A path entry can't auto-tag; a non-empty result means it needs one.
-      if (actual.length) problems.push({ item, actual, kind: 'missing' });
+      // No declaration: fine as long as the app's automatic tagging (raw
+      // extraction over the stored input) already produces the right types.
+      // Otherwise the entry needs an explicit declaration.
+      if (!sameTypes(autoTypesFor(item.input), actual) && actual.length) {
+        problems.push({ item, path, actual, kind: 'missing' });
+      }
       continue;
     }
 
@@ -155,7 +178,7 @@ export const main = async (argv) => {
     if (!actual.length) {
       warnings.push({ item, declared });
     } else {
-      problems.push({ item, actual, declared, kind: 'mismatch' });
+      problems.push({ item, path, actual, declared, kind: 'mismatch' });
     }
   }
 
@@ -179,7 +202,7 @@ export const main = async (argv) => {
       }
     }
     console.log(`\n${problems.length} entr${problems.length === 1 ? 'y' : 'ies'} out of sync. `
-      + `Run without --dry-run to update data/collections.js.`);
+      + `Run without --dry-run to update the data files.`);
     process.exitCode = 1;
     return;
   }
@@ -188,14 +211,23 @@ export const main = async (argv) => {
     console.log(`No changes needed (${checked} declarations verified).`);
     return;
   }
-  let text = readFileSync(COLLECTIONS_PATH, 'utf8');
+  // Apply per file so a single run can touch both example libraries.
+  const byPath = new Map();
   for (const p of problems) {
-    text = rewriteEntry(text, p.item.input, p.actual);
-    const verb = p.kind === 'missing' ? 'added' : 'updated';
-    console.log(`${verb}: ${label(p.item)} -> [${p.actual.join(', ')}]`);
+    if (!byPath.has(p.path)) byPath.set(p.path, []);
+    byPath.get(p.path).push(p);
   }
-  writeFileSync(COLLECTIONS_PATH, text);
-  console.log(`\nFixed ${problems.length} entr${problems.length === 1 ? 'y' : 'ies'} in data/collections.js.`);
+  for (const [path, ps] of byPath) {
+    let text = readFileSync(path, 'utf8');
+    for (const p of ps) {
+      text = rewriteEntry(text, p.item.name, p.actual);
+      const verb = p.kind === 'missing' ? 'added' : 'updated';
+      console.log(`${verb}: ${label(p.item)} -> [${p.actual.join(', ')}]`);
+    }
+    writeFileSync(path, text);
+  }
+  console.log(`\nFixed ${problems.length} entr${problems.length === 1 ? 'y' : 'ies'} across `
+    + `${byPath.size} file${byPath.size === 1 ? '' : 's'}.`);
 };
 
 runAsCli(import.meta.url, main);

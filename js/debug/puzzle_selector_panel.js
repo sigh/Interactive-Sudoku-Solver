@@ -121,12 +121,19 @@ export class PuzzleSelectorPanel {
     for (const listName of COLLECTION_NAMES) {
       const list = PuzzleCollections[listName];
       if (!list) continue;
-      const items = list.map((puzzle, i) => ({
-        puzzle,
-        label: `${listName}[${i}]`,
-        detail: puzzle.name || '',
-        search: `${listName} ${i} ${puzzle.name || ''}`.toLowerCase(),
-      }));
+      const items = list.map((entry, i) => {
+        const cfg = list.configFor(entry);
+        const tags = cfg.constraintTypes || extractConstraintTypes(cfg.input);
+        const name = PUZZLE_INDEX.has(entry) ? cfg.name : '';
+        return {
+          puzzle: entry,
+          src: cfg.src,
+          tags,
+          label: `${listName}[${i}]`,
+          detail: name,
+          search: `${listName} ${i} ${tags.join(' ')} ${name}`.toLowerCase(),
+        };
+      });
       groups.push({ items });
     }
 
@@ -166,7 +173,7 @@ export class PuzzleSelectorPanel {
         row.className = 'puzzle-item hstack';
         row.title = [item.label, secondary].filter(Boolean).join(' — ');
 
-        row.append(this._makeSrcIcon(item.puzzle.src));
+        row.append(this._makeSrcIcon(item.src ?? item.puzzle.src));
 
         const label = document.createElement('span');
         label.className = 'puzzle-item-label';

@@ -82,7 +82,7 @@ const puzzles9x9 = [
   'Quadruple X',
   'Quadruple - repeated values',
   'Odd-even thermo',  // Pair
-  'Nabner thermo - easy',  // PairX
+  'Nabner thermo [extra givens]',  // PairX
   'Knight-arrows',  // Binary (backward compatibility)
   'Zipper lines - tutorial',  // Zipper both odd and even length.
   'Ten Lines 01: Adding to Ten',  // sum lines
