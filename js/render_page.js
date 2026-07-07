@@ -1463,8 +1463,8 @@ class Selection {
     if (!a || !b) return [anchorId, targetId];
 
     const graph = geometry.cellGraph();
-    const posA = graph.cellPosition(a.cell);
-    const posB = graph.cellPosition(b.cell);
+    const posA = graph.cellPosition(a.cellIndex);
+    const posB = graph.cellPosition(b.cellIndex);
     if (!posA || !posB || posA[2] !== posB[2]) return [anchorId, targetId];
 
     const minRow = Math.min(posA[0], posB[0]);
