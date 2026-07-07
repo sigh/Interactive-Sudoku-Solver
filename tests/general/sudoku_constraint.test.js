@@ -1161,3 +1161,20 @@ await runTest('And rejects Shape (Var)', () => {
 });
 
 logSuiteComplete('CompositeConstraintBase allowed categories');
+
+// ============================================================================
+// Modular argument validation
+// ============================================================================
+
+await runTest('Modular rejects mod < 1', () => {
+  assert.throws(() => new SudokuConstraint.Modular(0, 'R1C1', 'R1C2'), /mod >= 1/);
+  assert.throws(() => new SudokuConstraint.Modular(-2, 'R1C1', 'R1C2'), /mod >= 1/);
+  assert.throws(() => new SudokuConstraint.Modular('x', 'R1C1', 'R1C2'), /mod >= 1/);
+});
+
+await runTest('Modular accepts mod >= 1', () => {
+  assert.equal(new SudokuConstraint.Modular(1, 'R1C1', 'R1C2').mod, 1);
+  assert.equal(new SudokuConstraint.Modular(3, 'R1C1', 'R1C2').mod, 3);
+});
+
+logSuiteComplete('Modular argument validation');

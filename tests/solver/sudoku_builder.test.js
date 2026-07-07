@@ -260,6 +260,25 @@ await runTest('Renban produces BinaryPairwise handler', () => {
   assert.ok(hasHandler(handlers, 'BinaryPairwise'));
 });
 
+await runTest('Modular mod>=2 produces all-different-mod BinaryPairwise', () => {
+  const constraint = new SudokuConstraint.Container([
+    new SudokuConstraint.Modular(2, 'R1C1', 'R1C2', 'R1C3'),
+  ]);
+  const handlers = buildHandlers(constraint);
+  assert.ok(hasHandler(handlers, 'BinaryPairwise'));
+});
+
+await runTest('Modular mod=1 is satisfiable', () => {
+  // A window of one cell is trivially all-different mod 1, so the constraint is
+  // vacuous. The single-cell all-different-mod handler must behave as a no-op
+  // rather than spuriously reporting the puzzle unsatisfiable.
+  const constraint = new SudokuConstraint.Container([
+    new SudokuConstraint.Modular(1, 'R1C1', 'R1C2'),
+  ]);
+  const solver = SudokuBuilder.build(constraint);
+  assert.ok(solver.nthSolution(0), 'mod=1 Modular should be satisfiable');
+});
+
 await runTest('Quad supports var-cell 2x2 squares', () => {
   const constraint = SudokuParser.parseString(
     '.Var~X~X~81.BlackDot~VX1~VX2~VX3~VX10.Quad~VX13~1~2~3~4');

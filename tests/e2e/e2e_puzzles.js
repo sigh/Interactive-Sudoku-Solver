@@ -156,6 +156,14 @@ const puzzles9x9 = [
     input: '.~R1C5_7~R2C4_1~R2C5_9~R2C6_5~R3C8_6~R4C5_6~R5C4_8~R5C9_1~R6C5_2~R7C7_2~R7C8_8~R8C6_9~R8C9_5~R9C8_7~R8C4_4~R7C2_6~R5C1_4~R4C1_8~R3C3_8~R1C1_5~R1C2_3.Regex~WzEtNV0q~R7C3~R7C4~R7C5~R6C5~R5C6~R4C6~R3C6~R2C6',
     solution: '534678912672195348198342567859761423426853791713924856961537284287419635345286179',
   },
+  {
+    // A Modular~1 line is vacuous: every group of one cell is trivially
+    // all-different mod 1. Adding it to classic sudoku must leave the (unique)
+    // classic solution unchanged, exercising the <2-cell BinaryPairwise no-op.
+    name: 'Classic sudoku + vacuous Modular 1',  // Modular (degenerate)
+    input: '.~R1C1_5~R1C2_3~R1C5_7~R2C1_6~R2C4_1~R2C5_9~R2C6_5~R3C2_9~R3C3_8~R3C8_6~R4C1_8~R4C5_6~R4C9_3~R5C1_4~R5C4_8~R5C6_3~R5C9_1~R6C1_7~R6C5_2~R6C9_6~R7C2_6~R7C7_2~R7C8_8~R8C4_4~R8C5_1~R8C6_9~R8C9_5~R9C5_8~R9C8_7~R9C9_9.Modular~1~R1C1~R1C2',
+    solution: '534678912672195348198342567859761423426853791713924856961537284287419635345286179',
+  },
 ];
 
 const puzzles16x16 = [

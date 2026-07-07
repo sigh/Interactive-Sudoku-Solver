@@ -1018,6 +1018,9 @@ export class SudokuConstraint {
       super(mod, ...cells);
       this.cells = cells;
       this.mod = +mod;
+      if (!(this.mod >= 1)) {
+        throw new Error('Modular requires mod >= 1. Got: ' + mod);
+      }
     }
 
     static displayName() {

@@ -1037,6 +1037,15 @@ export class BinaryPairwise extends SudokuConstraintHandler {
 
     // The key must be symmetric, so we just need the one table.
     this._table = lookupTables.forBinaryKey(this._key)[0];
+
+    // Allocate prefix cache for O(n) pairwise constraint enforcement.
+    this._prefixCache = new Uint16Array(this.cells.length + 1);
+    this._prefixCache[0] = lookupTables.allValues;
+
+    // A pairwise constraint with fewer than two cells has no pairs to enforce,
+    // so it is trivially satisfied. Leave it as a non-all-different no-op.
+    if (this.cells.length < 2) return true;
+
     this._isAllDifferent = this.constructor._isAllDifferent(
       this._table, geometry.numValues);
     if (this._isAllDifferent) {
@@ -1047,10 +1056,6 @@ export class BinaryPairwise extends SudokuConstraintHandler {
 
       this._cellExclusions = cellExclusions;
     }
-
-    // Allocate prefix cache for O(n) pairwise constraint enforcement.
-    this._prefixCache = new Uint16Array(this.cells.length + 1);
-    this._prefixCache[0] = lookupTables.allValues;
 
     // If no values are legal at the start, then this constraint is invalid.
     return this._table[lookupTables.allValues] !== 0;

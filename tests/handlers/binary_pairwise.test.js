@@ -104,4 +104,25 @@ await runTest('validCombinationInfo is zero when no valid subset exists', () => 
   assert.equal(table[valueMask(1, 2, 3, 4)], 0);
 });
 
+await runTest('fewer than 2 cells is a trivially satisfied no-op', () => {
+  // A pairwise constraint has no pairs with fewer than two cells, so it must be
+  // satisfiable regardless of the key -- even an always-false one, which the
+  // initialize() feasibility check would otherwise reject.
+  const numValues = 4;
+  const alwaysFalse = fnToBinaryKey(() => false, numValues);
+  const context = new GridTestContext({ gridSize: [1, 4], numValues });
+
+  const single = new BinaryPairwise(alwaysFalse, 0);
+  assert.equal(context.initializeHandler(single), true);
+
+  const grid = context.grid;
+  grid[0] = valueMask(1, 2, 3);
+  const acc = createAccumulator();
+  assert.equal(single.enforceConsistency(grid, acc), true);
+  assert.equal(grid[0], valueMask(1, 2, 3));  // Cell left unconstrained.
+
+  const none = new BinaryPairwise(alwaysFalse);
+  assert.equal(context.initializeHandler(none), true);
+});
+
 logSuiteComplete('binary_pairwise.test.js');
