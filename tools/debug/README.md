@@ -40,15 +40,18 @@ node tools/debug/solve.js --max-backtracks none --input-file puzzle.txt --soluti
 
 `--solution <digits>` injects the digit string as givens (main-grid cells,
 row-major) and reports `ACCEPTED` (exit 0) or `REJECTED` (exit non-zero), so it
-doubles as an assertion in scripts/CI. Verifying an answer is a bounded yes/no
-check, not a search — there's no backtrack cap to set.
+doubles as an assertion in scripts/CI. Verifying an answer is meant to be quick,
+so `--max-backtracks` defaults to `1`: the pinned grid should usually accept or
+reject after at most the first failed branch/search unwind. Raise it only for
+encodings that need a small amount of Var-cell search; use `none` only for rare
+deliberately unbounded checks. A `CAPPED` result is inconclusive.
 
 ```sh
 # Confirm the encoding accepts a known-good solution after a constraint change.
 node tools/debug/verify_solution.js --puzzle "Chaos Construction" --solution 123456789...
 
 # Same, from a raw constraint string / file.
-node tools/debug/verify_solution.js --input-file puzzle.txt --solution 123456789...
+node tools/debug/verify_solution.js --input-file puzzle.txt --solution 123456789... --max-backtracks 100
 ```
 
 A `REJECTED` result means the constraints reject that assignment — useful for
@@ -203,6 +206,11 @@ node tools/debug/run_sandbox.js --file my_puzzle.js \
 # Run inline code; --raw prints the return value instead of serializing it.
 node tools/debug/run_sandbox.js --code 'return [new Shape("6x6"), new Given("R1C1", 3)];'
 ```
+
+Use `--output <path>` to write the serialized constraint string directly. If the
+write fails (for example, the target path is outside the writable workspace), the
+tool warns on stderr and prints the generated string to stdout instead, so the
+script result is not lost.
 
 Use `--current <constraintString>` to populate `currentConstraint()` /
 `currentCellGeometry()` for scripts that transform the loaded puzzle. This is how the

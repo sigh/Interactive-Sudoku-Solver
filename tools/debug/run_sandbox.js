@@ -23,7 +23,8 @@
 //   --raw              Print the return value as-is (via console.log) instead of
 //                      serializing it to a constraint string.
 //   --output <path>    Write the serialized constraint string to a file instead
-//                      of stdout. Not valid with --raw.
+//                      of stdout. If the write fails, the constraint string is
+//                      printed to stdout as a fallback. Not valid with --raw.
 //   -h, --help         Print this help and exit.
 //
 // Examples:
@@ -64,7 +65,8 @@ Source (pick one):
 
 Options:
   --current <str>    Constraint string for currentConstraint()/currentCellGeometry().
-  --output <path>    Write the serialized constraint string to a file.
+  --output <path>    Write the serialized constraint string to a file. If the
+                     write fails, print it to stdout as a fallback.
   --raw              Print the return value as-is instead of serializing it.
   -h, --help         Print this help and exit.`);
 
@@ -86,9 +88,21 @@ export const main = async (argv) => {
   }
 
   const str = serialize(result);
-  if (str && args.output) writeFileSync(args.output, str + '\n');
-  else if (str) console.log(str);
-  else console.error('(script returned no constraints; use --raw to see the value)');
+  if (!str) {
+    console.error('(script returned no constraints; use --raw to see the value)');
+    return;
+  }
+  if (!args.output) {
+    console.log(str);
+    return;
+  }
+  try {
+    writeFileSync(args.output, str + '\n');
+  } catch (e) {
+    console.error(`warning: could not write --output ${JSON.stringify(args.output)}: ${e.message}`);
+    console.error('warning: printing generated constraint string to stdout instead');
+    console.log(str);
+  }
 };
 
 runAsCli(import.meta.url, main);

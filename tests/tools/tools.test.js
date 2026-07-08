@@ -67,13 +67,34 @@ await runTest('verify_solution.js accepts the correct solution', async () => {
     verifyMain(argv('verify_solution.js', '--puzzle', VERIFY_PUZZLE, '--solution', VERIFY_SOLUTION)));
   assert.equal(thrown, null, thrown?.message);
   assert.match(stdout, /Result: ACCEPTED/);
+  assert.match(stdout, /Backtracks: \d+ \(cap 1\)/);
 });
 
-await runTest('verify_solution.js rejects a wrong solution (throws non-zero)', async () => {
+await runTest('verify_solution.js accepts an explicit backtrack cap', async () => {
+  const { stdout, thrown } = await capture(() =>
+    verifyMain(argv('verify_solution.js', '--puzzle', VERIFY_PUZZLE, '--solution', VERIFY_SOLUTION,
+      '--max-backtracks', '5')));
+  assert.equal(thrown, null, thrown?.message);
+  assert.match(stdout, /Backtracks: \d+ \(cap 5\)/);
+  assert.match(stdout, /Result: ACCEPTED/);
+});
+
+await runTest('verify_solution.js rejects a wrong solution with the default cap', async () => {
   const wrong = '6' + VERIFY_SOLUTION.slice(1); // duplicate a digit in row 1 → conflict
   const { stdout, thrown } = await capture(() =>
     verifyMain(argv('verify_solution.js', '--puzzle', VERIFY_PUZZLE, '--solution', wrong)));
   assert.match(thrown?.message ?? '', /rejected/);
+  assert.match(stdout, /Backtracks: \d+ \(cap 1\)/);
+  assert.match(stdout, /Result: REJECTED/);
+});
+
+await runTest('verify_solution.js rejects a wrong solution with an explicit cap', async () => {
+  const wrong = '6' + VERIFY_SOLUTION.slice(1); // duplicate a digit in row 1 → conflict
+  const { stdout, thrown } = await capture(() =>
+    verifyMain(argv('verify_solution.js', '--puzzle', VERIFY_PUZZLE, '--solution', wrong,
+      '--max-backtracks', '5')));
+  assert.match(thrown?.message ?? '', /rejected/);
+  assert.match(stdout, /Backtracks: \d+ \(cap 5\)/);
   assert.match(stdout, /Result: REJECTED/);
 });
 
@@ -143,6 +164,20 @@ await runTest('search_hotspots.js runs', async () => {
 await runTest('search_hotspots.js requires --max-backtracks', async () => {
   const { thrown } = await capture(() => hotspotsMain(argv('search_hotspots.js', '--puzzle', PUZZLE)));
   assert.match(thrown?.message ?? '', /backtrack limit is required/);
+});
+
+await runTest('run_sandbox.js falls back to stdout when --output write fails', () => {
+  const script = join(DEBUG_DIR, 'run_sandbox.js');
+  const r = spawnSync(process.execPath, [
+    script,
+    '--code', 'return [new Shape("6x6"), new Given("R1C1", 3)];',
+    '--output', '/definitely-missing-dir/out.iss',
+  ], { encoding: 'utf8', timeout: 60000 });
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stderr, /could not write --output/);
+  assert.match(r.stderr, /printing generated constraint string to stdout/);
+  assert.match(r.stdout.trim(), /^\.Shape~6x6/);
+  assert.match(r.stdout.trim(), /\.~R1C1_3/);
 });
 
 // The one subprocess check: the shared CLI entry maps a thrown error to a
