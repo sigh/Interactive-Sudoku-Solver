@@ -1367,8 +1367,17 @@ export class SudokuConstraint {
     }
 
     static encodeSpec(spec, numValues, { valueOffset = 0, multiSegment = false } = {}) {
-      const nfa = javascriptSpecToNFA(spec, numValues, { valueOffset, multiSegment });
-      return NFASerializer.serialize(nfa);
+      try {
+        const nfa = javascriptSpecToNFA(spec, numValues, { valueOffset, multiSegment });
+        return NFASerializer.serialize(nfa);
+      } catch (err) {
+        const specStr = typeof spec === 'string'
+          ? spec
+          : Object.entries(spec).map(
+            ([k, v]) => `${k}: ${typeof v === 'function' ? v : JSON.stringify(v)}`).join('\n');
+        err.message = `${err.message}\nWhile compiling NFA spec:\n${specStr}`;
+        throw err;
+      }
     }
 
     static *makeFromArgs(args, geometry) {

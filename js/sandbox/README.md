@@ -65,6 +65,10 @@ Every grid has the same baseline, applied automatically:
 - Every cell draws from one value range (e.g. `1–9`), set by `Shape`.
 
 Everything else is built by adding constraints on top of this baseline.
+There is currently no switch to remove or replace the automatic row/column
+all-different groups on the main grid. Puzzles whose rows or columns intentionally
+contain repeated values need a different model or are not faithfully expressible as
+an ISS main grid today.
 
 ### A rule with no dedicated constraint
 

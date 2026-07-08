@@ -75,7 +75,7 @@ export class NFA {
     this._assertUnsealed();
     if (this._stateLimit !== null && this._transitions.length >= this._stateLimit) {
       const error = new Error(
-        `State limit of ${this._stateLimit} exceeded. `);
+        `NFA compile-time state limit exceeded (${this._stateLimit} states).`);
       error.helpUrl = 'help/custom-constraints#state-count';
       error.helpText = 'See help on reducing the state count';
       throw error;
