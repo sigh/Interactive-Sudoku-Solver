@@ -22,6 +22,8 @@
 //                      puzzle). Defaults to none.
 //   --raw              Print the return value as-is (via console.log) instead of
 //                      serializing it to a constraint string.
+//   --output <path>    Write the serialized constraint string to a file instead
+//                      of stdout. Not valid with --raw.
 //   -h, --help         Print this help and exit.
 //
 // Examples:
@@ -29,12 +31,14 @@
 //   node tools/debug/run_sandbox.js --file gen.js | node tools/debug/solve.js \
 //       --max-backtracks none --input-file /dev/stdin --solutions 2
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { runAsCli } from '../lib/cli_entry.js';
 import { runSandboxScript, serialize } from '../lib/sandbox_runner.js';
 
 const parseArgs = (argv) => {
-  const args = { file: null, code: null, current: null, raw: false, help: false };
+  const args = {
+    file: null, code: null, current: null, output: null, raw: false, help: false,
+  };
   for (let i = 2; i < argv.length; i++) {
     const [key, inlineValue] = argv[i].split(/=(.*)/s);
     const next = () => inlineValue ?? argv[++i];
@@ -43,6 +47,7 @@ const parseArgs = (argv) => {
       case '--file': args.file = next(); break;
       case '--code': args.code = next(); break;
       case '--current': args.current = next(); break;
+      case '--output': args.output = next(); break;
       case '--raw': args.raw = true; break;
       default: throw new Error(`Unknown argument: ${argv[i]}\nRun with --help for usage.`);
     }
@@ -59,6 +64,7 @@ Source (pick one):
 
 Options:
   --current <str>    Constraint string for currentConstraint()/currentCellGeometry().
+  --output <path>    Write the serialized constraint string to a file.
   --raw              Print the return value as-is instead of serializing it.
   -h, --help         Print this help and exit.`);
 
@@ -74,12 +80,14 @@ export const main = async (argv) => {
   const result = await runSandboxScript(source, args.current);
 
   if (args.raw) {
+    if (args.output) throw new Error('--output cannot be used with --raw');
     console.log(result);
     return;
   }
 
   const str = serialize(result);
-  if (str) console.log(str);
+  if (str && args.output) writeFileSync(args.output, str + '\n');
+  else if (str) console.log(str);
   else console.error('(script returned no constraints; use --raw to see the value)');
 };
 

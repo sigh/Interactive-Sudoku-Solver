@@ -18,6 +18,7 @@
 //   --puzzles <a,b,...>   Puzzle names, collection names, and/or ladder selectors
 //                         (ladder:<name>[@25-15-5]). Default: "Chaos Construction".
 //   --input <string>      Solve a raw constraint string instead of named puzzles.
+//   --input-file <path>   Solve a raw constraint string read from a file.
 //   --solutions <n|all>   How many solutions to search for. Default 2 = proof of
 //                         uniqueness (status "unique" once the search exhausts
 //                         finding only one; "multiple" if a 2nd exists). "all"
@@ -47,6 +48,7 @@ import {
   resolvePuzzles, materializePuzzles, parseBacktrackLimit, parseSolutionLimit,
   warnIfFirstSolution, runSolve, applyAblations, validateAblations, ABLATIONS,
 } from '../lib/solver_analysis.js';
+import { readFileSync } from 'node:fs';
 
 const parseList = (value) => (value ?? '').split(',').map(v => v.trim()).filter(Boolean);
 
@@ -67,6 +69,7 @@ const parseArgs = (argv) => {
       case '--repeat': args.repeat = Number(next()); break;
       case '--puzzles': args.puzzles = parseList(next()); break;
       case '--input': args.puzzles = ['input:' + next()]; break;
+      case '--input-file': args.puzzles = ['input:' + readFileSync(next(), 'utf8').trim()]; break;
       case '--ablate': args.ablate = parseList(next()); break;
       case '--compare': args.compare = parseList(next()); break;
       default: throw new Error(`unknown argument: ${argv[i]}`);
@@ -81,6 +84,7 @@ const usage = () => console.log(
   `  --max-backtracks <n|none>  REQUIRED. Backtrack cap per solve; "none" = unlimited.\n` +
   `  --puzzles <a,b,...>        Names / collections / ladder:<name>. Default: "Chaos Construction".\n` +
   `  --input <string>           Solve a raw constraint string.\n` +
+  `  --input-file <path>        Solve a raw constraint string read from a file.\n` +
   `  --solutions <n|all>        Default 2 = prove uniqueness; "all" exhausts; "1" = first only (warns).\n` +
   `  --ablate <a,b,...>         Disable optimizations for the run.\n` +
   `  --compare <a,b,...>        Baseline vs each ablation (prints guess ratio).\n` +

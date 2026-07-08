@@ -16,7 +16,9 @@ id helpers, and the solver) with no imports needed. The API is documented in:
 - [../../js/sudoku_constraint.js](../../js/sudoku_constraint.js) — the full list of built-in constraint classes.
 
 The easiest way to author a new script is interactively in the sandbox, then
-save the code here.
+save the code here. Before checking it in, run
+[`../../tools/dev/lint_sandbox_script.js`](../../tools/dev/lint_sandbox_script.js)
+and review any targeted guidance it surfaces.
 
 ## Running scripts
 

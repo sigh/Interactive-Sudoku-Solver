@@ -9,7 +9,7 @@ Command-line tools for solver development. Every CLI takes `--help`.
 | [debug/](debug/README.md) | Inspection CLIs — *what* the solver found and *why*. |
 | [perf/](perf/README.md) | Performance CLIs — *how much* search / *how fast*. |
 | [bisect/](bisect/README.md) | `git bisect` helper for guess-count regressions. |
-| [dev/](dev/README.md) | Repo-maintenance scripts (e.g. keeping generated data in sync). |
+| [dev/](dev/README.md) | Repo-maintenance and authoring-hygiene scripts (e.g. keeping generated data in sync, linting sandbox scripts). |
 | `lib/` | Shared modules the CLIs import (never run directly): `cli_entry.js` (the `runAsCli` harness), `puzzle_runner.js`, `solver_analysis.js`, `ladder.js`, `micro_bench_harness.js`, and the ablation `extensions/`. |
 
 The one shared piece that lives outside `tools/` is the headless-run bootstrap
@@ -31,6 +31,7 @@ it stays there and the tools import it back.
 | Run the micro-benchmarks (`npm run bench`) | [`perf/run_legacy_benchmarks.js`](perf/README.md) |
 | Bisect a guess-count regression across history | [`bisect/run-bisect.sh`](bisect/README.md) |
 | Sync `data/collections.js` constraintTypes with the puzzles | [`dev/fix_constraint_types.js`](dev/README.md) |
+| Surface targeted sandbox-script authoring guidance | [`dev/lint_sandbox_script.js`](dev/README.md) |
 
 ## Conventions
 

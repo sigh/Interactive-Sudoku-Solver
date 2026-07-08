@@ -50,6 +50,12 @@ To run a script outside the browser — e.g. to generate a puzzle file — use
 [`tools/debug/run_sandbox.js`](../../tools/debug/run_sandbox.js), which executes
 it against these same globals and prints the resulting constraints.
 
+Before settling a script, run
+[`tools/dev/lint_sandbox_script.js`](../../tools/dev/lint_sandbox_script.js) for
+targeted guidance about authoring idioms the script may have missed, such as
+parsing or building `R#C#` ids by hand, duplicating `cellGraph()` neighbour
+helpers, or generating a very long constraint string without `Replicate`.
+
 ### What the engine always enforces
 
 Every grid has the same baseline, applied automatically:
