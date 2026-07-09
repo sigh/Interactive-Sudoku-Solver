@@ -1690,7 +1690,9 @@ class GridInputManager {
 
   _restorePanelFocus() {
     const target = this._getSelectionFocusTarget && this._getSelectionFocusTarget();
-    if (target) target.select ? target.select() : target.focus();
+    if (!target) return;
+    target.focus({ preventScroll: true });
+    target.select?.();
   }
 
   reshape(geometry) {
@@ -1927,4 +1929,3 @@ class SandboxHandler {
     }
   }
 }
-

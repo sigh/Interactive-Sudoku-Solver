@@ -864,7 +864,7 @@ class MultiCellInput extends ConstraintCategoryInput {
         if (typeData.dynamicOptionsFn) {
           typeData.dynamicOptionsFn(inputManager.getSelection());
         }
-        typeData.valueElem.focus();
+        typeData.valueElem.focus({ preventScroll: true });
       } else {
         valueContainer.style.visibility = 'hidden';
       }
