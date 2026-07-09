@@ -1,5 +1,6 @@
 const {
   autoSaveField,
+  createSourceLinkIcon,
   dynamicCSSFileLoader,
 } = await import('../util.js' + self.VERSION_PARAM);
 
@@ -12,39 +13,6 @@ const {
   resolvePuzzleConfig,
 } = await import('../../data/example_puzzles.js' + self.VERSION_PARAM);
 const PuzzleCollections = await import('../../data/collections.js' + self.VERSION_PARAM);
-
-// Common source domains we have a local favicon for (img/link_favicons/<domain>.png).
-// Anything else falls back to a generic "open in new tab" icon.
-const FAVICON_DOMAINS = [
-  'logic-masters.de',
-  'youtube.com',
-  'sudokupad.app',
-  'forum.enjoysudoku.com',
-  'reddit.com',
-  'discord.com',
-];
-
-const FALLBACK_ICON = 'img/open-in-new-48.png';
-
-// Resolve a source URL to a local favicon path, or null if we don't have one.
-const faviconForSrc = (src) => {
-  let host;
-  try {
-    host = new URL(src).hostname.replace(/^www\./, '');
-  } catch {
-    return null;
-  }
-  // Progressive suffix match so subdomains resolve too
-  // (e.g. forum.enjoysudoku.com -> enjoysudoku.com).
-  const parts = host.split('.');
-  for (let i = 0; i < parts.length - 1; i++) {
-    const candidate = parts.slice(i).join('.');
-    if (FAVICON_DOMAINS.includes(candidate)) {
-      return `img/link_favicons/${candidate}.png`;
-    }
-  }
-  return null;
-};
 
 // Benchmark collections to surface, in display order.
 const COLLECTION_NAMES = [
@@ -359,30 +327,9 @@ export class PuzzleSelectorPanel {
       return placeholder;
     }
 
-    const link = document.createElement('a');
-    link.className = 'puzzle-item-src';
-    link.href = src;
-    link.target = '_blank';
-    link.rel = 'noopener';
-    link.title = 'Open source';
+    const link = createSourceLinkIcon(src, 'puzzle-item-src');
     // Opening the source should not also load the puzzle.
     link.addEventListener('click', (e) => e.stopPropagation());
-
-    const img = document.createElement('img');
-    img.alt = 'source';
-    const favicon = faviconForSrc(src);
-    if (favicon) {
-      img.src = favicon;
-      // Fall back if a favicon ever fails to load.
-      img.onerror = () => { img.onerror = null; this._setFallbackIcon(img); };
-    } else {
-      this._setFallbackIcon(img);
-    }
-    link.append(img);
     return link;
-  }
-
-  _setFallbackIcon(img) {
-    img.src = FALLBACK_ICON;
   }
 }

@@ -832,6 +832,22 @@ textarea {
   margin-left: auto;
 }
 
+.example-source-links.hstack {
+  column-gap: 4px;
+}
+
+.example-source-link img {
+  display: block;
+  width: 14px;
+  height: 14px;
+  transform: scale(0.82);
+  transition: transform 0.1s ease;
+}
+
+.example-source-link:hover img {
+  transform: scale(1);
+}
+
 #solution-control-panel {
   width: 250px;
   --vstack-gap: 2px;

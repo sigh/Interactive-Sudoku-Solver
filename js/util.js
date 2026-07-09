@@ -33,6 +33,54 @@ export const createSvgElement = (tag) => {
   return document.createElementNS('http://www.w3.org/2000/svg', tag);
 };
 
+const SOURCE_ICON_DOMAINS = [
+  'logic-masters.de',
+  'youtube.com',
+  'sudokupad.app',
+  'forum.enjoysudoku.com',
+  'reddit.com',
+  'discord.com',
+];
+
+const FALLBACK_SOURCE_ICON = 'img/open-in-new-48.png';
+
+const sourceIconForUrl = (url) => {
+  let host;
+  try {
+    host = new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return FALLBACK_SOURCE_ICON;
+  }
+
+  const parts = host.split('.');
+  for (let i = 0; i < parts.length - 1; i++) {
+    const domain = parts.slice(i).join('.');
+    if (SOURCE_ICON_DOMAINS.includes(domain)) {
+      return `img/link_favicons/${domain}.png`;
+    }
+  }
+  return FALLBACK_SOURCE_ICON;
+};
+
+export const createSourceLinkIcon = (url, className) => {
+  const link = document.createElement('a');
+  link.className = className;
+  link.href = url;
+  link.target = '_blank';
+  link.rel = 'noopener';
+  link.title = 'Open source';
+
+  const img = document.createElement('img');
+  img.alt = 'source';
+  img.src = sourceIconForUrl(url);
+  img.onerror = () => {
+    img.onerror = null;
+    img.src = FALLBACK_SOURCE_ICON;
+  };
+  link.append(img);
+  return link;
+};
+
 export const copyToClipboard = async (text, element) => {
   const TIMEOUT_MS = 1000;
 

@@ -10,6 +10,7 @@ const {
   dynamicJSFileLoader,
   dynamicCSSFileLoader,
   isKeyEventFromEditableElement,
+  createSourceLinkIcon,
 } = await import('./util.js' + self.VERSION_PARAM);
 const {
   SudokuConstraint,
@@ -311,23 +312,36 @@ class ExampleHandler {
       exampleSelect.appendChild(option);
     }
 
-    const link = exampleSelect.nextElementSibling;
+    const sourceLinks = exampleSelect.nextElementSibling;
     exampleSelect.onchange = () => {
       if (exampleSelect.selectedIndex) {
         const exampleName = exampleSelect.options[exampleSelect.selectedIndex].text;
         const example = PUZZLE_INDEX.get(exampleName);
-        link.href = Array.isArray(example.src) ? example.src[0] : example.src;
-        link.style.display = 'inline-block';
+        this._renderSourceLinks(sourceLinks, example.src);
 
         this._ignoreConstraintChanges = true;
         this._constraintManager.loadUnsafeFromText(example.input);
       } else {
-        link.style.display = 'none';
+        this._renderSourceLinks(sourceLinks, null);
         this._ignoreConstraintChanges = true;
       }
     };
     exampleSelect.disabled = false;
     exampleSelect.onchange();
+  }
+
+  _renderSourceLinks(container, src) {
+    const sources = (Array.isArray(src) ? src : [src]).filter(Boolean);
+    clearDOMNode(container);
+    container.hidden = sources.length === 0;
+    if (!sources.length) return;
+
+    const label = document.createElement('span');
+    label.className = 'example-source-label';
+    label.textContent = sources.length === 1 ? 'Source:' : 'Sources:';
+    container.append(
+      label,
+      ...sources.map(src => createSourceLinkIcon(src, 'example-source-link')));
   }
 
   newConstraintLoaded() {
