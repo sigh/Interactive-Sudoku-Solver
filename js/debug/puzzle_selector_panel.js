@@ -33,6 +33,7 @@ export class PuzzleSelectorPanel {
     this._openScriptInSandbox = openScriptInSandbox;
 
     this._filter = bodyElement.querySelector('#puzzle-selector-filter');
+    this._modeButtons = bodyElement.querySelectorAll('#puzzle-selector-mode [data-mode]');
     this._list = bodyElement.querySelector('#puzzle-selector-list');
     this._count = bodyElement.querySelector('#puzzle-selector-count');
     this._status = bodyElement.querySelector('#puzzle-selector-status');
@@ -40,20 +41,25 @@ export class PuzzleSelectorPanel {
     // Bumped on every selection; a load whose token is stale by the time it
     // resolves is dropped (latest click wins).
     this._loadToken = 0;
+    this._buildToken = 0;
+    this._mode = 'examples';
+    this._e2ePuzzlesPromise = null;
 
     // Per-group rows (for filtering) and a flat ordered list (for keyboard nav).
     this._groups = [];
     this._navItems = [];
     this._active = null;
 
-    this._buildList();
+    this._setMode(this._mode);
 
     // The filter persists (it is never cleared on selection), so the user can
     // browse through all puzzles matching a query by clicking each in turn.
     autoSaveField(this._filter);
+    for (const button of this._modeButtons) {
+      button.addEventListener('click', () => this._setMode(button.dataset.mode));
+    }
     this._filter.addEventListener('input', () => this._applyFilter());
     this._filter.addEventListener('keydown', (e) => this._onFilterKey(e));
-    this._applyFilter();
   }
 
   setEnabled(enabled) {
@@ -69,21 +75,24 @@ export class PuzzleSelectorPanel {
     this._setStatus('');
   }
 
-  // Build the grouped model: Examples followed by each benchmark collection.
-  _buildGroups() {
+  // Build a nav item from a puzzle config.
+  _makeItem(puzzle, cfg, label) {
+    const tags = cfg.constraintTypes || extractConstraintTypes(cfg.input);
+    return {
+      puzzle,
+      input: cfg.input,
+      src: cfg.src,
+      tags,
+      label,
+      search: [label, ...tags].join(' ').toLowerCase(),
+    };
+  }
+
+  _exampleGroups() {
     const groups = [];
 
-    const exampleItems = [];
-    for (const puzzle of PUZZLE_INDEX.values()) {
-      const types = puzzle.constraintTypes
-        || extractConstraintTypes(puzzle.input);
-      exampleItems.push({
-        puzzle,
-        label: puzzle.name || '(unnamed)',
-        tags: types,
-        search: `${puzzle.name || ''} ${types.join(' ')}`.toLowerCase(),
-      });
-    }
+    const exampleItems = [...PUZZLE_INDEX.values()].map(puzzle =>
+      this._makeItem(puzzle, puzzle, puzzle.name || '(unnamed)'));
     groups.push({ items: exampleItems });
 
     for (const listName of COLLECTION_NAMES) {
@@ -91,21 +100,29 @@ export class PuzzleSelectorPanel {
       if (!list) continue;
       const items = list.map((entry, i) => {
         const cfg = list.configFor(entry);
-        const tags = cfg.constraintTypes || extractConstraintTypes(cfg.input);
         const name = PUZZLE_INDEX.has(entry) ? cfg.name : '';
-        return {
-          puzzle: entry,
-          src: cfg.src,
-          tags,
-          label: `${listName}[${i}]`,
-          detail: name,
-          search: `${listName} ${i} ${tags.join(' ')} ${name}`.toLowerCase(),
-        };
+        return this._makeItem(entry, cfg, `${listName}[${i}]`);
       });
       groups.push({ items });
     }
 
     return groups;
+  }
+
+  async _e2eGroups() {
+    this._e2ePuzzlesPromise ??= import('../../tests/e2e/e2e_puzzles.js' + self.VERSION_PARAM);
+    const { solveCollections } = await this._e2ePuzzlesPromise;
+    return solveCollections.map(({ collection, puzzles }) => ({
+      items: puzzles.map((entry, i) => {
+        const cfg = resolvePuzzleConfig(entry);
+        const label = `${collection}[${i}]` + (cfg.name ? `: ${cfg.name}` : '');
+        return this._makeItem(entry, cfg, label);
+      }),
+    }));
+  }
+
+  _buildGroups() {
+    return this._mode === 'e2e' ? this._e2eGroups() : this._exampleGroups();
   }
 
   // Assign each constraint type a stable, well-separated hue
@@ -124,9 +141,36 @@ export class PuzzleSelectorPanel {
     return hues;
   }
 
-  _buildList() {
+  async _setMode(mode) {
+    if (!mode || (mode === this._mode && this._groups.length)) return;
+    this._mode = mode;
+    const token = ++this._buildToken;
+    this._setActive(null);
+    this._groups = [];
+    this._navItems = [];
+    this._list.textContent = '';
+    this._count.textContent = '';
+    for (const button of this._modeButtons) {
+      button.classList.toggle('active', button.dataset.mode === mode);
+    }
+
+    if (mode === 'e2e' && !this._e2ePuzzlesPromise) {
+      this._setStatus('Loading E2E puzzles…');
+    }
+    try {
+      const groups = await this._buildGroups();
+      if (token !== this._buildToken) return;
+      this._renderGroups(groups);
+      this._setStatus('');
+      this._applyFilter();
+    } catch (e) {
+      if (token !== this._buildToken) return;
+      this._setStatus(`Couldn't load ${mode} puzzles: ${e.message || e}`, 'error');
+    }
+  }
+
+  _renderGroups(groups) {
     const fragment = document.createDocumentFragment();
-    const groups = this._buildGroups();
     const tagHues = this._makeTagHues(groups);
 
     for (const group of groups) {
@@ -135,11 +179,9 @@ export class PuzzleSelectorPanel {
 
       const groupItems = [];
       for (const item of group.items) {
-        const secondary = item.tags?.length ? item.tags.join(', ') : item.detail;
-
         const row = document.createElement('div');
         row.className = 'puzzle-item hstack';
-        row.title = [item.label, secondary].filter(Boolean).join(' — ');
+        row.title = [item.label, item.tags?.join(', ')].filter(Boolean).join(' — ');
 
         row.append(this._makeSrcIcon(item.src ?? item.puzzle.src));
 
@@ -159,14 +201,9 @@ export class PuzzleSelectorPanel {
             tags.append(chip);
           }
           row.append(tags);
-        } else if (item.detail) {
-          const detail = document.createElement('span');
-          detail.className = 'puzzle-item-detail';
-          detail.textContent = item.detail;
-          row.append(detail);
         }
 
-        const input = item.puzzle.input;
+        const input = item.input ?? item.puzzle.input;
         if (typeof input === 'string' && input.endsWith('.js')) {
           row.append(this._makeScriptIcon(input));
         }

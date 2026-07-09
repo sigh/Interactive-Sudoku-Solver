@@ -181,7 +181,7 @@ const puzzles16x16 = [
   '16x16: Jigsaw',
 ];
 
-const puzzlesOtherSizes = [
+const puzzlesSmallSizes = [
   '6x6',
   '6x6: Numbered rooms',
   '6x6: Between Odd and Even',
@@ -264,7 +264,7 @@ const puzzles0Indexed = [
   },
 ];
 
-const puzzlesExtraVariables = [
+const puzzlesExtraCells = [
   'Doppelganger',  // Doppelganger
   'Dutch-pelgänger [easier]',  // Doppelganger, Whisper on state cells
   'Bates Motel',  // Var, ValueIndexing, 6x6
@@ -346,10 +346,10 @@ const puzzlesExtraVariables = [
 export const solveCollections = [
   { collection: '9x9', puzzles: puzzles9x9 },
   { collection: '16x16', puzzles: puzzles16x16 },
-  { collection: 'Other sizes', puzzles: puzzlesOtherSizes },
-  { collection: 'Non-square grids', puzzles: puzzlesNonSquareGrids },
-  { collection: '0-indexed', puzzles: puzzles0Indexed },
-  { collection: 'Extra Variables', puzzles: puzzlesExtraVariables },
+  { collection: 'Small', puzzles: puzzlesSmallSizes },
+  { collection: 'Non-square', puzzles: puzzlesNonSquareGrids },
+  { collection: '0-value', puzzles: puzzles0Indexed },
+  { collection: 'Extra Cells', puzzles: puzzlesExtraCells },
 ];
 
 export const layoutCases = [

@@ -22,4 +22,4 @@ Both are wired up in [../solution_controller.js](../solution_controller.js).
 
 ## Puzzle Loading
 
-[puzzle_selector_panel.js](puzzle_selector_panel.js) builds its dropdown index from the example puzzles in [../../data/example_puzzles.js](../../data/example_puzzles.js) and the benchmark collections in [../../data/collections.js](../../data/collections.js). Selecting an entry resolves its config (fetching the input from a file path if needed) and loads it into the constraint manager.
+[puzzle_selector_panel.js](puzzle_selector_panel.js) builds its default dropdown index from the example puzzles in [../../data/example_puzzles.js](../../data/example_puzzles.js) and the benchmark collections in [../../data/collections.js](../../data/collections.js). Its E2E mode lazy-loads [../../tests/e2e/e2e_puzzles.js](../../tests/e2e/e2e_puzzles.js) on demand. Selecting an entry resolves its config (fetching the input from a file path if needed) and loads it into the constraint manager.

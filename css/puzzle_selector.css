@@ -16,6 +16,14 @@
   flex: 0 0 200px;
 }
 
+#puzzle-selector-mode {
+  justify-content: stretch;
+}
+
+#puzzle-selector-mode button {
+  flex: 1;
+}
+
 #puzzle-selector-filter {
   box-sizing: border-box;
   width: 100%;
@@ -62,11 +70,6 @@
 .puzzle-item-label {
   flex: 0 0 auto;
   white-space: nowrap;
-}
-
-.puzzle-item-detail {
-  color: var(--color-text-muted);
-  font-size: var(--font-size-small);
 }
 
 /* Constraint types, each a small chip. The container fills the space between the

@@ -813,6 +813,10 @@ function accept(state) {
         <div class="lazy-body" hidden>
           <div id="puzzle-selector-panel">
             <div id="puzzle-selector-controls" class="vstack">
+              <div id="puzzle-selector-mode" class="tab-container">
+                <button type="button" class="active" data-mode="examples">Examples</button>
+                <button type="button" data-mode="e2e">Tests</button>
+              </div>
               <input type="text" id="puzzle-selector-filter" placeholder="Filter puzzles…" autocomplete="off">
               <div id="puzzle-selector-count"></div>
               <div id="puzzle-selector-status" class="notice"></div>
