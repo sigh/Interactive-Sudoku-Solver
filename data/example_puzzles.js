@@ -8,7 +8,7 @@ export const DISPLAYED_EXAMPLES = [
   },
   {
     name: 'Thermosudoku',
-    src: 'https://www.youtube.com/watch?v=lgJYOuVk910',
+    src: ['https://www.youtube.com/watch?v=lgJYOuVk910', 'https://sudokupad.app/TtTmqGMBDR'],
     input:
       '.~R1C2_4~R1C8_1~R2C1_2~R2C9_6~R8C1_9~R8C9_2~R9C2_1~R9C8_9.Thermo~R9C4~R8C3~R7C2~R6C1~R5C2~R4C3.Thermo~R4C1~R3C2~R2C3~R1C4~R2C5~R3C6.Thermo~R1C6~R2C7~R3C8~R4C9~R5C8~R6C7.Thermo~R6C9~R7C8~R8C7~R9C6~R8C5~R7C4',
     solution: '847632519295471386631598247129743865486259173753816924368924751974185632512367498',
@@ -43,7 +43,7 @@ export const DISPLAYED_EXAMPLES = [
   },
   {
     name: 'Little killer',
-    src: 'https://www.youtube.com/watch?v=y4eKdI3ZJ78',
+    src: ['https://www.youtube.com/watch?v=y4eKdI3ZJ78', 'https://sudokupad.app/nQHjr7Ggpg'],
     input:
       '.~R3C2_5~R3C7_2~R5C4_3~R5C5_7.LittleKiller~22~R1C1.LittleKiller~28~R2C1.LittleKiller~26~R3C1.LittleKiller~23~R1C5.LittleKiller~34~R1C7.LittleKiller~40~R1C8.LittleKiller~42~R1C9',
     solution: '198235764427968531653714289732186945541379826986542173865421397279653418314897652',
@@ -57,13 +57,13 @@ export const DISPLAYED_EXAMPLES = [
   },
   {
     name: 'XV-kropki',
-    src: 'https://www.youtube.com/watch?v=TT-6BfDeCdc',
+    src: ['https://www.youtube.com/watch?v=TT-6BfDeCdc', 'https://sudokupad.app/LTR8GR7D84'],
     input: '.X~R2C1~R2C2.X~R3C1~R3C2.X~R1C8~R1C7.X~R2C7~R2C8.X~R7C8~R8C8.X~R7C9~R8C9.X~R8C3~R9C3.X~R8C2~R9C2.X~R5C4~R5C5.V~R8C2~R8C3.V~R8C8~R8C9.V~R2C1~R3C1.V~R1C7~R2C7.BlackDot~R2C5~R2C6.BlackDot~R4C6~R5C6.BlackDot~R5C6~R6C6.BlackDot~R3C1~R4C1.WhiteDot~R3C3~R3C2.WhiteDot~R4C3~R5C3.WhiteDot~R8C4~R8C5.WhiteDot~R8C6~R8C7.WhiteDot~R5C2~R6C2',
     solution: '195287463284536197376149825657912384918374256423658719532461978741895632869723541',
   },
   {
     name: 'Sandwich sudoku',
-    src: 'https://www.youtube.com/watch?v=2wfR6QIvNn4&t=4s',
+    src: ['https://www.youtube.com/watch?v=2wfR6QIvNn4&t=4s', 'https://sudokupad.app/p8fFp3hT96'],
     input: '.Sandwich~8~C1.Sandwich~4~C2.Sandwich~17~C3.Sandwich~35~C4.Sandwich~14~C5.Sandwich~13~C6.Sandwich~3~C7.Sandwich~10~C8.Sandwich~25~C9.Sandwich~4~R1.Sandwich~33~R2.Sandwich~20~R3.Sandwich~17~R4.Sandwich~26~R5.Sandwich~10~R6.Sandwich~16~R7.Sandwich~24~R8.Sandwich~0~R9.~R3C3_1~R5C5_5~R7C7_9',
     solution: '236941875954378612871625439182439756397856124645217398413562987569783241728194563',
   },
@@ -75,19 +75,19 @@ export const DISPLAYED_EXAMPLES = [
   },
   {
     name: 'German whispers',
-    src: 'https://www.youtube.com/watch?v=nH3vat8z9uM',
+    src: ['https://www.youtube.com/watch?v=nH3vat8z9uM', 'https://sudokupad.app/QM8RdBLBb9'],
     input: '.Whisper~R8C1~R7C1~R7C2~R8C3~R9C3~R9C2.Whisper~R9C6~R8C7~R7C7~R7C8~R6C9~R5C8.Whisper~R6C3~R5C2~R4C3~R3C4~R2C5~R1C6~R1C7~R2C8~R3C8~R4C7~R5C6~R6C6~R7C6~R8C5~R7C4.Whisper~R4C5~R4C6~R3C7.~R1C5_1~R2C2_5~R5C1_6~R5C9_9~R7C3_3~R8C8_3~R9C1_5~R9C5_3',
     solution: '796413852352689417184275693247591386615348279839762541923857164478126935561934728',
   },
   {
     name: 'International whispers',
-    src: 'https://www.youtube.com/watch?v=5xu7OpQogfo',
+    src: ['https://www.youtube.com/watch?v=5xu7OpQogfo', 'https://sudokupad.app/jbJ8PNDgR7'],
     input: '.WhiteDot~R8C9~R9C9.WhiteDot~R7C9~R7C8.WhiteDot~R8C4~R8C5.WhiteDot~R5C2~R5C1.WhiteDot~R5C2~R6C2.WhiteDot~R6C6~R6C5.WhiteDot~R5C8~R5C7.WhiteDot~R2C4~R2C5.WhiteDot~R2C2~R2C1.Whisper~6~R1C2~R2C2~R3C2.Whisper~6~R2C1~R3C2~R4C3.Whisper~6~R2C3~R3C2~R4C1.Whisper~4~R7C2~R8C2~R9C2.Whisper~4~R8C1~R8C2~R8C3.Whisper~4~R9C1~R9C2~R9C3.Whisper~2~R9C7~R9C8~R8C8~R7C8~R6C8.Whisper~2~R7C7~R7C8~R8C9.Whisper~2~R8C7~R7C8~R6C9.Whisper~4~R4C7~R3C8~R4C9.Whisper~4~R3C8~R2C8~R1C8.Whisper~4~R1C7~R1C8~R1C9.Whisper~4~R2C7~R2C8~R2C9.Whisper~3~R4C5~R5C5~R6C5~R7C5.Whisper~3~R5C4~R5C5~R5C6.Whisper~3~R6C4~R5C5~R6C6.~R1C3_6~R4C4_3~R7C1_4~R9C9_2~R4C8_4',
     solution: '536971284897234516214856793768392145342518679951467328485123967629785431173649852',
   },
   {
     name: 'Renban',
-    src: 'https://www.youtube.com/watch?v=XouRUgRsVSA',
+    src: ['https://www.youtube.com/watch?v=XouRUgRsVSA', 'https://sudokupad.app/jtgN8Hd7f6'],
     input: '.Renban~R4C8~R4C9~R5C9~R6C9.Renban~R7C9~R8C9~R9C9~R9C8.Renban~R6C7~R7C7~R8C7~R8C6.Renban~R2C6~R1C6~R1C5~R1C4.Renban~R2C1~R1C1~R1C2~R1C3.Renban~R2C3~R2C4~R3C4~R4C4.Renban~R5C5~R5C6~R6C6~R7C6.Renban~R5C4~R5C3~R6C3~R7C3.Renban~R3C1~R4C1~R5C1~R5C2.Renban~R7C1~R8C1~R9C1~R9C2.Renban~R7C4~R8C4~R9C4~R9C3.~R3C7_1.BlackDot~R2C9~R3C9.BlackDot~R1C7~R1C8.BlackDot~R3C6~R3C5.BlackDot~R4C7~R5C7',
     solution: '132769845496518723758342196815473269963285417274196358521937684389624571647851932',
   },
@@ -105,19 +105,19 @@ export const DISPLAYED_EXAMPLES = [
   },
   {
     name: 'Palindromes',
-    src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?chlang=en&id=0001WP',
+    src: ['https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?chlang=en&id=0001WP', 'https://sudokupad.app/0eqtn1ibko'],
     input: '.Palindrome~R7C1~R6C2~R5C1~R4C2~R3C3~R2C4~R1C5~R2C6~R1C7.Palindrome~R9C3~R8C4~R9C5~R8C6~R7C7~R6C8~R5C9~R4C8~R3C9.Palindrome~R7C4~R7C5~R7C6~R6C7~R5C7~R4C7.Palindrome~R3C6~R3C5~R3C4~R4C3~R5C3~R6C3.~R1C1_6~R1C9_5~R2C3_8~R2C5_5~R2C7_9~R4C1_8~R4C5_1~R4C9_3~R5C5_4~R6C5_2~R8C1_9~R8C3_7~R8C7_8~R8C9_2~R9C2_5~R9C8_6',
     solution: '694178235128453976375296481842619753719345628536827149283761594967534812451982367',
   },
   {
     name: 'Zipper lines',
-    src: 'https://www.youtube.com/watch?v=qP_oxUzGD5g',
+    src: ['https://www.youtube.com/watch?v=qP_oxUzGD5g', 'https://sudokupad.app/k9mm1xgca5'],
     input: '.Zipper~R1C2~R1C1~R2C1~R2C2~R3C2~R3C1~R4C1~R5C1~R4C2.Zipper~R2C3~R1C3~R1C4~R2C4~R3C4.Zipper~R2C6~R3C5~R3C6~R2C7~R1C6~R1C5.Zipper~R9C3~R8C2~R7C1~R6C1~R5C2~R4C3~R4C4~R5C4~R6C3.Zipper~R8C3~R7C3~R6C4~R6C5~R5C5~R4C5~R4C6~R5C6~R6C6~R6C7~R6C8~R6C9.Zipper~R5C7~R5C8~R4C7~R3C7~R2C8.Zipper~R7C5~R7C6~R8C6~R8C7~R7C7~R7C8~R7C9~R8C9~R9C9~R9C8~R9C7~R9C6~R9C5~R8C5.',
     solution: '354897126672451839189632574231564987597328641846719352415973268968245713723186495'
   },
   {
     name: 'Jigsaw',
-    src: 'https://www.youtube.com/watch?v=wuduuLVGKDQ',
+    src: ['https://www.youtube.com/watch?v=wuduuLVGKDQ', 'https://sudokupad.app/fTbNFPQ44g'],
     input: '.NoBoxes.Jigsaw~000000021453303021453333221453322221455566121445666111445566667488887777888887777.~R1C1_3~R1C9_7~R2C1_1~R2C9_5~R3C5_6~R3C6_8~R4C3_5~R4C5_1~R4C6_9~R5C4_9~R6C9_2~R7C1_8~R7C6_3~R8C4_2~R8C5_3~R8C6_5~R8C9_1~R9C8_9',
     solution: '364891527189374265542168739625719843213987456937456182876523914498235671751642398',
   },
@@ -129,7 +129,7 @@ export const DISPLAYED_EXAMPLES = [
   },
   {
     name: 'Region sum lines',
-    src: 'https://www.youtube.com/watch?v=7UZKP82Em14',
+    src: ['https://www.youtube.com/watch?v=7UZKP82Em14', 'https://sudokupad.app/jsm6fxl03y'],
     input: '.RegionSumLine~R1C2~R2C2~R3C2~R4C2~R5C2.RegionSumLine~R1C3~R2C4~R3C5.RegionSumLine~R6C1~R7C1~R8C1.RegionSumLine~R7C2~R6C3~R5C4~R4C5~R3C6~R2C7~R1C8.RegionSumLine~R2C8~R3C7~R4C6~R5C5~R6C4~R7C3~R8C2.RegionSumLine~R3C8~R4C7~R5C6~R6C5~R7C4~R8C3~R9C2.RegionSumLine~R3C9~R4C8~R5C7~R6C6~R7C5~R8C4~R9C3.RegionSumLine~R5C9~R6C8~R7C7~R8C6~R9C5.',
     solution: '847925163965137284312468579693854712421376895758219346586743921274591638139682457',
   },
@@ -147,7 +147,7 @@ export const DISPLAYED_EXAMPLES = [
   },
   {
     name: 'Skyscraper',
-    src: 'https://www.youtube.com/watch?v=rLlZA5ZND00',
+    src: ['https://www.youtube.com/watch?v=rLlZA5ZND00', 'https://sudokupad.app/mMFtMNMMqg'],
     input: '.~R1C1_1~R1C6_2~R1C9_8~R3C1_3~R3C4_6~R3C7_4~R5C1_5~R5C3_2~R5C6_3~R7C1_7~R7C4_8~R7C7_2~R9C9_6~R9C6_4~R9C1_9.Skyscraper~C5~5.Skyscraper~R2~2.Skyscraper~R4~4.Skyscraper~R6~6.Skyscraper~R8~8',
     solution: '147932658826145937359678412678419325592783164413256789765891243234567891981324576',
   },
@@ -159,19 +159,19 @@ export const DISPLAYED_EXAMPLES = [
   },
   {
     name: 'X-Sum',
-    src: 'https://www.youtube.com/watch?v=fnCzYnsC4Ow',
+    src: ['https://www.youtube.com/watch?v=fnCzYnsC4Ow', 'https://sudokupad.app/PtjJbFhttP'],
     input: '.XSum~C2~27~27.XSum~C4~11~11.XSum~C6~21~.XSum~C7~16~16.XSum~R2~8~8.XSum~R4~17~17.XSum~R6~30~30.XSum~R8~28~28.',
     solution: '856214379341975862792863541417529683985631724623487195274156938539748216168392457',
   },
   {
     name: 'Odd even',
-    src: 'https://www.youtube.com/watch?v=Q7hhVgE8zGM',
+    src: ['https://www.youtube.com/watch?v=Q7hhVgE8zGM', 'https://sudokupad.app/8bNmDd4J9G'],
     input: '.~R1C6_7~R1C7_2~R1C8_1~R1C9_6~R2C9_5~R2C8_7~R2C7_9~R2C6_4~R8C1_2~R8C2_7~R8C3_4~R8C4_5~R9C1_9~R9C2_5~R9C3_8~R9C4_2~R4C7_2_4_6_8~R4C8_2_4_6_8~R5C6_2_4_6_8~R6C6_2_4_6_8~R6C7_2_4_6_8~R6C8_2_4_6_8~R7C6_2_4_6_8~R8C7_2_4_6_8~R8C8_2_4_6_8~R2C3_1_3_5_7_9~R3C2_1_3_5_7_9~R4C4_1_3_5_7_9~R4C2_1_3_5_7_9~R5C4_1_3_5_7_9~R5C2_1_3_5_7_9~R3C4_1_3_5_7_9~R6C3_1_3_5_7_9',
     solution: '549837216823614975716925348635149827492786153187352469361478592274593681958261734',
   },
   {
     name: 'Odd-even thermo',
-    src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=0003V5',
+    src: ['https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=0003V5', 'https://sudokupad.app/dmax9sth7b'],
     input: '.Pair~UFVQFUAFQAE~_Odd-Even%20Thermo~r1c2~r1c3~r1c4~r1c5~~r1c8~r1c9~r2c9~r3c9~~r2c8~r2c7~~r3c4~r3c3~~r3c2~r4c2~r4c1~~r6c3~r5c3~r5c4~r4c4~~r5c6~r4c6~r4c5~~r6c8~r6c9~r5c9~~r7c2~r7c3~~r7c8~r7c9~r8c9~~r8c2~r9c2~r9c1~~r8c4~r9c4~~r8c5~r9c5~r9c6',
     solution: '613798524298145736457362198971853642384621975562479813139286457726514389845937261',
   },
@@ -184,7 +184,7 @@ export const DISPLAYED_EXAMPLES = [
   },
   {
     name: 'Pill arrow',
-    src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=0007D1',
+    src: ['https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=0007D1', 'https://sudokupad.app/k672pxo3r9'],
     input: '.PillArrow~2~R1C3~R1C2~R1C1~R2C1~R3C1.PillArrow~2~R1C8~R1C7~R1C6~R1C5~R1C4.PillArrow~2~R2C7~R2C6~R2C5~R2C4~R2C3.PillArrow~2~R4C1~R5C1~R6C1~R7C1~R8C1.PillArrow~2~R3C2~R4C2~R5C2~R6C2~R7C2.PillArrow~2~R9C1~R9C2~R9C3~R9C4~R9C5.PillArrow~2~R5C9~R4C9~R3C9~R2C9~R1C9.PillArrow~2~R8C6~R9C6~R9C7~R9C8~R9C9.Arrow~R3C3~R4C4~R5C5.Arrow~R7C3~R6C4~R5C5~R4C6.Arrow~R3C8~R4C7.',
     solution: '514896237679231485328745196235684971491327658786159342967418523853962714142573869',
   },
@@ -208,7 +208,7 @@ export const DISPLAYED_EXAMPLES = [
   },
   {
     name: 'Quadruple X',
-    src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=00040T',
+    src: ['https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=00040T', 'https://sudokupad.app/20mp1nw1lh'],
     input: '.Diagonal~1.Diagonal~-1..Quad~R1C1~1~4~6~7.Quad~R5C1~2~3.Quad~R6C1~1~2.Quad~R3C3~1~2~4~8.Quad~R6C3~3~5~8~9.Quad~R2C4~6~7.Quad~R7C5~3~6.Quad~R3C6~4~5~8~9.Quad~R6C6~2~3~6~7.Quad~R3C8~1~2.Quad~R4C8~1~5.Quad~R8C8~2~3~4~5',
     solution: '762384591415729368398165427654278913837691245129543786543812679971436852286957134',
   },
@@ -226,13 +226,13 @@ export const DISPLAYED_EXAMPLES = [
   },
   {
     name: 'Entropic connections',
-    src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=000EA3',
+    src: ['https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=000EA3', 'https://sudokupad.app/ov06jl2z3j'],
     input: '.Cage~9~R1C1~R2C1.Cage~20~R2C3~R3C3~R3C2.Cage~12~R1C9~R1C8.Cage~15~R2C7~R3C7~R3C8.Cage~20~R7C2~R7C3~R8C3.Cage~10~R9C1~R9C2.Cage~9~R8C9~R9C9.Cage~18~R7C8~R7C7~R8C7.Whisper~5~R9C1~R8C2~R7C3.Whisper~5~R4C2~R5C3~R6C2.Whisper~5~R1C1~R2C2~R3C3.Whisper~5~R7C7~R8C8~R9C9.Entropic~R3C1~R4C1~R5C1~R6C1~R7C1~R8C1.Entropic~R1C2~R1C3~R1C4~R1C5~R1C6~R1C7.Entropic~R2C9~R3C9~R4C9~R5C9~R6C9.Entropic~R9C8~R9C7~R9C6~R9C5~R9C4~R9C3~R9C2.Entropic~R6C8~R5C7~R4C6~R3C5~R2C4~R3C4~R4C4~R5C5~R6C4~R7C4~R8C4.Pair~EAEBEAAQAAAAE~_1%3A3~R2C6~R3C6.',
     solution: '642751839315986427978342561581493276263175948794268153459617382136824795827539614',
   },
   {
     name: 'Indexing',
-    src: 'https://www.youtube.com/watch?v=J0OVDew3Hg4',
+    src: ['https://www.youtube.com/watch?v=J0OVDew3Hg4', 'https://sudokupad.app/8rrr3nrDqF'],
     input: '.~R2C2_4~R2C3_9~R2C4_7~R1C6_3~R1C8_5~R3C6_5~R3C7_1~R3C8_2~R4C2_2~R4C4_6~R5C3_7~R7C2_6~R7C3_3~R7C4_8~R6C6_8~R5C7_8~R6C8_6~R8C6_9~R8C7_5~R8C8_3~R9C2_7~R9C4_2.Indexing~C~R1C1~R2C1~R3C1~R4C1~R5C1~R6C1~R7C1~R8C1~R9C1~R1C5~R2C5~R3C5~R4C5~R5C5~R6C5~R7C5~R8C5~R9C5~R1C9~R2C9~R3C9~R4C9~R5C9~R6C9~R7C9~R8C9~R9C9',
     solution: '216483957549712683738965124824697315657321849391548762963854271482179536175236498',
   },
@@ -262,7 +262,7 @@ export const DISPLAYED_EXAMPLES = [
   },
   {
     name: 'Counting circles',
-    src: 'https://www.youtube.com/watch?v=J_3SltyIJ1I',
+    src: ['https://www.youtube.com/watch?v=J_3SltyIJ1I', 'https://sudokupad.app/QbPRdNNRMH'],
     input: '.CountingCircles~R1C1~R1C5~R1C9~R2C7~R2C3~R3C2~R3C8~R4C6~R4C7~R4C4~R5C1~R5C2~R6C3~R6C4~R6C6~R7C8~R8C7~R9C9~R9C5~R7C2~R8C3~R9C1~R5C8.~R1C5_1~R2C8_2~R2C2_8~R5C9_3~R5C1_7~R8C2_6~R9C5_5~R7C3_8~R6C5_9~R7C7_2~R8C6_1~R8C8_4',
     solution: '623514897584379621971268354219436785745182963836795412158643279367921548492857136',
   },
@@ -274,7 +274,7 @@ export const DISPLAYED_EXAMPLES = [
   },
   {
     name: 'Magic square',
-    src: 'https://www.youtube.com/watch?v=hAyZ9K2EBF0',
+    src: ['https://www.youtube.com/watch?v=hAyZ9K2EBF0', 'https://sudokupad.app/2QM8JHJ4HB'],
     input: '.AntiKnight.Diagonal~1.Diagonal~-1.Cage~15~R4C6~R5C6~R6C6.Cage~15~R4C4~R5C4~R6C4.Cage~15~R4C4~R4C5~R4C6.Cage~15~R6C4~R6C5~R6C6.Cage~15~R5C4~R5C5~R5C6.Cage~15~R4C5~R5C5~R6C5.Cage~15~R6C4~R5C5~R4C6.Cage~15~R4C4~R5C5~R6C6.~R4C1_3~R4C2_8~R4C3_4~R9C9_2',
     solution: '843567219275913846619428375384672951726159483951834627537286194462791538198345762',
   },
@@ -373,7 +373,7 @@ export const DISPLAYED_EXAMPLES = [
   },
   {
     name: '6x9: Postcard',
-    src: 'https://www.youtube.com/watch?v=0HDv7XZzeuw',
+    src: ['https://www.youtube.com/watch?v=0HDv7XZzeuw', 'https://sudokupad.app/wxge3tm0qt'],
     input: '.Shape~6x9.Whisper~5~R2C4~R2C5.Whisper~5~R3C5~R4C6~R4C5~R4C4~R5C5.Indexing~C~R1C5~R2C5~R3C5~R4C5~R5C5~R6C5.Indexing~C~R1C1~R2C1~R3C1.AntiKnight',
     solution: '762894135438165729159723864215938647876541293943672581',
   }
