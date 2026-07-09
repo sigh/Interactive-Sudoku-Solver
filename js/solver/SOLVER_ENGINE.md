@@ -160,6 +160,15 @@ During `enforceConsistency`, the allocated state is accessed via
 `grid[offset]` — it is saved and restored automatically as the engine
 pushes and pops stack frames.
 
+A single boolean flag doesn't need a whole slot:
+`stateAllocator.allocateBit()` returns `{ offset, mask }` for one
+branch-state bit, packing bits from different handlers into shared
+words. Read with `grid[offset] & mask`, set with
+`grid[offset] |= mask`. Since the word is saved and restored like any
+other state, a set bit clears again on backtrack — the idiom for
+running an expensive step at most once per branch (see `ChaosArrow`'s
+excluded flag).
+
 ### Writing `enforceConsistency`
 
 `enforceConsistency` is the hot loop of the solver — it runs millions of

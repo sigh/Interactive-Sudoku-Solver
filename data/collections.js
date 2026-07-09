@@ -908,10 +908,8 @@ const EXAMPLE_NON_STANDARD_NUM_VALUES = [
     solution: '159482742163368597813925695748427316',
   },
   {
-    name: '6x6: Irregular Quadro Quadri',
-    // TODO: wrong src — this link is a copy-paste of 'Successor Arrows' and
-    // decodes to that puzzle. Replace with the correct puzzle link.
-    src: 'https://sudokupad.app/txrhj6jpls',
+    name: 'Quadro Quadri',
+    src: 'https://sudokupad.app/2b042wcx79',
     input: '.Shape~6x6~9.RegionSize~9.NoBoxes.Renban~R5C1~R6C2.Renban~R4C2~R5C3.Renban~R2C1~R1C2.Renban~R3C2~R2C3.Renban~R1C5~R2C6.Renban~R2C4~R3C5.Renban~R4C5~R5C4.Renban~R5C6~R6C5.Quad~R1C5~1~2~4.Quad~R2C5~7~8.Quad~R1C1~1~2~3.Quad~R1C2~8~9.Quad~R3C3~1~2~3~4.Quad~R4C1~5~9.Quad~R5C1~2~3~4.Quad~R5C4~6~7.Quad~R5C5~1~3~4.Jigsaw~122222112223111233114333144433444443',
     solution: '829514318672972358561497495863236741',
   },

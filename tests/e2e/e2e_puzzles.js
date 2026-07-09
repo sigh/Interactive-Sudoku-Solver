@@ -19,6 +19,21 @@ const { VALID_JIGSAW_BOX_LAYOUTS } = await import('../../data/jigsaw_box_layouts
 // The 'Classic sudoku' example, reused as an input/solution base for several puzzles.
 const CLASSIC_9X9 = PUZZLE_INDEX.get('Classic sudoku');
 
+// Build an e2e-only variant by reusing a source puzzle's metadata and appending
+// extra constraints, typically a few givens to make the solve fast enough for tests.
+const withExtraConstraints = (sourceName, extraConstraints, overrides = {}) => {
+  const sourcePuzzle = PUZZLE_INDEX.get(sourceName);
+  if (!sourcePuzzle) throw new Error(`Unknown source puzzle: ${sourceName}`);
+
+  return {
+    ...sourcePuzzle,
+    ...overrides,
+    name: overrides.name ?? `${sourcePuzzle.name} [extra constraints]`,
+    input: sourcePuzzle.input,
+    extraConstraints,
+  };
+};
+
 // Base64 Replicate bitset covering `count` consecutive cells from the origin.
 const consecutiveBitset = (count) => {
   const arr = new Uint8Array(Math.ceil(count / 6));
@@ -38,10 +53,26 @@ const puzzles9x9 = [
   'Classic sudoku, hard',
   'Anti-knights move',
   'Killer sudoku',
-  'Killer sudoku [overlap]',
-  'Killer sudoku [gaps]',
-  'Killer sudoku [0 cage]',
-  'Killer sudoku [alldiff]',
+  withExtraConstraints(
+    'Killer sudoku',
+    '.Cage~9~R1C5~R2C5.',
+    { name: 'Killer sudoku [overlap]' }),
+  {
+    name: 'Killer sudoku [gaps]',
+    comment: "Same as 'Killer sudoku' but with gaps for the optimizer to fill.",
+    input: '.Cage~17~R2C3~R2C4.Cage~9~R3C3~R3C4~R4C4.Cage~22~R1C6~R2C5~R2C6~R3C5.Cage~4~R1C7~R2C7.Cage~16~R1C8~R2C8.Cage~15~R1C9~R2C9~R3C9~R4C9.Cage~20~R3C7~R3C8~R4C7.Cage~17~R4C5~R5C5~R6C5.Cage~20~R5C4~R6C4~R7C4.Cage~14~R4C2~R4C3.Cage~6~R4C1~R5C1.Cage~13~R5C2~R5C3~R6C2.Cage~6~R6C3~R7C2~R7C3.Cage~17~R4C8~R5C7~R5C8.Cage~27~R6C1~R7C1~R8C1~R9C1.Cage~8~R8C2~R9C2.Cage~16~R8C3~R9C3.Cage~10~R7C5~R8C4~R8C5~R9C4.Cage~12~R5C9~R6C9.Cage~6~R6C7~R6C8.Cage~20~R6C6~R7C6~R7C7.Cage~15~R8C6~R8C7.Cage~14~R7C8~R7C9~R8C8~R8C9.Cage~13~R9C5~R9C6~R9C7.Cage~17~R9C8~R9C9.',
+    solution: PUZZLE_INDEX.get('Killer sudoku').solution,
+  },
+  {
+    name: 'Killer sudoku [0 cage]',
+    input: '.Cage~3~R1C1~R1C2.Cage~15~R1C3~R1C4~R1C5.Cage~17~R2C3~R2C4.Cage~22~R1C6~R2C5~R2C6~R3C5.Cage~4~R1C7~R2C7.Cage~16~R1C8~R2C8.Cage~15~R1C9~R2C9~R3C9~R4C9.Cage~8~R3C6~R4C6~R5C6.Cage~6~R4C1~R5C1.Cage~6~R6C3~R7C2~R7C3.Cage~27~R6C1~R7C1~R8C1~R9C1.Cage~8~R8C2~R9C2.Cage~16~R8C3~R9C3.Cage~10~R7C5~R8C4~R8C5~R9C4.Cage~12~R5C9~R6C9.Cage~6~R6C7~R6C8.Cage~20~R6C6~R7C6~R7C7.Cage~15~R8C6~R8C7.Cage~14~R7C8~R7C9~R8C8~R8C9.Cage~13~R9C5~R9C6~R9C7.Cage~17~R9C8~R9C9.Cage~0~R5C4~R5C3~R5C2~R6C2.Cage~0~R3C7~R3C8~R4C8.',
+    solution: PUZZLE_INDEX.get('Killer sudoku').solution,
+  },
+  {
+    name: 'Killer sudoku [alldiff]',
+    input: '.Cage~3~R1C1~R1C2.Cage~15~R1C3~R1C4~R1C5.Cage~17~R2C3~R2C4.Cage~22~R1C6~R2C5~R2C6~R3C5.Cage~4~R1C7~R2C7.Cage~16~R1C8~R2C8.Cage~15~R1C9~R2C9~R3C9~R4C9.Cage~8~R3C6~R4C6~R5C6.Cage~6~R4C1~R5C1.Cage~6~R6C3~R7C2~R7C3.Cage~27~R6C1~R7C1~R8C1~R9C1.Cage~8~R8C2~R9C2.Cage~16~R8C3~R9C3.Cage~10~R7C5~R8C4~R8C5~R9C4.Cage~12~R5C9~R6C9.Cage~6~R6C7~R6C8.Cage~20~R6C6~R7C6~R7C7.Cage~15~R8C6~R8C7.Cage~14~R7C8~R7C9~R8C8~R8C9.Cage~13~R9C5~R9C6~R9C7.Cage~17~R9C8~R9C9.AllDifferent~R5C4~R5C3~R5C2~R6C2.Cage~0~R3C7~R3C8~R4C8.',
+    solution: PUZZLE_INDEX.get('Killer sudoku').solution,
+  },
   'Sudoku X',
   'Anti-knight Anti-king',
   'Anti-knight Anti-consecutive',
@@ -52,7 +83,13 @@ const puzzles9x9 = [
   'CTC Tribute',  // arrow + killer cages
   'Kropki sudoku',
   'Little killer',
-  'Little killer [Sum clue]',
+  {
+    name: 'Little killer [sum clue]',
+    comment: "Same as 'Little killer' but the 23 little-killer clue is replaced with a Sum constraint.",
+    src: ['https://www.youtube.com/watch?v=y4eKdI3ZJ78', 'https://sudokupad.app/nQHjr7Ggpg'],
+    input: '.LittleKiller~22~R1C1.LittleKiller~28~R2C1.LittleKiller~26~R3C1.LittleKiller~34~R1C7.LittleKiller~40~R1C8.LittleKiller~42~R1C9.~R3C2_5~R3C7_2~R5C4_3~R5C5_7.Sum~23~R1C5~R2C4~R3C3~R4C2~R5C1',
+    solution: PUZZLE_INDEX.get('Little killer').solution,
+  },
   'Little killer 2',
   'Sandwich sudoku',
   'German whispers',
@@ -72,7 +109,9 @@ const puzzles9x9 = [
   'XV-kropki',
   'Strict kropki',
   'Strict XV',
-  'Hailstone - little killer [easier]',
+  withExtraConstraints(
+    'Hailstone - little killer',
+    '.~R1C5_3~R9C5_4~R5C1_1~R5C9_2'),
   'X-Sum little killer',
   'Skyscraper',
   'Skyscraper - all 6',
@@ -82,7 +121,9 @@ const puzzles9x9 = [
   'Quadruple X',
   'Quadruple - repeated values',
   'Odd-even thermo',  // Pair
-  'Nabner thermo [extra givens]',  // PairX
+  withExtraConstraints(
+    'Nabner thermo',
+    '~R6C8_4~R6C2_6'),  // PairX
   'Knight-arrows',  // Binary (backward compatibility)
   'Zipper lines - tutorial',  // Zipper both odd and even length.
   'Ten Lines 01: Adding to Ten',  // sum lines
@@ -92,9 +133,23 @@ const puzzles9x9 = [
   'Indexing',
   '2D 1-5-9',
   'Full rank',
-  'Event Horizon [simplified]',
+  'Event horizon', // Full duplicate-cell sum regression, with renban constraints.
+  {
+    // Focused duplicate-cell sum regression, without the renban machinery
+    // from the full Event Horizon puzzle.
+    name: 'Event Horizon [simplified]',
+    src: ['https://www.youtube.com/watch?v=gBXJpnHyZfE', 'https://sudokupad.app/giuk6t4rfg'],
+    input: '.Cage~20~R1C2~R2C2~R2C1.Cage~20~R4C2~R4C3~R4C4~R4C4.Cage~20~R8C2~R8C1~R9C1.Cage~10~R1C8~R2C8~R2C9.Cage~0~R6C6~R6C7~R6C8.Cage~70~R8C5~R7C5~R6C5~R5C5~R5C4~R4C5~R3C5~R2C5~R4C5~R5C5~R5C4~R6C5~R5C6~R5C6.Sum~30~R1C9~R2C8~R3C7~R7C3~R8C2~R9C1~R4C6~R5C5~R6C4~R4C6~R5C5~R6C4.Sum~30~R1C2~R2C3~R3C4~R4C5~R5C6~R6C7~R7C8~R8C9~R4C5~R5C6.LittleKiller~30~R1C6.~R4C5_6~R7C4_5~R2C5_3~R3C6_9',
+    solution: PUZZLE_INDEX.get('Event horizon').solution,
+  },
   'Lunchbox',  // Lunchbox
-  'Killer lunchboxes [resolved]', // Lunchbox with 0
+  {
+    name: 'Killer lunchboxes [resolved]',
+    comment: "Same as 'Killer lunchboxes' but with the Or constraints resolved.",
+    src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?print=true&chlang=en&id=0003OO',
+    input: '.Lunchbox~3~R1C1~R2C1~R2C2~R3C2~R4C2~R4C3.Lunchbox~8~R1C3~R1C4~R2C4.Cage~11~R1C5~R1C6~R1C7~R1C8.Cage~16~R4C4~R3C4~R3C5~R3C6~R4C6.Lunchbox~6~R5C2~R5C3~R6C3.Lunchbox~10~R6C4~R5C4~R5C5~R5C6.Lunchbox~7~R4C7~R5C7~R6C7.Cage~6~R4C8~R5C8~R5C9.Lunchbox~0~R9C7~R9C8~R9C9.Cage~13~R7C7~R7C6~R8C6~R8C5.Cage~8~R7C2~R7C3~R8C3.Lunchbox~15~R7C1~R8C1~R9C1~R9C2.Cage~7~R4C1~R5C1~R6C1.Lunchbox~0~R6C5~R7C5~R7C4~R8C4~R9C4.',
+    solution: PUZZLE_INDEX.get('Killer lunchboxes').solution,
+  }, // Lunchbox with 0
   'Hidden skyscrapers',
   'Unbidden First Hidden', // And constraint
   'Look-and-say',
@@ -117,8 +172,9 @@ const puzzles9x9 = [
   'Septa',  // region sum line on irregular 7x7 jigsaw
   'Embedded Squishdoku',
   'Force non-unit coeff', // Sum with non-unit coeff
-  'Event horizon', // Duplicate cell in sum, BinaryPairwise optimization.
-  'Copycat [easy]',  // Same value - 2 sets, repeated values
+  withExtraConstraints(
+    'Copycat',
+    '~R2C2_9'),  // Same value - 2 sets, repeated values
   'Clone sudoku', // Same value - single cell sets
   'Slingshot sudoku', // ValueIndexing
   'Numbered Rooms vs X-Sums', // Or constraint
@@ -164,14 +220,13 @@ const puzzles9x9 = [
     input: '.~R1C5_7~R2C4_1~R2C5_9~R2C6_5~R3C8_6~R4C5_6~R5C4_8~R5C9_1~R6C5_2~R7C7_2~R7C8_8~R8C6_9~R8C9_5~R9C8_7~R8C4_4~R7C2_6~R5C1_4~R4C1_8~R3C3_8~R1C1_5~R1C2_3.Regex~WzEtNV0q~R7C3~R7C4~R7C5~R6C5~R5C6~R4C6~R3C6~R2C6',
     solution: CLASSIC_9X9.solution,
   },
-  {
-    // A Modular~1 line is vacuous: every group of one cell is trivially
-    // all-different mod 1. Adding it to classic sudoku must leave the (unique)
-    // classic solution unchanged, exercising the <2-cell BinaryPairwise no-op.
-    name: 'Classic sudoku [vacuous Modular 1]',  // Modular (degenerate)
-    input: CLASSIC_9X9.input + '.Modular~1~R1C1~R1C2',
-    solution: CLASSIC_9X9.solution,
-  },
+  // A Modular~1 line is vacuous: every group of one cell is trivially
+  // all-different mod 1. Adding it to classic sudoku must leave the (unique)
+  // classic solution unchanged, exercising the <2-cell BinaryPairwise no-op.
+  withExtraConstraints(
+    'Classic sudoku',
+    '.Modular~1~R1C1~R1C2',
+    { name: 'Classic sudoku [vacuous Modular 1]' }),  // Modular (degenerate)
 ];
 
 const puzzles16x16 = [
@@ -210,7 +265,7 @@ const puzzlesNonSquareGrids = [
   /* 7x7 */ 'Buy Or Rent? (Numbered Rooms Version)',  // non-standard numValues, Numbered Rooms
   /* 6x6 */ 'Hidden Hostility', // non-standard numValues, Diagonal, region-sized boxes
   /* 6x6 */ 'Order From Chaos', // non-standard numValues, Global Entropy, NFA, region-sized boxes
-  '6x6: Irregular Quadro Quadri', // non-standard numValues, Jigsaw
+  /* 6x6 */ 'Quadro Quadri', // non-standard numValues, Jigsaw
   '7x7: Dutch Flat Mate Squishdoku', // non-standard numValues, Dutch Flatmates
   '7x7: Buggy NR Squishdoku',  // non-standard numValues, Numbered Rooms
   '6x6: 9-value disjoint sets',  // non-standard numValues, DisjointSets
@@ -236,7 +291,13 @@ const puzzles0Indexed = [
   '0-indexed: Killer sudoku, with 0 cage, hard',  // Cage (with 0-sum cages)
   'Zeroed In',  // RegionSumLine
   'A Very Full Quiver', // Arrow
-  "Let's Build a Snowman [0-indexed]",  // Arrow, BlackDot, WhiteDot, Thermo, Whisper
+  {
+    name: "Let's Build a Snowman [0-indexed]",  // Arrow, BlackDot, WhiteDot, Thermo, Whisper
+    comment: "0-based re-encoding; the domino clue was dropped because it doesn't work with shifted (0-based) indices.",
+    src: ['https://www.youtube.com/watch?v=L-cbtgqTE9M', 'https://sudokupad.app/HmMdQDq98p'],
+    input: '.Shape~9x9~0-8.BlackDot~R4C5~R5C5~R6C5.BlackDot~R6C5~R7C5.Whisper~5~R6C7~R5C8~R4C9.Whisper~5~R4C8~R5C8.Whisper~5~R4C1~R5C2~R6C3.Whisper~5~R5C1~R5C2.Thermo~R3C5~R3C6.Arrow~R7C7~R8C6~R8C5~R8C4~R7C3.Arrow~R5C3~R4C4~R3C3~R2C3~R1C4~R1C5~R1C6~R2C7~R3C7~R4C6~R5C7.WhiteDot~R2C4~R2C5~R2C6.~R7C8_4~R1C4_2~R2C3_0~R6C8_3~R3C2_5',
+    solution: '374201658280456173651378024523180467708643215146527830032815746467032581815764302',
+  },
   '± Information',  // V, StrictXV, Diagonal
   '0-indexed: Hidden skyscrapers',  // HiddenSkyscraper
   '0-indexed: Quadruple X',  // Quad, Diagonal
@@ -245,7 +306,13 @@ const puzzles0Indexed = [
   '0-indexed: Skyscraper',  // Skyscraper
   'Hippo Birdie',  // CountingCircles
   '0-indexed: Sequence sudoku',  // NFA
-  'Regex Line [0-indexed]',  // Regex
+  {
+    name: 'Regex Line [0-indexed]',  // Regex
+    comment: '0-based re-encoding of the 1-9 original; lines encoded as Regex constraints.',
+    src: 'https://sudokupad.app/8fy259rt01',
+    input: '.Shape~9x9~0-8.Regex~KFteMC0yXVszNl1bNThdfFszNl0wMTJbNThdKSo~R5C2~R4C1~R3C1~R2C1~R1C1~R1C2~R2C3~R3C3~R4C3~R4C4~R4C5~R4C6~R4C7~R3C7~R2C7~R1C8~R1C9~R2C9~R3C9~R4C9~R5C8~R6C8.Regex~KFteMTQ3XS5bMDIzNV0uWzAzNV18WzAyM10uLjQuLlsyMzVdKSouPw~R5C8~R6C9~R7C9~R8C9~R9C9~R9C8~R9C7~R8C7~R7C7~R6C7~R6C6~R6C5~R6C4~R6C3~R7C3~R8C3~R9C3~R9C2~R9C1~R8C1~R7C1~R6C1~R5C2~R4C2.Regex~Lj8oW14zNl18MzYwKSo~R5C1~R4C1~R3C2~R2C3~R2C4~R2C5~R2C6~R2C7~R3C8~R4C9~R5C9.WhiteDot~R4C6~R5C6',
+    solution: '870413265246058713135762840027684351368105427514237086452376108781520634603841572',
+  },
   '0-indexed: Sums and indexing',  // SumLine, XSum, Rellik, Lunchbox, Sandwich, Indexing, ValueIndexing, NumberedRoom
   {
     name: 'Jigsaw [extended range]',  // extended value range (0-10) but restricted grid. Tests optimizer.
@@ -266,7 +333,9 @@ const puzzles0Indexed = [
 
 const puzzlesExtraCells = [
   'Doppelganger',  // Doppelganger
-  'Dutch-pelgänger [easier]',  // Doppelganger, Whisper on state cells
+  withExtraConstraints(
+    'Dutch-pelgänger',
+    '.GreaterThan~DGB9~DGB8~DGB6.~R8C3_8~R3C5_1'),  // Doppelganger, Whisper on state cells
   'Bates Motel',  // Var, ValueIndexing, 6x6
   'The good, the bad and the ugly',  // Var, NFA, SameValues, Arrow, NFA (for sandwich, xsum, skyscraper)
   'Letter Little Killer',  // Var, Sum (with coeffs)
@@ -281,12 +350,9 @@ const puzzlesExtraCells = [
     input: '.Var~X~X~27.BlackDot~VX1~VX2~VX3~VX10.Quad~VX13~1~2~3~4.AntiKnight.AntiConsecutive.Thermo~VX22~VX13~VX4~R9C4~R8C4~R7C4.Thermo~VX19~VX10~VX1~R9C1~R8C1.Thermo~VX22~VX23~VX24~VX25~VX26~VX27~VX18~VX17.Thermo~VX16~VX15~VX14~VX5~VX6~VX7~VX8~VX9.Thermo~VX12~VX21~VX20~VX11~VX2.~VX12_4~VX16_2~R5C3_1~R2C2_2~R6C7_5~R4C6_6',
     solution: '384629157629157384157384629573846291291573846846291573462915738915738462738462915',
   },
-  {
-    name: 'House of Cards [extra givens]',  // EqualSum, NFA, Pair, Var
-    src: 'https://www.youtube.com/watch?v=PRavHFxxZ7Y',
-    input: '.Shape~6x6.Var~S~Skyscraper~24.NFA~UUJn50JUtgIQxCHGMZ5CEI-UpSl_MYxjG_CIZCmfa58InynSo9r4DzoHf7RDIU37nDIU373vIU38IQgU38YxjEz8nPhF-c3wi_SlIRfrWtYn2nSp970qfjGKj5vgfWsB70A~_Skyscraper~VS1~R1C1~R1C2~R1C3~R1C4~R1C5~R1C6~~VS2~R2C1~R2C2~R2C3~R2C4~R2C5~R2C6~~VS3~R3C1~R3C2~R3C3~R3C4~R3C5~R3C6~~VS4~R4C1~R4C2~R4C3~R4C4~R4C5~R4C6~~VS5~R5C1~R5C2~R5C3~R5C4~R5C5~R5C6~~VS6~R6C1~R6C2~R6C3~R6C4~R6C5~R6C6~~VS7~R1C1~R2C1~R3C1~R4C1~R5C1~R6C1~~VS8~R1C2~R2C2~R3C2~R4C2~R5C2~R6C2~~VS9~R1C3~R2C3~R3C3~R4C3~R5C3~R6C3~~VS10~R1C4~R2C4~R3C4~R4C4~R5C4~R6C4~~VS11~R1C5~R2C5~R3C5~R4C5~R5C5~R6C5~~VS12~R1C6~R2C6~R3C6~R4C6~R5C6~R6C6~~VS13~R1C6~R1C5~R1C4~R1C3~R1C2~R1C1~~VS14~R2C6~R2C5~R2C4~R2C3~R2C2~R2C1~~VS15~R3C6~R3C5~R3C4~R3C3~R3C2~R3C1~~VS16~R4C6~R4C5~R4C4~R4C3~R4C2~R4C1~~VS17~R5C6~R5C5~R5C4~R5C3~R5C2~R5C1~~VS18~R6C6~R6C5~R6C4~R6C3~R6C2~R6C1~~VS19~R6C1~R5C1~R4C1~R3C1~R2C1~R1C1~~VS20~R6C2~R5C2~R4C2~R3C2~R2C2~R1C2~~VS21~R6C3~R5C3~R4C3~R3C3~R2C3~R1C3~~VS22~R6C4~R5C4~R4C4~R3C4~R2C4~R1C4~~VS23~R6C5~R5C5~R4C5~R3C5~R2C5~R1C5~~VS24~R6C6~R5C6~R4C6~R3C6~R2C6~R1C6.Pair~961rXv~_non-consecutive~R3C1~R3C2.EqualSum~R1C3~R1C2~R2C2~-~R2C3~R2C4~R2C5~-~R2C6~R3C6~R4C6~-~R4C2~R4C3~R5C3~R5C2~-~VS1~VS2~VS3~VS4~VS5~VS6~-~VS7~VS8~VS9~VS10~VS11~VS12~-~VS13~VS14~VS15~VS16~VS17~VS18~-~VS19~VS20~VS21~VS22~VS23~VS24.~R1C1_3~R3C2_4~R6C3_5~R4C4_2~R6C4_6~R1C5_1',
-    solution: '326514154362642135531246263451415623',
-  },
+  withExtraConstraints(
+    'House of Cards',  // EqualSum, NFA, Pair, Var
+    '.~R1C1_3~R3C2_4~R6C3_5~R4C4_2~R6C4_6~R1C5_1'),
   'Cavernous Construction: 6x6',  // ChaosConstruction, multi-arm ChaosArrow
   'Chaos Construction: 6x6',  // ChaosConstruction, NFA
   {  // ChaosConstruction with numValues > regionSize, cells restricted back to {1..6}
@@ -302,17 +368,14 @@ const puzzlesExtraCells = [
     solution: '265413314652543126126534631245452361',
   },
   {
-    name: 'Uncovering Tunnels [easy]',
-    src: 'https://sudokupad.app/y323plq5im', // With extra gives to make it faster
+    name: 'Uncovering Tunnels [extra givens]',
+    src: 'https://sudokupad.app/y323plq5im',
     input: '.ChaosConstruction.NoBoxes.ChaosArrow~R6C1~1~CC46~CC37~CC28~CC19~CC10~CC1.ChaosArrow~R3C2~1~CC20~CC29~CC38~CC47~CC56~CC65~CC74.ChaosArrow~R3C3~1~CC21~CC30~CC39~CC48~CC57~CC66~CC75.ChaosArrow~R1C3~1~CC3~CC4~CC5~CC6~CC7~CC8~CC9.ChaosArrow~R1C4~1~CC4~CC12~CC20~CC28.ChaosArrow~R3C5~1~CC23~CC14~CC5.ChaosArrow~R3C5~1~CC23~CC15~CC7.ChaosArrow~R2C8~1~CC17~CC16~CC15~CC14~CC13~CC12~CC11~CC10.ChaosArrow~R4C7~1~CC34~CC33~CC32~CC31~CC30~CC29~CC28.ChaosArrow~R5C4~1~CC40~CC49~CC58~CC67~CC76.ChaosArrow~R7C5~1~CC59~CC68~CC77.ChaosArrow~R7C5~1~CC59~CC67~CC75.ChaosArrow~R8C7~1~CC70~CC71~CC72.ChaosArrow~R7C9~1~CC63~CC54~CC45~CC36~CC27~CC18~CC9.ChaosArrow~R6C6~1~CC51~CC52~CC53~CC54.NFA~UgIn_GQpjoSpdVCEIQqoQhC_4wjCMIwj_7CMIwjCM_5WlaVpWl_7jOM4zjO_53ned53n_8EQRBEEQ_6YpimKYp_8lSVJUlS_65rmua5r_4mCYJgmC_7RtG0bRt_5HEcRxHE_7yvK8ryv_5oGgaBoG_8TxPE8Tx_6JIkiSJI_80zTNM0z~_ParityCount~R6C1~R5C1~R4C1~R3C1~R2C1~R1C1~~R3C2~R4C2~R5C2~R6C2~R7C2~R8C2~R9C2~~R3C3~R4C3~R5C3~R6C3~R7C3~R8C3~R9C3~~R1C3~R1C4~R1C5~R1C6~R1C7~R1C8~R1C9~~R1C4~R2C3~R3C2~R4C1~~R3C5~R2C5~R1C5~~R3C5~R2C6~R1C7~~R2C8~R2C7~R2C6~R2C5~R2C4~R2C3~R2C2~R2C1~~R4C7~R4C6~R4C5~R4C4~R4C3~R4C2~R4C1~~R5C4~R6C4~R7C4~R8C4~R9C4~~R7C5~R8C5~R9C5~~R7C5~R8C4~R9C3~~R8C7~R8C8~R8C9~~R7C9~R6C9~R5C9~R4C9~R3C9~R2C9~R1C9~~R6C6~R6C7~R6C8~R6C9.Whisper~4~R6C1~R6C2.Whisper~4~R2C7~R3C7.Whisper~4~R3C6~R4C6.Whisper~4~R4C7~R5C6.Whisper~4~R4C9~R5C8.Whisper~4~R6C5~R7C6.Whisper~4~R7C7~R7C8.Whisper~4~R7C3~R8C3.AllDifferent~CC46~CC47.AllDifferent~CC16~CC25.AllDifferent~CC24~CC33.AllDifferent~CC34~CC42.AllDifferent~CC36~CC44.AllDifferent~CC50~CC60.AllDifferent~CC61~CC62.AllDifferent~CC57~CC66.~R2C3_9~R7C7_9~R6C2_9~R3C4_9~R5C6_9~R9C5_9~R8C9_9~R4C1_9~R9C2_1~R7C3_1~R1C6_6~R5C7_6~R4C3_2~R1C1_5~R9C7_5~R6C4_5~R3C8_8~R2C7_7~R7C1_3',
     solution: '524176398159864732643915287932781465785249613496532871371628954268357149817493526',
   },
-  {
-    name: 'Calm Construction [extra givens]', // ChaosConstruction, with boxes
-    src: 'https://www.youtube.com/watch?v=iOD6yayIVCo',
-    input: '.ChaosConstruction.~R6C5_9~R1C7_1~R8C2_9~R8C8_7~R4C6_2~R1C2_2~R9C9_6~R5C2_4~R1C9_3~R8C5_1~R7C3_2~R2C5_2~R8C1_8~R7C6_7~R5C7_9~R4C9_4~R1C5_7~R6C1_3~R9C4_9~R3C7_2~R3C3_5~R6C3_7~R9C6_5~R9C3_3~R2C8_4~R6C8_6~R3C1_6~R4C8_8.ChaosCount~R1C1~0~CC1~CC2~CC3~CC12~CC11~CC10~CC19~CC20~CC21.ChaosCount~R1C2~0~CC2~CC1~CC10~CC19~CC20~CC11~CC3~CC12~CC21.ChaosCount~R2C2~0~CC11~CC1~CC2~CC3~CC12~CC21~CC20~CC19~CC10.ChaosCount~R2C4~0~CC13~CC4~CC5~CC6~CC15~CC14~CC22~CC23~CC24.ChaosCount~R2C5~0~CC14~CC4~CC5~CC6~CC15~CC24~CC23~CC22~CC13.ChaosCount~R2C6~0~CC15~CC6~CC5~CC13~CC14~CC4~CC22~CC23~CC24.ChaosCount~R1C7~0~CC7~CC8~CC9~CC18~CC17~CC16~CC25~CC27~CC26.ChaosCount~R1C8~0~CC8~CC7~CC16~CC25~CC26~CC17~CC9~CC18~CC27.ChaosCount~R1C9~0~CC9~CC8~CC7~CC16~CC17~CC18~CC27~CC26~CC25.ChaosCount~R4C2~0~CC29~CC30~CC39~CC38~CC37~CC28~CC46~CC47~CC48.ChaosCount~R5C2~0~CC38~CC30~CC29~CC28~CC37~CC46~CC47~CC48~CC39.ChaosCount~R4C5~0~CC32~CC33~CC42~CC51~CC50~CC41~CC31~CC40~CC49.ChaosCount~R4C6~0~CC33~CC42~CC51~CC50~CC41~CC32~CC31~CC40~CC49.ChaosCount~R4C9~0~CC36~CC35~CC34~CC43~CC44~CC45~CC54~CC53~CC52.ChaosCount~R9C9~0~CC81~CC80~CC79~CC70~CC61~CC62~CC71~CC72~CC63.ChaosCount~R8C1~0~CC64~CC55~CC56~CC57~CC66~CC65~CC75~CC74~CC73',
-    solution: '428679153739521648615483297951362784246758931387194562562837419894216375173945826',
-  },
+  withExtraConstraints(
+    'Calm Construction',  // ChaosConstruction, with boxes
+    '.~R1C7_1~R8C2_9~R8C8_7~R4C6_2~R1C2_2~R9C9_6~R5C2_4~R1C9_3~R8C5_1~R7C3_2~R2C5_2~R8C1_8~R7C6_7~R5C7_9~R4C9_4~R1C5_7~R6C1_3~R9C4_9~R3C7_2~R3C3_5~R6C3_7~R9C6_5~R9C3_3~R2C8_4~R6C8_6~R3C1_6~R4C8_8'),
   {
     // 81 grid + 919 var = 1000 cells: the MAX_SEARCH_CELLS limit.
     name: 'Classic sudoku [1000 var cells, at the limit]',

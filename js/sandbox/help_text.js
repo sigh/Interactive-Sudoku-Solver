@@ -59,6 +59,8 @@ CELL IDENTIFIERS
   The following convenience functions are available for working with cell IDs:
     parseCellId('R3C4')  => { row: 3, col: 4 }
     makeCellId(3, 4)     => 'R3C4'
+    makeCellId({ row: 3, col: 4 }) => 'R3C4'
+    makeCellId(parseCellId('R3C4')) => 'R3C4'
 
 CELL GEOMETRY
 

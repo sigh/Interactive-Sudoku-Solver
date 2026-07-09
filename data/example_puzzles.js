@@ -383,6 +383,15 @@ export const DISPLAYED_EXAMPLES = [
 export const PUZZLE_INDEX = new Map(
   DISPLAYED_EXAMPLES.map(puzzle => [puzzle.name, puzzle]));
 
+const resolveInlineExtraConstraints = (puzzle) => {
+  if (!puzzle?.extraConstraints) return puzzle;
+  if (typeof puzzle.input !== 'string' || puzzle.input.startsWith('/')) return puzzle;
+  return {
+    ...puzzle,
+    input: puzzle.input + puzzle.extraConstraints,
+  };
+};
+
 // Resolve a puzzle configuration.
 // Supports:
 // - Plain objects: treated as full puzzle configs.
@@ -390,11 +399,11 @@ export const PUZZLE_INDEX = new Map(
 // - Other strings: treated as raw puzzle input.
 export const resolvePuzzleConfig = (puzzleCfg) => {
   if (puzzleCfg && typeof puzzleCfg === 'object' && !Array.isArray(puzzleCfg)) {
-    return { name: puzzleCfg.input, ...puzzleCfg };
+    return resolveInlineExtraConstraints({ name: puzzleCfg.input, ...puzzleCfg });
   }
 
   const puzzle = PUZZLE_INDEX.get(puzzleCfg);
-  if (puzzle) return { name: puzzleCfg, ...puzzle };
+  if (puzzle) return resolveInlineExtraConstraints({ name: puzzleCfg, ...puzzle });
 
   return { name: puzzleCfg, input: puzzleCfg };
 };

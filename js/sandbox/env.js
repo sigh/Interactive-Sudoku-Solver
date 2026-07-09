@@ -106,7 +106,13 @@ const parseCellId = (cellId) => {
   };
 };
 
-const makeCellId = (row, col) => GEOMETRY_MAX.makeCellId(row - 1, col - 1);
+const makeCellId = (rowOrCell, col) => {
+  const { row, col: resolvedCol } =
+    typeof rowOrCell === 'object' && rowOrCell !== null
+      ? rowOrCell
+      : { row: rowOrCell, col };
+  return GEOMETRY_MAX.makeCellId(row - 1, resolvedCol - 1);
+};
 
 // Resolve a lenient shape argument to a CellGeometry:
 //   - a grid size: cellGeometry(9) => 9x9, cellGeometry(6, 9) => 6 rows x 9 cols

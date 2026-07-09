@@ -566,6 +566,8 @@ await runTest('parseCellId / makeCellId round-trip', () => {
   assert.equal(makeCellId(3, 4), 'R3C4');
   const { row, col } = parseCellId('R7C2');
   assert.equal(makeCellId(row, col), 'R7C2');
+  assert.equal(makeCellId(parseCellId('R7C2')), 'R7C2');
+  assert.equal(makeCellId({ row: 9, col: 9 }), 'R9C9');
 });
 
 // ============================================================================
