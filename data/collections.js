@@ -5,10 +5,7 @@
 // puzzle keeps the source title and adds a `[label]` suffix (e.g. `[easier]`).
 const { PUZZLE_INDEX, resolvePuzzleConfig } = await import('./example_puzzles.js' + self.VERSION_PARAM);
 
-export const EXAMPLES = [
-  //////////////////////////////////////////////////////////////////////////////
-  // Classic sodoku
-  //////////////////////////////////////////////////////////////////////////////
+const EXAMPLE_CLASSIC_SUDOKU = [
   {
     name: 'Classic sudoku, hard',
     src: 'https://www.telegraph.co.uk/news/science/science-news/9359579/Worlds-hardest-sudoku-can-you-crack-it.html',
@@ -35,9 +32,9 @@ export const EXAMPLES = [
     input: '.~R1C6_5~R1C8_8~R2C4_6~R2C6_1~R2C8_4~R2C9_3~R4C2_1~R4C4_5~R5C4_1~R5C6_6~R6C1_3~R6C9_5~R7C1_5~R7C2_3~R7C8_9~R7C9_1~R8C9_4',
   },
 
-  //////////////////////////////////////////////////////////////////////////////
-  // Other variants
-  //////////////////////////////////////////////////////////////////////////////
+];
+
+const EXAMPLE_OTHER_VARIANTS = [
   {
     name: 'Anti-knights move',
     src: ['https://www.youtube.com/watch?v=mTdhTfAhOI8', 'https://sudokupad.app/RPBnQFRLR8'],
@@ -157,18 +154,6 @@ export const EXAMPLES = [
     name: 'X-Sum little killer',
     input: '.LittleKiller~23~R1C1.LittleKiller~12~R2C9.LittleKiller~23~R3C9.LittleKiller~25~R5C9.LittleKiller~12~R7C1.LittleKiller~25~R1C6.~R7C2_2~R7C8_5.XSum~C1~25~23.XSum~C5~12~25.XSum~C9~23~12',
     solution: '562831974837429165941576238195384726286715349473692581329168457758943612614257893',
-  },
-  {
-    name: 'Skyscraper - all 6',
-    src: 'https://sudokutheory.com/wiki/index.php?title=Snipes#Skyscrapers',
-    input: '.Skyscraper~C1~6.Skyscraper~C3~6.Skyscraper~C6~6.Skyscraper~R5~6.Skyscraper~R8~6.Skyscraper~R1~~6.Skyscraper~R4~~6.Skyscraper~R7~~6.Skyscraper~C2~~6.Skyscraper~C4~~6',
-    solution: '491872653582631974673495218714986532356724189829513746968357421145268397237149865',
-  },
-  {
-    name: 'Skyscraper - all 5',
-    src: 'https://sudokutheory.com/wiki/index.php?title=Snipes#Skyscrapers',
-    input: '.Skyscraper~C1~5~.Skyscraper~C4~5~.Skyscraper~C7~5~.Skyscraper~C9~5~.Skyscraper~R2~~5.Skyscraper~R5~~5.Skyscraper~R7~~5.Skyscraper~C6~~5.Skyscraper~C5~~5.Skyscraper~C3~~5.Skyscraper~C2~~5.Skyscraper~R8~5~.Skyscraper~R6~5~.Skyscraper~R4~5~.Skyscraper~R1~5~.',
-    solution: '357486192498127365621395487234519678789643521516278934975864213163752849842931756',
   },
   {
     name: 'Renban skyscrapers',
@@ -579,9 +564,9 @@ export const EXAMPLES = [
     solution: '438617592521938674769254831854791326392546718617382945945163287283475169176829453',
   },
 
-  //////////////////////////////////////////////////////////////////////////////
-  // Long sums
-  //////////////////////////////////////////////////////////////////////////////
+];
+
+const EXAMPLE_LONG_SUMS = [
   // From the CTC discord, sum constraints which have more than 16 cells.
   {
     name: 'Long sums 1',
@@ -599,9 +584,21 @@ export const EXAMPLES = [
     solution: '765432198432198765198765432219876543543219876876543219654321987321987654987654321',
   },
 
-  //////////////////////////////////////////////////////////////////////////////
-  // Snipes
-  //////////////////////////////////////////////////////////////////////////////
+];
+
+const EXAMPLE_SNIPES = [
+  {
+    name: 'Skyscraper - all 6',
+    src: 'https://sudokutheory.com/wiki/index.php?title=Snipes#Skyscrapers',
+    input: '.Skyscraper~C1~6.Skyscraper~C3~6.Skyscraper~C6~6.Skyscraper~R5~6.Skyscraper~R8~6.Skyscraper~R1~~6.Skyscraper~R4~~6.Skyscraper~R7~~6.Skyscraper~C2~~6.Skyscraper~C4~~6',
+    solution: '491872653582631974673495218714986532356724189829513746968357421145268397237149865',
+  },
+  {
+    name: 'Skyscraper - all 5',
+    src: 'https://sudokutheory.com/wiki/index.php?title=Snipes#Skyscrapers',
+    input: '.Skyscraper~C1~5~.Skyscraper~C4~5~.Skyscraper~C7~5~.Skyscraper~C9~5~.Skyscraper~R2~~5.Skyscraper~R5~~5.Skyscraper~R7~~5.Skyscraper~C6~~5.Skyscraper~C5~~5.Skyscraper~C3~~5.Skyscraper~C2~~5.Skyscraper~R8~5~.Skyscraper~R6~5~.Skyscraper~R4~5~.Skyscraper~R1~5~.',
+    solution: '357486192498127365621395487234519678789643521516278934975864213163752849842931756',
+  },
   {
     name: 'Full rank - 6 clue snipe',
     src: ['https://discord.com/channels/709370620642852885/721090566481510732/1258800235594125352', 'https://sudokutheory.com/wiki/index.php?title=Snipes#Full_Rank'],
@@ -615,10 +612,9 @@ export const EXAMPLES = [
     input: '.Sandwich~18~C1.Sandwich~18~C2.Sandwich~18~C3.Sandwich~18~R1.Sandwich~18~R2.Sandwich~18~R3.Sandwich~18~R4.Sandwich~18~R5.Sandwich~18~R6.Sandwich~18~C4.Sandwich~18~C5.Sandwich~18~C7.Sandwich~18~C9.',
     solution: '584137269239684157167592843396751428845923671721846935952478316673219584418365792',
   },
+];
 
-  //////////////////////////////////////////////////////////////////////////////
-  // Slow case examples (some no longer slow).
-  //////////////////////////////////////////////////////////////////////////////
+const EXAMPLE_SLOW_CASES = [
   {
     name: 'Anti-Knight, slow',
     input: '.AntiKnight.~R1C2_3~R1C9_7~R3C6_9~R3C7_2~R4C1_6~R4C4_4~R5C9_5~R6C2_4~R7C1_3~R8C5_6~R8C8_5~R9C2_6~R9C3_4~R9C4_3',
@@ -662,9 +658,9 @@ export const EXAMPLES = [
     input: '.LittleKiller~49~R1C9.LittleKiller~49~R1C8.LittleKiller~49~R9C2.LittleKiller~49~R9C3.LittleKiller~49~R7C9.LittleKiller~49~R1C1.LittleKiller~49~R2C1.LittleKiller~49~R3C1.',
   },
 
-  //////////////////////////////////////////////////////////////////////////////
-  // Extreme killers.
-  //////////////////////////////////////////////////////////////////////////////
+];
+
+const EXAMPLE_EXTREME_KILLERS = [
   {
     name: 'Wecoc #1',
     src: 'http://forum.enjoysudoku.com/killing-with-flowers-t36181.html#p278651',
@@ -701,9 +697,9 @@ export const EXAMPLES = [
   },
 
 
-  //////////////////////////////////////////////////////////////////////////////
-  // Hard puzzles for benchmarks
-  //////////////////////////////////////////////////////////////////////////////
+];
+
+const EXAMPLE_HARD_BENCHMARKS = [
   {
     name: 'Hard renban 1',
     input: '.Renban~R2C1~R1C2.Renban~R3C2~R2C3~R1C4.Renban~R3C4~R2C5~R1C6.Renban~R3C6~R2C7~R1C8.Renban~R2C8~R3C9.Renban~R3C7~R4C8~R5C9.Renban~R3C5~R4C6~R5C7.Renban~R3C3~R4C4~R5C5.Renban~R3C1~R4C2~R5C3.Renban~R6C1~R5C2.Renban~R7C1~R8C2~R9C3.Renban~R7C2~R6C3~R5C4.Renban~R7C3~R8C4~R9C5.Renban~R7C5~R8C6~R9C7.Renban~R7C7~R8C8~R9C9.Renban~R6C8~R7C9.Renban~R7C6~R6C7~R5C8.Renban~R5C6~R6C5~R7C4.~R6C4_1~R4C5_2',
@@ -755,9 +751,9 @@ export const EXAMPLES = [
     solution: '561798243784263915239541687472916538618352794953487162146825379395174826827639451'
   },
 
-  //////////////////////////////////////////////////////////////////////////////
-  // 16x16
-  //////////////////////////////////////////////////////////////////////////////
+];
+
+const EXAMPLE_16X16 = [
   {
     name: '16x16: Sudoku X',
     src: 'http://forum.enjoysudoku.com/giant-sudokus-t39758-30.html#p320617',
@@ -779,9 +775,9 @@ export const EXAMPLES = [
     solution: 'NEBHPLFDMAGCKIJOICOPHBEGDNKJMAFLLGMFKAOJIEBHNCPDKDAJMNICFLPOEGBHJMIAGFNLEPCKODHBHNCODPKBAFILJMEGGKDLAEHIJMOBFPCNBFPECMJOGDHNAKLIFBEMIKGNLCAPHODJOPHNECDMKBJIGLAFALJGBHPFNODMCEIKCIKDJOLAHGFEPBNMMONBFJAECKLDIHGPEHLINGBKPJMADFOCDAFCOIMPBHNGLJKEPJGKLDCHOIEFBNMA',
   },
 
-  //////////////////////////////////////////////////////////////////////////////
-  // Other shapes
-  //////////////////////////////////////////////////////////////////////////////
+];
+
+const EXAMPLE_OTHER_SHAPES = [
   {
     name: '6x6: Full rank',
     src: 'https://discord.com/channels/709370620642852885/709373384437268530/1249572584211611688',
@@ -833,9 +829,9 @@ export const EXAMPLES = [
     solution: '3241143241232314',
   },
 
-  //////////////////////////////////////////////////////////////////////////////
-  // Non-rectangular grids
-  //////////////////////////////////////////////////////////////////////////////
+];
+
+const EXAMPLE_NON_RECTANGULAR_GRIDS = [
   {
     name: '6x8: Plain',
     comment: 'Added numbers randomly until it had a unique solution.',
@@ -867,9 +863,9 @@ export const EXAMPLES = [
     solution: '138456279546781338296574213584967962438187932145541739624678125962519738',
   },
 
-  //////////////////////////////////////////////////////////////////////////////
-  // Non-standard numValues
-  //////////////////////////////////////////////////////////////////////////////
+];
+
+const EXAMPLE_NON_STANDARD_NUM_VALUES = [
   {
     name: '7x7: Killer Squishdoku',
     src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?chlang=en&id=000G53',
@@ -943,9 +939,9 @@ export const EXAMPLES = [
     solution: '173564528917649283952831436752817496',
   },
 
-  //////////////////////////////////////////////////////////////////////////////
-  // Or
-  //////////////////////////////////////////////////////////////////////////////
+];
+
+const EXAMPLE_OR = [
   {
     name: 'Hidden Skyscraper - Full Odd',
     src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=00037K',
@@ -988,9 +984,9 @@ export const EXAMPLES = [
     solution: '815923674369417258274586913583172469692854137741369825957241386426738591138695742',
   },
 
-  //////////////////////////////////////////////////////////////////////////////
-  // 0-indexed puzzles (0-based value ranges)
-  //////////////////////////////////////////////////////////////////////////////
+];
+
+const EXAMPLE_ZERO_INDEXED = [
   {
     name: '0-indexed: Classic sudoku',
     input: '.Shape~9x9~0-8.~R1C1_4~R1C2_2~R1C5_6~R2C1_5~R2C4_0~R2C5_8~R2C6_4~R3C2_8~R3C3_7~R3C8_5~R4C1_7~R4C5_5~R4C9_2~R5C1_3~R5C4_7~R5C6_2~R5C9_0~R6C1_6~R6C5_1~R6C9_5~R7C2_5~R7C7_1~R7C8_7~R8C4_3~R8C5_0~R8C6_8~R8C9_4~R9C5_7~R9C8_6~R9C9_8',
@@ -1155,9 +1151,9 @@ export const EXAMPLES = [
     solution: '712456308508731426346280715273108654184625037065374182851047263420563871637812540',
   },
 
-  //////////////////////////////////////////////////////////////////////////////
-  // Extra variables
-  //////////////////////////////////////////////////////////////////////////////
+];
+
+const EXAMPLE_EXTRA_VARIABLES = [
   {
     name: 'Doppelganger',
     src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?chlang=en&id=0005Q2',
@@ -1314,6 +1310,23 @@ export const EXAMPLES = [
     input: '/data/scripts/inset.js',
     constraintTypes: ['6x6', 'NoBoxes', 'Var', 'AllDifferent', 'NFA: odd sum', 'NFA: even sum'],
   },
+];
+
+export const EXAMPLES = [
+  ...EXAMPLE_CLASSIC_SUDOKU,
+  ...EXAMPLE_OTHER_VARIANTS,
+  ...EXAMPLE_LONG_SUMS,
+  ...EXAMPLE_SNIPES,
+  ...EXAMPLE_SLOW_CASES,
+  ...EXAMPLE_EXTREME_KILLERS,
+  ...EXAMPLE_HARD_BENCHMARKS,
+  ...EXAMPLE_16X16,
+  ...EXAMPLE_OTHER_SHAPES,
+  ...EXAMPLE_NON_RECTANGULAR_GRIDS,
+  ...EXAMPLE_NON_STANDARD_NUM_VALUES,
+  ...EXAMPLE_OR,
+  ...EXAMPLE_ZERO_INDEXED,
+  ...EXAMPLE_EXTRA_VARIABLES,
 ];
 
 for (const puzzle of EXAMPLES) {
