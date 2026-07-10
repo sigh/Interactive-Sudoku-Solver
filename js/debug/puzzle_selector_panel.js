@@ -60,6 +60,16 @@ export class PuzzleSelectorPanel {
     }
     this._filter.addEventListener('input', () => this._applyFilter());
     this._filter.addEventListener('keydown', (e) => this._onFilterKey(e));
+
+    this._revealDevTabIfPopulated();
+  }
+
+  // The Dev tab button ships hidden; show it only when data/dev/ has files.
+  async _revealDevTabIfPopulated() {
+    const devButton = [...this._modeButtons].find(b => b.dataset.mode === 'dev');
+    if (!devButton) return;
+    const names = await this._fetchDevManifest();
+    if (names.length) devButton.hidden = false;
   }
 
   setEnabled(enabled) {
@@ -121,8 +131,36 @@ export class PuzzleSelectorPanel {
     }));
   }
 
+  // Scratch scripts dropped in data/dev/, listed via its Jekyll-built
+  // index.json (see data/dev/README.md).
+  async _devGroups() {
+    const paths = await this._fetchDevManifest();
+    const items = paths.map(input => {
+      const name = input.slice(input.lastIndexOf('/') + 1);
+      return this._makeItem({ name, input }, { input }, name);
+    });
+    return [{ items }];
+  }
+
+  // The data/dev/ file paths, or [] if the manifest is missing (e.g. served
+  // without Jekyll).
+  async _fetchDevManifest() {
+    try {
+      const response = await fetch('./data/dev/index.json' + self.VERSION_PARAM);
+      if (!response.ok) return [];
+      const paths = await response.json();
+      return Array.isArray(paths) ? paths : [];
+    } catch {
+      return [];
+    }
+  }
+
   _buildGroups() {
-    return this._mode === 'e2e' ? this._e2eGroups() : this._exampleGroups();
+    switch (this._mode) {
+      case 'e2e': return this._e2eGroups();
+      case 'dev': return this._devGroups();
+      default: return this._exampleGroups();
+    }
   }
 
   // Assign each constraint type a stable, well-separated hue

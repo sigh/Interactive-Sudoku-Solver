@@ -1,0 +1,6 @@
+# Dev scratch scripts are personal — don't commit them, but keep the tab's
+# scaffolding (manifest, readme) tracked.
+*
+!.gitignore
+!index.json
+!README.md

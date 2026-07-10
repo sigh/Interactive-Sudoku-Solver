@@ -1,0 +1,15 @@
+---
+# Jekyll renders this to a JSON array of the .js / .iss files in data/dev/, so
+# the puzzle selector's Dev tab lists whatever is dropped here — no manifest to
+# maintain. `jekyll serve` regenerates it when a file is added or removed.
+---
+[{% assign first = true -%}
+{%- for f in site.static_files -%}
+{%- if f.path contains "/data/dev/" -%}
+{%- if f.extname == ".js" or f.extname == ".iss" -%}
+{%- unless first %},{% endunless -%}
+"{{ f.path }}"
+{%- assign first = false -%}
+{%- endif -%}
+{%- endif -%}
+{%- endfor -%}]
