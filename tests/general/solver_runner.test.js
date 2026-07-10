@@ -823,6 +823,38 @@ await runTest('solve with invalid constraint reports InvalidConstraintError', as
   assert.ok(errorMsg.startsWith('Invalid Constraint:'), `Expected prefix, got: ${errorMsg}`);
 });
 
+// A solver error thrown inside the detached solutions-prefetch has no awaiter,
+// so before the fix it became a silent unhandled rejection. It must reach
+// onError instead.
+await runTest('solutions prefetch errors are reported to onError', async () => {
+  let errorMsg = null;
+  const runner = new SolverRunner({ onError: (msg) => { errorMsg = msg; } });
+
+  const savedMakeSolver = SolverProxy.makeSolver;
+  SolverProxy.makeSolver = async () => ({
+    // n < 2 succeed (consumed by the initial run); n >= 2 is only reached by
+    // the background prefetch and throws.
+    async nthSolution(n) {
+      if (n >= 2) throw new Error('boom');
+      return [n];
+    },
+    terminate() { },
+  });
+
+  try {
+    await runner.solve(makeSimpleConstraint(), { mode: 'solutions' });
+    await waitForSettle();
+    // Advancing bumps the prefetch target to n = 2, triggering the throw.
+    runner.next();
+    await waitForSettle();
+  } finally {
+    SolverProxy.makeSolver = savedMakeSolver;
+  }
+
+  assert.ok(errorMsg, 'onError should have been called');
+  assert.ok(errorMsg.includes('boom'), `Expected boom, got: ${errorMsg}`);
+});
+
 // ============================================================================
 // Cleanup
 // ============================================================================

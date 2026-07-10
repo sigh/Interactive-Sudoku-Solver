@@ -56,6 +56,8 @@ class ModeHandler {
     this._solutions = [];
     this._done = false;
     this._listener = () => { };
+    // Default rethrows so an unwired handler fails loudly; the runner wires it.
+    this._errorListener = (e) => { throw e; };
   }
 
   async run(solver) {
@@ -103,6 +105,10 @@ class ModeHandler {
     this._listener = fn;
   }
 
+  setErrorListener(fn) {
+    this._errorListener = fn;
+  }
+
   // Returns true if the threshold change was handled, false if re-solve needed.
   setCandidateSupportThreshold(candidateSupportThreshold) {
     // Return true by default since most modes are unaffected and should
@@ -110,12 +116,6 @@ class ModeHandler {
     return true;
   }
 
-  handleSolverException(e) {
-    // If the solver was terminated, then don't show an error.
-    if (!(e instanceof AbortedError)) {
-      throw e;
-    }
-  }
 }
 
 class AllPossibilitiesModeHandler extends ModeHandler {
@@ -252,7 +252,8 @@ class AllSolutionsModeHandler extends ModeHandler {
   async get(i) {
     // Ensure we have at least one past the solution being asked for.
     this._targetCount = i + 2;
-    this._fetchSolutions().catch(this.handleSolverException);
+    // Detached prefetch, so route its errors instead of letting them reject.
+    this._fetchSolutions().catch((e) => this._errorListener(e));
 
     return super.get(i);
   }
@@ -567,6 +568,7 @@ export class SolverRunner {
 
     // Set up handler update listener
     handler.setUpdateListener(() => this._update());
+    handler.setErrorListener((e) => this._handleException(e));
 
     // Run the handler (if session wasn't aborted during setup)
     if (!session.isAborted()) {
