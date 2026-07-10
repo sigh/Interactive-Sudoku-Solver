@@ -159,7 +159,13 @@ export const main = async (argv) => {
   let checked = 0;
   for (const { item, path } of collectEntries()) {
     const declared = item.constraintTypes;
-    const actual = await actualTypesFor(item.input);
+    let actual;
+    try {
+      actual = await actualTypesFor(item.input);
+    } catch (e) {
+      e.message = `${item.name || item.input}: ${e.message}`;
+      throw e;
+    }
 
     if (declared === undefined) {
       // No declaration: fine as long as the app's automatic tagging (raw
