@@ -1105,14 +1105,16 @@ await runTest('And accepts StateMachine (NFA)', () => {
     () => new SudokuConstraint.And([new SudokuConstraint.NFA(enc, 'g', 'R1C1')]));
 });
 
-await runTest('And accepts ChaosConstruction (ChaosArrow)', () => {
-  assert.doesNotThrow(
-    () => new SudokuConstraint.And([new SudokuConstraint.ChaosArrow('R2C1')]));
+await runTest('And rejects ChaosConstruction (ChaosArrow)', () => {
+  assert.throws(
+    () => new SudokuConstraint.And([new SudokuConstraint.ChaosArrow('R2C1')]),
+    /Invalid constraint type in 'And'/);
 });
 
-await runTest('And accepts ChaosConstruction (ChaosCount)', () => {
-  assert.doesNotThrow(
-    () => new SudokuConstraint.And([new SudokuConstraint.ChaosCount('R2C1')]));
+await runTest('And rejects ChaosConstruction (ChaosCount)', () => {
+  assert.throws(
+    () => new SudokuConstraint.And([new SudokuConstraint.ChaosCount('R2C1')]),
+    /Invalid constraint type in 'And'/);
 });
 
 await runTest('And accepts nested Composite (And)', () => {
@@ -1125,7 +1127,6 @@ await runTest('Or accepts all the same allowed categories', () => {
     new SudokuConstraint.Thermo('R1C1', 'R1C2'),
     new SudokuConstraint.Given('R1C1', 5),
     new SudokuConstraint.Sandwich('R1', 10),
-    new SudokuConstraint.ChaosArrow('R2C1'),
   ];
   for (const inner of allowed) {
     assert.doesNotThrow(
@@ -1158,6 +1159,12 @@ await runTest('And rejects Shape (Var)', () => {
   assert.throws(
     () => new SudokuConstraint.And([new SudokuConstraint.Var('X', 'label', 1)]),
     /Invalid constraint type in 'And'/);
+});
+
+await runTest('Or rejects ChaosConstruction (ChaosArrow)', () => {
+  assert.throws(
+    () => new SudokuConstraint.Or([new SudokuConstraint.ChaosArrow('R2C1')]),
+    /Invalid constraint type in 'Or'/);
 });
 
 logSuiteComplete('CompositeConstraintBase allowed categories');

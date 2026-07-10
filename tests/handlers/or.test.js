@@ -1,52 +1,17 @@
 import assert from 'node:assert/strict';
 import { ensureGlobalEnvironment } from '../helpers/test_env.js';
 import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
-import { GridTestContext, createAccumulator, createCellExclusions, valueMask } from '../helpers/grid_test_utils.js';
+import { GridTestContext, createAccumulator, valueMask, initTypedHandler } from '../helpers/grid_test_utils.js';
 
 ensureGlobalEnvironment();
 
 const { Or, True, False, GivenCandidates } = await import('../../js/solver/handlers.js');
-const { CellGeometry } = await import('../../js/cell_geometry.js');
 const { LookupTables } = await import('../../js/solver/lookup_tables.js');
 
-// Or requires a stateAllocator with an allocate method, and postInitialize
-// with a grid-like array. This helper handles both.
-// Or uses .set() and .fill() on grids, so typed arrays are required.
-function initOrHandler(context, handler) {
-  const numCells = context.geometry.totalCells();
-
-  // Convert the grid to Uint16Array for Or compatibility.
-  const plainGrid = context.grid;
-  const typedGrid = new Uint16Array(numCells);
-  for (let i = 0; i < plainGrid.length; i++) typedGrid[i] = plainGrid[i];
-  // Fill var cells with allValues.
-  const allValues = LookupTables.get(context.geometry.numValues).allValues;
-  for (let i = plainGrid.length; i < numCells; i++) typedGrid[i] = allValues;
-  context._grid = typedGrid;
-
-  const extraState = [];
-  const stateAllocator = {
-    allocate(state) {
-      const start = numCells + extraState.length;
-      extraState.push(...state);
-      return start;
-    }
-  };
-
-  const cellExclusions = createCellExclusions({ numCells: context.geometry.numGridCells });
-  const result = handler.initialize(typedGrid, cellExclusions, context.geometry, stateAllocator);
-
-  if (result && extraState.length) {
-    // Extend the grid to include the extra state.
-    const newGrid = new Uint16Array(numCells + extraState.length);
-    newGrid.set(typedGrid);
-    for (let i = 0; i < extraState.length; i++) newGrid[numCells + i] = extraState[i];
-    context._grid = newGrid;
-    handler.postInitialize(newGrid);
-  }
-
-  return result;
-}
+// Or requires a typed, state-extended grid and postInitialize; initTypedHandler
+// (shared with the Or-wrap harness) sets both up.
+const initOrHandler = (context, handler) =>
+  initTypedHandler(context, handler).result;
 
 await runTest('all handlers fail returns false', () => {
   const context = new GridTestContext({ gridSize: [1, 4], numValues: 4 });

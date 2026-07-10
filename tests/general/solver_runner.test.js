@@ -13,6 +13,7 @@ ensureGlobalEnvironment({
 
 const { SudokuBuilder } = await import('../../js/solver/sudoku_builder.js');
 const { SudokuConstraint } = await import('../../js/sudoku_constraint.js');
+const { CellGeometry } = await import('../../js/cell_geometry.js');
 const { Timer } = await import('../../js/util.js');
 const {
   SolverRunner,
@@ -30,6 +31,10 @@ const {
 const waitForCallback = () => new Promise(resolve => queueMicrotask(resolve));
 // Helper to wait for all pending microtasks and async callbacks to settle.
 const waitForSettle = () => new Promise(resolve => setTimeout(resolve, 0));
+
+// Sample cap for estimate-solutions under test, so the sampling loop
+// terminates instead of running until aborted.
+const ESTIMATE_TEST_MAX_SAMPLES = 50;
 
 // Create a local solver proxy for testing (no web worker needed)
 class LocalSolverProxy {
@@ -72,7 +77,12 @@ class LocalSolverProxy {
   async nthSolution(n) { return this._call('nthSolution', n); }
   async nthStep(n, stepGuides) { return this._call('nthStep', n, stepGuides); }
   async countSolutions() { return this._call('countSolutions'); }
-  async estimatedCountSolutions() { return this._call('estimatedCountSolutions'); }
+  async estimatedCountSolutions() {
+    // The real worker runs sampling unbounded until the user aborts; bound it
+    // here so the mode terminates deterministically under test. The engine's
+    // fixed seed makes the estimate reproducible.
+    return this._call('estimatedCountSolutions', ESTIMATE_TEST_MAX_SAMPLES);
+  }
 
   terminate() {
     this._solver = null;
@@ -154,6 +164,27 @@ const makeSimpleConstraint = () => {
     givens.map(([cell, value]) => new SudokuConstraint.Given(cell, value))
   );
 };
+
+// Build a NoBoxes jigsaw constraint from a layout string, for validate-layout
+// testing. validate-layout is about the layout itself, so no givens are added.
+const makeJigsawLayoutConstraint = (layout) => {
+  const pieces = [
+    ...SudokuConstraint.Jigsaw.makeFromArgs([layout], CellGeometry.fromGridSize(9)),
+  ];
+  return new SudokuConstraint.Container([
+    new SudokuConstraint.NoBoxes(),
+    ...pieces,
+  ]);
+};
+
+// A solvable jigsaw layout. (From data/jigsaw_layouts.js VALID_JIGSAW_LAYOUTS.)
+const makeValidLayoutConstraint = () => makeJigsawLayoutConstraint(
+  '111222233111222233114452333144455633444555666774556669777856699778888999778888999');
+
+// A jigsaw layout with no possible solution.
+// (From data/jigsaw_layouts.js EASY_INVALID_JIGSAW_LAYOUTS.)
+const makeInvalidLayoutConstraint = () => makeJigsawLayoutConstraint(
+  '000000001223411101223415111223455556223444566233334566777374566787774566788888888');
 
 // ============================================================================
 // Modes and getHandlerClass
@@ -517,6 +548,43 @@ await runTest('count-solutions mode returns sample solution', async () => {
   assert.equal(updateResult.description, 'Sample solution');
 });
 
+await runTest('estimate-solutions mode returns sample solution', async () => {
+  let updateResult = null;
+  const runner = new SolverRunner({
+    onUpdate: (result) => { updateResult = result; },
+  });
+
+  const constraint = makeSimpleConstraint();
+  const handler = await runner.solve(constraint, { mode: 'estimate-solutions' });
+  await waitForSettle();
+
+  assert.ok(handler);
+  assert.equal(handler.ITERATION_CONTROLS, false);
+  assert.equal(handler.ALLOW_DOWNLOAD, false);
+
+  assert.ok(updateResult);
+  assert.ok(updateResult.solution, 'Should have a sample solution');
+  assert.equal(updateResult.description, 'Sample solution');
+});
+
+await runTest('estimate-solutions mode delivers a running estimate via state', async () => {
+  let estimate = null;
+  const runner = new SolverRunner({
+    stateHandler: (state) => {
+      if (state.extra?.estimate) estimate = state.extra.estimate;
+    },
+  });
+
+  const constraint = makeSimpleConstraint();
+  await runner.solve(constraint, { mode: 'estimate-solutions' });
+  await waitForSettle();
+
+  assert.ok(estimate, 'Should receive an estimate in state.extra');
+  assert.equal(estimate.samples, ESTIMATE_TEST_MAX_SAMPLES);
+  // The simple puzzle is uniquely solvable, so the estimate is 1.
+  assert.equal(estimate.solutions, 1);
+});
+
 await runTest('validate-layout mode handler properties', async () => {
   const runner = new SolverRunner({
     onUpdate: () => {},
@@ -530,6 +598,36 @@ await runTest('validate-layout mode handler properties', async () => {
   assert.equal(handler.ITERATION_CONTROLS, false);
   assert.equal(handler.ALLOW_DOWNLOAD, false);
   assert.equal(handler.ALLOW_ALT_CLICK, false);
+});
+
+await runTest('validate-layout mode reports a valid layout with a sample solution', async () => {
+  let updateResult = null;
+  const runner = new SolverRunner({
+    onUpdate: (result) => { updateResult = result; },
+  });
+
+  const constraint = makeValidLayoutConstraint();
+  await runner.solve(constraint, { mode: 'validate-layout' });
+  await waitForSettle();
+
+  assert.ok(updateResult);
+  assert.ok(updateResult.solution, 'Valid layout should include a sample solution');
+  assert.equal(updateResult.description, 'Valid layout [Sample solution]');
+});
+
+await runTest('validate-layout mode reports an invalid layout', async () => {
+  let updateResult = null;
+  const runner = new SolverRunner({
+    onUpdate: (result) => { updateResult = result; },
+  });
+
+  const constraint = makeInvalidLayoutConstraint();
+  await runner.solve(constraint, { mode: 'validate-layout' });
+  await waitForSettle();
+
+  assert.ok(updateResult);
+  assert.equal(updateResult.solution, null);
+  assert.equal(updateResult.description, 'Invalid layout');
 });
 
 await runTest('step-by-step mode returns step data with statusData', async () => {

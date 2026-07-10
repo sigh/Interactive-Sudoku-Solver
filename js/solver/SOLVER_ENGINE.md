@@ -169,6 +169,53 @@ other state, a set bit clears again on backtrack — the idiom for
 running an expensive step at most once per branch (see `ChaosArrow`'s
 excluded flag).
 
+### Composite safety (`Or` / `And` nesting)
+
+`Or` speculatively enforces each branch on a scratch copy of the grid,
+unions the surviving branches' cell lanes back, and commits state lanes
+verbatim. A handler that already obeys the universal invariants — cell
+writes only narrow, `false` only when unsatisfiable, a state lane written
+only by its allocating handler — is safe to nest with no special effort;
+`Or` just leans on those harder (the union assumes subset results, a
+branch `false` becomes permanent for the subtree). Nesting adds only two
+rules beyond ordinary correctness:
+
+- **State lanes hold branch-scoped facts.** A lane written while enforcing
+  branch `b` is only valid for solutions satisfying `b`, so it may be read
+  only from *within* the same branch. This is what makes monotonic-state
+  handlers (`Rellik`, `SameValues`) safe to nest: their lanes are private
+  and self-read. A lane with an out-of-branch reader is **not** nestable —
+  it is the one property the category allowlist below actually guards.
+- **Re-derive each call; assume no persistence.** A previous call's cell
+  writes may have been widened away by the union, so recompute from the
+  current grid plus your own lanes. (At top level writes persist; under
+  `Or` they may not.)
+
+**Declaring safety.** Nesting is gated at build time by
+`CompositeConstraintBase._ALLOWED_CATEGORIES` in
+[sudoku_constraint.js](../sudoku_constraint.js): a constraint whose
+`CATEGORY` is not listed throws `Invalid constraint type` when placed in a
+composite. This is the enforcement point — a handler that reads a state
+lane from outside its own branch (today: the `ChaosConstruction` family,
+whose shard state is shared with the top-level region handler) must keep
+its category off that list.
+
+| Handler shape | Nestable? |
+| --- | --- |
+| Cell-lane only, or private self-read state lane | yes (the common case) |
+| Reads a state lane written by another handler / outside its branch | no — keep its category out of `_ALLOWED_CATEGORIES` |
+
+The full soundness model (invariants I1–I12, the `Sol(n, b)` conditioning
+argument, and the per-handler census) lives in
+[or-safety-invariants.md](../../_notes/roadmap/deep-dives/engine/or-safety-invariants.md).
+The Or-wrap test harness (`wrapInOr` / `assertOrWrapEquivalent` /
+`assertOrWrapNoStateLeak` in
+[tests/helpers/grid_test_utils.js](../../tests/helpers/grid_test_utils.js),
+adopted in [tests/handlers/or_wrap.test.js](../../tests/handlers/or_wrap.test.js))
+drives a bare handler through `Or`'s delta-replay, scratch, and writeback
+paths so a broken state lane surfaces as a unit-test failure — add a case
+there for any new state-allocating handler.
+
 ### Writing `enforceConsistency`
 
 `enforceConsistency` is the hot loop of the solver — it runs millions of

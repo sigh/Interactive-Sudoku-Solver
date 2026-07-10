@@ -528,9 +528,10 @@ export class CompositeConstraintBase extends SudokuConstraintBase {
   //  - Or would just be a bit confusing to include given the above two caveats
   //    (such as Anti-knight). It is easier to ban everything in the layout
   //    panel.
+  // ChaosConstruction handlers read shard state so can't be inside composites.
   static _ALLOWED_CATEGORIES = new Set(
     ['LinesAndSets', 'GivenCandidates', 'OutsideClue', 'Composite', 'Pairwise',
-      'StateMachine', 'ChaosConstruction']);
+      'StateMachine']);
 
   static allowedConstraintClass(constraintClass) {
     return this._ALLOWED_CATEGORIES.has(constraintClass.CATEGORY);
