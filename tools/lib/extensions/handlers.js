@@ -9,4 +9,5 @@ export const handlerModules = [
   await import('../../../js/solver/chaos_handler.js' + self.VERSION_PARAM),
   await import('../../../js/solver/sum_handler.js' + self.VERSION_PARAM),
   await import('../../../js/solver/nfa_handler.js' + self.VERSION_PARAM),
+  await import('../../../js/solver/connected_handler.js' + self.VERSION_PARAM),
 ];

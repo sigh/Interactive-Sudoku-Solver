@@ -1,6 +1,7 @@
 const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM);
 const { SudokuConstraintHandler, InvalidConstraintError } = await import('./handlers.js' + self.VERSION_PARAM);
-const { countOnes16bit, memoize } = await import('../util.js' + self.VERSION_PARAM);
+const { countOnes16bit } = await import('../util.js' + self.VERSION_PARAM);
+const { NO_CELL, neighborTable, enclosingNeighbors } = await import('./connected_handler.js' + self.VERSION_PARAM);
 
 const DEFER_CONNECTIVITY = 2;
 const REGION_POSSIBLE_COUNT_MASK = 0x1ff;
@@ -12,41 +13,6 @@ const REGION_COUNT_MASK = (1 << REGION_VALUE_MASK_SHIFT) - 1;
 const cellsAreAdjacent = (cellA, cellB, numCols) => {
   const delta = Math.abs(cellA - cellB);
   return delta === numCols || (delta === 1 && (cellA / numCols | 0) === (cellB / numCols | 0));
-};
-
-// Sentinel for "no neighbour" (grid edge) in the neighbour table.
-const NO_CELL = 0xffff;
-
-// Orthogonal-neighbour lookup: neighbors[cell * 4 + dir] is the neighbouring cell
-// in direction dir (0 left, 1 right, 2 up, 3 down), or NO_CELL at the grid edge.
-// Memoized by grid dimensions so it is built once and shared across handlers.
-export const neighborTable = memoize((numRows, numCols) => {
-  const numCells = numRows * numCols;
-  const neighbors = new Uint16Array(numCells * 4).fill(NO_CELL);
-  for (let cell = 0; cell < numCells; cell++) {
-    const row = (cell / numCols) | 0;
-    const col = cell - row * numCols;
-    const offset = cell * 4;
-    if (col > 0) neighbors[offset] = cell - 1;
-    if (col + 1 < numCols) neighbors[offset + 1] = cell + 1;
-    if (row > 0) neighbors[offset + 2] = cell - numCols;
-    if (row + 1 < numRows) neighbors[offset + 3] = cell + numCols;
-  }
-  return neighbors;
-});
-
-// Returns `cell`'s in-grid orthogonal neighbours when every one of them is in
-// `cellSet` (the cell is "enclosed"), otherwise null.
-export const enclosingNeighbors = (neighborTable, cell, cellSet) => {
-  const base = cell * 4;
-  const neighbors = [];
-  for (let dir = 0; dir < 4; dir++) {
-    const neighbor = neighborTable[base + dir];
-    if (neighbor === NO_CELL) continue;
-    if (!cellSet.has(neighbor)) return null;
-    neighbors.push(neighbor);
-  }
-  return neighbors;
 };
 
 // Union-find union: merges cellA and cellB's shards, keeping the smaller index as root.

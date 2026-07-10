@@ -2,6 +2,16 @@
 // test-only puzzle definitions. Bare strings are looked up in PUZZLE_INDEX
 // (data/collections.js, data/example_puzzles.js); objects are used as-is.
 // The runner lives in e2e.test.js.
+//
+// Criteria for selecting an e2e puzzle:
+//  - It exercises the tested constraint/condition: the test would fail
+//    without it (e.g. the solution would not be unique).
+//  - It is fast — ideally a few ms.
+//  - It is ideally a real puzzle, possibly with extra constraints for speed
+//    (see withExtraConstraints).
+//  - No sandbox scripts (for speed). Inline the constraint string where
+//    necessary; if it is too long to inline, store it as a pre-serialized
+//    .iss file and reference it by path (e.g. 'Xin Yang v2').
 
 // Populate PUZZLE_INDEX so the bare-string names below resolve. CLASSIC_9X9 is
 // reused from the 'Classic sudoku' example as a base for several puzzles.
@@ -340,6 +350,10 @@ const puzzlesExtraCells = [
   'The good, the bad and the ugly',  // Var, NFA, SameValues, Arrow, NFA (for sandwich, xsum, skyscraper)
   'Letter Little Killer',  // Var, Sum (with coeffs)
   'Hailstorm',  // 6x6, Var, Sum (with coeffs), NFA (comparing sums), Replicate, PerfectAllDifferent optimization
+  {
+    ...PUZZLE_INDEX.get('Xin Yang v2'),  // ConnectedValues, Var, PillArrow, Or, And, Replicate
+    input: '/data/scripts/xin_yang_v2.iss',
+  },
   {  // Var cells inside Or composite
     name: 'Or with extra cells',
     input: '.Var~X~X.Or.And.~R1C1_1~VX_1~R4C4_1.End.And.~R1C1_2~VX_2~R4C4_2.End.End.~R2C5_1~R5C3_3~R7C7_4~R8C2_5~R3C2_6~R1C8_7~R9C9_8~R6C6_9~R5C9_1~R9C3_2~R7C1_3~R6C4_4~R3C6_5~R2C7_6~R7C9_7~R8C5_8~R1C3_9~R5C1_5~R6C8_6~R3C4_8~R9C1_7~R3C7_9',

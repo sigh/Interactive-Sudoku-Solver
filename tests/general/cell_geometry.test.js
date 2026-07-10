@@ -515,6 +515,50 @@ await runTest('CellGraph.diagonal handles cell index 0 as intermediate', () => {
   assert.equal(graph.diagonal(cell, CellGraph.UP, CellGraph.LEFT), null);
 });
 
+await runTest('CellGraph.perimeter traces the boundary clockwise', () => {
+  const geometry = CellGeometry.fromGridSize(4, 4);
+  const graph = geometry.cellGraph();
+  const at = (r, c) => geometry.cellIndex(r, c);
+  // Clockwise from the top-left: top row, right col, bottom row, left col.
+  assert.deepEqual(graph.perimeter(at(0, 0)), [
+    at(0, 0), at(0, 1), at(0, 2), at(0, 3),
+    at(1, 3), at(2, 3), at(3, 3),
+    at(3, 2), at(3, 1), at(3, 0),
+    at(2, 0), at(1, 0),
+  ]);
+});
+
+await runTest('CellGraph.perimeter is the same from any cell in the region', () => {
+  const geometry = CellGeometry.fromGridSize(4, 4);
+  const graph = geometry.cellGraph();
+  const fromCorner = graph.perimeter(geometry.cellIndex(0, 0));
+  assert.deepEqual(graph.perimeter(geometry.cellIndex(2, 2)), fromCorner);  // interior
+  assert.deepEqual(graph.perimeter(geometry.cellIndex(1, 3)), fromCorner);  // edge
+});
+
+await runTest('CellGraph.perimeter handles a non-square grid', () => {
+  const geometry = CellGeometry.fromGridSize(2, 3);
+  const graph = geometry.cellGraph();
+  const at = (r, c) => geometry.cellIndex(r, c);
+  assert.deepEqual(graph.perimeter(at(0, 0)), [
+    at(0, 0), at(0, 1), at(0, 2), at(1, 2), at(1, 1), at(1, 0),
+  ]);
+});
+
+await runTest("CellGraph.perimeter uses a var group's own column count", () => {
+  const geometry = CellGeometry.fromGridSize(4, 4);
+  geometry.addVarCellsForConstraints([
+    { getVarCellGroups: () => [{ prefix: 'VW', count: 16, columns: 8 }] },
+  ]);
+  const graph = geometry.cellGraph();
+  const cells = geometry.varCellsForGroup('VW');  // 16 cells laid out 2 x 8
+  // Only 2 rows, so every cell is on the perimeter: top row L->R, bottom R->L.
+  assert.deepEqual(graph.perimeter(cells[0]), [
+    ...cells.slice(0, 8),
+    ...cells.slice(8).reverse(),
+  ]);
+});
+
 await runTest('CellGraph.cellPosition returns grid row, col, and origin', () => {
   const geometry = CellGeometry.fromGridSize(9);
   const graph = geometry.cellGraph();

@@ -1308,6 +1308,13 @@ const EXAMPLE_EXTRA_VARIABLES = [
     input: '/data/scripts/inset.js',
     constraintTypes: ['6x6', 'NoBoxes', 'Var', 'AllDifferent', 'NFA: odd sum', 'NFA: even sum'],
   },
+  {
+    name: 'Xin Yang v2',
+    src: ['https://www.youtube.com/watch?v=_Q1fvtndpsA', 'https://sudokupad.app/qc37ejydvj'],
+    input: '/data/scripts/xin_yang_v2.js',
+    solution: '861459273792316485435287619246891357153764928978523146317645892589132764624978531',
+    constraintTypes: ['Var', 'Replicate', 'ConnectedValues', 'WhiteDot', 'PillArrow', 'Or', 'And', 'NFA: opposite-shade', 'NFA: no-mono-2x2'],
+  },
 ];
 
 export const EXAMPLES = [

@@ -518,6 +518,27 @@ export class CellGraph {
     return cell1 === null ? null : this._graph[cell1][dir1];
   }
 
+  // Returns the boundary cells of the region containing `cell`, in clockwise
+  // cyclic order starting from its top-left.
+  perimeter(cell) {
+    const CW = [CellGraph.RIGHT, CellGraph.DOWN, CellGraph.LEFT, CellGraph.UP];
+    // Hug the wall: turn left if possible, else straight, right, or back.
+    const TURNS = [3, 0, 1, 2];
+    const start = this.cellPosition(cell)[2];  // top-left of the region
+    const boundary = [];
+    let current = start;
+    let facing = 0;  // index into CW; start heading right along the top edge
+    do {
+      boundary.push(current);
+      for (const turn of TURNS) {
+        const f = (facing + turn) % 4;
+        const next = this._graph[current][CW[f]];
+        if (next !== null) { current = next; facing = f; break; }
+      }
+    } while (current !== start);
+    return boundary;
+  }
+
   neighborCountIn(cell, cellSet) {
     let count = 0;
     for (const adj of this._graph[cell]) {

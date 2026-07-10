@@ -2463,6 +2463,29 @@ export class SudokuConstraint {
     }
   };
 
+  static ConnectedValues = class ConnectedValues extends SudokuConstraintBase {
+    static DESCRIPTION = (`
+      The cells of the given var group which contain any of the
+      values must form a single orthogonally-connected region.`);
+    static CATEGORY = 'Experimental';
+
+    constructor(groupPrefix, values) {
+      super(groupPrefix, values);
+      this.groupPrefix = groupPrefix;
+      this.values = values;
+      this.valueStr = values.replace(/_/g, ',');
+    }
+
+    getCells(geometry) {
+      return (geometry.varCellsForGroup(this.groupPrefix) || []).map(
+        c => geometry.makeCellIdFromIndex(c));
+    }
+
+    chipLabel() {
+      return `ConnectedValues (${this.groupPrefix}: ${this.valueStr})`;
+    }
+  };
+
   static SameValues = class SameValues extends SudokuConstraintBase {
     static DESCRIPTION = (`
       The cells are taken as a series of sets of the same size.

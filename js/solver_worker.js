@@ -23,6 +23,7 @@ if (!self.VERSION_PARAM.endsWith('&sync')) {
   import('./solver/optimizer.js' + self.VERSION_PARAM);
   import('./solver/candidate_selector.js' + self.VERSION_PARAM);
   import('./solver/chaos_handler.js' + self.VERSION_PARAM);
+  import('./solver/connected_handler.js' + self.VERSION_PARAM);
   import('./solver/sum_handler.js' + self.VERSION_PARAM);
   import('./solver/nfa_handler.js' + self.VERSION_PARAM);
   import('./cell_geometry.js' + self.VERSION_PARAM);

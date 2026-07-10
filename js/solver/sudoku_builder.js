@@ -6,6 +6,7 @@ const HandlerModule = await import('./handlers.js' + self.VERSION_PARAM);
 const SumHandlerModule = await import('./sum_handler.js' + self.VERSION_PARAM);
 const NFAHandlerModule = await import('./nfa_handler.js' + self.VERSION_PARAM);
 const ChaosHandlerModule = await import('./chaos_handler.js' + self.VERSION_PARAM);
+const ConnectedHandlerModule = await import('./connected_handler.js' + self.VERSION_PARAM);
 
 const { InvalidConstraintError } = HandlerModule;
 
@@ -765,6 +766,20 @@ export class SudokuBuilder {
             constraint.cells.map(c => geometry.parseCellId(c).cellIndex),
             constraint.values.split('_').map(v => +v),
             /* strict = */ true);
+          break;
+
+        case 'ConnectedValues':
+          {
+            const groupCells = geometry.varCellsForGroup(constraint.groupPrefix);
+            if (!groupCells) {
+              throw new InvalidConstraintError(
+                `Connected Values: unknown variable group '${constraint.groupPrefix}'.`);
+            }
+            yield new ConnectedHandlerModule.ConnectedValues(
+              geometry.numGridCells,
+              groupCells[0],
+              constraint.values.split('_').map(v => +v));
+          }
           break;
 
         case 'RegionSameValues':
