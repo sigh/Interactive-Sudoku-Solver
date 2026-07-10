@@ -45,12 +45,16 @@ const SOURCE_ICON_DOMAINS = [
 const FALLBACK_SOURCE_ICON = 'img/open-in-new-48.png';
 
 const sourceIconForUrl = (url) => {
-  let host;
+  let parsed;
   try {
-    host = new URL(url).hostname.replace(/^www\./, '');
+    // URL.parse doesn't throw, so pause-on-exceptions won't stop here; new URL
+    // is a fallback for browsers without it (Chrome < 126).
+    parsed = URL.parse ? URL.parse(url) : new URL(url);
   } catch {
-    return FALLBACK_SOURCE_ICON;
+    parsed = null;
   }
+  if (!parsed) return FALLBACK_SOURCE_ICON;
+  const host = parsed.hostname.replace(/^www\./, '');
 
   const parts = host.split('.');
   for (let i = 0; i < parts.length - 1; i++) {
