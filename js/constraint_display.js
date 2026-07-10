@@ -1300,8 +1300,9 @@ class OutsideClue extends BaseConstraintDisplayItem {
       }
     }
 
-    // Choose font size based on the number of values.
-    const fontSize = 17 - 2 * tspans.length;
+    // Choose font size based on the number of values, with a floor so that
+    // many stacked values stay positive.
+    const fontSize = Math.max(5, 17 - 2 * tspans.length);
     textNode.setAttribute('style', `font-size: ${fontSize}px`);
   }
 

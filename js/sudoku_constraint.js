@@ -2115,6 +2115,9 @@ export class SudokuConstraint {
       super(sum, ...cells);
       this.cells = cells;
       this.sum = +sum;
+      if (String(sum).trim() !== '' && !Number.isInteger(this.sum)) {
+        throw Error('Cage sum must be an integer: ' + sum);
+      }
     }
 
     chipLabel() {
@@ -2189,7 +2192,7 @@ export class SudokuConstraint {
 
       const parts = String(sum).split('_');
       this.sum = +parts[0];
-      if (!Number.isInteger(this.sum)) {
+      if (parts[0].trim() === '' || !Number.isInteger(this.sum)) {
         throw Error('Sum must be an integer: ' + parts[0]);
       }
 

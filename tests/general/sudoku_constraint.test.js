@@ -929,6 +929,33 @@ await runTest('Sum: rejects non-integer sum', () => {
     { message: /Sum must be an integer/ });
 });
 
+await runTest('Sum: rejects empty sum', () => {
+  assert.throws(
+    () => new SudokuConstraint.Sum('', 'R1C1'),
+    { message: /Sum must be an integer/ });
+  assert.throws(
+    () => new SudokuConstraint.Sum('  ', 'R1C1'),
+    { message: /Sum must be an integer/ });
+});
+
+await runTest('Cage: accepts integer sums including the 0 sentinel', () => {
+  assert.equal(new SudokuConstraint.Cage(10, 'R1C1', 'R1C2').sum, 10);
+  assert.equal(new SudokuConstraint.Cage(0, 'R1C1', 'R1C2').sum, 0);
+  assert.equal(new SudokuConstraint.Cage('15', 'R1C1', 'R1C2').sum, 15);
+});
+
+await runTest('Cage: accepts a blank sum (sumless killer cage)', () => {
+  // Serialized as `.Cage~~...`; coerces to 0, which the builder treats as a
+  // uniqueness-only cage.
+  assert.equal(new SudokuConstraint.Cage('', 'R1C1', 'R1C2').sum, 0);
+});
+
+await runTest('Cage: rejects non-integer sum', () => {
+  assert.throws(
+    () => new SudokuConstraint.Cage('abc', 'R1C1', 'R1C2'),
+    { message: /Cage sum must be an integer/ });
+});
+
 await runTest('Sum: rejects non-integer coefficient', () => {
   assert.throws(
     () => new SudokuConstraint.Sum('15_=_2.5', 'R1C1'),
