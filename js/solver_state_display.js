@@ -51,11 +51,13 @@ export class SolverStateDisplay {
       return;
     }
 
+    // Show the running method's label while solving, and clear it once the
+    // solve stops.
+    this._elements.solveStatus.textContent =
+      isSolving ? (this._METHOD_TO_STATUS[method] ?? '') : '';
     if (isSolving) {
-      this._elements.solveStatus.textContent = this._METHOD_TO_STATUS[method];
       this._elements.progressPercentage.style.display =
         this._isEstimateMode ? 'none' : 'inline';
-      this._elements.solveStatus.textContent = '';
     }
     this._elements.progressContainer.classList.remove('solver-status-error');
   }
