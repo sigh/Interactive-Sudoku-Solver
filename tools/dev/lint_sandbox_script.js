@@ -40,6 +40,17 @@ const GUIDANCE_DEFS = [
     ],
   },
   {
+    code: 'local-file-reference',
+    message: 'reference to a local working file or dev tool found; sandbox scripts are shared '
+      + 'standalone (?code= links), so keep decode/provenance/validation notes in local files instead',
+    patterns: [
+      /\b(?:raw|decoded?|result)\.json\b/g,
+      /\b(?:notes|description)\.md\b/g,
+      /\bsummarize_(?:geometry|decode)\.js\b/g,
+      /\b(?:verify_solution|benchmark_puzzles|run_sandbox|lint_sandbox_script)\b/g,
+    ],
+  },
+  {
     code: 'custom-neighbour-helper',
     message: 'custom neighbour helper found; prefer cellGraph().neighbours/kingNeighbours when applicable',
     patterns: [
