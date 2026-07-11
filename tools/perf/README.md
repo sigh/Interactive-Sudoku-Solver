@@ -75,7 +75,18 @@ the most important single result), any solution mismatch, and the top guess
 movers. Add `--require-same-solutions` (with `--solutions all`) as the soundness
 gate for a new mechanism: it byte-compares the full solution sets of baseline
 and ablation on every puzzle and exits non-zero on any difference — a capped run
-also fails it, as inconclusive. `bench_vs_ref` compares *two git revisions in separate processes*. By
+also fails it, as inconclusive.
+
+**Experiment counters flow through automatically.** Code under test can add its
+own counters to the engine's `counters` object (e.g. `counters.probes` from an
+initialization hook); anything beyond the engine's standard set is passed
+through by the tooling — `benchmark_puzzles` shows them as extra table columns,
+`extra: {...}` in `--json` rows, and per-ablation totals in the compare summary;
+`profile.js` appends them to its per-puzzle line; `bench_vs_ref` includes them
+in its counter-identity check on the keys both revisions report (a counter only
+one side knows is a code-version difference, not a behaviour change). This is
+how an experiment attributes its own cost (work done at init vs search saved)
+without touching the tools. `bench_vs_ref` compares *two git revisions in separate processes*. By
 default it reports both how the counters moved and the wall-time delta; add
 `--require-identical` for a pure refactor where the counters must **not** move (it
 then fails on any change). When counters change intentionally the wall-time ratio

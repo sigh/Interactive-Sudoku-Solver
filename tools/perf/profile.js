@@ -43,7 +43,7 @@
 import {
   resolvePuzzles, materializePuzzles, parseBacktrackLimit, parseSolutionLimit,
   warnIfFirstSolution, runSolve, applyAblations, validateAblations, HANDLERS,
-  handlerMethodNames,
+  handlerMethodNames, extraCounters,
 } from '../lib/solver_analysis.js';
 
 const parseList = (value) => (value ?? '').split(',').map(v => v.trim()).filter(Boolean);
@@ -136,10 +136,14 @@ const main = async () => {
       finally { restore(); }
 
       const c = result.counters;
+      // Experiment-added counters (if any) tag along at the end of the line.
+      const extra = extraCounters(c);
+      const extraStr = extra
+        ? ' ' + Object.entries(extra).map(([k, v]) => `${k}=${v}`).join(' ') : '';
       console.log(
         `\n${result.name}  [${args.handler}]  status=${result.status} ` +
         `solutions=${c.solutions} guesses=${c.guesses} backtracks=${c.backtracks} ` +
-        `nodes=${c.nodesSearched} solveMs=${result.elapsedMs.toFixed(1)}`);
+        `nodes=${c.nodesSearched} solveMs=${result.elapsedMs.toFixed(1)}${extraStr}`);
       if (args.summary) continue;
 
       const rows = methods

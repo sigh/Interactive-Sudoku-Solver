@@ -76,20 +76,33 @@ const usage = () => console.log(
 const COUNTERS = ['status', 'solutions', 'guesses', 'backtracks', 'nodesSearched'];
 
 // Normalise a row's counters (types coerced so a JSON row and a TSV row compare
-// equal).
+// equal). `extra` holds experiment-added counters passed through by
+// benchmark_puzzles --json (absent from TSV rows and from refs predating them).
 const normCounters = (row) => ({
   status: String(row.status),
   solutions: Number(row.solutions),
   guesses: Number(row.guesses),
   backtracks: Number(row.backtracks),
   nodesSearched: Number(row.nodesSearched),
+  extra: row.extra ?? {},
 });
 
-const countersEqual = (a, b) => COUNTERS.every((k) => a[k] === b[k]);
+// Extra counters are compared only on keys BOTH sides report: a counter that
+// exists on one side only (the ref predates the experiment, or the experiment
+// was removed) is a code-version difference, not a behaviour difference.
+const sharedExtraKeys = (a, b) =>
+  Object.keys(a.extra).filter((k) => k in b.extra);
+
+const countersEqual = (a, b) =>
+  COUNTERS.every((k) => a[k] === b[k]) &&
+  sharedExtraKeys(a, b).every((k) => Number(a.extra[k]) === Number(b.extra[k]));
 
 // Compact description of which counters changed, e.g. "nodesSearched 100→80".
-const countersDiff = (a, b) =>
-  COUNTERS.filter((k) => a[k] !== b[k]).map((k) => `${k} ${a[k]}→${b[k]}`).join(' ');
+const countersDiff = (a, b) => [
+  ...COUNTERS.filter((k) => a[k] !== b[k]).map((k) => `${k} ${a[k]}→${b[k]}`),
+  ...sharedExtraKeys(a, b).filter((k) => Number(a.extra[k]) !== Number(b.extra[k]))
+    .map((k) => `${k} ${a.extra[k]}→${b.extra[k]}`),
+].join(' ');
 
 // Parse benchmark_puzzles.js tab-separated output (fallback for refs predating
 // --json; those older revisions still emit real TSV). Columns are looked up by

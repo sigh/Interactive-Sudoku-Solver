@@ -48,7 +48,11 @@
 //                         guesses, backtracks, nodesSearched, ms, msMedian, msMax }.
 //                         Under --compare each row also carries { variant, vsBase }
 //                         (variant: null for the baseline row, else the ablation
-//                         name; `puzzle` stays the bare puzzle name).
+//                         name; `puzzle` stays the bare puzzle name). Counters the
+//                         engine doesn't define by default (added by experiment
+//                         code, e.g. a `probes` counter) appear as { extra: {...} }
+//                         — they also become table columns and per-ablation
+//                         summary totals in the human view.
 //   --list-ablations      Print the available ablations and exit.
 //   -h, --help            Print this help and exit.
 //
@@ -61,6 +65,7 @@
 import {
   resolvePuzzles, materializePuzzles, parseBacktrackLimit, parseSolutionLimit,
   warnIfFirstSolution, runSolve, applyAblations, validateAblations, ABLATIONS,
+  extraCounters,
 } from '../lib/solver_analysis.js';
 import { readFileSync } from 'node:fs';
 
@@ -148,6 +153,8 @@ const toRow = (r, variant, vsBase) => {
     msMedian: Number(s.median.toFixed(1)),
     msMax: Number(s.max.toFixed(1)),
   };
+  const extra = extraCounters(r.counters);
+  if (extra) row.extra = extra;
   if (variant !== undefined) row.variant = variant;
   if (vsBase !== undefined) row.vsBase = vsBase;
   return row;
@@ -159,11 +166,14 @@ const COLUMNS = ['puzzle', 'status', 'sols', 'guesses', 'backtracks', 'nodes', '
 // numbers, right-justified so digits line up.
 const LEFT_COLS = new Set([0, 1]);
 
-const rowCells = (row) => {
+// `extraNames` are experiment-added counter names (union across rows) rendered
+// as additional numeric columns after the standard ones.
+const rowCells = (row, extraNames) => {
   const puzzle = row.puzzle + (row.variant ? ` [-${row.variant}]` : '');
   const cells = [puzzle, row.status, String(row.solutions), String(row.guesses),
     String(row.backtracks), String(row.nodesSearched), row.ms.toFixed(1),
     row.msMedian.toFixed(1), row.msMax.toFixed(1)];
+  for (const name of extraNames) cells.push(String(row.extra?.[name] ?? ''));
   if (row.vsBase !== undefined) cells.push(row.vsBase);
   return cells;
 };
@@ -172,8 +182,8 @@ const rowCells = (row) => {
 // we size every column from the data (header + all rows) — which is why output
 // is buffered until the run completes rather than streamed line by line. --json
 // is the machine-readable contract; this is purely the human view.
-const renderTable = (headerCols, rows) => {
-  const matrix = [headerCols, ...rows.map(rowCells)];
+const renderTable = (headerCols, rows, extraNames) => {
+  const matrix = [headerCols, ...rows.map((row) => rowCells(row, extraNames))];
   const widths = headerCols.map((_, c) => Math.max(...matrix.map((cells) => (cells[c] ?? '').length)));
   const formatRow = (cells) => cells
     .map((cell, c) => LEFT_COLS.has(c) ? (cell ?? '').padEnd(widths[c]) : (cell ?? '').padStart(widths[c]))
@@ -196,6 +206,7 @@ const newCompareStats = () => ({
   better: 0, worse: 0, flat: 0,
   statusChanges: [], solutionMismatches: [], inconclusive: [],
   movers: [],
+  extras: new Map(),  // extra counter name -> { base, ablated } totals
 });
 
 const accumulateCompareStats = (s, base, ablated) => {
@@ -216,6 +227,18 @@ const accumulateCompareStats = (s, base, ablated) => {
   const delta = ablated.counters.guesses - base.counters.guesses;
   if (delta > 0) s.worse++; else if (delta < 0) s.better++; else s.flat++;
   if (delta !== 0) s.movers.push({ name: base.name, delta });
+
+  const baseExtra = extraCounters(base.counters);
+  const ablatedExtra = extraCounters(ablated.counters);
+  if (baseExtra || ablatedExtra) {
+    for (const key of new Set(
+      [...Object.keys(baseExtra ?? {}), ...Object.keys(ablatedExtra ?? {})])) {
+      const totals = s.extras.get(key) ?? { base: 0, ablated: 0 };
+      totals.base += baseExtra?.[key] ?? 0;
+      totals.ablated += ablatedExtra?.[key] ?? 0;
+      s.extras.set(key, totals);
+    }
+  }
 
   if (base.counters.solutions !== ablated.counters.solutions) {
     s.solutionMismatches.push(
@@ -245,6 +268,9 @@ const renderCompareSummary = (name, s) => {
     `total ms:      base=${s.baseMs.toFixed(1)} ablated=${s.ablatedMs.toFixed(1)}` +
     ` vs-base=${ratio(s.ablatedMs, s.baseMs)}`);
   lines.push(`ablated guesses: worse on ${s.worse}, better on ${s.better}, flat on ${s.flat}`);
+  for (const [key, t] of [...s.extras].sort(([a], [b]) => a.localeCompare(b))) {
+    lines.push(`extra ${key}: base=${t.base} ablated=${t.ablated}`);
+  }
   for (const change of s.statusChanges) lines.push(`status change: ${change}`);
   for (const mismatch of s.solutionMismatches) lines.push(`SOLUTION MISMATCH: ${mismatch}`);
   const movers = [...s.movers]
@@ -284,7 +310,6 @@ const main = async () => {
 
   // Buffer rows; render the aligned table (or JSON) once the run completes.
   const rows = [];
-  const headerCols = args.compare.length ? [...COLUMNS, 'vs-base'] : COLUMNS;
   const emit = (row) => { rows.push(row); };
 
   const compareStats = new Map(args.compare.map((name) => [name, newCompareStats()]));
@@ -312,7 +337,11 @@ const main = async () => {
 
   if (args.json) console.log(JSON.stringify(rows));
   else {
-    console.log(renderTable(headerCols, rows));
+    // Extra (experiment-added) counters become columns; only known after the runs.
+    const extraNames = [...new Set(rows.flatMap((r) => Object.keys(r.extra ?? {})))].sort();
+    const headerCols = [
+      ...COLUMNS, ...extraNames, ...(args.compare.length ? ['vs-base'] : [])];
+    console.log(renderTable(headerCols, rows, extraNames));
     for (const [name, s] of compareStats) console.log('\n' + renderCompareSummary(name, s));
   }
 

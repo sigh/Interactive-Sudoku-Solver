@@ -354,6 +354,27 @@ export const handlerMethodNames = (HandlerClass) => {
 
 export const COUNTER_COLUMNS = ['status', 'solutions', 'guesses', 'backtracks', 'nodesSearched'];
 
+// The counters the engine always defines (see InternalSolver.reset()). Anything
+// else on a result's `counters` was added by experiment code (a prototype patch
+// or a branch under test adding e.g. `probes`); the reporting CLIs pass such
+// "extra" counters through so an experiment can attribute its own cost/effect
+// without touching the tools. If the engine grows a new standard counter, add it
+// here — until then it just shows up as an extra, which is harmless.
+const ENGINE_COUNTERS = new Set([
+  'valuesTried', 'nodesSearched', 'backtracks', 'guesses', 'solutions',
+  'constraintsProcessed', 'progressRatio', 'progressRatioPrev', 'branchesIgnored',
+]);
+
+// Return the non-standard counters of a result as a plain object, or null if
+// there are none (the common case — callers can cheaply skip the plumbing).
+export const extraCounters = (counters) => {
+  let extra = null;
+  for (const key of Object.keys(counters)) {
+    if (!ENGINE_COUNTERS.has(key)) (extra ??= {})[key] = counters[key];
+  }
+  return extra;
+};
+
 export const counterRow = (result) =>
   [result.status, result.counters.solutions, result.counters.guesses,
   result.counters.backtracks, result.counters.nodesSearched];
