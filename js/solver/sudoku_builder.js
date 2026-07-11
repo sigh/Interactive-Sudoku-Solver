@@ -653,21 +653,33 @@ export class SudokuBuilder {
             cells.cellIds(geometry), cells.isLoop(), constraint.sum);
           break;
 
-        case 'WhiteDot':
-          for (const [a, b] of constraint.adjacentPairs(geometry)) {
+        case 'WhiteDot': {
+          const pairs = constraint.adjacentPairs(geometry);
+          if (!pairs.length) {
+            throw new InvalidConstraintError(
+              `WhiteDot enforces nothing: no adjacent cell pairs in [${constraint.cells}]`);
+          }
+          for (const [a, b] of pairs) {
             yield new HandlerModule.BinaryConstraint(
               a, b,
               SudokuConstraint.WhiteDot.fnKey(geometry.numValues, geometry.valueOffset));
           }
           break;
+        }
 
-        case 'BlackDot':
-          for (const [a, b] of constraint.adjacentPairs(geometry)) {
+        case 'BlackDot': {
+          const pairs = constraint.adjacentPairs(geometry);
+          if (!pairs.length) {
+            throw new InvalidConstraintError(
+              `BlackDot enforces nothing: no adjacent cell pairs in [${constraint.cells}]`);
+          }
+          for (const [a, b] of pairs) {
             yield new HandlerModule.BinaryConstraint(
               a, b,
               SudokuConstraint.BlackDot.fnKey(geometry.numValues, geometry.valueOffset));
           }
           break;
+        }
 
         case 'X':
           for (const pair of constraint.adjacentPairs(geometry)) {

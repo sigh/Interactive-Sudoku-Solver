@@ -319,6 +319,26 @@ await runTest('Given produces GivenCandidates handler', () => {
 // InvalidConstraintError
 // ============================================================================
 
+await runTest('WhiteDot with no adjacent pairs throws InvalidConstraintError', () => {
+  const constraint = new SudokuConstraint.Container([
+    new SudokuConstraint.WhiteDot('R1C1', 'R5C5'),
+  ]);
+  assert.throws(
+    () => buildHandlers(constraint),
+    { name: 'InvalidConstraintError' },
+  );
+});
+
+await runTest('BlackDot with no adjacent pairs throws InvalidConstraintError', () => {
+  const constraint = new SudokuConstraint.Container([
+    new SudokuConstraint.BlackDot('R1C1', 'R5C5'),
+  ]);
+  assert.throws(
+    () => buildHandlers(constraint),
+    { name: 'InvalidConstraintError' },
+  );
+});
+
 await runTest('Diagonal on non-square grid throws InvalidConstraintError', () => {
   const constraint = new SudokuConstraint.Container([
     new SudokuConstraint.Shape('4x6'),
