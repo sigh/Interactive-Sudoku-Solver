@@ -41,7 +41,7 @@ const resolveInput = (input) => {
 };
 
 const COLLECTIONS = await import('../../data/collections.js' + self.VERSION_PARAM);
-const { PUZZLE_INDEX } = await import('../../data/example_puzzles.js' + self.VERSION_PARAM);
+const { PUZZLE_INDEX, resolvePuzzleConfig } = await import('../../data/example_puzzles.js' + self.VERSION_PARAM);
 const { SudokuParser } = await import('../../js/sudoku_parser.js' + self.VERSION_PARAM);
 const { SudokuBuilder } = await import('../../js/solver/sudoku_builder.js' + self.VERSION_PARAM);
 const { LookupTables } = await import('../../js/solver/lookup_tables.js' + self.VERSION_PARAM);
@@ -92,11 +92,23 @@ const findExample = (name) => {
 };
 
 // Expand a collections.js export name (e.g. 'TAREK_ALL', 'EXTREME_KILLERS') into
-// its puzzle objects. Entries are either raw constraint strings or already-shaped
-// { name, input, solution? } objects.
-const expandCollection = (name) =>
-  COLLECTIONS[name].map((entry, i) =>
-    typeof entry === 'string' ? { name: `${name}#${i}`, input: entry } : entry);
+// its puzzle objects. Entries may be raw constraint strings, PUZZLE_INDEX puzzle
+// names, or already-shaped { name, input, solution? } objects — resolution is
+// delegated to the data layer (resolvePuzzleConfig / PuzzleCollection.configFor)
+// so every entry shape the app accepts works here too. Entries without a
+// distinct name (raw constraint strings) are labelled by position.
+const expandCollection = (name) => {
+  const collection = COLLECTIONS[name];
+  return collection.map((entry, i) => {
+    const config = typeof collection.configFor === 'function'
+      ? collection.configFor(entry)
+      : resolvePuzzleConfig(entry);
+    if (!config.name || config.name === config.input) {
+      return { ...config, name: `${name}#${i}` };
+    }
+    return config;
+  });
+};
 
 // Build a difficulty ladder from a base puzzle. Spec forms:
 //   ladder:<puzzle name>            — default given counts
@@ -228,7 +240,10 @@ const solutionString = (grid, geometry) => {
 // unlimited. The solver is built fresh, so prototype patches (ablations) applied
 // beforehand take effect. The optional `onSolver` hook (used by the profiler)
 // runs after build but before search, e.g. to install method wrappers.
-export const runSolve = (puzzle, { maxBacktracks, maxSolutions }, onSolver) => {
+// With `collectSolutions`, the result gains `solutionSet`: every solution found,
+// as sorted digit strings — sorted because two runs that explore the tree in a
+// different order enumerate the same solutions in a different order.
+export const runSolve = (puzzle, { maxBacktracks, maxSolutions, collectSolutions }, onSolver) => {
   const constraint = SudokuParser.parseText(resolveInput(puzzle.input));
   const geometry = constraint.getGeometry();
   // Reconstruct constraint instances from their type+args, as the worker and
@@ -244,11 +259,14 @@ export const runSolve = (puzzle, { maxBacktracks, maxSolutions }, onSolver) => {
   if (maxSolutions) mode.maxSolutions = maxSolutions;
 
   let firstGrid = null;
+  const solutionSet = collectSolutions ? [] : null;
   const start = performance.now();
   internal.run(Object.keys(mode).length ? mode : null, (grid) => {
     if (!firstGrid) firstGrid = grid.slice(0, geometry.numGridCells);
+    if (solutionSet) solutionSet.push(solutionString(grid, geometry));
   });
   const elapsedMs = performance.now() - start;
+  solutionSet?.sort();
 
   const counters = { ...internal.counters };
   const exhausted = internal.state === internal.constructor.STATE_EXHAUSTED;
@@ -264,7 +282,12 @@ export const runSolve = (puzzle, { maxBacktracks, maxSolutions }, onSolver) => {
   else if (exhausted) status = STATUS.UNIQUE;
   else status = STATUS.FIRST;
 
-  return { name: puzzle.name, geometry, counters, elapsedMs, exhausted, capped, status, solution: actual };
+  const result = {
+    name: puzzle.name, geometry, counters, elapsedMs, exhausted, capped, status,
+    solution: actual,
+  };
+  if (solutionSet) result.solutionSet = solutionSet;
+  return result;
 };
 
 // --- Ablations ---------------------------------------------------------------

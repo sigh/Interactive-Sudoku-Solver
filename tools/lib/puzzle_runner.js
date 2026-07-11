@@ -17,6 +17,7 @@ const { SudokuParser } = await import('../../js/sudoku_parser.js' + self.VERSION
 const { SudokuBuilder } = await import('../../js/solver/sudoku_builder.js' + self.VERSION_PARAM);
 const { LookupTables } = await import('../../js/solver/lookup_tables.js' + self.VERSION_PARAM);
 const Collections = await import('../../data/collections.js' + self.VERSION_PARAM);
+const { resolvePuzzleConfig } = await import('../../data/example_puzzles.js' + self.VERSION_PARAM);
 
 // ============================================================================
 // Puzzle source (--puzzle / --input / --input-file / --list)
@@ -25,14 +26,22 @@ const Collections = await import('../../data/collections.js' + self.VERSION_PARA
 export const allPuzzles = () => {
   const seen = new Set();
   const puzzles = [];
-  for (const value of Object.values(Collections)) {
+  for (const [collectionName, value] of Object.entries(Collections)) {
     if (!Array.isArray(value)) continue;
-    for (const entry of value) {
-      if (!entry || typeof entry.input !== 'string' || typeof entry.name !== 'string') continue;
-      if (seen.has(entry.name)) continue;
-      seen.add(entry.name);
-      puzzles.push({ name: entry.name, input: entry.input });
-    }
+    value.forEach((entry, i) => {
+      // Entries may be raw constraint strings, PUZZLE_INDEX puzzle names, or
+      // { name, input } objects; the data layer resolves all three shapes.
+      const config = typeof value.configFor === 'function'
+        ? value.configFor(entry)
+        : resolvePuzzleConfig(entry);
+      if (!config || typeof config.input !== 'string') return;
+      // Raw constraint strings have no distinct name; label them by position.
+      const name = (!config.name || config.name === config.input)
+        ? `${collectionName}#${i}` : config.name;
+      if (seen.has(name)) return;
+      seen.add(name);
+      puzzles.push({ name, input: config.input });
+    });
   }
   return puzzles;
 };

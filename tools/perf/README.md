@@ -68,7 +68,14 @@ node tools/perf/bench_vs_ref.js --require-identical --max-backtracks none --puzz
 **Two kinds of A/B, two tools.** `benchmark_puzzles --compare/--ablate` toggles a
 feature *within one build* (it patches a prototype at runtime) — use it to ask
 "is this optimization reducing search?", where the node count is *expected* to
-move. `bench_vs_ref` compares *two git revisions in separate processes*. By
+move. Under `--compare` it appends a per-ablation summary block: total
+guess/wall-time ratios over the pairs where both sides completed,
+better/worse/flat counts, any status change (a `capped <-> unique` flip is often
+the most important single result), any solution mismatch, and the top guess
+movers. Add `--require-same-solutions` (with `--solutions all`) as the soundness
+gate for a new mechanism: it byte-compares the full solution sets of baseline
+and ablation on every puzzle and exits non-zero on any difference — a capped run
+also fails it, as inconclusive. `bench_vs_ref` compares *two git revisions in separate processes*. By
 default it reports both how the counters moved and the wall-time delta; add
 `--require-identical` for a pure refactor where the counters must **not** move (it
 then fails on any change). When counters change intentionally the wall-time ratio

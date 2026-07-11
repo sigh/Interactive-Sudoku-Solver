@@ -26,15 +26,29 @@
 //                         only — not valid evidence for an optimization (warns).
 //   --ablate <a,b,...>    Disable named optimizations for the run (see --list-ablations).
 //   --compare <a,b,...>   Run a baseline AND each ablation, printing a "vs-base"
-//                         guess ratio (>1 ⇒ the feature was reducing search).
+//                         guess ratio (>1 ⇒ the feature was reducing search) and,
+//                         per ablation, a summary block: total guess/wall ratios,
+//                         better/worse/flat counts, status changes (e.g. a run
+//                         flipping capped <-> unique — always worth a look), and
+//                         any solution mismatch (a soundness alarm). Totals only
+//                         aggregate pairs where both sides completed; a capped
+//                         side makes a pair incomparable.
+//   --require-same-solutions
+//                         Soundness gate for --compare: collect every solution on
+//                         both sides and fail (exit 1) unless the solution sets
+//                         are identical for every puzzle. Requires --solutions all
+//                         (identity of a truncated enumeration proves nothing); a
+//                         capped run also fails the gate as inconclusive.
 //   --repeat <n>          Re-solve n times and report the best wall time as `ms`,
 //                         plus `median` and `max` columns showing the spread (node
 //                         counts are deterministic; only timing is noisy). Default 1.
 //   --json                Emit a JSON array of result rows instead of TSV — a
 //                         stable, machine-readable contract for tooling (e.g.
 //                         bench_vs_ref.js). Each row: { puzzle, status, solutions,
-//                         guesses, backtracks, nodesSearched, ms, msMedian, msMax }
-//                         (+ vsBase under --compare).
+//                         guesses, backtracks, nodesSearched, ms, msMedian, msMax }.
+//                         Under --compare each row also carries { variant, vsBase }
+//                         (variant: null for the baseline row, else the ablation
+//                         name; `puzzle` stays the bare puzzle name).
 //   --list-ablations      Print the available ablations and exit.
 //   -h, --help            Print this help and exit.
 //
@@ -56,6 +70,7 @@ const parseArgs = (argv) => {
   const args = {
     maxBacktracksRaw: undefined, puzzles: ['Chaos Construction'], solutionsRaw: undefined,
     ablate: [], compare: [], repeat: 1, help: false, listAblations: false, json: false,
+    requireSameSolutions: false,
   };
   for (let i = 2; i < argv.length; i++) {
     const [key, inlineValue] = argv[i].split(/=(.*)/s);
@@ -72,6 +87,7 @@ const parseArgs = (argv) => {
       case '--input-file': args.puzzles = ['input:' + readFileSync(next(), 'utf8').trim()]; break;
       case '--ablate': args.ablate = parseList(next()); break;
       case '--compare': args.compare = parseList(next()); break;
+      case '--require-same-solutions': args.requireSameSolutions = true; break;
       default: throw new Error(`unknown argument: ${argv[i]}`);
     }
   }
@@ -87,7 +103,9 @@ const usage = () => console.log(
   `  --input-file <path>        Solve a raw constraint string read from a file.\n` +
   `  --solutions <n|all>        Default 2 = prove uniqueness; "all" exhausts; "1" = first only (warns).\n` +
   `  --ablate <a,b,...>         Disable optimizations for the run.\n` +
-  `  --compare <a,b,...>        Baseline vs each ablation (prints guess ratio).\n` +
+  `  --compare <a,b,...>        Baseline vs each ablation (guess ratios + summary block).\n` +
+  `  --require-same-solutions   With --compare + --solutions all: fail unless solution\n` +
+  `                             sets are identical on every puzzle (soundness gate).\n` +
   `  --repeat <n>               Re-solve n times; report best (ms), median and max (default 1).\n` +
   `  --json                     Emit JSON rows instead of TSV (machine-readable).\n` +
   `  --list-ablations           List available ablations.\n` +
@@ -113,11 +131,14 @@ const bestOf = (repeat, fn) => {
 };
 
 // A result row as a plain object — the shared geometry for both TSV and JSON output.
-// `vsBase` is only present under --compare.
-const toRow = (r, label, vsBase) => {
+// `variant` and `vsBase` are only present under --compare: variant is null for the
+// baseline row and the ablation name otherwise, and `puzzle` stays the bare puzzle
+// name (the human table renders the variant as a name suffix; JSON consumers get
+// it as a field instead of re-parsing the name).
+const toRow = (r, variant, vsBase) => {
   const s = r.msStats ?? { min: r.elapsedMs, median: r.elapsedMs, max: r.elapsedMs };
   const row = {
-    puzzle: r.name + (label ? ` [${label}]` : ''),
+    puzzle: r.name,
     status: r.status,
     solutions: r.counters.solutions,
     guesses: r.counters.guesses,
@@ -127,6 +148,7 @@ const toRow = (r, label, vsBase) => {
     msMedian: Number(s.median.toFixed(1)),
     msMax: Number(s.max.toFixed(1)),
   };
+  if (variant !== undefined) row.variant = variant;
   if (vsBase !== undefined) row.vsBase = vsBase;
   return row;
 };
@@ -138,7 +160,8 @@ const COLUMNS = ['puzzle', 'status', 'sols', 'guesses', 'backtracks', 'nodes', '
 const LEFT_COLS = new Set([0, 1]);
 
 const rowCells = (row) => {
-  const cells = [row.puzzle, row.status, String(row.solutions), String(row.guesses),
+  const puzzle = row.puzzle + (row.variant ? ` [-${row.variant}]` : '');
+  const cells = [puzzle, row.status, String(row.solutions), String(row.guesses),
     String(row.backtracks), String(row.nodesSearched), row.ms.toFixed(1),
     row.msMedian.toFixed(1), row.msMax.toFixed(1)];
   if (row.vsBase !== undefined) cells.push(row.vsBase);
@@ -159,6 +182,80 @@ const renderTable = (headerCols, rows) => {
   return matrix.map(formatRow).join('\n');
 };
 
+// --- Compare summary ----------------------------------------------------------
+
+// Per-ablation aggregates over the (baseline, ablated) pairs. Totals and
+// better/worse/flat counts only cover pairs where both sides completed: a capped
+// run is an incomplete search, so its counters are not comparable. Status changes
+// and solution mismatches are tracked for every pair — a status flip (especially
+// capped <-> unique) is often the most interesting result of a comparison, and a
+// solution mismatch on completed runs is a soundness alarm, not a perf result.
+const newCompareStats = () => ({
+  pairs: 0, completed: 0,
+  baseGuesses: 0, ablatedGuesses: 0, baseMs: 0, ablatedMs: 0,
+  better: 0, worse: 0, flat: 0,
+  statusChanges: [], solutionMismatches: [], inconclusive: [],
+  movers: [],
+});
+
+const accumulateCompareStats = (s, base, ablated) => {
+  s.pairs++;
+  if (base.status !== ablated.status) {
+    s.statusChanges.push(`${base.name}: ${base.status} -> ${ablated.status}`);
+  }
+  if (base.capped || ablated.capped) {
+    s.inconclusive.push(base.name);
+    return;
+  }
+  s.completed++;
+  s.baseGuesses += base.counters.guesses;
+  s.ablatedGuesses += ablated.counters.guesses;
+  s.baseMs += base.elapsedMs;
+  s.ablatedMs += ablated.elapsedMs;
+
+  const delta = ablated.counters.guesses - base.counters.guesses;
+  if (delta > 0) s.worse++; else if (delta < 0) s.better++; else s.flat++;
+  if (delta !== 0) s.movers.push({ name: base.name, delta });
+
+  if (base.counters.solutions !== ablated.counters.solutions) {
+    s.solutionMismatches.push(
+      `${base.name}: ${base.counters.solutions} vs ${ablated.counters.solutions} solutions`);
+  } else if (base.solutionSet && ablated.solutionSet &&
+    base.solutionSet.join('|') !== ablated.solutionSet.join('|')) {
+    s.solutionMismatches.push(`${base.name}: solution content differs`);
+  } else if (!base.solutionSet && base.solution !== ablated.solution &&
+    base.counters.solutions === 1 && ablated.counters.solutions === 1) {
+    s.solutionMismatches.push(`${base.name}: solution content differs`);
+  }
+};
+
+const TOP_MOVERS = 5;
+
+const renderCompareSummary = (name, s) => {
+  const ratio = (a, b) => b ? (a / b).toFixed(2) : '-';
+  const lines = [`== summary vs [-${name}] ==`];
+  const excluded = s.pairs - s.completed;
+  lines.push(
+    `completed-both pairs: ${s.completed} of ${s.pairs}` +
+    (excluded ? ` (${excluded} excluded: a capped side)` : ''));
+  lines.push(
+    `total guesses: base=${s.baseGuesses} ablated=${s.ablatedGuesses}` +
+    ` vs-base=${ratio(s.ablatedGuesses, s.baseGuesses)}`);
+  lines.push(
+    `total ms:      base=${s.baseMs.toFixed(1)} ablated=${s.ablatedMs.toFixed(1)}` +
+    ` vs-base=${ratio(s.ablatedMs, s.baseMs)}`);
+  lines.push(`ablated guesses: worse on ${s.worse}, better on ${s.better}, flat on ${s.flat}`);
+  for (const change of s.statusChanges) lines.push(`status change: ${change}`);
+  for (const mismatch of s.solutionMismatches) lines.push(`SOLUTION MISMATCH: ${mismatch}`);
+  const movers = [...s.movers]
+    .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta)).slice(0, TOP_MOVERS);
+  if (movers.length) {
+    lines.push('top guess movers: ' + movers.map(
+      (m) => `${m.name} (${m.delta > 0 ? '+' : ''}${m.delta})`).join(', '));
+  }
+  return lines.join('\n');
+};
+
 const main = async () => {
   const args = parseArgs(process.argv);
   if (args.help) { usage(); return; }
@@ -171,25 +268,38 @@ const main = async () => {
   const maxSolutions = parseSolutionLimit(args.solutionsRaw);
   warnIfFirstSolution(maxSolutions);
   validateAblations([...args.ablate, ...args.compare]);
+  if (args.requireSameSolutions) {
+    if (!args.compare.length) {
+      throw new Error('--require-same-solutions only makes sense with --compare');
+    }
+    if (maxSolutions !== 0) {
+      throw new Error(
+        '--require-same-solutions requires --solutions all: identical prefixes of a ' +
+        'truncated enumeration prove nothing about the full solution sets');
+    }
+  }
   const repeat = Number.isInteger(args.repeat) && args.repeat > 0 ? args.repeat : 1;
   const puzzles = await materializePuzzles(resolvePuzzles(args.puzzles));
-  const budgets = { maxBacktracks, maxSolutions };
+  const budgets = { maxBacktracks, maxSolutions, collectSolutions: args.requireSameSolutions };
 
   // Buffer rows; render the aligned table (or JSON) once the run completes.
   const rows = [];
   const headerCols = args.compare.length ? [...COLUMNS, 'vs-base'] : COLUMNS;
   const emit = (row) => { rows.push(row); };
 
+  const compareStats = new Map(args.compare.map((name) => [name, newCompareStats()]));
+
   if (args.compare.length) {
     for (const puzzle of puzzles) {
       const base = bestOf(repeat, () => runSolve(puzzle, budgets));
-      emit(toRow(base, '', '1.00'));
+      emit(toRow(base, null, '1.00'));
       for (const name of args.compare) {
         const restore = applyAblations([name]);
         try {
           const ablated = bestOf(repeat, () => runSolve(puzzle, budgets));
           const ratio = (ablated.counters.guesses / Math.max(1, base.counters.guesses)).toFixed(2);
-          emit(toRow(ablated, `-${name}`, ratio));
+          emit(toRow(ablated, name, ratio));
+          accumulateCompareStats(compareStats.get(name), base, ablated);
         } finally { restore(); }
       }
     }
@@ -201,7 +311,30 @@ const main = async () => {
   }
 
   if (args.json) console.log(JSON.stringify(rows));
-  else console.log(renderTable(headerCols, rows));
+  else {
+    console.log(renderTable(headerCols, rows));
+    for (const [name, s] of compareStats) console.log('\n' + renderCompareSummary(name, s));
+  }
+
+  if (args.requireSameSolutions) {
+    // The gate fails on any mismatch, and also on any capped pair — a truncated
+    // search is inconclusive, not a pass.
+    const failures = [];
+    for (const [name, s] of compareStats) {
+      for (const m of s.solutionMismatches) failures.push(`[-${name}] ${m}`);
+      for (const p of s.inconclusive) {
+        failures.push(`[-${name}] ${p}: capped — inconclusive; raise --max-backtracks`);
+      }
+    }
+    if (failures.length) {
+      console.error(`require-same-solutions: FAILED (${failures.length}):`);
+      for (const f of failures) console.error(`  ${f}`);
+      process.exitCode = 1;
+    } else {
+      console.error(`require-same-solutions: OK — solution sets identical across ` +
+        `${puzzles.length} puzzle(s) x ${args.compare.length} ablation(s)`);
+    }
+  }
 };
 
 main().catch((e) => {
