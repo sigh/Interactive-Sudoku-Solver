@@ -212,6 +212,14 @@ await runTest('run_sandbox.js falls back to stdout when --output write fails', a
   assert.match(stdout.trim(), /\.~R1C1_3/);
 });
 
+await runTest('run_sandbox.js rejects output that fails to build', async () => {
+  // A count=1 Var group gets the bare-prefix id ('VM'), so 'VM1' is invalid —
+  // the round-trip build must surface that here, not in a downstream tool.
+  const { thrown } = await capture(() => sandboxMain(argv('run_sandbox.js',
+    '--code', 'return [new Shape("9x9"), new Var("M", "m", 1), new WhiteDot("VM1", "R1C1")];')));
+  assert.match(thrown?.message, /fails to build: Invalid cell ID: VM1/);
+});
+
 // The shared CLI entry maps a thrown error to a non-zero exit with a clean
 // message (the contract scripts/CI rely on). Spawns a lightweight fixture that
 // imports only cli_entry.js — no solver module graph — so it stays cheap.

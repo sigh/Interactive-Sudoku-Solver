@@ -34,6 +34,7 @@
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { runAsCli } from '../lib/cli_entry.js';
+import { buildSolver } from '../lib/puzzle_runner.js';
 import { runSandboxScript, serialize } from '../lib/sandbox_runner.js';
 
 const parseArgs = (argv) => {
@@ -91,6 +92,15 @@ export const main = async (argv) => {
   if (!str) {
     console.error('(script returned no constraints; use --raw to see the value)');
     return;
+  }
+  // Round-trip through the parser and solver builder so errors (e.g. a bad
+  // cell id) surface here rather than in a downstream tool.
+  try {
+    buildSolver(str);
+  } catch (e) {
+    throw new Error(
+      `generated constraint string fails to build: ${e.message}\n` +
+      '(for an intentionally partial fragment, use --raw)');
   }
   if (!args.output) {
     console.log(str);
