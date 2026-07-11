@@ -102,10 +102,12 @@ export const injectSolutionGivens = (input, digits) => {
   if (D * D !== digits.length) {
     throw new Error(`solution must be a perfect-square digit string (got length ${digits.length})`);
   }
+  // Cell ids use one base-17 character per coordinate (column 10 is 'a'), so
+  // decimal interpolation would build invalid ids on grids wider than 9.
   let givens = '';
   for (let i = 0; i < digits.length; i++) {
-    const r = Math.floor(i / D) + 1;
-    const c = (i % D) + 1;
+    const r = (Math.floor(i / D) + 1).toString(17);
+    const c = ((i % D) + 1).toString(17);
     givens += `.~R${r}C${c}_${digits[i]}`;
   }
   return input + givens;
