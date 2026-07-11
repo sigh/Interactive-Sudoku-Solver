@@ -18,6 +18,9 @@ import { main as solveMain } from '../../tools/debug/solve.js';
 import { main as verifyMain } from '../../tools/debug/verify_solution.js';
 import { main as stepMain } from '../../tools/debug/step_analysis.js';
 import { main as hotspotsMain } from '../../tools/debug/search_hotspots.js';
+import { main as traceMain } from '../../tools/debug/decision_trace.js';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 
 // The debug CLIs live in tools/debug/; this test lives under tests/.
 const DEBUG_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'tools', 'debug');
@@ -164,6 +167,33 @@ await runTest('search_hotspots.js runs', async () => {
 await runTest('search_hotspots.js requires --max-backtracks', async () => {
   const { thrown } = await capture(() => hotspotsMain(argv('search_hotspots.js', '--puzzle', PUZZLE)));
   assert.match(thrown?.message ?? '', /backtrack limit is required/);
+});
+
+await runTest('decision_trace.js exports then self-replays exactly', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'iss-trace-'));
+  const traceFile = join(dir, 'trace.ndjson');
+  try {
+    const exp = await capture(() => traceMain(argv('decision_trace.js',
+      '--max-backtracks', 'none', '--puzzle', PUZZLE, '--out', traceFile)));
+    assert.equal(exp.thrown, null, exp.thrown?.message);
+
+    // Self-replay reproduces the run exactly: 100% guided, no divergence.
+    const rep = await capture(() => traceMain(argv('decision_trace.js',
+      '--max-backtracks', 'none', '--puzzle', PUZZLE, '--replay', traceFile)));
+    assert.equal(rep.thrown, null, rep.thrown?.message);
+    assert.match(rep.stdout, /status=unique/);
+    assert.match(rep.stdout, /guided=\d+ \(100\.0%, 0 overriding/);
+    assert.match(rep.stdout, /diverged=0/);
+
+    // Replaying under a selection-only ablation stays sound (finds the unique
+    // solution) — a forced order can never turn a SAT puzzle UNSAT.
+    const abl = await capture(() => traceMain(argv('decision_trace.js',
+      '--max-backtracks', 'none', '--puzzle', PUZZLE, '--ablate', 'demote-off', '--replay', traceFile)));
+    assert.equal(abl.thrown, null, abl.thrown?.message);
+    assert.match(abl.stdout, /status=unique/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 await runTest('run_sandbox.js falls back to stdout when --output write fails', () => {

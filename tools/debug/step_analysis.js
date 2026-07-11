@@ -241,57 +241,48 @@ const describeCells = (geometry, cells) => {
 // ============================================================================
 // Candidate-selector instrumentation
 //
-// We wrap the selector's private decision methods to capture, for each branch,
-// what was chosen and (optionally) a snapshot for competitor ranking. Because
-// nthStep replays deterministically and stops at the target step's guess, the
-// last captured branch in a run is that step's branch.
+// We observe each branch via the selector's supported decision hook
+// (setDecisionHook), reshaping its descriptor into the `decision` record the
+// reports below consume. Because nthStep replays deterministically and stops at
+// the target step's guess, the last branch captured in a run is that step's.
+// The candidate finders are wrapped separately (a stable finder interface, not
+// the selector's private methods) to name which finder produced a placement.
 // ============================================================================
 
-const capture = { current: null, last: null, wantSnapshot: false };
+const capture = { last: null, pendingFinder: null, wantSnapshot: false };
 
 // The CandidateFinders prototype patching below is global; guard it so
 // instrumenting a second solver (e.g. under --compare) doesn't re-wrap it.
 let candidateFindersPatched = false;
 
 const installInstrumentation = (selector) => {
-  const origCandidate = selector._selectBestCandidate.bind(selector);
-  const origCell = selector._selectBestCell.bind(selector);
-
-  selector._selectBestCell = function (gridState, cellOrder, cellDepth) {
-    const offset = origCell(gridState, cellOrder, cellDepth);
-    if (capture.current) capture.current.heuristicCell = cellOrder[offset];
-    return offset;
-  };
-
-  selector._selectBestCandidate = function (gridState, cellOrder, cellDepth, isNewNode) {
-    const dec = { cellDepth, isNewNode, finder: null, heuristicCell: null };
-    capture.current = dec;
-    const res = origCandidate(gridState, cellOrder, cellDepth, isNewNode);
-    capture.current = null;
-
-    const { cellOffset, value, count } = res;
-    if (isNewNode && count > 1) {
-      dec.chosenCell = cellOrder[cellOffset];
-      dec.value = value;
-      dec.count = count;
-      dec.isCustom = !!this._candidateSelectionFlags[cellDepth];
-      if (dec.isCustom) {
-        const state = this._candidateSelectionStates[cellDepth];
-        // The chosen cell was popped from state.cells; the rest are alternatives.
-        dec.placementValue = state.value;
-        dec.placementCells = [dec.chosenCell, ...[...state.cells].reverse()];
-      }
-      if (capture.wantSnapshot) {
-        dec.grid = gridState.slice();
-        dec.cellOrder = cellOrder.slice();
-        dec.conflictScores = this._conflictScores.scores.slice();
-        dec.maxValueInfo = this._conflictScores.getMaxValueScore();
-        dec.linkedCells = this._linkedCells;
-      }
-      capture.last = dec;
+  selector.setDecisionHook((d) => {
+    const dec = {
+      cellDepth: d.cellDepth,
+      chosenCell: d.cell,
+      value: d.value,
+      count: d.count,
+      isCustom: d.isCustom,
+      heuristicCell: d.heuristicCell,
+      placementValue: d.placementValue,
+      placementCells: d.placementCells,
+      // isCustom ⟺ a finder just fired for this node, so pendingFinder is fresh.
+      finder: d.isCustom ? capture.pendingFinder : null,
+    };
+    capture.pendingFinder = null;
+    // Only --explain needs the competitor-ranking snapshot, and only for the
+    // step being explained; build it just then (see runStep).
+    if (capture.wantSnapshot) {
+      const s = d.snapshot();
+      dec.grid = s.grid;
+      dec.cellOrder = s.cellOrder;
+      dec.conflictScores = s.conflictScores;
+      dec.maxValueInfo = s.maxValueInfo;
+      dec.linkedCells = s.linkedCells;
     }
-    return res;
-  };
+    capture.last = dec;
+    return null;  // observe only
+  });
 
   // Wrap the candidate finders so we learn which finder/house produced a
   // value-placement branch. The last finder to improve the result wins.
@@ -301,8 +292,8 @@ const installInstrumentation = (selector) => {
     const orig = klass.prototype.maybeFindCandidate;
     klass.prototype.maybeFindCandidate = function (grid, conflictScores, result) {
       const improved = orig.call(this, grid, conflictScores, result);
-      if (improved && capture.current) {
-        capture.current.finder = { type: klass.name, cells: [...this.cells], value: result.value };
+      if (improved) {
+        capture.pendingFinder = { type: klass.name, cells: [...this.cells], value: result.value };
       }
       return improved;
     };

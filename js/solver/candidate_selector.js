@@ -121,6 +121,8 @@ export class CandidateSelector {
     this._numSearchCells = numSearchCells;
     this._optionSelector = null;
 
+    this._decisionHook = null;
+
     // The candidate count the previously-watched guess left behind.
     this._prevCandidateCount = -1;
     this._linkedCells = buildLinkedSearchCells(handlerSet, numSearchCells);
@@ -145,6 +147,13 @@ export class CandidateSelector {
     this._prevCandidateCount = -1;
 
     this._candidateSelectionFlags.fill(0);
+  }
+
+  // A supported observe/override seam for analysis tools (decision_trace,
+  // step_analysis), so they don't wrap the private selection methods. null
+  // clears it. Called once per branch node.
+  setDecisionHook(hook) {
+    this._decisionHook = hook;
   }
 
   getCellOrder(upto) {
@@ -203,6 +212,15 @@ export class CandidateSelector {
       }, 2);
     }
 
+    // Consult the decision hook (observes in every mode; may override outside
+    // step mode). Before any step-guide adjustment, so it sees the heuristic's
+    // own choice.
+    if (this._decisionHook !== null && isNewNode && count > 1) {
+      [cellOffset, value, count] = this._consultDecisionHook(
+        cellDepth, cellOrder, gridState, cellOffset, value, count,
+        best.heuristicCell, !stepState);
+    }
+
     // Adjust the value for step-by-step.
     if (stepState) {
       if (this._debugLogger.enableStepLogs) {
@@ -252,6 +270,48 @@ export class CandidateSelector {
     result.value = value;
     result.count = count;
     return result;
+  }
+
+  // Build this branch's decision descriptor, pass it to the hook, and apply any
+  // returned override. Returns the (possibly overridden) [cellOffset, value,
+  // count]. A custom candidate (flag 1) is a multi-cell house/digit branch
+  // (placementCells share placementValue); a plain branch is one cell's values.
+  // Only a plain branch is overridable — a custom branch isn't representable as
+  // a single (cell, value) — and only when allowOverride (outside step mode, so
+  // the step guide's adjustment isn't fought). An override yields another plain
+  // branch, so the search stays complete.
+  _consultDecisionHook(cellDepth, cellOrder, gridState, cellOffset, value, count, heuristicCell, allowOverride) {
+    const cell = cellOrder[cellOffset];
+    const isCustom = this._candidateSelectionFlags[cellDepth] === 1;
+    const descriptor = {
+      cellDepth, cell, value, count, isCustom, gridState, heuristicCell,
+      placementValue: 0, placementCells: null,
+      // Lazy: a tool calls snapshot() only for the decisions it ranks; most
+      // don't, so the copies (grid, cell order, conflict scores) aren't taken.
+      snapshot: () => ({
+        grid: gridState.slice(),
+        cellOrder: cellOrder.slice(),
+        conflictScores: this._conflictScores.scores.slice(),
+        maxValueInfo: this._conflictScores.getMaxValueScore(),
+        linkedCells: this._linkedCells,
+      }),
+    };
+    if (isCustom) {
+      const state = this._candidateSelectionStates[cellDepth];
+      descriptor.placementValue = state.value;
+      // state.cells had the chosen cell popped; restore chosen-first order.
+      descriptor.placementCells = [cell, ...[...state.cells].reverse()];
+    }
+    const override = this._decisionHook(descriptor);
+    if (override !== null && allowOverride && !isCustom) {
+      const newOffset = cellOrder.indexOf(override.cell, cellDepth);
+      if (newOffset !== -1) {
+        cellOffset = newOffset;
+        value = override.value;
+        count = countOnes16bit(gridState[cellOrder[cellOffset]]);
+      }
+    }
+    return [cellOffset, value, count];
   }
 
   _updateCellOrder(cellDepth, cellOffset, count, grid) {
@@ -313,11 +373,12 @@ export class CandidateSelector {
   // Selects the best candidate, returning a { cellOffset, value, count } object
   // (reused across calls — read it immediately, do not retain).
   static _selectBestCandidateResult = {
-    cellOffset: 0, value: 0, count: 0, totalCandidateCount: -1
+    cellOffset: 0, value: 0, count: 0, totalCandidateCount: -1, heuristicCell: -1
   };
   _selectBestCandidate(gridState, cellOrder, cellDepth, isNewNode) {
     const result = CandidateSelector._selectBestCandidateResult;
     result.totalCandidateCount = -1;  // default for the non-branching early returns below
+    result.heuristicCell = -1;
     if (isNewNode) {
       // Clear any previous candidate selection state.
       this._candidateSelectionFlags[cellDepth] = 0;
@@ -353,6 +414,9 @@ export class CandidateSelector {
       gridState, cellOrder, cellDepth);
     result.totalCandidateCount = totalCandidateCount;
     const cell = cellOrder[cellOffset];
+    // The plain heuristic cell, before the custom-candidate block below may
+    // override cellOffset (reported in the decision descriptor).
+    result.heuristicCell = cell;
 
     // Find the next smallest value to try.
     // NOTE: We will always have a value because:

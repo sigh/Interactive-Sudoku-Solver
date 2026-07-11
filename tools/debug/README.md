@@ -15,6 +15,7 @@ causes.
 | `node tools/debug/verify_solution.js` | Check whether an encoding **accepts** a known solution (injects it as givens): prints `ACCEPTED`/`REJECTED` with a matching exit code. The bounded yes/no counterpart to `solve.js`. |
 | `node tools/debug/step_analysis.js` | Walk the search step by step. Explain why a branch was chosen, show pencilmarks/var-cell candidates, the per-step propagation log (what each handler pruned + the refuter), and where an ablation makes the branching diverge. |
 | `node tools/debug/search_hotspots.js` | Where the search concentrates over a (bounded) solve: the conflict heatmap, the cells re-guessed most (churn), the branch-factor shape (grid vs var, MRV gap), and the propagation yield (how often guesses eliminate nothing — branching into the void). The headless view of the debug UI's heatmap. |
+| `node tools/debug/decision_trace.js` | Export a solve's branch decisions to a trace file, and replay a trace to force another run onto the same order. Replaying a trace under an ablation/revision (B-frozen-order) isolates how much of a search change is pruning vs selection. |
 | `node tools/debug/run_sandbox.js` | Run a [sandbox](../../js/sandbox/README.md) script outside the browser and print the constraints it returns. Generate or regenerate puzzle definitions (e.g. `.iss` files) without opening the browser; pipe the output into `solve.js`. |
 
 Run any script with `--help` for the full option reference.
@@ -216,3 +217,36 @@ Use `--current <constraintString>` to populate `currentConstraint()` /
 `currentCellGeometry()` for scripts that transform the loaded puzzle. This is how the
 `.iss` puzzle files under [`data/`](../../data/) are (re)generated from a sandbox
 script.
+
+---
+
+### `decision_trace.js` — export and replay branch decisions
+
+Rides a supported observe/override seam on the candidate selector
+(`setDecisionHook`, default off), so it does not patch selector internals.
+
+**Export** (default) streams one NDJSON record per branch decision —
+`(n, depth, cell, value, count, elims)` — to `--out <file>` (or stdout):
+
+```sh
+node tools/debug/decision_trace.js --max-backtracks none --puzzle "Chaos Construction" --out /tmp/a.ndjson
+```
+
+**Replay** (`--replay <file>`) forces each branch onto the recorded `(cell, value)`
+whenever it is still applicable, and reports the **guided fraction**:
+
+```sh
+# B-frozen-order: replay A's trace under an ablation. A guided ratio near 100%
+# with the guess count unchanged means the ablation was pure selection (no
+# pruning value); a large guess change at high guided-fraction is pruning.
+node tools/debug/decision_trace.js --max-backtracks none --puzzle "Chaos Construction" \
+  --ablate demote-off --replay /tmp/a.ndjson
+```
+
+Replaying a trace against its own build reproduces it exactly (100% guided,
+identical counters); a forced order can never turn a solvable puzzle unsolvable.
+Below ~90% guided the replaying build prunes a different tree and the tool says
+so — the decomposition is unmeasurable, reported honestly rather than as a
+number. Only **plain single-cell branches** are traced/forced; custom multi-cell
+candidates (house/digit branches) are left to the heuristic, so on puzzles that
+lean on them the guided fraction is measured over the plain decisions.
