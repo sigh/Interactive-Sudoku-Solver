@@ -1600,11 +1600,16 @@ await runTest('nfaToJavascriptSpec emits [SEGMENT_BREAK] and round-trips', () =>
   };
 
   const alphabet = [1, 2, 3, 4, SEGMENT_BREAK];
+  // Enumerate every sequence of length 0..5 exactly once. Extend only the
+  // previous generation (`frontier`) — extending the whole accumulated list
+  // would re-grow shorter sequences and roughly double the work with dupes.
   const seqs = [[]];
+  let frontier = [[]];
   for (let len = 1; len <= 5; len++) {
     const grown = [];
-    for (const s of seqs) for (const a of alphabet) grown.push([...s, a]);
+    for (const s of frontier) for (const a of alphabet) grown.push([...s, a]);
     seqs.push(...grown);
+    frontier = grown;
   }
   for (const seq of seqs) {
     assert.equal(evalSpec(parsed, seq), evalSpec(spec, seq),

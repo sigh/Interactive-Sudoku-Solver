@@ -4,9 +4,13 @@
 // geometry), so they break silently when an internal API changes — this catches
 // that drift. Each tool exports `main(argv)` and throws on failure, so the tests
 // run them IN-PROCESS: the heavy solver + collections module graph loads once
-// (when this file imports the three tools), and each case is a cheap call. Adding
-// a case costs ~nothing — no per-test subprocess startup. A single subprocess
-// test covers the CLI exit-code contract (the throw -> process.exit mapping).
+// (when this file imports the tools), and each case is a cheap call. Adding a
+// case costs ~nothing — no per-test subprocess startup. Only two tests spawn a
+// subprocess, and both do so for a reason the in-process path can't cover: the
+// --dump-state | --input - pipe (real stdin + the stdout/stderr split), and the
+// CLI exit-code contract (the throw -> process.exit mapping). The latter spawns
+// a lightweight fixture that imports only cli_entry.js, so it pays node startup
+// but not the solver module graph.
 
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -19,6 +23,7 @@ import { main as verifyMain } from '../../tools/debug/verify_solution.js';
 import { main as stepMain } from '../../tools/debug/step_analysis.js';
 import { main as hotspotsMain } from '../../tools/debug/search_hotspots.js';
 import { main as traceMain } from '../../tools/debug/decision_trace.js';
+import { main as sandboxMain } from '../../tools/debug/run_sandbox.js';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 
@@ -196,28 +201,26 @@ await runTest('decision_trace.js exports then self-replays exactly', async () =>
   }
 });
 
-await runTest('run_sandbox.js falls back to stdout when --output write fails', () => {
-  const script = join(DEBUG_DIR, 'run_sandbox.js');
-  const r = spawnSync(process.execPath, [
-    script,
+await runTest('run_sandbox.js falls back to stdout when --output write fails', async () => {
+  const { stdout, stderr, thrown } = await capture(() => sandboxMain(argv('run_sandbox.js',
     '--code', 'return [new Shape("6x6"), new Given("R1C1", 3)];',
-    '--output', '/definitely-missing-dir/out.iss',
-  ], { encoding: 'utf8', timeout: 60000 });
-  assert.equal(r.status, 0, r.stderr);
-  assert.match(r.stderr, /could not write --output/);
-  assert.match(r.stderr, /printing generated constraint string to stdout/);
-  assert.match(r.stdout.trim(), /^\.Shape~6x6/);
-  assert.match(r.stdout.trim(), /\.~R1C1_3/);
+    '--output', '/definitely-missing-dir/out.iss')));
+  assert.equal(thrown, null, thrown?.message);
+  assert.match(stderr, /could not write --output/);
+  assert.match(stderr, /printing generated constraint string to stdout/);
+  assert.match(stdout.trim(), /^\.Shape~6x6/);
+  assert.match(stdout.trim(), /\.~R1C1_3/);
 });
 
-// The one subprocess check: the shared CLI entry maps a thrown error to a
-// non-zero exit (the contract scripts/CI rely on). Everything else is in-process.
+// The shared CLI entry maps a thrown error to a non-zero exit with a clean
+// message (the contract scripts/CI rely on). Spawns a lightweight fixture that
+// imports only cli_entry.js — no solver module graph — so it stays cheap.
 await runTest('CLI entry exits non-zero on error', () => {
-  const r = spawnSync(process.execPath,
-    [join(DEBUG_DIR, 'solve.js'), '--puzzle', PUZZLE],
-    { encoding: 'utf8', timeout: 60000 });
+  const fixture = join(dirname(fileURLToPath(import.meta.url)), '..', 'helpers', 'cli_entry_throw_fixture.js');
+  const r = spawnSync(process.execPath, [fixture], { encoding: 'utf8', timeout: 60000 });
   assert.equal(r.status, 1);
-  assert.match(r.stderr, /backtrack limit is required/);
+  assert.match(r.stderr, /fixture: intentional failure/);
+  assert.match(r.stderr, /run with --help for usage/);
 });
 
 logSuiteComplete('Debug tools smoke');

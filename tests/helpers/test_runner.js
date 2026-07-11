@@ -5,6 +5,7 @@ let _totalFailures = 0;
 let _suiteFailures = [];
 const _verbose = process.argv.includes('--verbose');
 const _quiet = process.argv.includes('--quiet');
+const _timings = process.argv.includes('--timings');
 
 export class TestSuiteFailure extends Error {
   constructor(suiteName, failures, testCount, elapsedMs) {
@@ -33,9 +34,11 @@ export const runTest = async (name, fn) => {
   _suiteCount++;
   _totalCount++;
 
+  const _t0 = _timings ? performance.now() : 0;
   try {
     await fn();
-    if (_verbose) console.log(`  ✓ ${name}`);
+    if (_timings) console.log(`  [${(performance.now() - _t0).toFixed(0)}ms] ${name}`);
+    else if (_verbose) console.log(`  ✓ ${name}`);
   } catch (error) {
     _totalFailures++;
     _suiteFailures.push({ name, error });

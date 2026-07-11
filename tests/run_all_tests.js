@@ -37,7 +37,7 @@ const parseArgs = (argv) => {
       options.list = true;
     } else if (arg === '--quiet') {
       options.quiet = true;
-    } else if (arg === '--verbose') {
+    } else if (arg === '--verbose' || arg === '--timings') {
       // Handled in test_runner.js from process.argv.
     } else if (arg.startsWith('--')) {
       throw new Error(`Unknown option: ${arg}`);
