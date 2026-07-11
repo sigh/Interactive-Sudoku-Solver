@@ -1372,7 +1372,13 @@ export class JavascriptNFABuilder {
     const indexToStateStr = [];
 
     const addState = (stateStr, accepting) => {
-      const index = nfa.addState();
+      let index;
+      try {
+        index = nfa.addState();
+      } catch (err) {
+        err.message += ` Last state: ${stateStr}`;
+        throw err;
+      }
       stateStrToIndex.set(stateStr, index);
       indexToStateStr.push(stateStr);
       if (accepting) nfa.addAcceptId(index);
