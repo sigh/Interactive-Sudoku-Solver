@@ -1263,3 +1263,69 @@ await runTest('Var exposes its member cell ids', () => {
 });
 
 logSuiteComplete('Structured args and member ids');
+
+// ============================================================================
+// OutsideConstraintBase.fromCells
+// ============================================================================
+
+// Diagonal clue (LittleKiller): symmetric, so either ordering of a diagonal's
+// cells resolves to the same canonical corner arrowId.
+await runTest('LittleKiller.fromCells resolves either diagonal ordering to its corner', () => {
+  for (const size of [4, 6, 9]) {
+    const geometry = CellGeometry.fromGridSize(size);
+    const cellMap = SudokuConstraint.LittleKiller.cellMap(geometry);
+    for (const [arrowId, cells] of Object.entries(cellMap)) {
+      for (const order of [cells, [...cells].reverse()]) {
+        const clue = SudokuConstraint.LittleKiller.fromCells(10, order, geometry);
+        assert.equal(clue.arrowId, arrowId, `size ${size}, cells ${cells}`);
+        assert.deepEqual(clue.getCells(geometry), cells);
+      }
+    }
+  }
+});
+
+// Single-line clue (Sandwich): symmetric, so either ordering of a line
+// resolves to the same forward arrowId.
+await runTest('Sandwich.fromCells is direction-independent', () => {
+  const geometry = CellGeometry.fromGridSize(9);
+  for (const [arrowId, cells] of SudokuConstraint.Sandwich.fullLineCellMap(geometry)) {
+    if (!arrowId.endsWith(',1')) continue;   // the canonical forward entry
+    for (const order of [cells, [...cells].reverse()]) {
+      const clue = SudokuConstraint.Sandwich.fromCells(7, order, geometry);
+      assert.equal(clue.arrowId, arrowId, `Sandwich ${arrowId}`);
+      assert.deepEqual(clue.getCells(geometry), cells);
+    }
+  }
+});
+
+// Double-line clues: directional, so each line+direction entry resolves to its
+// own arrowId (iterating both directions proves they are told apart).
+const DOUBLE_LINE_CLUES = [
+  SudokuConstraint.XSum,
+  SudokuConstraint.Skyscraper,
+  SudokuConstraint.HiddenSkyscraper,
+  SudokuConstraint.NumberedRoom,
+  SudokuConstraint.FullRank,
+];
+for (const cls of DOUBLE_LINE_CLUES) {
+  await runTest(`${cls.name}.fromCells resolves each line and direction`, () => {
+    const geometry = CellGeometry.fromGridSize(9);
+    for (const [arrowId, cells] of cls.fullLineCellMap(geometry)) {
+      const clue = cls.fromCells(7, cells, geometry);
+      assert.equal(clue.arrowId, arrowId, `${cls.name} ${arrowId}`);
+      assert.deepEqual(clue.getCells(geometry), cells);
+    }
+  });
+}
+
+await runTest('fromCells throws when no clue covers the cells', () => {
+  const geometry = CellGeometry.fromGridSize(9);
+  assert.throws(
+    () => SudokuConstraint.LittleKiller.fromCells(10, ['R1C1', 'R1C2'], geometry),
+    /No LittleKiller clue covers cells/);
+  assert.throws(
+    () => SudokuConstraint.XSum.fromCells(7, ['R1C1', 'R2C2'], geometry),
+    /No XSum clue covers cells/);
+});
+
+logSuiteComplete('OutsideConstraintBase.fromCells');

@@ -44,6 +44,10 @@ CONSTRAINT OBJECTS
     new Var('F', 'flags', 23).cells()      => ['VF1', ..., 'VF23']
     new Var('F', 'flags', 23).cell(5)      => 'VF5'  (bare 'VF' when count is 1)
 
+  Outside clues (LittleKiller, Sandwich, XSum, ...) take a canonical arrowId,
+  often not the cell nearest the drawn clue. Build one from its line of cells:
+    LittleKiller.fromCells(15, ['R1C4', 'R2C3', 'R3C2'], cellGeometry('9x9'))
+
   The type of a constraint instance c can be found with c.type.
 
   WARNING: The APIs of these constraints may be unintuitive as they were not

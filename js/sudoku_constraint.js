@@ -2,6 +2,7 @@ const {
   memoize,
   MultiMap,
   arrayRemoveValue,
+  arraysAreEqual,
   groupSortedBy,
   Base64Codec
 } = await import('./util.js' + self.VERSION_PARAM);
@@ -438,6 +439,23 @@ export class OutsideConstraintBase extends SudokuConstraintBase {
       default:
         throw Error('Unknown clue type');
     }
+  }
+
+  // Build an outside clue from the line of cells it covers, instead of its
+  // canonical arrowId.
+  static fromCells(value, cells, geometry) {
+    const entries = this.CLUE_TYPE === this.CLUE_TYPE_DIAGONAL
+      ? Object.entries(this.cellMap(geometry))
+      : this.fullLineCellMap(geometry);
+    const directional = this.CLUE_TYPE === this.CLUE_TYPE_DOUBLE_LINE;
+    const reversed = cells.slice().reverse();
+    for (const [arrowId, clueCells] of entries) {
+      if (arraysAreEqual(clueCells, cells) ||
+        (!directional && arraysAreEqual(clueCells, reversed))) {
+        return new this(arrowId, value);
+      }
+    }
+    throw Error(`No ${this.name} clue covers cells: ${cells.join(',')}`);
   }
 
   chipLabel() {
