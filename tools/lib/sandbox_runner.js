@@ -12,12 +12,19 @@ import { ensureGlobalEnvironment } from '../../tests/helpers/test_env.js';
 ensureGlobalEnvironment();
 
 const env = await import('../../js/sandbox/env.js' + self.VERSION_PARAM);
+const { SudokuParser } = await import('../../js/sudoku_parser.js' + self.VERSION_PARAM);
 
 const AsyncFunction = Object.getPrototypeOf(async function () { }).constructor;
 
 // Serialize a returned value into a constraint string. Constraints (and arrays
 // of them, and raw strings) are accepted; each constraint's toString() defers to
-// its class serializer. One constraint per line (the parser ignores whitespace).
+// its class serializer (the parser ignores whitespace). The combined text is
+// then round-tripped through the parser so the class serializers can merge
+// repeated constraints -- most importantly, many NFA constraints that share one
+// machine emit that machine once instead of per constraint. This matches the
+// browser sandbox, which canonicalizes the same way via normalizeToConstraint.
+//
+// Finally, put each constraint token on its own line for readability.
 export const serialize = (value) => {
   const flatten = (v) => {
     if (v == null) return [];
@@ -26,7 +33,8 @@ export const serialize = (value) => {
     if (typeof v.toString === 'function') return [v.toString()];
     return [];
   };
-  return flatten(value).join('\n');
+  const canonical = SudokuParser.parseString(flatten(value).join('')).toString();
+  return canonical.replaceAll('.', '\n.').trim();
 };
 
 // Run a sandbox script `source` as the sandbox runs it (top-level return and
