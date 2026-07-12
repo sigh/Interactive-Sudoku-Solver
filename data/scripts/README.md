@@ -23,3 +23,13 @@ and review any targeted guidance it surfaces.
 ## Running scripts
 
 Outside the sandbox, run it through [../../tools/debug/run_sandbox.js](../../tools/debug/run_sandbox.js), which executes the script against the same sandbox globals and prints the resulting constraints — useful for generating a puzzle file or checking a script in CI.
+
+## `.iss` mirrors
+
+A `foo.iss` next to a `foo.js` is the pre-expanded, canonicalized constraint
+string that `run_sandbox.js --output` produces from the script. It lets a
+consumer load the expanded puzzle directly instead of running the sandbox (for
+example the e2e test uses [`xin_yang_v2.iss`](xin_yang_v2.iss)). A mirror goes
+stale whenever its script changes; [`../../tools/dev/sync_derived_puzzle_data.js`](../../tools/dev/sync_derived_puzzle_data.js)
+regenerates every `.iss` that has a sibling script, so run it after editing a
+mirrored script (`--dry-run` reports staleness without writing).

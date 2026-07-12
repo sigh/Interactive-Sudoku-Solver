@@ -1,6 +1,10 @@
-// fix_constraint_types.js — declare constraintTypes on the example puzzle
-// entries (data/example_puzzles.js DISPLAYED_EXAMPLES and data/collections.js
-// EXAMPLES) so the puzzle selector tags them the same way the app would.
+// sync_derived_puzzle_data.js — regenerate the puzzle data derived from the
+// source of truth so it can't drift. Two derived artifacts: the constraintTypes
+// declared on the example puzzle entries (data/example_puzzles.js
+// DISPLAYED_EXAMPLES and data/collections.js EXAMPLES), so the puzzle selector
+// tags them the same way the app would; and the `.iss` files in data/scripts
+// that mirror a `.js` sandbox script (the pre-expanded constraint string that
+// run_sandbox.js --output produces), so they stay in sync with their script.
 //
 // The app tags an un-declared puzzle automatically via extractConstraintTypes
 // (js/debug/extract_constraint_types.js) over its raw `input`. That fallback only
@@ -18,17 +22,19 @@
 // puzzles keep tagging themselves and are left untouched (order preserved).
 //
 // Usage:
-//   node tools/dev/fix_constraint_types.js [--dry-run] [-h|--help]
+//   node tools/dev/sync_derived_puzzle_data.js [--dry-run] [-h|--help]
 //
-//   (default)  Rewrite the data files so declarations match the actual types.
-//   --dry-run  Report the entries that would change without writing; exits
-//              non-zero if any are out of sync (usable as a CI check).
+//   (default)  Rewrite the data files (and stale `.iss` mirrors) to match.
+//   --dry-run  Report the entries/mirrors that would change without writing;
+//              exits non-zero if any are out of sync (usable as a CI check).
 
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { ensureGlobalEnvironment } from '../../tests/helpers/test_env.js';
 import { runAsCli } from '../lib/cli_entry.js';
+import { runSandboxToConstraint } from '../lib/sandbox_runner.js';
+import { buildSolver } from '../lib/puzzle_runner.js';
 
 ensureGlobalEnvironment();
 
@@ -39,6 +45,7 @@ const collections = await import('../../data/collections.js' + self.VERSION_PARA
 const examplePuzzles = await import('../../data/example_puzzles.js' + self.VERSION_PARAM);
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+const SCRIPTS_DIR = resolve(ROOT, 'data/scripts');
 
 // The example libraries the selector surfaces, each paired with its source file.
 const SOURCES = [
@@ -131,6 +138,36 @@ const rewriteEntry = (text, name, types) => {
   return text.slice(0, j + 1) + `${comma}\n    constraintTypes: ${literal},` + text.slice(j + 1);
 };
 
+// Regenerate the `.iss` files in data/scripts that mirror a `.js` sandbox
+// script. Each `foo.iss` is the canonicalized constraint string that
+// `run_sandbox.js --output` produces from `foo.js`; regenerating it the same way
+// (run the script, serialize, round-trip through the solver builder) keeps the
+// mirror byte-identical so downstream consumers — like the e2e puzzle that loads
+// the pre-expanded `.iss` instead of running the sandbox — stay in sync. An
+// `.iss` with no sibling `.js` is hand-authored and left untouched. Returns the
+// mirrors that were (or, in dryRun, would be) rewritten.
+const syncIssFiles = async (dryRun) => {
+  const changed = [];
+  for (const file of readdirSync(SCRIPTS_DIR).sort()) {
+    if (!file.endsWith('.iss')) continue;
+    const issPath = resolve(SCRIPTS_DIR, file);
+    let source;
+    try {
+      source = readFileSync(resolve(SCRIPTS_DIR, file.slice(0, -4) + '.js'), 'utf8');
+    } catch {
+      continue; // No sibling script: not a generated mirror.
+    }
+    const generated = await runSandboxToConstraint(source);
+    // Round-trip so a broken script fails here rather than in a consumer.
+    buildSolver(generated);
+    const next = generated + '\n';
+    if (readFileSync(issPath, 'utf8') === next) continue;
+    changed.push({ file, path: issPath, next });
+    if (!dryRun) writeFileSync(issPath, next);
+  }
+  return changed;
+};
+
 const parseArgs = (argv) => {
   const args = { dryRun: false, help: false };
   for (let i = 2; i < argv.length; i++) {
@@ -144,11 +181,12 @@ const parseArgs = (argv) => {
 };
 
 const printUsage = () => console.log(`\
-Usage: node tools/dev/fix_constraint_types.js [--dry-run]
+Usage: node tools/dev/sync_derived_puzzle_data.js [--dry-run]
 
-  (default)  Rewrite the data files so declarations match the actual types.
-  --dry-run  Report entries that would change without writing; exits non-zero if
-             any are out of sync.`);
+  (default)  Rewrite the data files so declarations match the actual types, and
+             regenerate any stale data/scripts/*.iss script mirrors.
+  --dry-run  Report entries and mirrors that would change without writing; exits
+             non-zero if any are out of sync.`);
 
 export const main = async (argv) => {
   const args = parseArgs(argv);
@@ -194,11 +232,9 @@ export const main = async (argv) => {
       + `declaration [${w.declared.join(', ')}] unchanged.`);
   }
 
+  const issChanges = await syncIssFiles(args.dryRun);
+
   if (args.dryRun) {
-    if (!problems.length) {
-      console.log(`OK: all ${checked} constraintTypes declarations match.`);
-      return;
-    }
     for (const p of problems) {
       if (p.kind === 'missing') {
         console.log(`MISSING  ${label(p.item)}\n         needs: [${p.actual.join(', ')}]`);
@@ -207,16 +243,27 @@ export const main = async (argv) => {
           + `\n         actual:   [${p.actual.join(', ')}]`);
       }
     }
-    console.log(`\n${problems.length} entr${problems.length === 1 ? 'y' : 'ies'} out of sync. `
-      + `Run without --dry-run to update the data files.`);
+    for (const c of issChanges) {
+      console.log(`STALE    data/scripts/${c.file}: out of date with its sandbox script.`);
+    }
+    const outOfSync = problems.length + issChanges.length;
+    if (!outOfSync) {
+      console.log(`OK: all ${checked} constraintTypes declarations match and `
+        + `.iss mirrors are up to date.`);
+      return;
+    }
+    console.log(`\n${outOfSync} item${outOfSync === 1 ? '' : 's'} out of sync. `
+      + `Run without --dry-run to update.`);
     process.exitCode = 1;
     return;
   }
 
-  if (!problems.length) {
-    console.log(`No changes needed (${checked} declarations verified).`);
+  if (!problems.length && !issChanges.length) {
+    console.log(`No changes needed (${checked} declarations verified, `
+      + `.iss mirrors up to date).`);
     return;
   }
+
   // Apply per file so a single run can touch both example libraries.
   const byPath = new Map();
   for (const p of problems) {
@@ -232,8 +279,19 @@ export const main = async (argv) => {
     }
     writeFileSync(path, text);
   }
-  console.log(`\nFixed ${problems.length} entr${problems.length === 1 ? 'y' : 'ies'} across `
-    + `${byPath.size} file${byPath.size === 1 ? '' : 's'}.`);
+  for (const c of issChanges) {
+    console.log(`regenerated: data/scripts/${c.file}`);
+  }
+
+  const parts = [];
+  if (problems.length) {
+    parts.push(`${problems.length} entr${problems.length === 1 ? 'y' : 'ies'} across `
+      + `${byPath.size} file${byPath.size === 1 ? '' : 's'}`);
+  }
+  if (issChanges.length) {
+    parts.push(`${issChanges.length} .iss mirror${issChanges.length === 1 ? '' : 's'}`);
+  }
+  console.log(`\nFixed ${parts.join(' and ')}.`);
 };
 
 runAsCli(import.meta.url, main);

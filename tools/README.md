@@ -30,7 +30,7 @@ it stays there and the tools import it back.
 | Profile one handler during a solve | [`perf/profile.js`](perf/README.md) |
 | Run the micro-benchmarks (`npm run bench`) | [`perf/run_legacy_benchmarks.js`](perf/README.md) |
 | Bisect a guess-count regression across history | [`bisect/run-bisect.sh`](bisect/README.md) |
-| Sync `data/collections.js` constraintTypes with the puzzles | [`dev/fix_constraint_types.js`](dev/README.md) |
+| Sync derived puzzle data (`constraintTypes` tags, `.iss` script mirrors) with the puzzles | [`dev/sync_derived_puzzle_data.js`](dev/README.md) |
 | Surface targeted sandbox-script authoring guidance | [`dev/lint_sandbox_script.js`](dev/README.md) |
 
 ## Conventions

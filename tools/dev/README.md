@@ -8,7 +8,7 @@ the performance CLIs in [`tools/perf/`](../perf/README.md).
 
 | Command | Purpose |
 | --- | --- |
-| `node tools/dev/fix_constraint_types.js` | Bring the `constraintTypes` declared on puzzle entries in [`data/collections.js`](../../data/collections.js) back in sync with what the app would tag them. `--dry-run` for a read-only report (non-zero exit if out of sync). |
+| `node tools/dev/sync_derived_puzzle_data.js` | Bring the `constraintTypes` declared on puzzle entries in [`data/collections.js`](../../data/collections.js) back in sync with what the app would tag them, and regenerate the [`data/scripts/*.iss`](../../data/scripts/) mirrors of the sandbox scripts. `--dry-run` for a read-only report (non-zero exit if out of sync). |
 | `node tools/dev/lint_sandbox_script.js` | Surface targeted authoring guidance on sandbox-script *source*. Advisory by default; `--fail-on-guidance` exits non-zero. |
 | `node tools/dev/lint_constraints.js` | Surface canonicalization and redundancy guidance on *generated constraints* (`.iss` files or stdin via `-`; with `--script`, sandbox scripts it runs itself). Advisory by default; `--fail-on-guidance` exits non-zero. |
 
@@ -16,7 +16,7 @@ Run any script with `--help` for the full option reference.
 
 ---
 
-### `fix_constraint_types.js` — keep collection tags in sync
+### `sync_derived_puzzle_data.js` — keep collection tags and `.iss` mirrors in sync
 
 The puzzle selector tags each entry by its constraint types. For most entries
 that is derived automatically (`SudokuParser.extractConstraintTypes` over the
@@ -31,14 +31,23 @@ puzzle. Entries already in sync are left untouched (order preserved, no churn).
 
 ```sh
 # Update data/collections.js in place.
-node tools/dev/fix_constraint_types.js
+node tools/dev/sync_derived_puzzle_data.js
 
 # Report what would change without writing (exits non-zero if anything is stale).
-node tools/dev/fix_constraint_types.js --dry-run
+node tools/dev/sync_derived_puzzle_data.js --dry-run
 ```
 
 An entry that resolves to no types is reported as a WARNING and left unchanged —
 an empty result means a resolution gap, not that the puzzle has no constraints.
+
+The same run also regenerates the `.iss` mirrors under
+[`data/scripts/`](../../data/scripts/). Each `foo.iss` is the pre-expanded,
+canonicalized constraint string that
+[`run_sandbox.js --output`](../debug/run_sandbox.js) produces from `foo.js`;
+consumers that load the expanded form directly (e.g. the e2e puzzle that uses
+`xin_yang_v2.iss` instead of running the sandbox) rely on it matching the
+script. This tool rewrites any mirror that has drifted from its sibling `.js`
+byte-for-byte; an `.iss` with no sibling script is hand-authored and left alone.
 
 ---
 
