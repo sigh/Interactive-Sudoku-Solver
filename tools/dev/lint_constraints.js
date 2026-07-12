@@ -28,7 +28,6 @@ const { SudokuParser } = await import('../../js/sudoku_parser.js' + self.VERSION
 const { CellGeometry } = await import('../../js/cell_geometry.js' + self.VERSION_PARAM);
 const { NFASerializer } = await import('../../js/nfa_builder.js' + self.VERSION_PARAM);
 
-const LONG_CONSTRAINT_LINE_THRESHOLD = 180;
 const STAMPED_COPY_THRESHOLD = 50;
 
 const parseArgs = (argv) => {
@@ -67,6 +66,17 @@ const parseGridCell = (cell) => {
 
 const isOrthAdjacent = (a, b) =>
   Math.abs(a.row - b.row) + Math.abs(a.col - b.col) === 1;
+
+// A cell's subgraph: the main grid, or a specific Var overlay (by prefix).
+// Replicate shifts a template within one subgraph only, so a constraint whose
+// cells span more than one (e.g. a grid cell together with a VS overlay cell)
+// is structurally not Replicable however regular its offsets look.
+const cellSubgraph = (cell) => {
+  if (/^R[0-9a-z]+C[0-9a-z]+$/i.test(cell)) return 'grid';
+  const m = /^(V[A-Za-z]*)/.exec(cell);
+  return m ? m[1] : 'other';
+};
+const spansSubgraphs = (cells) => new Set(cells.map(cellSubgraph)).size > 1;
 
 // Flatten the parsed tree. Composites (And/Or/Replicate) expose
 // `.constraints`; leaves are everything else. `inOr` marks constraints that
@@ -163,7 +173,7 @@ const findLine = (lines, type, firstCell) => {
 const describeCells = (cells) =>
   cells.length <= 4 ? cells.join(' ') : `${cells.slice(0, 3).join(' ')} … (${cells.length} cells)`;
 
-const lintConstraintText = (text) => {
+export const lintConstraintText = (text) => {
   const lines = text.split('\n');
   const root = SudokuParser.parseText(text);
   const leaves = collectLeaves(root, false, []);
@@ -173,18 +183,29 @@ const lintConstraintText = (text) => {
     ? CellGeometry.fromShapeSpec(shapeLeaf.constraint.shapeSpec)
     : CellGeometry.newDefault();
   const hasNoBoxes = leaves.some(({ constraint }) => constraint.type === 'NoBoxes');
-  const hasReplicate = leaves.some(({ constraint }) => constraint.type === 'Replicate');
+  // collectLeaves flattens composites (including Replicate) into their children,
+  // so a Replicate node never appears among the leaves; walk the tree for it.
+  const treeHasType = (c, type) => c.type === type ||
+    (Array.isArray(c.constraints) && c.constraints.some(ch => treeHasType(ch, type)));
+  const hasReplicate = treeHasType(root, 'Replicate');
   const shapeIsExtended = geometry.numValues !==
     CellGeometry.defaultNumValues(geometry.numRows, geometry.numCols);
 
   const pairRelations = nativePairRelations(geometry);
   const houses = enforcedHouseSets(geometry, hasNoBoxes);
 
+  // Equality / all-different Pair keys. Unlike the native relations above,
+  // these need no adjacency, so they are matched on every Pair group.
+  const binaryKey = (fn) => fnToBinaryKey(fn, geometry.numValues, geometry.valueOffset);
+  const sameValuesKey = binaryKey((a, b) => a === b);
+  const allDifferentKey = binaryKey((a, b) => a !== b);
+
   const items = [];
   const add = (line, code, message) => items.push({ line, code, message });
 
   const copiesByKey = new Map();
   const pairGroups = new Map();
+  const nfaGroups = new Map();
 
   for (const { constraint, inOr } of leaves) {
     const type = constraint.type;
@@ -236,21 +257,51 @@ const lintConstraintText = (text) => {
           + `${geometry.numValues} values (${geometry.numValues + 1} with a `
           + 'segment break); the machine was compiled for a larger Shape');
       }
-      const copyKey = `NFA\0${constraint.encodedNFA}`;
-      copiesByKey.set(copyKey, (copiesByKey.get(copyKey) || 0) + 1);
+      // Key by machine AND arity: Replicate stamps one fixed-shape template, so
+      // instances of the same machine over different cell counts (e.g. a
+      // degree check over 2/3/4 neighbours) can't share one Replicate.
+      const copyKey = `NFA\0${constraint.encodedNFA}\0${cells.length}`;
+      let copy = copiesByKey.get(copyKey);
+      if (!copy) { copy = { count: 0, allCross: true }; copiesByKey.set(copyKey, copy); }
+      copy.count++;
+      copy.allCross &&= spansSubgraphs(cells);
+
+      let nfaGroup = nfaGroups.get(constraint.encodedNFA);
+      if (!nfaGroup) {
+        nfaGroup = { count: 0, allTwoCell: true, line: line() };
+        nfaGroups.set(constraint.encodedNFA, nfaGroup);
+      }
+      nfaGroup.count++;
+      nfaGroup.allTwoCell &&= cells.length === 2;
     }
 
-    // --- Redundant full-range Given on an unextended Shape ---
-    if (type === 'Given' && !inOr && !shapeIsExtended && parseGridCell(constraint.cell)) {
-      const values = new Set(constraint.values);
-      let fullRange = values.size === geometry.numValues;
+    // --- Given: redundant-full-range, else a stamped-copy candidate ---
+    if (type === 'Given') {
+      const values = constraint.values || [];
+      const valueSet = new Set(values);
+      let fullRange = valueSet.size === geometry.numValues && parseGridCell(constraint.cell);
       for (let v = geometry.minValue(); fullRange && v <= geometry.maxValue(); v++) {
-        fullRange = values.has(v);
+        fullRange = valueSet.has(v);
       }
-      if (fullRange) {
+      if (inOr) {
+        // Conditional givens (Or/And hypothesis branches) are not standalone
+        // repeated facts, so they are neither redundant nor Replicate copies.
+      } else if (!shapeIsExtended && fullRange) {
         add(line(), 'redundant-full-range-given',
           `Given on ${constraint.cell} allows every value the Shape already `
           + 'allows; it does nothing');
+      } else {
+        // Identical Givens (same value set) are Replicate candidates -- Replicate
+        // shifts the cell and keeps the values -- even though they serialize onto
+        // one line. Common as "restrict every cell to 1-N" on an extended Shape.
+        // Key by subgraph too: one Replicate can't span the grid and a Var
+        // overlay, so same-valued Givens in different subgraphs are separate.
+        const valueSig = [...values].sort((a, b) => a - b).join('_');
+        const copyKey = `Given\0${valueSig}\0${cellSubgraph(constraint.cell)}`;
+        let copy = copiesByKey.get(copyKey);
+        if (!copy) { copy = { count: 0, allCross: true }; copiesByKey.set(copyKey, copy); }
+        copy.count++;
+        copy.allCross &&= spansSubgraphs([constraint.cell]);
       }
     }
 
@@ -277,45 +328,51 @@ const lintConstraintText = (text) => {
   // adjacent grid pair: a partial replacement would split one drawn rule
   // into two constraint types and stop the pairs compressing together.
   for (const group of pairGroups.values()) {
+    const count = `${group.count} ${group.type} constraint${group.count === 1 ? '' : 's'}`;
+    // A Pair keyed on == / != is a two-cell SameValues / AllDifferent expressed
+    // as a custom binary function; the native class is the direct form. This
+    // holds per pair (no adjacency, no clique, and inside an Or too), so it is
+    // judged for every such group -- merging into one larger set is a separate,
+    // optional step the author can take when the pairs form a clique.
+    if (group.key === sameValuesKey) {
+      add(group.line, 'pair-same-values',
+        `${count} re-encode a two-cell equality; use SameValues`);
+      continue;
+    }
+    if (group.key === allDifferentKey) {
+      add(group.line, 'pair-all-different',
+        `${count} re-encode a two-cell all-different; use AllDifferent`);
+      continue;
+    }
     if (!group.allReplaceable) continue;
     const relation = pairRelations.find(r => r.key === group.key);
     if (!relation) continue;
     add(group.line, 'pair-native-relation',
-      `${group.count} ${group.type} constraint${group.count === 1 ? '' : 's'} `
-      + `re-encode ${relation.name} on adjacent cells; use the native constraint`);
+      `${count} re-encode ${relation.name} on adjacent cells; use the native constraint`);
+  }
+
+  // --- NFA machines applied only to 2-cell inputs (a binary relation) ---
+  for (const group of nfaGroups.values()) {
+    if (!group.allTwoCell) continue;
+    add(group.line, 'nfa-two-cell-use-pair',
+      `${group.count} NFA constraint${group.count === 1 ? '' : 's'} apply one `
+      + 'machine to 2 cells; a 2-cell relation is a Pair — use Pair.fnToKey instead');
   }
 
   // --- Stamped copies that suggest Replicate ---
   if (!hasReplicate) {
-    for (const [copyKey, count] of copiesByKey) {
-      if (count < STAMPED_COPY_THRESHOLD) continue;
+    for (const [copyKey, copy] of copiesByKey) {
+      if (copy.count < STAMPED_COPY_THRESHOLD) continue;
+      // Every instance spans multiple cell subgraphs, so Replicate cannot
+      // express them regardless of how uniform the offsets are.
+      if (copy.allCross) continue;
       const type = copyKey.split('\0')[0];
+      const shared = type === 'Given' ? 'value set' : 'machine';
       add(1, 'stamped-copies-without-replicate',
-        `${count} ${type} constraints share one machine; if they are shifted `
+        `${copy.count} ${type} constraints share one ${shared}; if they are shifted `
         + 'copies, use Replicate to shorten the encoding');
     }
   }
-
-  // --- Long output without Replicate (migrated from lint_sandbox_script) ---
-  const constraintLineCount = lines.filter(l => l.trim().startsWith('.')).length;
-  if (constraintLineCount >= LONG_CONSTRAINT_LINE_THRESHOLD && !hasReplicate) {
-    add(1, 'long-output-without-replicate',
-      `${constraintLineCount} constraint lines and no Replicate; if many `
-      + 'constraints are shifted copies, use Replicate to shorten the string');
-  }
-
-  // --- Duplicate constraint lines (text-level, exact) ---
-  const seenLines = new Map();
-  lines.forEach((rawLine, i) => {
-    const trimmed = rawLine.trim();
-    if (!trimmed.startsWith('.')) return;
-    if (seenLines.has(trimmed)) {
-      add(i + 1, 'duplicate-constraint',
-        `identical to line ${seenLines.get(trimmed)}`);
-    } else {
-      seenLines.set(trimmed, i + 1);
-    }
-  });
 
   const seen = new Set();
   const deduped = items.filter((item) => {

@@ -82,6 +82,35 @@ const GUIDANCE_DEFS = [
     ],
   },
   {
+    code: 'outside-clue-by-arrow-id',
+    message: 'outside clue built from a raw corner/arrow id; prefer '
+      + 'Class.fromCells(value, cells, geometry) so the canonical corner and '
+      + 'direction come from the cells',
+    patterns: [
+      /\bnew\s+(?:LittleKiller|Sandwich|XSum|Skyscraper|HiddenSkyscraper|NumberedRoom|FullRank)\s*\(/g,
+    ],
+  },
+  {
+    code: 'outside-clue-by-arrow-id',
+    message: 'outside clue built from a raw corner/arrow id; prefer '
+      + 'Class.fromCells(value, cells, geometry) so the canonical corner and '
+      + 'direction come from the cells',
+    patterns: [
+      /\bnew\s+(?:LittleKiller|Sandwich|XSum|Skyscraper|HiddenSkyscraper|NumberedRoom|FullRank)\s*\(/g,
+    ],
+  },
+  {
+    code: 'outside-clue-literal-cells',
+    message: 'outside-clue fromCells given a literal cell-list array; derive the '
+      + 'line with graph.ray() (diagonals) or graph.row()/graph.column() instead '
+      + 'of hand-listing cell ids',
+    // Match `.fromCells(<value>, [` — a bare array literal as the second arg.
+    // A variable or graph.ray()/row()/column() call as the second arg does not.
+    patterns: [
+      /\.fromCells\(\s*(?:[^,()[\]]|\([^()]*\))+,\s*\[/g,
+    ],
+  },
+  {
     code: 'manual-house-lookup',
     message: 'row/column built from a corner cell; prefer index-based graph.row(n) / graph.column(n)',
     patterns: [
@@ -100,6 +129,9 @@ const GUIDANCE_DEFS = [
       /'R1C1',\s*'R1C4',\s*'R1C7'/g,
       /\[1,\s*4,\s*7\]/g,
     ],
+    // The [1,4,7] literal also appears in prose describing modulo-3 residue
+    // classes; a full-line comment is never box-construction code.
+    excludeLine: /^\s*\/\//,
   },
   {
     code: 'sum-wire-format',
@@ -211,7 +243,7 @@ const findMissingRulesGuidance = (source) => {
   }];
 };
 
-const lintSource = (source) => {
+export const lintSource = (source) => {
   const rawItems = [
     ...findPatternGuidance(source),
     ...findNumValuesGuidance(source),

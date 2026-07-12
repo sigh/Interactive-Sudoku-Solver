@@ -99,11 +99,13 @@ a script produced the output. It surfaces:
 - NFA machines whose stored alphabet exceeds the Shape's value range (plus one
   for the multi-segment break symbol). The serializer trims trailing symbols
   with no transitions, so only this overshoot direction is checkable;
-- Replicate candidates: many constraints sharing one NFA machine, and very
-  long outputs with no `Replicate` at all;
+- Replicate candidates: many NFA constraints sharing one machine *and* arity,
+  or many identical `Given`s (same value set) — e.g. restricting every cell to
+  `1-N` on an extended Shape. Templates that span multiple cell subgraphs (which
+  Replicate cannot shift) and conditional (`Or`-branch) copies are skipped;
 - redundancy: full-range `Given`s on an unextended Shape, `AllDifferent`s
-  duplicating an enforced row/column/box, duplicate constraint lines, and
-  repeated cells inside all-different-semantics constraints.
+  duplicating an enforced row/column/box, and repeated cells inside
+  all-different-semantics constraints.
 
 ```sh
 # Lint stored constraint files.

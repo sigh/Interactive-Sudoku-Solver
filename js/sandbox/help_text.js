@@ -46,7 +46,7 @@ CONSTRAINT OBJECTS
 
   Outside clues (LittleKiller, Sandwich, XSum, ...) take a canonical arrowId,
   often not the cell nearest the drawn clue. Build one from its line of cells:
-    LittleKiller.fromCells(15, ['R1C4', 'R2C3', 'R3C2'], cellGeometry('9x9'))
+    LittleKiller.fromCells(15, cellGraph('9x9').ray('R1C4', 1, 1), cellGeometry('9x9'))
 
   The type of a constraint instance c can be found with c.type.
 
