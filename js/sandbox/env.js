@@ -195,16 +195,48 @@ class SandboxCellGraph {
     return cells;
   }
 
-  // The whole grid row through `cell`, left to right.
-  row(cell) {
+  // The whole grid row, left to right: row(4) by 1-based index, or
+  // row('R4C7') through a cell.
+  row(rowOrCell) {
+    const cell = typeof rowOrCell === 'number' ? makeCellId(rowOrCell, 1) : rowOrCell;
     const leftward = this.ray(cell, 0, -1);
     return this.ray(leftward[leftward.length - 1], 0, 1);
   }
 
-  // The whole grid column through `cell`, top to bottom.
-  column(cell) {
+  // The whole grid column, top to bottom: column(2) by 1-based index, or
+  // column('R4C2') through a cell.
+  column(colOrCell) {
+    const cell = typeof colOrCell === 'number' ? makeCellId(1, colOrCell) : colOrCell;
     const upward = this.ray(cell, -1, 0);
     return this.ray(upward[upward.length - 1], 1, 0);
+  }
+
+  // The nth default box region (1-based, reading order), row-major, or null
+  // when the geometry has no box regions.
+  box(n) {
+    const { numRows, numCols, numValues } = this._geometry;
+    const [height, width] = CellGeometry.boxDimsForSize(numRows, numCols, numValues);
+    if (!height) return null;
+    const perRow = numCols / width;
+    const row = Math.floor((n - 1) / perRow) * height + 1;
+    const col = ((n - 1) % perRow) * width + 1;
+    return this.block(makeCellId(row, col), height, width);
+  }
+
+  // All rows / columns / default boxes, each an array of cells; boxes() is
+  // empty when the geometry has no box regions. houses() concatenates them.
+  rows() {
+    return Array.from({ length: this._geometry.numRows }, (_, i) => this.row(i + 1));
+  }
+  columns() {
+    return Array.from({ length: this._geometry.numCols }, (_, i) => this.column(i + 1));
+  }
+  boxes() {
+    const count = this.box(1) ? this._geometry.numGridCells / this.box(1).length : 0;
+    return Array.from({ length: count }, (_, i) => this.box(i + 1));
+  }
+  houses() {
+    return [...this.rows(), ...this.columns(), ...this.boxes()];
   }
 
   // The cells of a numRows x numCols block with topLeft as its top-left corner,

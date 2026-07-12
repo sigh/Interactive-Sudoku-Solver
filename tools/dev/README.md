@@ -46,12 +46,14 @@ an empty result means a resolution gap, not that the puzzle has no constraints.
 
 Sandbox scripts can often use helpers exposed by `js/sandbox/env.js` rather than
 rebuilding common geometry by hand. This tool is intentionally advisory: it
-surfaces regex parsing and template-literal building of `R#C#` / Var ids that
-should use `makeCellId` or the overlay helpers, custom neighbour helpers that
-may duplicate `cellGraph().neighbours()` / `cellGraph().kingNeighbours()`,
-manual box-index arithmetic, `NFA.encodeSpec` / `Pair.fnToKey` numValues
-literals that disagree with the script's own `new Shape(...)` declaration,
-hand-assembled `Sum` coefficient strings, 0-indexed cell-id wrappers, and
+surfaces regex parsing and template-literal building of `R#C#` ids (prefer
+`makeCellId`) and Var member ids (prefer `Var.cells()` / `.cell(n)`), custom
+neighbour helpers that may duplicate `cellGraph().neighbours()` /
+`cellGraph().kingNeighbours()`, rows/columns/boxes built by hand where the
+index-based `graph.row(n)` / `column(n)` / `box(n)` / `boxes()` apply,
+`NFA.encodeSpec` / `Pair.fnToKey` numValues literals that disagree with the
+script's own `new Shape(...)` declaration, hand-assembled `Sum` coefficient
+strings (prefer `[cell, coeff]` pairs), 0-indexed cell-id wrappers, and
 scripts with no rules prose at all.
 
 This tool lints source only and never executes the script. To check the

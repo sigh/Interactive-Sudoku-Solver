@@ -68,8 +68,6 @@ const GUIDANCE_DEFS = [
   },
   {
     code: 'manual-cell-id-template',
-    // Grid ids only: raw Var groups have no member-id helper yet, so their
-    // `V…${i}` templates are currently the only idiom and are not flagged.
     message: 'hand-built cell id template found; prefer makeCellId(row, col)',
     patterns: [
       /`R\$\{[^`]*\}C/g,
@@ -77,19 +75,35 @@ const GUIDANCE_DEFS = [
     ],
   },
   {
+    code: 'manual-var-id-template',
+    message: 'hand-built Var member id found; prefer Var .cells() / .cell(n)',
+    patterns: [
+      /`V[A-Z]*\$\{/g,
+    ],
+  },
+  {
+    code: 'manual-house-lookup',
+    message: 'row/column built from a corner cell; prefer index-based graph.row(n) / graph.column(n)',
+    patterns: [
+      /\.row\(\s*makeCellId\(/g,
+      /\.column\(\s*makeCellId\(/g,
+    ],
+  },
+  {
     code: 'manual-box-arithmetic',
-    message: 'manual box-index arithmetic or box-origin list found; prefer a geometry helper or one named derivation',
+    message: 'manual box construction found; prefer graph.box(n) / graph.boxes()',
     // Box-cell construction only. Cell→box-index derivations
     // (Math.floor((row - 1) / 3) style) are not flagged: no box-index
     // helper exists, so that math is currently the only idiom.
     patterns: [
       /\bb[rc]\s*\*\s*\d/g,
       /'R1C1',\s*'R1C4',\s*'R1C7'/g,
+      /\[1,\s*4,\s*7\]/g,
     ],
   },
   {
     code: 'sum-wire-format',
-    message: 'hand-assembled Sum coefficient string found; comment the coefficient layout and run lint_constraints.js for canonical alternatives (EqualSum, plain Sum)',
+    message: 'hand-assembled Sum coefficient string found; prefer [cell, coeff] pairs (new Sum(0, cellA, [cellB, -1])) and run lint_constraints.js for canonical alternatives (EqualSum, plain Sum)',
     patterns: [
       /`[^`\n]*_=_/g,
       /['"]-?\d+_=_/g,
@@ -173,7 +187,8 @@ const findNumValuesGuidance = (source) => {
         line: lineForIndex(source, match.index),
         code: 'num-values-mismatch',
         message: `numValues literal ${literal} does not match the declared `
-          + `Shape's ${numValues} values; derive it from the Shape declaration`,
+          + `Shape's ${numValues} values; pass the Shape or cellGeometry() `
+          + 'instead of a literal',
       });
     }
   }

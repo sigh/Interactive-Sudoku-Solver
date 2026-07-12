@@ -37,11 +37,12 @@ const circles = [
   'R7C1', 'R8C3', 'R1C6', 'R2C8', 'R2C5', 'R7C4', 'R6C5',
 ];
 
+const distinct = new Var('D', 'distinct', N);   // a distinct-digit count per false region
 const constraints = [
   new Shape('8x8'),
   new NoBoxes(),
   new ChaosConstruction(),
-  new Var('D', 'distinct', N),   // a distinct-digit count per false region
+  distinct,
 ];
 for (const [cell, v] of givens) constraints.push(new Given(cell, v));
 
@@ -57,7 +58,7 @@ for (let r = 1; r <= N; r++)
 // can't be a full 1-8 set. CountDistinct ties a control cell to the distinct
 // count; capping the control at 7 forbids a complete region.
 for (const [f, cells] of falseCells) {
-  const control = `VD${f + 1}`;
+  const control = distinct.cell(f + 1);
   constraints.push(new Given(control, 1, 2, 3, 4, 5, 6, 7));
   constraints.push(new CountDistinct(control, ...cells));
 }

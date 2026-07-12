@@ -1367,9 +1367,14 @@ export class SudokuConstraint {
       return `NFA${name} (${numStates} states)`;
     }
 
-    static encodeSpec(spec, numValues, { valueOffset = 0, multiSegment = false } = {}) {
+    // numValues may also be a CellGeometry or Shape constraint, which then
+    // supplies both the value count and the default valueOffset.
+    static encodeSpec(spec, numValues, { valueOffset, multiSegment = false } = {}) {
       try {
-        const nfa = javascriptSpecToNFA(spec, numValues, { valueOffset, multiSegment });
+        const range = resolveValueRange(numValues, valueOffset);
+        const nfa = javascriptSpecToNFA(
+          spec, range.numValues,
+          { valueOffset: range.valueOffset, multiSegment });
         return NFASerializer.serialize(nfa);
       } catch (err) {
         const specStr = typeof spec === 'string'
@@ -2188,6 +2193,12 @@ export class SudokuConstraint {
 
     constructor(sum, ...cells) {
       super(sum, ...cells);
+      // Cells may be [cell, coeff] pairs; bare cells have coefficient 1.
+      // e.g. new Sum(0, 'R1C1', 'R1C2', ['VK1', -1])
+      if (cells.some(Array.isArray)) {
+        sum = `${sum}_=_${cells.map(c => Array.isArray(c) ? c[1] : 1).join('_')}`;
+        cells = cells.map(c => Array.isArray(c) ? c[0] : c);
+      }
       this.cells = cells;
 
       const parts = String(sum).split('_');
@@ -2211,6 +2222,12 @@ export class SudokuConstraint {
       } else {
         this.coeffs = null;
       }
+    }
+
+    static serialize(constraints) {
+      return constraints.map(c => this._argsToString(
+        c.coeffs ? `${c.sum}_=_${c.coeffs.join('_')}` : `${c.sum}`,
+        ...c.cells)).join('');
     }
 
     chipLabel() {
@@ -2682,8 +2699,11 @@ export class SudokuConstraint {
       }
     }
 
-    static fnToKey(fn, numValues, valueOffset = 0) {
-      return fnToBinaryKey(fn, numValues, valueOffset);
+    // numValues may also be a CellGeometry or Shape constraint, which then
+    // supplies both the value count and the default valueOffset.
+    static fnToKey(fn, numValues, valueOffset) {
+      const range = resolveValueRange(numValues, valueOffset);
+      return fnToBinaryKey(fn, range.numValues, range.valueOffset);
     }
 
     static displayName() {
@@ -2700,11 +2720,12 @@ export class SudokuConstraint {
       nodeMarker: LineOptions.SMALL_FULL_CIRCLE_MARKER,
     };
 
-    static fnToKey(fn, numValues, valueOffset = 0) {
+    static fnToKey(fn, numValues, valueOffset) {
       // Make the function symmetric.
+      const range = resolveValueRange(numValues, valueOffset);
       return fnToBinaryKey(
         (a, b) => fn(a, b) && fn(b, a),
-        numValues, valueOffset);
+        range.numValues, range.valueOffset);
     }
 
     chipLabel() {
@@ -2878,6 +2899,19 @@ export class SudokuConstraint {
       ];
     }
 
+    // The member cell ids, in order: 'V{prefix}{n}' with 1-based n, or the
+    // bare 'V{prefix}' for a single-cell group.
+    cells() {
+      if (this.count === 1) return ['V' + this.prefix];
+      return Array.from(
+        { length: this.count }, (_, i) => `V${this.prefix}${i + 1}`);
+    }
+
+    // The nth member cell id (1-based).
+    cell(n) {
+      return this.count === 1 ? 'V' + this.prefix : `V${this.prefix}${n}`;
+    }
+
     static *makeFromArgs(args, geometry) {
       const [prefix, encodedLabel, count] = args;
       const label = this.uriDecodeArg(encodedLabel || '');
@@ -3038,6 +3072,22 @@ export class UserScriptExecutor {
     this._restartWorker();
   }
 }
+
+// Resolve a value-range argument that may be a numValues count or a
+// CellGeometry / Shape constraint. A geometry supplies both the count and the
+// default valueOffset (an explicit valueOffset argument still wins).
+export const resolveValueRange = (numValuesOrGeometry, valueOffset) => {
+  if (typeof numValuesOrGeometry === 'number') {
+    return { numValues: numValuesOrGeometry, valueOffset: valueOffset ?? 0 };
+  }
+  const geometry = typeof numValuesOrGeometry?.numValues === 'number'
+    ? numValuesOrGeometry
+    : CellGeometry.fromShapeSpec(numValuesOrGeometry?.shapeSpec);
+  return {
+    numValues: geometry.numValues,
+    valueOffset: valueOffset ?? geometry.valueOffset,
+  };
+};
 
 export const fnToBinaryKey = (fn, numValues, valueOffset = 0) => {
   const NUM_BITS = 6;

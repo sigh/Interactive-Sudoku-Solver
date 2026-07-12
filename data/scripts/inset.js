@@ -38,9 +38,14 @@ for (const g of GRIDS)
       if (idOf.has(k)) continue;
       const oi = ownerIndex(g.r0 + i, g.c0 + j);
       idOf.set(k, oi === 0
-        ? `R${g.r0 + i + 1}C${g.c0 + j + 1}`
-        : `V${LETTER[oi]}${++varCounts[oi]}`);
+        ? makeCellId(g.r0 + i + 1, g.c0 + j + 1)
+        : [oi, ++varCounts[oi]]);   // resolved via the Vars below
     }
+const vars = GRIDS.map((_, i) =>
+  i === 0 ? null : new Var(LETTER[i], LABEL[i], varCounts[i]));
+for (const [k, id] of idOf) {
+  if (Array.isArray(id)) idOf.set(k, vars[id[0]].cell(id[1]));
+}
 const cid = (r, c) => idOf.get(key(r, c));
 const minN = (r, c) => Math.min(...GRIDS
   .filter(g => r >= g.r0 && r < g.r0 + g.N && c >= g.c0 && c < g.c0 + g.N)
@@ -54,7 +59,7 @@ const ODD = parityNFA(1);
 const EVEN = parityNFA(0);
 const constraints = [new Shape('6x6'), new NoBoxes()];
 for (let i = 1; i < GRIDS.length; i++) {
-  constraints.push(new Var(LETTER[i], LABEL[i], varCounts[i]));
+  constraints.push(vars[i]);
 }
 const parityAt = new Map();
 for (const [r, c] of ODD_SINGLES) parityAt.set(key(r, c), 1);

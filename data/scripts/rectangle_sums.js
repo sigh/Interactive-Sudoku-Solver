@@ -32,20 +32,22 @@ const rectangle = (topLeft, bottomRight) => {
   return graph.block(topLeft, rc2.row - rc1.row + 1, rc2.col - rc1.col + 1);
 };
 
+const rectangleVar = new Var("R", "Rectangle", K);
+
 return [
   new Shape("9x9", K),
   ...rectangle("R1C1", "R9C9").map(cell =>
     new Given(cell, ...rangeI(1, 9))
   ),
-  new Var("R", "Rectangle", K),
-  new AllDifferent(...rangeI(1, K).map(i => `VR${i}`)),
+  rectangleVar,
+  new AllDifferent(...rectangleVar.cells()),
   ...topLefts.map(([topLeft, sum], i) => new Or(
     bottomRights
       .map((bottomRight, j) => ({ cells: rectangle(topLeft, bottomRight), value: j + 1 }))
       .filter(({ cells }) => cells.length > 0)
       .map(({ cells, value }) => new And([
         new Sum(sum, ...cells),
-        new Given(`VR${i + 1}`, value),
+        new Given(rectangleVar.cell(i + 1), value),
       ]))
   ))
 ];

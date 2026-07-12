@@ -557,6 +557,40 @@ await runTest('grid graph locator throws for an invalid cell', () => {
 });
 
 // ============================================================================
+// index-based houses
+// ============================================================================
+
+await runTest('row/column accept a 1-based index or a cell', () => {
+  const g = cellGraph('9x9');
+  assert.deepEqual(g.row(4), g.row('R4C7'));
+  assert.equal(g.row(4)[0], 'R4C1');
+  assert.equal(g.row(4).length, 9);
+  assert.deepEqual(g.column(2), g.column('R5C2'));
+  assert.equal(g.column(2)[8], 'R9C2');
+});
+
+await runTest('box(n) walks the default boxes in reading order', () => {
+  const g = cellGraph('9x9');
+  assert.deepEqual(g.box(1).slice(0, 3), ['R1C1', 'R1C2', 'R1C3']);
+  assert.equal(g.box(2)[0], 'R1C4');
+  assert.equal(g.box(4)[0], 'R4C1');
+  assert.equal(g.box(9)[8], 'R9C9');
+  // 6x6 default boxes are 2x3.
+  const g6 = cellGraph('6x6');
+  assert.deepEqual(g6.box(2), ['R1C4', 'R1C5', 'R1C6', 'R2C4', 'R2C5', 'R2C6']);
+});
+
+await runTest('rows/columns/boxes/houses enumerate every house', () => {
+  const g = cellGraph('9x9');
+  assert.equal(g.rows().length, 9);
+  assert.equal(g.columns().length, 9);
+  assert.equal(g.boxes().length, 9);
+  assert.equal(g.houses().length, 27);
+  assert.deepEqual(g.rows()[0], g.row(1));
+  assert.deepEqual(g.boxes()[8], g.box(9));
+});
+
+// ============================================================================
 // parseCellId / makeCellId  (1-based, over the max geometry)
 // ============================================================================
 

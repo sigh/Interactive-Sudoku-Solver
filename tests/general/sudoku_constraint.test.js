@@ -1212,3 +1212,54 @@ await runTest('Modular accepts mod >= 1', () => {
 });
 
 logSuiteComplete('Modular argument validation');
+
+// ============================================================================
+// Structured Sum / geometry-based value ranges / Var member ids
+// ============================================================================
+
+await runTest('Sum accepts [cell, coeff] pairs', () => {
+  const pairForm = new SudokuConstraint.Sum(
+    0, 'R1C1', 'R1C2', ['R2C1', -1]);
+  const stringForm = new SudokuConstraint.Sum(
+    '0_=_1_1_-1', 'R1C1', 'R1C2', 'R2C1');
+  assert.equal(pairForm.sum, 0);
+  assert.deepEqual(pairForm.coeffs, [1, 1, -1]);
+  assert.deepEqual(pairForm.cells, ['R1C1', 'R1C2', 'R2C1']);
+  // Both forms serialize identically, and args hold the constructor's
+  // actual arguments.
+  assert.equal(pairForm.toString(), stringForm.toString());
+  assert.deepEqual(pairForm.args, [0, 'R1C1', 'R1C2', ['R2C1', -1]]);
+  assert.equal(new SudokuConstraint.Sum(17, 'R1C1').toString(), '.Sum~17~R1C1');
+});
+
+await runTest('fnToKey and encodeSpec accept a CellGeometry or Shape', () => {
+  const geometry = CellGeometry.fromShapeSpec('6x6');
+  const fn = (a, b) => a < b;
+  assert.equal(
+    SudokuConstraint.Pair.fnToKey(fn, geometry),
+    SudokuConstraint.Pair.fnToKey(fn, 6));
+  assert.equal(
+    SudokuConstraint.Pair.fnToKey(fn, new SudokuConstraint.Shape('6x6')),
+    SudokuConstraint.Pair.fnToKey(fn, 6));
+  // A geometry carries its valueOffset: a 0-9 grid offsets values by -1.
+  const offsetGeometry = CellGeometry.fromShapeSpec('10x10~0-9');
+  assert.equal(
+    SudokuConstraint.Pair.fnToKey(fn, offsetGeometry),
+    SudokuConstraint.Pair.fnToKey(fn, 10, offsetGeometry.valueOffset));
+  const spec = { startState: 0, transition: (s) => s, accept: (s) => true };
+  assert.equal(
+    SudokuConstraint.NFA.encodeSpec(spec, geometry),
+    SudokuConstraint.NFA.encodeSpec(spec, 6));
+});
+
+await runTest('Var exposes its member cell ids', () => {
+  const group = new SudokuConstraint.Var('F', 'flags', 3);
+  assert.deepEqual(group.cells(), ['VF1', 'VF2', 'VF3']);
+  assert.equal(group.cell(2), 'VF2');
+  // A single-cell group uses the bare prefix.
+  const single = new SudokuConstraint.Var('M', 'm', 1);
+  assert.deepEqual(single.cells(), ['VM']);
+  assert.equal(single.cell(1), 'VM');
+});
+
+logSuiteComplete('Structured args and member ids');

@@ -261,6 +261,19 @@ await runTest('lint_sandbox_script.js flags numValues/Shape mismatch and id temp
   assert.match(stdout, /manual-cell-id-template/);
 });
 
+await runTest('lint_sandbox_script.js flags idioms superseded by houses/Var APIs', async () => {
+  const { stdout, thrown } = await lintCase(lintScriptMain, 'lint_sandbox_script.js', 's.js',
+    SCRIPT_HEADER
+    + 'const wolf = b => `VW${b}`;\n'
+    + 'const cells = graph.row(makeCellId(4, 1));\n'
+    + 'const origins = [1, 4, 7];\n'
+    + "return [new Shape('9x9')];\n");
+  assert.equal(thrown, null, thrown?.message);
+  assert.match(stdout, /manual-var-id-template/);
+  assert.match(stdout, /manual-house-lookup/);
+  assert.match(stdout, /manual-box-arithmetic/);
+});
+
 await runTest('lint_constraints.js suggests native constraints per key group', async () => {
   // The native suggestion fires only when EVERY Pair sharing the key is a
   // 2-cell adjacent pair — a partial replacement would split one drawn rule

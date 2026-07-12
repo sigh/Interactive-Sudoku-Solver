@@ -37,6 +37,13 @@ CONSTRAINT OBJECTS
     new Cage(sum, ...cells)
     new Thermo(...cells)
 
+  Sum cells may be [cell, coeff] pairs (bare cells have coefficient 1):
+    new Sum(0, 'R1C1', 'R1C2', ['VK1', -1])   => R1C1 + R1C2 - VK1 = 0
+
+  A Var constraint exposes its member cell ids:
+    new Var('F', 'flags', 23).cells()      => ['VF1', ..., 'VF23']
+    new Var('F', 'flags', 23).cell(5)      => 'VF5'  (bare 'VF' when count is 1)
+
   The type of a constraint instance c can be found with c.type.
 
   WARNING: The APIs of these constraints may be unintuitive as they were not
@@ -77,7 +84,10 @@ CELL GEOMETRY
       .kingNeighbours(cell)    the up-to-8 in-grid king-move neighbours
       .step(cell, dR, dC)      the cell (dR, dC) away, or null off-grid
       .ray(cell, dR, dC)       cells to the grid edge, inclusive of cell
-      .row(cell) / .column(cell)  the whole grid row / column through cell
+      .row(n | cell)           the whole grid row, by 1-based index or through cell
+      .column(n | cell)        the whole grid column, likewise
+      .box(n)                  the nth default box region (1-based, reading order)
+      .rows() / .columns() / .boxes() / .houses()  all such cell lists
       .block(topLeft, h, w)    cells of an h x w block, or null if off-grid
       .connected(cells)        is the set one orthogonally-connected group?
       .makeOverlay(prefix[, cells])  a cell graph over a var group (e.g. 'CC',
@@ -88,7 +98,10 @@ CELL GEOMETRY
 STATE MACHINES (NFA)
 
     NFA.encodeSpec(spec, numValues[, opts])  => compile a state machine to an NFA.
-      spec                   { startState, transition, accept }
+      spec                   { startState, transition, accept[, maxDepth] }
+      numValues              a count, or a CellGeometry / Shape constraint
+                             (which also supplies the default valueOffset);
+                             Pair.fnToKey accepts the same forms
       opts.multiSegment      Compile with segments, with SEGMENT_BREAK passed into
                              transition
       opts.valueOffset       offset added to cell values before transition, e.g.
