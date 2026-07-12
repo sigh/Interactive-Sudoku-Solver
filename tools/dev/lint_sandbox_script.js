@@ -2,17 +2,19 @@
 //
 // These suggestions surface places where sandbox idioms may have been missed:
 // hand-built/parsing cell ids, local neighbour helpers that duplicate cellGraph(),
-// and very long generated constraint strings that do not use Replicate.
-// They are advisory by default; pass --fail-on-guidance to use them as a CI gate.
+// numValues literals that disagree with the declared Shape, hand-assembled Sum
+// coefficient strings, and missing rules prose. They are advisory by default;
+// pass --fail-on-guidance to use them as a CI gate.
+//
+// This tool lints script *source* only. To lint the generated constraints
+// (canonicalization, Replicate candidates, redundancy), run the output through
+// tools/dev/lint_constraints.js.
 //
 // Usage:
 //   node tools/dev/lint_sandbox_script.js [--fail-on-guidance] <script.js> [...]
 
 import { readFileSync } from 'node:fs';
 import { runAsCli } from '../lib/cli_entry.js';
-import { runSandboxToConstraint } from '../lib/sandbox_runner.js';
-
-const LONG_CONSTRAINT_LINE_THRESHOLD = 180;
 
 const GUIDANCE_DEFS = [
   {
@@ -53,9 +55,53 @@ const GUIDANCE_DEFS = [
   {
     code: 'custom-neighbour-helper',
     message: 'custom neighbour helper found; prefer cellGraph().neighbours/kingNeighbours when applicable',
+    // King must start the name or a camelCase word ("kingMoves", "antiKing");
+    // a bare [Kk]ing alternation also matches "Marking"/"checking". A helper
+    // defined *on top of* the cell graph is idiomatic, not custom.
     patterns: [
-      /\bfunction\s+\w*(?:[Nn]eighbou?r|[Oo]rthogonal|[Kk]ing)\w*\s*\(/g,
-      /\bconst\s+\w*(?:[Nn]eighbou?r|[Oo]rthogonal|[Kk]ing)\w*\s*=/g,
+      /\bfunction\s+(?:\w*(?:[Nn]eighbou?r|[Oo]rthogonal|King)\w*|king\w*)\s*\(/g,
+      /\bconst\s+(?:\w*(?:[Nn]eighbou?r|[Oo]rthogonal|King)\w*|king\w*)\s*=/g,
+    ],
+    // Skip helpers built on the cell graph, and plain data tables whose
+    // name merely contains the keyword (e.g. "orthogonalPinkLines = [").
+    excludeLine: /\bcellGraph\(|\bgraph\.|\.step\(|\.neighbours\(|\.kingNeighbours\(|=\s*\[/,
+  },
+  {
+    code: 'manual-cell-id-template',
+    // Grid ids only: raw Var groups have no member-id helper yet, so their
+    // `V…${i}` templates are currently the only idiom and are not flagged.
+    message: 'hand-built cell id template found; prefer makeCellId(row, col)',
+    patterns: [
+      /`R\$\{[^`]*\}C/g,
+      /`R\d+C\$\{/g,
+    ],
+  },
+  {
+    code: 'manual-box-arithmetic',
+    message: 'manual box-index arithmetic or box-origin list found; prefer a geometry helper or one named derivation',
+    // Box-cell construction only. Cell→box-index derivations
+    // (Math.floor((row - 1) / 3) style) are not flagged: no box-index
+    // helper exists, so that math is currently the only idiom.
+    patterns: [
+      /\bb[rc]\s*\*\s*\d/g,
+      /'R1C1',\s*'R1C4',\s*'R1C7'/g,
+    ],
+  },
+  {
+    code: 'sum-wire-format',
+    message: 'hand-assembled Sum coefficient string found; comment the coefficient layout and run lint_constraints.js for canonical alternatives (EqualSum, plain Sum)',
+    patterns: [
+      /`[^`\n]*_=_/g,
+      /['"]-?\d+_=_/g,
+    ],
+  },
+  {
+    code: 'zero-indexed-cell-math',
+    // Only the both-arguments wrapper form: a single "+ 1" is usually
+    // legitimate neighbour/offset stepping, not a 0-indexed data table.
+    message: 'a makeCellId wrapper adding 1 to both row and column suggests 0-indexed data; prefer 1-indexed R/C data tables',
+    patterns: [
+      /=>\s*makeCellId\(\s*\w+\s*\+\s*1\s*,\s*\w+\s*\+\s*1\s*\)/g,
     ],
   },
 ];
@@ -80,31 +126,81 @@ Options:
   -h, --help          Print this help and exit.
 
 Guidance is heuristic and advisory by default. It surfaces manual cell-id
-parsing/building, custom neighbour helpers, and very long generated strings
-without Replicate as prompts to reconsider the implementation.`);
+parsing/building, custom neighbour helpers, box-index arithmetic, numValues
+literals that disagree with the declared Shape, hand-assembled Sum coefficient
+strings, and missing rules prose as prompts to reconsider the implementation.
+Lint the generated constraints separately with tools/dev/lint_constraints.js.`);
 
 const lineForIndex = (source, index) => source.slice(0, index).split('\n').length;
 
 const findPatternGuidance = (source) => {
+  const sourceLines = source.split('\n');
   const items = [];
   for (const def of GUIDANCE_DEFS) {
     for (const pattern of def.patterns) {
       pattern.lastIndex = 0;
       for (const match of source.matchAll(pattern)) {
-        items.push({
-          line: lineForIndex(source, match.index),
-          code: def.code,
-          message: def.message,
-        });
+        const line = lineForIndex(source, match.index);
+        if (def.excludeLine?.test(sourceLines[line - 1])) continue;
+        items.push({ line, code: def.code, message: def.message });
       }
     }
   }
   return items;
 };
 
+// Flag NFA.encodeSpec / fnToKey numValues literals that disagree with the
+// script's own `new Shape(...)` declaration. Skipped when the shape (or its
+// value count) can't be determined from a simple literal.
+const findNumValuesGuidance = (source) => {
+  const shapeMatch = /new Shape\(\s*['"](\d+)x(\d+)['"]\s*(?:,\s*(\d+)\s*)?\)/.exec(source);
+  if (!shapeMatch) return [];
+  const numValues = shapeMatch[3]
+    ? Number(shapeMatch[3])
+    : Math.max(Number(shapeMatch[1]), Number(shapeMatch[2]));
+
+  const items = [];
+  const patterns = [
+    /encodeSpec\(\s*[^,()]+,\s*(\d+)/g,
+    /fnToKey\(([^()]|\([^()]*\))*,\s*(\d+)\s*\)/g,
+  ];
+  for (const pattern of patterns) {
+    pattern.lastIndex = 0;
+    for (const match of source.matchAll(pattern)) {
+      const literal = Number(match[match.length - 1]);
+      if (literal === numValues) continue;
+      items.push({
+        line: lineForIndex(source, match.index),
+        code: 'num-values-mismatch',
+        message: `numValues literal ${literal} does not match the declared `
+          + `Shape's ${numValues} values; derive it from the Shape declaration`,
+      });
+    }
+  }
+  return items;
+};
+
+// Require some rule prose somewhere in the script: a comment line that is
+// not a "Field: value" header line (Title/Author/Video/Source and similar).
+const findMissingRulesGuidance = (source) => {
+  const HEADER_FIELD = /^\/\/\s*[A-Z][a-zA-Z ]*:/;
+  for (const rawLine of source.split('\n')) {
+    const line = rawLine.trim();
+    if (line.startsWith('//') && !HEADER_FIELD.test(line)) return [];
+  }
+  return [{
+    line: 1,
+    code: 'missing-rules-comment',
+    message: 'no rules prose found; state the rules being encoded '
+      + '(and any omissions) after the header',
+  }];
+};
+
 const lintSource = (source) => {
   const rawItems = [
     ...findPatternGuidance(source),
+    ...findNumValuesGuidance(source),
+    ...findMissingRulesGuidance(source),
   ];
   const seen = new Set();
   const items = rawItems.filter((item) => {
@@ -117,24 +213,6 @@ const lintSource = (source) => {
   return items;
 };
 
-const constraintType = (line) => {
-  const match = /^\s*\.([^~\s]+)/.exec(line);
-  return match?.[1] || null;
-};
-
-const findGeneratedGuidance = async (source) => {
-  const text = await runSandboxToConstraint(source);
-  const lines = text.split('\n').filter(line => line.trim());
-  if (lines.length < LONG_CONSTRAINT_LINE_THRESHOLD) return [];
-  if (lines.some(line => constraintType(line) === 'Replicate')) return [];
-  return [{
-    line: 1,
-    code: 'long-output-without-replicate',
-    message: `generated ${lines.length} constraint lines and no Replicate; `
-      + 'if many constraints are shifted copies, use Replicate to shorten the string',
-  }];
-};
-
 export const main = async (argv) => {
   const args = parseArgs(argv);
   if (args.help) { printUsage(); return; }
@@ -143,10 +221,7 @@ export const main = async (argv) => {
   let total = 0;
   for (const file of args.files) {
     const source = readFileSync(file, 'utf8');
-    const guidance = [
-      ...lintSource(source),
-      ...await findGeneratedGuidance(source),
-    ];
+    const guidance = lintSource(source);
     if (!guidance.length) {
       console.log(`${file}: OK`);
       continue;

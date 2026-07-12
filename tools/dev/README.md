@@ -9,7 +9,8 @@ the performance CLIs in [`tools/perf/`](../perf/README.md).
 | Command | Purpose |
 | --- | --- |
 | `node tools/dev/fix_constraint_types.js` | Bring the `constraintTypes` declared on puzzle entries in [`data/collections.js`](../../data/collections.js) back in sync with what the app would tag them. `--dry-run` for a read-only report (non-zero exit if out of sync). |
-| `node tools/dev/lint_sandbox_script.js` | Surface targeted sandbox-script authoring guidance. Advisory by default; `--fail-on-guidance` exits non-zero. |
+| `node tools/dev/lint_sandbox_script.js` | Surface targeted authoring guidance on sandbox-script *source*. Advisory by default; `--fail-on-guidance` exits non-zero. |
+| `node tools/dev/lint_constraints.js` | Surface canonicalization and redundancy guidance on *generated constraints* (`.iss` files or stdin via `-`; with `--script`, sandbox scripts it runs itself). Advisory by default; `--fail-on-guidance` exits non-zero. |
 
 Run any script with `--help` for the full option reference.
 
@@ -45,12 +46,17 @@ an empty result means a resolution gap, not that the puzzle has no constraints.
 
 Sandbox scripts can often use helpers exposed by `js/sandbox/env.js` rather than
 rebuilding common geometry by hand. This tool is intentionally advisory: it
-surfaces regex parsing of `R#C#` ids, template-literal builders that should use
-`makeCellId(row, col)`, and custom neighbour helpers that may duplicate
-`cellGraph().neighbours()` / `cellGraph().kingNeighbours()`. It also runs the
-script and reports when the generated constraint string is very long and contains
-no `Replicate`, as a prompt to check whether repeated shifted constraints can be
-compressed.
+surfaces regex parsing and template-literal building of `R#C#` / Var ids that
+should use `makeCellId` or the overlay helpers, custom neighbour helpers that
+may duplicate `cellGraph().neighbours()` / `cellGraph().kingNeighbours()`,
+manual box-index arithmetic, `NFA.encodeSpec` / `Pair.fnToKey` numValues
+literals that disagree with the script's own `new Shape(...)` declaration,
+hand-assembled `Sum` coefficient strings, 0-indexed cell-id wrappers, and
+scripts with no rules prose at all.
+
+This tool lints source only and never executes the script. To check the
+generated constraints, pipe the run_sandbox output through
+`lint_constraints.js` (below).
 
 Treat each item as guidance, not a correctness finding. Adjust the script when
 the suggestion applies, or keep the code when the local implementation is
@@ -62,4 +68,39 @@ node tools/dev/lint_sandbox_script.js data/scripts/my_puzzle.js
 
 # Use as a stricter gate.
 node tools/dev/lint_sandbox_script.js --fail-on-guidance data/scripts/my_puzzle.js
+```
+
+---
+
+### `lint_constraints.js` — surface generated-constraint guidance
+
+Lints the serialized constraint form, so its checks are exact regardless of how
+a script produced the output. It surfaces:
+
+- coefficient `Sum`s that re-encode a native constraint: all-±1 zero-total
+  forms that are `EqualSum` (or `SameValues` for the two-cell equality alias),
+  and all-1 coefficient forms that are plain `Sum`/`Cage`;
+- `Pair`/`PairX` keys whose decoded truth table matches a native relation
+  (`WhiteDot`, `BlackDot`, `X`, `V`, `GreaterThan`) — suggested only when
+  *every* constraint sharing that key is a 2-cell orthogonally-adjacent grid
+  pair: the native classes require adjacency, and a partial replacement would
+  split one drawn rule into two constraint types;
+- NFA machines whose stored alphabet exceeds the Shape's value range (plus one
+  for the multi-segment break symbol). The serializer trims trailing symbols
+  with no transitions, so only this overshoot direction is checkable;
+- Replicate candidates: many constraints sharing one NFA machine, and very
+  long outputs with no `Replicate` at all;
+- redundancy: full-range `Given`s on an unextended Shape, `AllDifferent`s
+  duplicating an enforced row/column/box, duplicate constraint lines, and
+  repeated cells inside all-different-semantics constraints.
+
+```sh
+# Lint stored constraint files.
+node tools/dev/lint_constraints.js data/puzzles/example.iss
+
+# Lint a sandbox script's generated output (the script is run in-process).
+node tools/dev/lint_constraints.js --script my_puzzle.js
+
+# Or lint any constraint text from stdin.
+node tools/debug/run_sandbox.js --file my_puzzle.js | node tools/dev/lint_constraints.js -
 ```

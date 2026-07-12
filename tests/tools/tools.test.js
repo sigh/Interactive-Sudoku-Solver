@@ -24,7 +24,9 @@ import { main as stepMain } from '../../tools/debug/step_analysis.js';
 import { main as hotspotsMain } from '../../tools/debug/search_hotspots.js';
 import { main as traceMain } from '../../tools/debug/decision_trace.js';
 import { main as sandboxMain } from '../../tools/debug/run_sandbox.js';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { main as lintScriptMain } from '../../tools/dev/lint_sandbox_script.js';
+import { main as lintConstraintsMain } from '../../tools/dev/lint_constraints.js';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 
 // The debug CLIs live in tools/debug/; this test lives under tests/.
@@ -218,6 +220,83 @@ await runTest('run_sandbox.js rejects output that fails to build', async () => {
   const { thrown } = await capture(() => sandboxMain(argv('run_sandbox.js',
     '--code', 'return [new Shape("9x9"), new Var("M", "m", 1), new WhiteDot("VM1", "R1C1")];')));
   assert.match(thrown?.message, /fails to build: Invalid cell ID: VM1/);
+});
+
+// The lint tools are guidance heuristics; these cases pin the rules most
+// prone to false positives (name-based helper detection, adjacency-gated
+// native-relation suggestions) alongside one true positive each.
+const lintCase = async (main, script, name, content, ...extraArgs) => {
+  const dir = mkdtempSync(join(tmpdir(), 'lint-test-'));
+  const file = join(dir, name);
+  writeFileSync(file, content);
+  try {
+    return await capture(() => main(argv(script, ...extraArgs, file)));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+};
+
+const SCRIPT_HEADER = `// Title: t\n// Author: a\n// Video: v\n// Source: s\n// Rules prose.\n`;
+
+await runTest('lint_sandbox_script.js passes idiomatic helpers', async () => {
+  // "Marking" contains "king"; a graph.step alias contains "neighbour" —
+  // neither is a custom helper.
+  const { stdout, thrown } = await lintCase(lintScriptMain, 'lint_sandbox_script.js', 's.js',
+    SCRIPT_HEADER
+    + 'function wolfAwareMarking(cells) { return cells; }\n'
+    + 'const leftNeighbour = graph.step(cell, 0, -1);\n'
+    + "return [new Shape('6x6'), new Given('R1C1', 3)];\n");
+  assert.equal(thrown, null, thrown?.message);
+  assert.match(stdout, /: OK/);
+});
+
+await runTest('lint_sandbox_script.js flags numValues/Shape mismatch and id templates', async () => {
+  const { stdout, thrown } = await lintCase(lintScriptMain, 'lint_sandbox_script.js', 's.js',
+    SCRIPT_HEADER
+    + 'const key = Pair.fnToKey((a, b) => a < b, 9);\n'
+    + 'const cells = [1, 2, 3].map(r => `R${r}C1`);\n'
+    + "return [new Shape('6x6'), new Pair(key, 'x', ...cells)];\n");
+  assert.equal(thrown, null, thrown?.message);
+  assert.match(stdout, /num-values-mismatch/);
+  assert.match(stdout, /manual-cell-id-template/);
+});
+
+await runTest('lint_constraints.js suggests native constraints per key group', async () => {
+  // The native suggestion fires only when EVERY Pair sharing the key is a
+  // 2-cell adjacent pair — a partial replacement would split one drawn rule
+  // into two constraint types.
+  const consecutiveKey = 'CoAKgCoAKgCoAC';
+  const allAdjacent = await lintCase(lintConstraintsMain, 'lint_constraints.js', 'c.iss',
+    `.Pair~${consecutiveKey}~_a~R1C1~R1C2\n`
+    + `.Pair~${consecutiveKey}~_b~R4C4~R5C4\n`
+    + '.Sum~0_=_1_1_-1~R5C1~R5C2~R6C1\n');
+  assert.equal(allAdjacent.thrown, null, allAdjacent.thrown?.message);
+  assert.match(allAdjacent.stdout, /pair-native-relation.*2 Pair constraints re-encode WhiteDot/);
+  assert.match(allAdjacent.stdout, /sum-equal-sum/);
+
+  const mixedGroup = await lintCase(lintConstraintsMain, 'lint_constraints.js', 'c.iss',
+    `.Pair~${consecutiveKey}~_a~R1C1~R1C2\n`
+    + `.Pair~${consecutiveKey}~_b~R1C1~R3C3\n`);
+  assert.equal(mixedGroup.thrown, null, mixedGroup.thrown?.message);
+  assert.doesNotMatch(mixedGroup.stdout, /pair-native-relation/);
+});
+
+await runTest('lint_constraints.js --script runs inputs through the sandbox', async () => {
+  const { stdout, thrown } = await lintCase(lintConstraintsMain, 'lint_constraints.js', 's.js',
+    "return [new Shape('9x9'), new Sum('0_=_1_1_-1', 'R5C1', 'R5C2', 'R6C1')];\n",
+    '--script');
+  assert.equal(thrown, null, thrown?.message);
+  assert.match(stdout, /sum-equal-sum/);
+});
+
+await runTest('lint_constraints.js flags redundancy and duplicates', async () => {
+  const { stdout, thrown } = await lintCase(lintConstraintsMain, 'lint_constraints.js', 'c.iss',
+    '.AllDifferent~R1C1~R1C2~R1C3~R1C4~R1C5~R1C6~R1C7~R1C8~R1C9\n'
+    + '.WhiteDot~R2C1~R2C2\n'
+    + '.WhiteDot~R2C1~R2C2\n');
+  assert.equal(thrown, null, thrown?.message);
+  assert.match(stdout, /redundant-all-different.*row 1/);
+  assert.match(stdout, /duplicate-constraint/);
 });
 
 // The shared CLI entry maps a thrown error to a non-zero exit with a clean
