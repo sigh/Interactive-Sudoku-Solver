@@ -736,7 +736,7 @@ export class ChaosConstruction extends SudokuConstraintHandler {
   }
 
   // Phase 1: restricts region labels so label k may first appear only after label k−1,
-  // breaking the label-permutation symmetry (§4 in CHAOS_CONSTRUCTION.md).
+  // breaking the label-permutation symmetry (§4 in chaos_construction.md).
   _enforceCanonicalOrder(grid, pQueue) {
     const regionCellOffset = this._regionCellOffset;
     const regionMask = this._regionMask;
@@ -948,7 +948,7 @@ export class ChaosConstruction extends SudokuConstraintHandler {
   }
 
   // Phase 2b: fixed-point loop — scan shard summaries, apply size/value/full-region
-  // pruning rules, then attempt a hidden-region-value single (§6 in CHAOS_CONSTRUCTION.md).
+  // pruning rules, then attempt a hidden-region-value single (§6 in chaos_construction.md).
   _enforceShardHouseRules(grid, pQueue, shards, regions) {
     // Phase 2: scan summaries, prune shard labels, then use stable witnesses.
     const regionScanData = regions.scanData;

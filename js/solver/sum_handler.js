@@ -4,7 +4,7 @@ const { SudokuConstraintHandler, HandlerUtil, InvalidConstraintError } = await i
 const { GEOMETRY_MAX, GEOMETRY_9x9 } = await import('../cell_geometry.js' + self.VERSION_PARAM);
 
 // Enforces a weighted linear equation `Σ coeff·value = sum` over the cells
-// (killer cages, arithmetic sums, equalities). See SUM.md for the full
+// (killer cages, arithmetic sums, equalities). See sum.md for the full
 // algorithm.
 export class Sum extends SudokuConstraintHandler {
   _rawSum = -1;

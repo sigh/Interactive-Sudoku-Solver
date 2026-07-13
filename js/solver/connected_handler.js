@@ -67,7 +67,7 @@ const MULTI_DOOR = 0xfffe;
 // cell is `cellOffset + i`, and grid adjacency defines the connectivity
 // graph.
 //
-// See handler_docs/CONNECTED_VALUES.md for the algorithm and its soundness
+// See handler_docs/connected_values.md for the algorithm and its soundness
 // arguments; § references below are into that document.
 export class ConnectedValues extends SudokuConstraintHandler {
   // `values` is one set, or a list of pairwise-disjoint single-value sets (a

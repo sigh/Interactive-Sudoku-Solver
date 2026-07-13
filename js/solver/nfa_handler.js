@@ -92,7 +92,7 @@ export const compressNFA = (nfa) => {
 
 // Enforces a sequential constraint (regex / line constraints) by propagating a
 // compiled NFA across the cells' candidate sets to prune unsupported values.
-// See handler_docs/NFA.md for the full algorithm.
+// See handler_docs/nfa.md for the full algorithm.
 export class NFAConstraint extends SudokuConstraintHandler {
   constructor(segments, cnfa) {
     super(segments.flat());

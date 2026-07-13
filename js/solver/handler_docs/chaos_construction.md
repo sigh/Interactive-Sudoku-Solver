@@ -36,7 +36,7 @@ auxiliary clues defined in terms of the same unknown regions.
 ### 2.1 Candidates as bitmasks
 
 The engine stores every cell's possible values as a 16-bit integer, one bit per
-value (see [SOLVER_ENGINE.md](SOLVER_ENGINE.md) §"Cell Candidates as Bitmasks").
+value (see [SOLVER_ENGINE.md](../SOLVER_ENGINE.md) §"Cell Candidates as Bitmasks").
 Region labels are encoded the same way. Concretely, the grid state array holds
 two parallel lanes:
 

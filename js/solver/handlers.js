@@ -2968,7 +2968,7 @@ export class CountDistinct extends SudokuConstraintHandler {
     return !!(initialGridCells[this._controlCell] &= rangeMask);
   }
 
-  // NValue propagator (`control = #distinct(counted)`). See COUNT_DISTINCT.md for
+  // NValue propagator (`control = #distinct(counted)`). See count_distinct.md for
   // the full derivation; the section references below point into it.
   enforceConsistency(grid, pQueue) {
     const countedCells = this._countedCells;
@@ -3044,7 +3044,7 @@ export class CountDistinct extends SudokuConstraintHandler {
 
     // Min-support set (§4.2): one branchless pass over the packing. `supported`
     // starts as every covered value; each cell that can stand in for a picked
-    // owner narrows that owner's bits to its footprint. See COUNT_DISTINCT.md §4.2.
+    // owner narrows that owner's bits to its footprint. See count_distinct.md §4.2.
     let supportedMask = 0;
     if (minAllowed) {
       supportedMask = packUsed;
