@@ -28,9 +28,9 @@ A handler may hold several value sets over the same cells, each independently
 forming its own region (§5); everything below describes one set's pass.
 
 The cells must be a whole layer in order: the grid itself, or a var-cell
-group with one cell per grid cell. Grid adjacency defines the connectivity
-graph either way, and position `i`'s search cell is simply `cellOffset + i`,
-so the handler stores one offset instead of a cell mapping.
+group with one cell per grid cell. The layer's column count defines adjacency,
+and position `i`'s search cell is simply `cellOffset + i`, so the handler stores
+one offset instead of a cell mapping.
 
 `V` is held as a candidate bitmask `valueMask`, so per-cell classification is
 two bitwise tests against the cell's current candidate mask `D`:
@@ -66,14 +66,19 @@ Two consequences drive the whole handler:
   must lie inside that cell's possible component. A possible component with no
   decided cell can never host the region, so *every* cell in it can be excluded.
 
-### 2.2 The zero-decided early-out
+### 2.2 The zero-decided early-out and singleton support
 
 With no decided cell neither consequence applies: any non-empty possible
 component could still host the region, so nothing can be checked or pruned
-beyond non-emptiness. The pass returns immediately:
+beyond non-emptiness. Non-emptiness does make one deduction: if exactly one
+cell can still belong to the set, that sole support must belong to it. The pass
+returns immediately after checking this:
 
 ```text
-if numDecided = 0: return numPossible ≠ 0
+if numDecided = 0:
+    if numPossible = 0: return CONFLICT
+    if numPossible = 1: force the sole possible cell into valueMask
+    return OK
 ```
 
 This skips the traversal entirely for the bulk of early-search wakes, when the
@@ -84,13 +89,14 @@ constraint has not yet committed to any region cell.
 ```text
 function enforceConsistency(grid):
     classify every cell into states[]; count numPossible, numDecided   # §1
-    if numDecided = 0: return numPossible ≠ 0                          # §2.2
+    if numDecided = 0: check non-emptiness / force singleton support   # §2.2
 
-    BFS the possible graph from one decided seed                       # §3
+    traverse the possible graph from one decided seed                  # §3
+        → visited marks, numBlobs, anySingleDoor
     if some decided cell is unvisited: return CONFLICT
     exclude every unvisited possible cell
     if numPossible = numDecided: return OK        # region complete
-    if numDecided = 1: return OK                  # a single blob never forces
+    if numBlobs < 2 or not anySingleDoor: return OK   # forcing cannot fire §4.1
 
     loop:                                         # §4.3
         forced ← forceDoors()                     # §4
@@ -99,9 +105,15 @@ function enforceConsistency(grid):
         if numPossible = numDecided: return OK
 ```
 
-## 3. The Single-Traversal Check
+The traversal's blob count and door tally are what make the last guard exact:
+it admits a forcing round *only* when one is going to force something. That
+matters because the round is not cheap — it re-traverses every blob — and on
+these puzzles it almost never fires. Gating it removes 62–99.9% of the rounds
+(§4.4).
 
-All decided cells must end up in one region, so one BFS over the possible
+## 3. The Single Traversal
+
+All decided cells must end up in one region, so one traversal of the possible
 graph, seeded at *any* decided cell, answers everything at once:
 
 - **An unvisited decided cell** is in a different possible component from the
@@ -113,11 +125,55 @@ graph, seeded at *any* decided cell, answers everything at once:
 - **Everything visited and fully decided** (`numPossible = numDecided`) means
   the region is complete and connected: a leaf accept.
 
-The BFS counts visited possible and visited decided cells as it marks, so both
-tests are counter comparisons; the prune loop only runs when the possible count
-fell short, and stops after finding exactly the shortfall. Since nothing new
-can be marked once every possible cell is visited, the scan also exits early at
-that point — the common fully-connected case skips the whole tail of the queue.
+The traversal counts visited possible and visited decided cells as it marks, so
+both tests are counter comparisons; the prune loop only runs when the possible
+count fell short, and stops after finding exactly the shortfall. Since nothing
+new can be marked once every possible cell is visited, the traversal also exits
+early at that point — the common fully-connected case skips the whole tail of
+the queue.
+
+### 3.1 The same traversal decomposes the decided cells
+
+The traversal walks the *possible* graph, so it reaches decided cells through
+undecided detours, in an order that interleaves the blobs — two cells of one
+blob can arrive by different routes, and two cells of different blobs can land
+side by side in the queue. Visit order alone therefore says nothing about blob
+membership. But that is an artefact of the queue discipline, not of the graph,
+and changing the discipline makes the blobs fall out for free:
+
+> **Drain decided cells eagerly.** Decided cells go on a **LIFO**, undecided
+> cells on a **FIFO**, and the LIFO is always emptied before the FIFO is touched
+> again. A blob is therefore entered, exhausted, and left in one uninterrupted
+> run — so a new blob begins exactly when a decided cell is met with the LIFO
+> empty.
+
+Concretely, the moment an undecided cell's expansion finds an unvisited decided
+neighbour, that neighbour's whole blob is drained on the spot. This is what
+makes the count exact: an undecided cell can touch the *same* blob on two or
+three sides, and by the time its remaining neighbours are read, the drain has
+marked them, so the blob is counted once. (Deferring the drain instead — banking
+the candidates and deduplicating later — also works, but needs a seed list and
+an extra visited-check; draining eagerly needs neither.)
+
+Because the drain interrupts the undecided cell mid-expansion, that cell is left
+at the FIFO head and **expanded again** afterwards rather than resumed. Re-
+expansion is idempotent: everything the drain marked is now skipped, so the only
+thing the second pass can still find is a neighbour in a *different*, not-yet-
+seen blob — which is precisely what it is there to find.
+
+### 3.2 And tallies each blob's door
+
+While draining a blob, every one of its cells' neighbours is read anyway, so the
+blob's doors (§4.1) cost nothing but a comparison on a byte already loaded. The
+door slot is a three-value lattice — none seen / exactly this cell / several —
+and re-seeing a door the blob already has leaves it alone, which is the only
+distinctness the rule needs: past one, the count never matters again.
+
+The pass keeps just one bit of this: **did any blob end up with exactly one
+door?** Which blob, and which door, a forcing round rediscovers for itself
+(§4.4). Note a door is by definition an undecided *neighbour of a decided cell*,
+so the drain always marks it — and the dead-component prune only removes
+*unmarked* cells. The prune can therefore never invalidate the tally.
 
 ## 4. Door Forcing
 
@@ -183,6 +239,36 @@ round: a re-traversal could neither fail nor prune. Only the blob structure
 evolves (blobs merge and grow), so each round costs one traversal of the
 decided subgraph, not of the whole possible graph. The loop terminates because
 each round decides at least one more cell.
+
+### 4.4 The gate: rounds run only when they will force
+
+A round is not free — it re-traverses every blob and re-derives every door — and
+on real puzzles it almost always forces *nothing*. The rule fires only when two
+blobs exist **and** one of them has a single door (§4.1), and §3 already
+established both. So the round is run only when that conjunction holds:
+
+```text
+if numBlobs < 2 or not anySingleDoor: skip forcing entirely
+```
+
+This is exact, not a heuristic filter: when the test fails, a round would have
+traversed every blob and forced nothing, so skipping it cannot change a single
+deduction. The search is bit-for-bit identical with and without the gate.
+
+It is worth stating why nothing *cheaper* than §3's traversal can decide this.
+Connected-component count is not locally computable — for 4-connected cells the
+Euler characteristic `V − E + Q` (cells, adjacent pairs, filled 2×2 blocks) gives
+components *minus holes*, not components — so no per-cell or per-edge tally can
+tell one blob from two. Nor can a per-cell proxy stand in for the single-door
+condition: a blob's *interior* cells have zero undecided neighbours, exactly like
+the cells of a sealed one-door blob, so "some decided cell has ≤1 undecided
+neighbour" is true almost always and screens out nothing. Something has to walk
+the decided subgraph. §3's traversal is already walking it — the gate's whole
+trick is to read the answer off a walk that was happening anyway.
+
+Measured on the handler's puzzles, the gate removes 62% (reciprocals), 95%
+(Nordschleife, whispers_in_the_maze, rat_run_38) and 99.9% (lupins_loop_4, from
+114,804 rounds down to 96) of forcing rounds.
 
 ## 5. Multiple Value Sets
 
@@ -338,17 +424,47 @@ untouched.
   reads classification from the grid *inside the traversals* needs a second
   marks structure and pays a second load on the handler's hottest lines.
   (Re-deriving it once per set pass, as §5.1 does, is the cheap use; the
-  in-loop read is the expensive one.) This was measured, not assumed:
-  grid-direct variants (separate marks as a byte array or bitset, with or
-  without direct grid indexing) and a bitboard rewrite all lost 4–10% of
-  solve time on door-forcing-heavy puzzles, and caching classification for
-  the forcing rounds alone did not recover it.
+  in-loop read is the expensive one.)
+
+  The arithmetic is decisive because the pass is **edge-dominated**. Classifying
+  costs one load and one store per cell; the traversal examines four edges per
+  possible cell, each one load of `neighbors` and one of `states`. Working off
+  the grid deletes the per-cell store but cannot delete the marks — "visited" is
+  not in the grid — so every edge pays a second load. On a 9×9 that trades ~81
+  stores for ~4 × 39 ≈ 157 extra loads, and loses about 2:1 before cache effects.
+  Edges outnumber cells four to one, and that ratio is the whole argument.
+
+  It was also measured, before the traversal was reworked: grid-direct variants
+  (separate marks as a byte array or bitset, with or without direct grid
+  indexing) and a bitboard rewrite all lost 4–10% of solve time on
+  door-forcing-heavy puzzles, and caching classification for the forcing rounds
+  alone did not recover it. The rework only widened the gap — forcing rounds now
+  fire on ~0.1% of passes (§4.4), so the pass is almost purely the one
+  edge-heavy traversal, which is exactly where the extra load would land.
+
+  Two escapes do not work either. Generation-stamping the state byte, to skip
+  the store on excluded cells, saves ~40 stores per pass but puts the stamp
+  arithmetic into every edge test — the same losing shape. And marking in the
+  grid's spare candidate bits (a 9×9 uses 9 of 16) would need no second
+  structure at all, but the grid is the search state: copied per node, read by
+  every other handler. Scratch marks cannot live there.
 - **The byte layout.** The state codes are chosen as bits — bit 0 "may be in
   the region", bit 1 "certainly is" (EXCLUDED = 0, UNDECIDED = 1, DECIDED = 3)
   — and traversal marks fold in as a VISITED bit (4). The states array is
-  rebuilt by classification each pass, so marks never need resetting. The BFS
-  inner test is a single load and mask-compare: unvisited-possible is
-  `state ∧ 5 = 1`, and `state ≫ 1` counts the decided cells among them.
+  rebuilt by classification each pass, so marks never need resetting. Each of
+  §3's two branches is then an exact byte compare: `state = DECIDED` is an
+  unvisited decided cell (a blob to grow), `state = UNDECIDED` an unvisited
+  undecided one. Testing for a **door** is the one place a mask is needed —
+  `state ∧ DECIDED = UNDECIDED`, bit 0 set and bit 1 clear — because a door
+  counts whether or not it is already marked, and masking with `UNDECIDED`
+  alone would also match a *marked decided* cell, which carries bit 0 too.
+- **The traversal's two ends of one array.** §3's FIFO of undecided cells grows
+  up from the front of `_traversalBuffer`, and the LIFO of the blob being drained
+  grows down from its back. They cannot collide: the FIFO holds each undecided
+  cell at most once and the LIFO only ever holds decided cells, so together
+  they never hold more than one entry per possible cell, and `numUndecided + numDecided ≤
+  numCells`. So the blob decomposition costs no memory at all — the handler
+  allocates exactly the two arrays it always did.
 - **Mark polarity in forcing rounds.** After §3 every surviving cell has
   VISITED set, and every blob traversal visits every decided cell, so forcing
   rounds reuse the byte by alternating which polarity of the decided cells'
@@ -358,24 +474,29 @@ untouched.
   visited polarity so the whole decided set flips together. This is what
   extends the one-load fusion into the forcing rounds: no per-round mark
   resets and no second marks structure.
-- **One queue, doors banked in seed slots.** Blob `b`'s traversal queue starts
-  at `queue[numBlobs]`, and when the blob completes, its door value overwrites
-  its own dead seed slot: the banked doors form a prefix that later traversals
-  start past, so doors and the live queue are disjoint by construction. The
-  traversals stay in bounds because banked blobs hold one slot each and every
-  blob has at least one cell, so `numBlobs + size(blob) ≤ numDecided ≤
-  numCells`.
+- **Two ends of one array, again** (forcing rounds). A round uses the same
+  split as §3, for the same reason: the banked doors take one slot per blob at
+  the front of `_traversalBuffer`, and the blob being traversed is a LIFO from its
+  back.
+  They cannot meet — every banked blob holds one slot and has at least one cell,
+  so `numBlobs + size(blob) ≤ numDecided ≤ numCells`. A round reuses the
+  `_traversalBuffer` §3 traversed with, whose contents are dead by then.
 - **Door sentinels.** `NO_CELL` (0xffff, "no door seen") and `MULTI_DOOR`
   (0xfffe, "several doors") both sort above any real cell-list index, so
-  "nothing to force" is the single comparison `door ≥ MULTI_DOOR`.
-- **Blob scan order is load-bearing.** The blob scan starts at cell-list index
-  0 every round. A forced door can sit below the first classified decided
-  cell and seed a blob in a later round; changing the scan start would reorder
-  blob enumeration and hence the order of propagation-queue events, perturbing
-  the search.
+  "nothing to force" is the single comparison `door ≥ MULTI_DOOR`, and "exactly
+  one door" — §3.2's tally and a round's own test alike — is `door < MULTI_DOOR`.
+- **Blob scan order is load-bearing** (forcing rounds). The blob scan starts at
+  cell-list index 0 every round. A forced door can sit below the first classified
+  decided cell and seed a blob in a later round; changing the scan start would
+  reorder blob enumeration and hence the order of propagation-queue events,
+  perturbing the search. §3's traversal deliberately does *not* feed its blobs to
+  the round for this reason: it finds them in traversal order, not cell order, so
+  handing them over would need each blob's minimum cell tracked and the list
+  re-sorted. It passes only the two counters the gate needs (§4.4), and a round
+  that does run rediscovers its blobs in the order it requires.
 - **Stateless across passes.** The handler recomputes everything from the grid
   on every wake and keeps no cross-pass or per-branch state, which is what
   makes it safe to nest under composite handlers (e.g. `Or`). Incremental
   connectivity was considered and rejected: per-branch state would be O(cells)
-  and is copied per search node, which costs the same order as the single BFS
-  it would save.
+  and is copied per search node, which costs the same order as the single
+  traversal it would save.

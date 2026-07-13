@@ -116,6 +116,56 @@ await runTest('ConnectedValues: empty region fails', () => {
   assert.equal(handler.enforceConsistency(grid, createAccumulator()), false);
 });
 
+await runTest('ConnectedValues: sole possible cell is forced for non-emptiness', () => {
+  const context = makeContext();
+  const handler = new ConnectedValues(context.geometry.numGridCells, 0, [1]);
+  initHandler(context, handler);
+
+  const assignments = {};
+  for (let cell = 0; cell < 16; cell++) assignments[cell] = [2, 3];
+  assignments[6] = [1, 2];
+  const grid = applyCandidates(context.grid, assignments);
+  const acc = createAccumulator();
+
+  assert.equal(handler.enforceConsistency(grid, acc), true);
+  assertCandidates(grid, { 6: [1] });
+  assertTouched(acc, [6]);
+});
+
+await runTest('ConnectedValues: sole support narrows to a multi-value set', () => {
+  const context = makeContext();
+  const handler = new ConnectedValues(context.geometry.numGridCells, 0, [1, 2]);
+  initHandler(context, handler);
+
+  const assignments = {};
+  for (let cell = 0; cell < 16; cell++) assignments[cell] = [3, 4];
+  assignments[9] = [1, 2, 3];
+  const grid = applyCandidates(context.grid, assignments);
+  const acc = createAccumulator();
+
+  assert.equal(handler.enforceConsistency(grid, acc), true);
+  assertCandidates(grid, { 9: [1, 2] });
+  assertTouched(acc, [9]);
+});
+
+await runTest('ConnectedValues: singleton supports feed merged sets in one pass', () => {
+  const context = makeContext();
+  const handler = new ConnectedValues(
+    context.geometry.numGridCells, 0, [[1], [2]]);
+  initHandler(context, handler);
+
+  const assignments = {};
+  for (let cell = 0; cell < 16; cell++) assignments[cell] = [3, 4];
+  assignments[0] = [1, 2];
+  assignments[1] = [2, 3];
+  const grid = applyCandidates(context.grid, assignments);
+  const acc = createAccumulator();
+
+  assert.equal(handler.enforceConsistency(grid, acc), true);
+  assertCandidates(grid, { 0: [1], 1: [2] });
+  assertTouched(acc, [0, 1]);
+});
+
 await runTest('ConnectedValues: multi-value region counts mixed in-set candidates as decided', () => {
   const context = makeContext();
   const handler = new ConnectedValues(context.geometry.numGridCells, 0, [1, 2]);
@@ -398,7 +448,7 @@ await runTest('ConnectedValues: unknown variable group fails to build', () => {
 });
 
 // ===========================================================================
-// One-door forcing (ENABLE_DOOR_FORCING, on by default).
+// One-door forcing.
 // ===========================================================================
 
 await runTest('ConnectedValues door forcing: single-door corridor cascades', () => {
@@ -839,6 +889,18 @@ await runTest('ConnectedBorder: requires exactly two values', () => {
     const handler = new ConnectedBorder(BORDER_4X4, values);
     assert.throws(() => initHandler(context, handler), InvalidConstraintError);
   }
+});
+
+await runTest('ConnectedBorder: accepts a one-row perimeter', () => {
+  const context = new GridTestContext({ gridSize: [1, 4] });
+  const perimeter = context.geometry.cellGraph().perimeter(0);
+  const handler = new ConnectedBorder(perimeter, [1, 2]);
+  initHandler(context, handler);
+
+  const grid = applyCandidates(context.grid, {
+    0: [1], 1: [1], 2: [2], 3: [2],
+  });
+  assert.equal(handler.enforceConsistency(grid, createAccumulator()), true);
 });
 
 await runTest('ConnectedValues: optimizer merges same-cell instances', async () => {

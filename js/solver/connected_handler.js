@@ -2,14 +2,11 @@ const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM)
 const { SudokuConstraintHandler, InvalidConstraintError } = await import('./handlers.js' + self.VERSION_PARAM);
 const { memoize } = await import('../util.js' + self.VERSION_PARAM);
 
-// Sentinel for "no neighbour" (grid edge) in the neighbour table, and for
-// "no cell" generally.
 export const NO_CELL = 0xffff;
 
-// Position-indexed orthogonal-neighbour lookup for `numCells` cells laid out in
-// `numCols` columns (the last row may be partial): neighbors[i * 4 + dir] is the
-// neighbour of position i in direction dir (0 left, 1 right, 2 up, 3 down), or
-// `sentinel` at an edge.
+// neighbors[i * 4 + dir] is the orthogonal neighbour of position i (dir: 0 left,
+// 1 right, 2 up, 3 down), or `sentinel` at an edge. `numCells` cells in `numCols`
+// columns, the last row possibly partial.
 const buildNeighborTable = (numCells, numCols, sentinel) => {
   const neighbors = new Uint16Array(numCells * 4).fill(sentinel);
   for (let i = 0; i < numCells; i++) {
@@ -23,19 +20,16 @@ const buildNeighborTable = (numCells, numCols, sentinel) => {
   return neighbors;
 };
 
-// Full grid, using NO_CELL at the edges. Memoized by grid dimensions so it is
-// built once and shared across handlers.
+// Full grid, using NO_CELL at the edges.
 export const neighborTable = memoize((numRows, numCols) =>
   buildNeighborTable(numRows * numCols, numCols, NO_CELL));
 
 // A cell layer whose missing-neighbour sentinel is `numCells` — a permanently
-// EXCLUDED states slot, so traversals need no edge checks. Depends only on the
-// layer's shape, so it is memoized and shared across handlers.
+// EXCLUDED states slot, so traversals need no edge checks.
 const layerNeighborTable = memoize((numCells, numCols) =>
   buildNeighborTable(numCells, numCols, numCells));
 
-// Returns `cell`'s in-grid orthogonal neighbours when every one of them is in
-// `cellSet` (the cell is "enclosed"), otherwise null.
+// `cell`'s in-grid neighbours if every one of them is in `cellSet`, else null.
 export const enclosingNeighbors = (gridNeighbors, cell, cellSet) => {
   const base = cell * 4;
   const neighbors = [];
@@ -48,32 +42,24 @@ export const enclosingNeighbors = (gridNeighbors, cell, cellSet) => {
   return neighbors;
 };
 
-// Cell classification within a pass (see enforceConsistency). Chosen so that
-// bit 0 = "may hold an in-set value" and bit 1 = "certainly holds one".
+// Bit 0 = "may hold an in-set value", bit 1 = "certainly holds one".
 const EXCLUDED = 0;
 const UNDECIDED = 1;
 const DECIDED = 3;
 const VISITED = 4;
 
-// Sentinel for "several doors" in door forcing; both sentinels sort above any
-// real cell index so `door >= MULTI_DOOR` means "nothing to force".
+// "Several doors". Sorts above any real cell index but below NO_CELL, so
+// `door >= MULTI_DOOR` means "nothing to force".
 const MULTI_DOOR = 0xfffe;
 
 // Enforces that, for each of its value sets, the cells holding one of the
 // set's values form a single non-empty orthogonally-connected region.
 //
-// The handler covers a whole cell layer — the grid itself (cellOffset 0),
-// or a var-cell group with one cell per grid cell — so position i's search
-// cell is `cellOffset + i`, and grid adjacency defines the connectivity
-// graph.
-//
 // See handler_docs/connected_values.md for the algorithm and its soundness
 // arguments; § references below are into that document.
 export class ConnectedValues extends SudokuConstraintHandler {
   // `values` is one set, or a list of pairwise-disjoint single-value sets (a
-  // multi-value set is only supported alone). The optimizer merges same-layer
-  // instances into one multi-set handler and adds the joint ConnectedCrossing/
-  // ConnectedBorder handlers (§5).
+  // multi-value set is only supported alone).
   constructor(numGridCells, cellOffset, values) {
     const cells = new Uint16Array(numGridCells);
     for (let i = 0; i < numGridCells; i++) cells[i] = cellOffset + i;
@@ -84,7 +70,7 @@ export class ConnectedValues extends SudokuConstraintHandler {
       values.length && Array.isArray(values[0]) ? values : [values];
     this._valueMasks = null;
     this._neighbors = null;
-    this._queue = null;
+    this._traversalBuffer = null;
     this._states = null;
   }
 
@@ -122,49 +108,25 @@ export class ConnectedValues extends SudokuConstraintHandler {
     }
 
     const numCells = this.cells.length;
-    if (numCells !== geometry.numGridCells ||
-      this._cellOffset !== this.constructor._layerStart(
-        geometry, this._cellOffset)) {
+    // The grid, or a var-cell group with one cell per grid cell. A group may set
+    // its own width, so the layer need not have the grid's shape.
+    const layer = this._cellOffset === 0 ?
+      { count: geometry.numGridCells, columns: geometry.numCols } :
+      geometry.varCellGroups().find((g) => g.cells[0] === this._cellOffset);
+    if (numCells !== geometry.numGridCells || layer?.count !== numCells) {
       throw new InvalidConstraintError(
         'Connected Values must cover the grid, or a var-cell group with one cell per grid cell.');
     }
-    // The layer is laid out in `numCols` columns — the grid's, or a var-cell
-    // group's own — so the layer need not match the grid's shape.
-    let numCols = geometry.numCols;
-    if (this._cellOffset !== 0) {
-      const group = geometry.varCellGroups().find(
-        (g) => g.cells[0] === this._cellOffset);
-      if (group) numCols = group.columns || geometry.numCols;
-    }
-    this._neighbors = layerNeighborTable(numCells, numCols);
-    this._queue = new Uint16Array(numCells);
-    // One extra states entry for the sentinel neighbor index numCells.
-    // Scratch, classified fresh from the grid each pass.
+    this._neighbors = layerNeighborTable(
+      numCells, layer.columns || geometry.numCols);
+    this._traversalBuffer = new Uint16Array(numCells);
+    // One extra entry for the sentinel neighbor index numCells.
     this._states = new Uint8Array(numCells + 1);
 
     return true;
   }
 
-  // Start index of `cell`'s layer (the grid itself, or a full-grid var-cell
-  // group).
-  static _layerStart(geometry, cell) {
-    if (cell < geometry.numGridCells) return 0;
-    for (const group of geometry.varCellGroups()) {
-      const start = group.cells[0];
-      if (cell < start || cell >= start + group.count) continue;
-      if (group.count !== geometry.numGridCells) {
-        throw new InvalidConstraintError(
-          'Connected Values var cells must be from a group with one cell per grid cell.');
-      }
-      return start;
-    }
-    throw new InvalidConstraintError('Connected Values: unknown cell.');
-  }
-
   enforceConsistency(grid, pQueue) {
-    // One pass over the sets: disjoint sets feed each other through the grid
-    // (an exclusion from one decides a cell for another). The joint crossing
-    // and border rules are separate handlers (§5).
     const numSets = this._valueMasks.length;
     for (let s = 0; s < numSets; s++) {
       if (!this._enforceSet(grid, pQueue, s)) return false;
@@ -172,18 +134,19 @@ export class ConnectedValues extends SudokuConstraintHandler {
     return true;
   }
 
-  // Enforces the value set with index `s` (§2-4). Returns false on conflict,
-  // true otherwise.
+  // Enforces the value set with index `s` (§2-4).
   _enforceSet(grid, pQueue, s) {
     const cellOffset = this._cellOffset;
     const numCells = this.cells.length;
     const valueMask = this._valueMasks[s];
     const states = this._states;
 
-    // states is scratch: classify this set fresh from the grid.
+    // The traversal may start at any decided cell (§3), so keep the last one
+    // seen.
     let numPossible = 0;
     let numDecided = 0;
-    let firstDecided = 0;
+    let possibleCell = 0;
+    let seedCell = 0;
     for (let i = 0; i < numCells; i++) {
       const value = grid[cellOffset + i];
       if (!(value & valueMask)) {
@@ -191,51 +154,109 @@ export class ConnectedValues extends SudokuConstraintHandler {
         continue;
       }
       numPossible++;
+      possibleCell = i;
       if (value & ~valueMask) {
         states[i] = UNDECIDED;
       } else {
         states[i] = DECIDED;
-        if (!numDecided++) firstDecided = i;
+        numDecided++;
+        seedCell = i;
       }
     }
 
-    // With no decided cell only non-emptiness can be checked (§2.2).
-    if (numDecided === 0) return numPossible !== 0;
+    // With no decided cell, non-emptiness fails on zero supports and forces the
+    // sole support when exactly one remains.
+    if (numDecided === 0) {
+      if (numPossible === 0) return false;
+      if (numPossible === 1) {
+        grid[cellOffset + possibleCell] &= valueMask;
+        pQueue.addForCell(cellOffset + possibleCell);
+      }
+      return true;
+    }
 
     const neighbors = this._neighbors;
-    const queue = this._queue;
+    const buffer = this._traversalBuffer;
 
-    // A single traversal from any decided cell answers everything (§3):
-    // unvisited decided => fail, unvisited possible => prune, and once every
-    // possible cell is visited nothing more can be marked — exit early.
+    // Traverse the possible cells from `seedCell` (§3). Undecided cells queue
+    // FIFO from the front of `buffer`, the blob being drained is a LIFO from its
+    // back; the ends cannot meet (§6).
+    let numBlobs = 0;
+    let anySingleDoor = false;
+    let queueHead = 0;
     let queueSize = 0;
-    let visitedPossible = 1;
-    let visitedDecided = 1;
-    queue[queueSize++] = firstDecided;
-    states[firstDecided] |= VISITED;
-    for (let head = 0; head < queueSize && visitedPossible < numPossible;
-      head++) {
-      const cell = queue[head];
+    let visitedDecided = 0;
+    let seed = seedCell;
+
+    while (true) {
+      if (seed !== NO_CELL) {
+        numBlobs++;
+        let door = NO_CELL;
+        let stackTop = numCells;
+        buffer[--stackTop] = seed;
+        states[seed] = DECIDED | VISITED;
+        visitedDecided++;
+        while (stackTop < numCells) {
+          const cell = buffer[stackTop++];
+          const offset = cell << 2;
+          for (let dir = 0; dir < 4; dir++) {
+            const neighbor = neighbors[offset + dir];
+            const state = states[neighbor];
+            if (state === DECIDED) {
+              states[neighbor] = DECIDED | VISITED;
+              visitedDecided++;
+              buffer[--stackTop] = neighbor;
+            } else if ((state & DECIDED) === UNDECIDED) {
+              // Undecided, marked or not — a door either way. Masking with
+              // UNDECIDED would also match a marked decided cell (§6).
+              if (door !== neighbor) {
+                door = door === NO_CELL ? neighbor : MULTI_DOOR;
+              }
+              if (state === UNDECIDED) {
+                states[neighbor] = UNDECIDED | VISITED;
+                buffer[queueSize++] = neighbor;
+              }
+            }
+          }
+        }
+        anySingleDoor ||= door < MULTI_DOOR;
+        seed = NO_CELL;
+        continue;
+      }
+
+      // Nothing left to expand, or every possible cell is already marked.
+      if (queueHead === queueSize ||
+        visitedDecided + queueSize === numPossible) break;
+
+      // Drain a decided neighbour's blob before reading this cell's remaining
+      // neighbours, or a blob touched on two sides counts twice — so the cell
+      // stays at the head and is expanded again after (§3.1).
+      const cell = buffer[queueHead];
       const offset = cell << 2;
       for (let dir = 0; dir < 4; dir++) {
         const neighbor = neighbors[offset + dir];
         const state = states[neighbor];
-        if ((state & (VISITED | UNDECIDED)) !== UNDECIDED) continue;
-        states[neighbor] = state | VISITED;
-        visitedPossible++;
-        visitedDecided += state >> 1;
-        queue[queueSize++] = neighbor;
+        if (state === DECIDED) {
+          seed = neighbor;
+          break;
+        }
+        if (state === UNDECIDED) {
+          states[neighbor] = UNDECIDED | VISITED;
+          buffer[queueSize++] = neighbor;
+        }
       }
+      if (seed === NO_CELL) queueHead++;
     }
 
     if (visitedDecided < numDecided) return false;
 
+    const visitedPossible = visitedDecided + queueSize;
     if (visitedPossible < numPossible) {
       let toPrune = numPossible - visitedPossible;
       for (let i = 0; toPrune; i++) {
         if ((states[i] & (VISITED | UNDECIDED)) !== UNDECIDED) continue;
-        // Unvisited cells are undecided (unvisited decided failed above),
-        // so stripping the value mask cannot empty them.
+        // Unvisited cells are undecided, so stripping the value mask cannot
+        // empty them.
         states[i] = EXCLUDED;
         grid[cellOffset + i] &= ~valueMask;
         pQueue.addForCell(cellOffset + i);
@@ -243,15 +264,15 @@ export class ConnectedValues extends SudokuConstraintHandler {
       }
       numPossible = visitedPossible;
     }
-    // Fully decided and unsplit: the region is complete.
     if (numPossible === numDecided) return true;
 
-    // A single decided cell is a single blob, which never forces.
-    if (numDecided === 1) return true;
+    // Exactly when forcing fires (§4.1), so a round only runs if it will force
+    // (§4.4). The prune cannot invalidate it: only unmarked cells are pruned.
+    if (numBlobs < 2 || !anySingleDoor) return true;
 
-    // Door forcing to a fixed point (§4). Forcing leaves the possible graph
-    // unchanged, so the traversal above never reruns; rounds re-mark cheaply
-    // by alternating the decided cells' VISITED polarity (§6).
+    // Force to a fixed point (§4.3). Each round must re-mark the decided cells,
+    // so rather than clear the marks, alternate which VISITED polarity counts as
+    // unmarked (§6).
     let unvisitedDecidedState = DECIDED | VISITED;
     while (true) {
       const forced = this._forceDoors(
@@ -263,37 +284,32 @@ export class ConnectedValues extends SudokuConstraintHandler {
     }
   }
 
-  // One round of one-door forcing for the set with mask `valueMask` (§4): a
-  // decided blob whose only undecided neighbour is its single door forces it,
-  // when ≥2 blobs exist. Returns the number of cells forced.
-  // `unvisitedDecidedState` is the decided cells' current state; this round
-  // marks them by toggling their VISITED bit.
+  // One round of one-door forcing (§4), returning the number of cells forced.
   _forceDoors(grid, pQueue, valueMask, numDecided, unvisitedDecidedState) {
     const cellOffset = this._cellOffset;
     const numCells = this.cells.length;
     const neighbors = this._neighbors;
-    const queue = this._queue;
+    const buffer = this._traversalBuffer;
     const states = this._states;
     const visitedDecidedState = unvisitedDecidedState ^ VISITED;
     const undecidedState = UNDECIDED | VISITED;
 
-    // Traverse each blob and bank its door (or MULTI_DOOR) in a dead seed
-    // slot, forming a queue prefix later traversals start past (§6). Doors are
-    // applied only after the scan — each must come from the pre-forcing
-    // snapshot (§4.2).
+    // Bank each blob's door one slot per blob at the front of `buffer`, the blob
+    // being traversed a LIFO from its back (§6). Doors are applied only after
+    // the scan — each must come from the pre-forcing snapshot (§4.2). The scan
+    // stops once every decided cell is seen: no blob is left to seed.
     let numBlobs = 0;
     let numVisited = 0;
-    // Once every decided cell is visited no further blob can be seeded.
     for (let i = 0; i < numCells && numVisited < numDecided; i++) {
       if (states[i] !== unvisitedDecidedState) continue;
 
       let door = NO_CELL;
-      let queueSize = numBlobs;
-      queue[queueSize++] = i;
+      let stackTop = numCells;
+      buffer[--stackTop] = i;
       states[i] = visitedDecidedState;
       numVisited++;
-      for (let head = numBlobs; head < queueSize; head++) {
-        const cell = queue[head];
+      while (stackTop < numCells) {
+        const cell = buffer[stackTop++];
         const offset = cell << 2;
         for (let dir = 0; dir < 4; dir++) {
           const neighbor = neighbors[offset + dir];
@@ -301,24 +317,24 @@ export class ConnectedValues extends SudokuConstraintHandler {
           if (state === unvisitedDecidedState) {
             states[neighbor] = visitedDecidedState;
             numVisited++;
-            queue[queueSize++] = neighbor;
+            buffer[--stackTop] = neighbor;
           } else if (state === undecidedState && door !== neighbor) {
             door = door === NO_CELL ? neighbor : MULTI_DOOR;
           }
         }
       }
-      queue[numBlobs++] = door;
+      buffer[numBlobs++] = door;
     }
     if (numBlobs < 2) return 0;
 
     let numForced = 0;
     for (let blobId = 0; blobId < numBlobs; blobId++) {
-      const door = queue[blobId];
+      const door = buffer[blobId];
       if (door >= MULTI_DOOR) continue;
       if (states[door] !== undecidedState) continue;  // Forced by an earlier blob.
 
-      // Forced doors join the visited polarity so the next round toggles
-      // every decided cell together.
+      // Take the visited polarity, so the next round toggles the decided cells
+      // as one.
       states[door] = visitedDecidedState;
       grid[cellOffset + door] &= valueMask;
       pQueue.addForCell(cellOffset + door);
@@ -357,8 +373,6 @@ export class ConnectedCrossing extends SudokuConstraintHandler {
     v = grid[cells[2]]; const sw = (v & setMask) && !(v & (v - 1)) ? v : 0;
     v = grid[cells[3]]; const se = (v & setMask) && !(v & (v - 1)) ? v : 0;
 
-    // One diagonal decided to set X, a cell of the other to Y ≠ X: Y is
-    // forbidden on the fourth (completing) cell (§5.2).
     let target = 0;
     let forbidden = 0;
     if (nw && nw === se) {
@@ -378,10 +392,8 @@ export class ConnectedCrossing extends SudokuConstraintHandler {
   }
 }
 
-// Border rule (§5.3) over the perimeter `cells` in cyclic order: two disjoint
-// connected regions cannot interleave around it (X..Y..X..Y), so a gap flanked
-// by same-set decided cells cannot hold the other set. `values` is the union
-// of the two single-value sets.
+// Border rule (§5.3) over the perimeter `cells` in cyclic order: at most 2
+// transitions between set tokens around the perimeter.
 export class ConnectedBorder extends SudokuConstraintHandler {
   constructor(cells, values) {
     super(cells);
