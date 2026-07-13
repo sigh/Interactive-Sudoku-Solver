@@ -48,7 +48,7 @@ layout: null
       <!-- When adding/removing a recipe, also update the summary list in help/index.html. -->
       <ul>
         <li><a href="#clone">Clone</a></li>
-        <li><a href="#magic-square">3x3 Magic Square</a></li>
+        <li><a href="#magic-square">Magic Square</a></li>
         <li><a href="#thermo-variants">Thermometer Variants</a></li>
         <li><a href="#nabner-line">Nabner Line</a></li>
         <li><a href="#not-renban">Not Renban</a></li>
@@ -88,15 +88,15 @@ layout: null
           cells to mark them as equal. Each pair must be a separate constraint.
         </p>
 
-        <h3 id="magic-square">3x3 Magic Square</h3>
+        <h3 id="magic-square">Magic Square</h3>
         <p>
           <b>Description:</b>
           A square of cells, where the sum of the values in each row, column,
           and diagonal is the same.
         </p>
         <p>
-          Use the <code>Cage</code> constraint on each row, column, and diagonal
-          to sum to 15.
+          Use a single <code>Equal Sum</code> constraint, with each row, column,
+          and diagonal of the square as a segment.
         </p>
 
         <h3 id="thermo-variants">Thermometer Variants</h3>
