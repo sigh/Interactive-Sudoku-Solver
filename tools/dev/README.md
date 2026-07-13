@@ -10,7 +10,7 @@ the performance CLIs in [`tools/perf/`](../perf/README.md).
 | --- | --- |
 | `node tools/dev/sync_derived_puzzle_data.js` | Bring the `constraintTypes` declared on puzzle entries in [`data/collections.js`](../../data/collections.js) back in sync with what the app would tag them, and regenerate the [`data/scripts/*.iss`](../../data/scripts/) mirrors of the sandbox scripts. `--dry-run` for a read-only report (non-zero exit if out of sync). |
 | `node tools/dev/lint_sandbox_script.js` | Surface targeted authoring guidance on sandbox-script *source*. Advisory by default; `--fail-on-guidance` exits non-zero. |
-| `node tools/dev/lint_constraints.js` | Surface canonicalization and redundancy guidance on *generated constraints* (`.iss` files or stdin via `-`; with `--script`, sandbox scripts it runs itself). Advisory by default; `--fail-on-guidance` exits non-zero. |
+| `node tools/dev/lint_constraints.js` | Surface canonicalization and redundancy guidance on *generated constraints* (`.iss` files or stdin via `-`; with `--script`, sandbox scripts it runs itself). Advisory by default; `--fail-on-guidance` exits non-zero, as does an input that cannot be linted at all. |
 
 Run any script with `--help` for the full option reference.
 
@@ -51,27 +51,59 @@ byte-for-byte; an `.iss` with no sibling script is hand-authored and left alone.
 
 ---
 
+### Shared behaviour: rules, tiers, selection, output
+
+Both linters run a rule registry through one CLI shell
+([`tools/lib/lint_cli.js`](../lib/lint_cli.js)), so they share their flags and
+their output format. The registry is the only place a rule is described —
+**`--list-rules` prints what every rule catches and when to ignore it**, so
+this file does not repeat them. Every rule has a **tier**:
+
+| Tier | Meaning |
+| --- | --- |
+| `exact` | Decided from an exact parse of what was built. No triaged false positives, so this is the only tier safe to gate CI on. |
+| `heuristic` | Idiom/pattern guidance read off source text. A human decides. Advisory. |
+| `info` | A note that a rule could not run — never a finding about the code. |
+
+| Flag | Effect |
+| --- | --- |
+| `--list-rules` | Print the registry (code, tier, what each rule catches). `--format=json` for the machine-readable form. |
+| `--only=<codes>` / `--ignore=<codes>` | Run a subset of rules. An unknown code is an error, not a silent no-op. |
+| `--fail-on-guidance` | Exit non-zero on any finding. |
+| `--fail-on=<tiers>` | Exit non-zero only for these tiers — `--fail-on=exact` gates CI on the zero-false-positive tier while heuristics stay advisory. |
+| `--format=text\|json` | `text` (default) is `<file>:<line>: guidance <code>: <message>`. `json` emits `{items, errors, suppressed}` for consumers that would rather not regex it. |
+| `--baseline=<file>` / `--write-baseline=<file>` | Hold a known, accepted set of findings at zero noise: write the counts once, then pass `--baseline` on later runs. Only findings *beyond* the recorded count per file per code are reported, so an accepted finding is silent but a new one still fails. |
+
+An input that cannot be parsed or run is an *error*, not guidance: it prints
+`<file>:1: error: ...`, is kept out of the guidance total, and always exits
+non-zero, whatever the guidance policy is.
+
+---
+
 ### `lint_sandbox_script.js` — surface sandbox authoring guidance
 
 Sandbox scripts can often use helpers exposed by `js/sandbox/env.js` rather than
-rebuilding common geometry by hand. This tool is intentionally advisory: it
-surfaces regex parsing and template-literal building of `R#C#` ids (prefer
-`makeCellId`) and Var member ids (prefer `Var.cells()` / `.cell(n)`), custom
-neighbour helpers that may duplicate `cellGraph().neighbours()` /
-`cellGraph().kingNeighbours()`, rows/columns/boxes built by hand where the
-index-based `graph.row(n)` / `column(n)` / `box(n)` / `boxes()` apply,
-`NFA.encodeSpec` / `Pair.fnToKey` numValues literals that disagree with the
-script's own `new Shape(...)` declaration, hand-assembled `Sum` coefficient
-strings (prefer `[cell, coeff]` pairs), 0-indexed cell-id wrappers, and
-scripts with no rules prose at all.
+rebuilding common geometry by hand. This tool lints source only and never
+executes the script — to check the generated constraints, pipe the run_sandbox
+output through `lint_constraints.js` (below).
 
-This tool lints source only and never executes the script. To check the
-generated constraints, pipe the run_sandbox output through
-`lint_constraints.js` (below).
+Every rule here reads source text, so all of them are `heuristic`: treat each
+item as guidance, not a correctness finding. Adjust the script when the
+suggestion applies, or keep the code when the local implementation is
+intentional — and when it is, say so in the file with
+`// lint-ok: <code>` on the offending line, or on the line directly above it.
+That silences those codes for that one line.
 
-Treat each item as guidance, not a correctness finding. Adjust the script when
-the suggestion applies, or keep the code when the local implementation is
-intentional.
+It surfaces hand-built and hand-parsed cell ids, custom neighbour helpers,
+rows/columns/boxes built by hand, `numValues` literals that disagree with the
+declared `Shape`, hand-assembled `Sum` coefficient strings, mutable constraint
+accumulators, and scripts with no rules prose. Run `--list-rules` for the
+current set, with what each one catches.
+
+Rules read a comment-stripped view of the source by default, so prose that
+mentions an idiom (`[1, 4, 7]`, the `_=_` wire format) is not mistaken for the
+idiom itself. String and template-literal contents are kept — that is where the
+idioms live. `local-file-reference` deliberately reads comments too.
 
 ```sh
 # Report targeted guidance for one or more sandbox scripts.
@@ -79,6 +111,9 @@ node tools/dev/lint_sandbox_script.js data/scripts/my_puzzle.js
 
 # Use as a stricter gate.
 node tools/dev/lint_sandbox_script.js --fail-on-guidance data/scripts/my_puzzle.js
+
+# What does each rule catch?
+node tools/dev/lint_sandbox_script.js --list-rules
 ```
 
 ---
@@ -86,26 +121,19 @@ node tools/dev/lint_sandbox_script.js --fail-on-guidance data/scripts/my_puzzle.
 ### `lint_constraints.js` — surface generated-constraint guidance
 
 Lints the serialized constraint form, so its checks are exact regardless of how
-a script produced the output. It surfaces:
+a script produced the output. That is why these rules are `exact` tier and
+`lint_sandbox_script.js`'s are not — and why `--fail-on=exact` gates on this
+tool alone.
 
-- coefficient `Sum`s that re-encode a native constraint: all-±1 zero-total
-  forms that are `EqualSum` (or `SameValues` for the two-cell equality alias),
-  and all-1 coefficient forms that are plain `Sum`/`Cage`;
-- `Pair`/`PairX` keys whose decoded truth table matches a native relation
-  (`WhiteDot`, `BlackDot`, `X`, `V`, `GreaterThan`) — suggested only when
-  *every* constraint sharing that key is a 2-cell orthogonally-adjacent grid
-  pair: the native classes require adjacency, and a partial replacement would
-  split one drawn rule into two constraint types;
-- NFA machines whose stored alphabet exceeds the Shape's value range (plus one
-  for the multi-segment break symbol). The serializer trims trailing symbols
-  with no transitions, so only this overshoot direction is checkable;
-- Replicate candidates: many NFA constraints sharing one machine *and* arity,
-  or many identical `Given`s (same value set) — e.g. restricting every cell to
-  `1-N` on an extended Shape. Templates that span multiple cell subgraphs (which
-  Replicate cannot shift) and conditional (`Or`-branch) copies are skipped;
-- redundancy: full-range `Given`s on an unextended Shape, `AllDifferent`s
-  duplicating an enforced row/column/box, and repeated cells inside
-  all-different-semantics constraints.
+It surfaces coefficient `Sum`s that re-encode `EqualSum`/`SameValues`/plain
+`Sum`, `Pair` keys that re-encode a native relation, NFA alphabets that
+disagree with the `Shape`, stamped copies that one `Replicate` could express,
+and redundant `Given`s/`AllDifferent`s — plus an `info` note when the builder
+cannot resolve the tree, since the two `Replicate` rules need cell positions.
+Run `--list-rules` for the current set, with each rule's exact conditions.
+
+Because `.iss` files are generated, they cannot carry `// lint-ok:` comments.
+Use `--baseline` to hold an accepted set of findings instead.
 
 ```sh
 # Lint stored constraint files.
@@ -116,4 +144,7 @@ node tools/dev/lint_constraints.js --script my_puzzle.js
 
 # Or lint any constraint text from stdin.
 node tools/debug/run_sandbox.js --file my_puzzle.js | node tools/dev/lint_constraints.js -
+
+# Gate CI on the exact tier, minus a known, accepted set of findings.
+node tools/dev/lint_constraints.js --baseline=lint_baseline.json --fail-on=exact data/puzzles/*.iss
 ```

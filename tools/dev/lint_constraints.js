@@ -9,6 +9,19 @@
 // copies that suggest Replicate, and redundant Givens/AllDifferents.
 // Guidance is advisory by default; pass --fail-on-guidance to gate on it.
 //
+// Because these rules read what was actually built, they are 'exact' tier:
+// --fail-on=exact gates CI on them. `.iss` files are generated and so cannot
+// carry inline suppressions -- a known, accepted set of findings is held with
+// --baseline instead.
+//
+// Structure: lintConstraintText prepares a context (parse, leaves, geometry,
+// houses, decoded keys, cell positions) and then runs the rule registry over
+// it. Each rule is {code, tier, summary, docs, make()}, where make() returns
+// `collect(leaf, ctx, add)` (called once per leaf, in file order) and/or
+// `finalize(ctx, add)` (called once, after the leaves) closing over whatever
+// state that one rule needs. Rules that judge a whole group -- one authored
+// rule stamped over many cells -- accumulate in collect and judge in finalize.
+//
 // Usage:
 //   node tools/dev/lint_constraints.js [--fail-on-guidance] <file.iss|-> [...]
 //   node tools/dev/lint_constraints.js --script <script.js> [...]
@@ -17,8 +30,8 @@
 // inputs are sandbox scripts: each is run and its generated constraints are
 // linted.
 
-import { readFileSync } from 'node:fs';
 import { runAsCli } from '../lib/cli_entry.js';
+import { dedupeGuidance, runLintCli } from '../lib/lint_cli.js';
 import { runSandboxToConstraint } from '../lib/sandbox_runner.js';
 import { ensureGlobalEnvironment } from '../../tests/helpers/test_env.js';
 
@@ -31,20 +44,7 @@ const { NFASerializer, SEGMENT_BREAK } = await import('../../js/nfa_builder.js' 
 
 const STAMPED_COPY_THRESHOLD = 50;
 
-const parseArgs = (argv) => {
-  const args = { files: [], failOnGuidance: false, script: false, help: false };
-  for (let i = 2; i < argv.length; i++) {
-    switch (argv[i]) {
-      case '-h': case '--help': args.help = true; break;
-      case '--fail-on-guidance': args.failOnGuidance = true; break;
-      case '--script': args.script = true; break;
-      default: args.files.push(argv[i]); break;
-    }
-  }
-  return args;
-};
-
-const printUsage = () => console.log(`\
+const USAGE = `\
 Usage: node tools/dev/lint_constraints.js [options] <file.iss|-> [...]
        node tools/dev/lint_constraints.js --script <script.js> [...]
 
@@ -54,11 +54,25 @@ generated constraints are linted.
 
 Options:
   --script            Treat inputs as sandbox scripts to run.
-  --fail-on-guidance  Exit non-zero when guidance is found.
+  --list-rules        Print the rules (code, tier, what each catches) and exit.
+  --only=<codes>      Run only these rules (comma-separated).
+  --ignore=<codes>    Run everything but these rules.
+  --fail-on-guidance  Exit non-zero when any guidance is found.
+  --fail-on=<tiers>   Exit non-zero only for these tiers (exact, heuristic, info).
+  --format=text|json  Output format (default text).
+  --baseline=<file>   Suppress the counts recorded in this baseline file.
+  --write-baseline=<file>  Write the run's counts as a new baseline.
   -h, --help          Print this help and exit.
 
-Guidance is advisory. It surfaces re-encodings of native constraints,
-Shape/alphabet mismatches, Replicate candidates, and redundant constraints.`);
+Guidance is advisory by default. It surfaces re-encodings of native
+constraints, Shape/alphabet mismatches, Replicate candidates, and redundant
+constraints; run --list-rules for what each rule catches. The rules read what
+was built, not how it was written, so they are 'exact' tier: --fail-on=exact
+gates on all of them. Hold a known, accepted set of findings at zero noise with
+--write-baseline=<file> once, then --baseline=<file> on every later run.
+
+An input that cannot be parsed or run is an error, not guidance: it is reported
+as \`<file>:1: error: ...\` and always exits non-zero.`;
 
 const parseGridCell = (cell) => {
   const match = /^R(\d+)C(\d+)$/.exec(cell);
@@ -219,321 +233,476 @@ const findLine = (lines, type, firstCell) => {
 const describeCells = (cells) =>
   cells.length <= 4 ? cells.join(' ') : `${cells.slice(0, 3).join(' ')} … (${cells.length} cells)`;
 
-export const lintConstraintText = (text) => {
+// ---------------------------------------------------------------------------
+// Context: everything derived from the input that more than one rule needs, or
+// that costs too much to redo per rule. Facts about the input only -- every
+// judgement lives in a rule.
+// ---------------------------------------------------------------------------
+
+const makeContext = (text) => {
   const lines = text.split('\n');
   const root = SudokuParser.parseText(text);
-  const leaves = collectLeaves(root, { inOr: false, inReplicate: false }, []);
+  const leaves = collectLeaves(root, { inOr: false, inReplicate: false }, [])
+    .map((leaf) => {
+      const { type } = leaf.constraint;
+      const cells = leaf.constraint.cells || [];
+      let line = null;
+      return {
+        ...leaf,
+        type,
+        cells,
+        // Attribution scans the file, so only pay for it when a rule reports.
+        line: () => (line ??= findLine(lines, type, cells[0])),
+      };
+    });
 
-  const shapeLeaf = leaves.find(({ constraint }) => constraint.type === 'Shape');
+  const shapeLeaf = leaves.find(({ type }) => type === 'Shape');
   const geometry = shapeLeaf
     ? CellGeometry.fromShapeSpec(shapeLeaf.constraint.shapeSpec)
     : CellGeometry.newDefault();
-  const hasNoBoxes = leaves.some(({ constraint }) => constraint.type === 'NoBoxes');
+  const hasNoBoxes = leaves.some(({ type }) => type === 'NoBoxes');
   const shapeIsExtended = geometry.numValues !==
     CellGeometry.defaultNumValues(geometry.numRows, geometry.numCols);
 
-  const pairRelations = nativePairRelations(geometry);
-  const houses = enforcedHouseSets(geometry, hasNoBoxes);
-
-  // Equality / all-different Pair keys. Unlike the native relations above,
-  // these need no adjacency, so they are matched on every Pair group.
+  // Equality / all-different Pair keys. Unlike the native relations, these need
+  // no adjacency, so they are matched on every Pair group.
   const binaryKey = (fn) => fnToBinaryKey(fn, geometry.numValues, geometry.valueOffset);
-  const sameValuesKey = binaryKey((a, b) => a === b);
-  const allDifferentKey = binaryKey((a, b) => a !== b);
 
-  const items = [];
-  const add = (line, code, message) => items.push({ line, code, message });
-
-  const cellContext = makeCellContext(root);
-  const positionOf = cellContext?.positionOf ?? null;
-  const givenLeaves = [];
   const replicateNodes = [];
   (function walk(c) {
     if (c.type === 'Replicate') replicateNodes.push(c);
     if (Array.isArray(c.constraints)) c.constraints.forEach(walk);
   })(root);
-  const copiesByKey = new Map();
+
+  // Pair/PairX leaves grouped by key: three rules judge these groups, and the
+  // grouping itself is a fact about the input, not one of their judgements.
   const pairGroups = new Map();
-  const nfaGroups = new Map();
-  const sumGroups = new Map();
-
-  for (const { constraint, inOr, inReplicate } of leaves) {
-    const type = constraint.type;
-    const cells = constraint.cells || [];
-    const line = () => findLine(lines, type, cells[0]);
-
-    // --- Sum canonicalization (collected; judged per coefficient group) ---
-    // All-1 coefficients are decided by the coefficients alone, so they can be
-    // judged here. EqualSum additionally needs a target of 0, which varies
-    // *within* a coefficient family -- so it is judged per group below.
-    if (type === 'Sum' && constraint.coeffs) {
-      const coeffs = constraint.coeffs;
-      if (coeffs.every(c => c === 1)) {
-        add(line(), 'sum-unit-coefficients',
-          'coefficient Sum with all-1 coefficients; use the plain Sum form '
-          + '(or Cage if values are also all-different)');
-      } else if (coeffs.every(c => c === 1 || c === -1)
-        && coeffs.some(c => c === 1) && coeffs.some(c => c === -1)) {
-        const groupKey = [...coeffs].sort((a, b) => a - b).join(',');
-        if (!sumGroups.has(groupKey)) {
-          sumGroups.set(groupKey, {
-            line: line(), count: 0, allZeroTarget: true, twoCell: true,
-          });
-        }
-        const group = sumGroups.get(groupKey);
-        group.count++;
-        group.allZeroTarget &&= constraint.sum === 0;
-        group.twoCell &&= cells.length === 2;
-      }
+  for (const leaf of leaves) {
+    if (leaf.type !== 'Pair' && leaf.type !== 'PairX') continue;
+    const gridCells = leaf.cells.map(parseGridCell);
+    const replaceable = leaf.cells.length === 2 && gridCells[0] && gridCells[1]
+      && isOrthAdjacent(gridCells[0], gridCells[1]);
+    const groupKey = `${leaf.type}\0${leaf.constraint.key}`;
+    if (!pairGroups.has(groupKey)) {
+      pairGroups.set(groupKey, {
+        type: leaf.type, key: leaf.constraint.key, line: leaf.line(),
+        count: 0, allReplaceable: true,
+      });
     }
+    const group = pairGroups.get(groupKey);
+    group.count++;
+    group.allReplaceable &&= replaceable;
+  }
 
-    // --- Pair key vs native relation (collected; judged per key group) ---
-    if (type === 'Pair' || type === 'PairX') {
-      const gridCells = cells.map(parseGridCell);
-      const replaceable = cells.length === 2 && gridCells[0] && gridCells[1]
-        && isOrthAdjacent(gridCells[0], gridCells[1]);
-      const groupKey = `${type}\0${constraint.key}`;
-      if (!pairGroups.has(groupKey)) {
-        pairGroups.set(groupKey, { type, key: constraint.key, line: line(), count: 0, allReplaceable: true });
-      }
-      const group = pairGroups.get(groupKey);
-      group.count++;
-      group.allReplaceable &&= replaceable;
-    }
+  const cellContext = makeCellContext(root);
 
-    // --- NFA alphabet vs Shape ---
-    // The serialized machine stores a trimmed symbol count (highest symbol
-    // with any transition), so a count below numValues is legitimate. Only
-    // overshoot is a definite mismatch, allowing one extra symbol for the
-    // multi-segment break.
-    if (type === 'NFA') {
-      const numSymbols = nfaSymbolCount(constraint.encodedNFA);
-      if (numSymbols > geometry.numValues + 1) {
-        add(line(), 'nfa-alphabet-mismatch',
-          `NFA has transitions for ${numSymbols} symbols but the grid has `
-          + `${geometry.numValues} values (${geometry.numValues + 1} with a `
-          + 'segment break); the machine was compiled for a larger Shape');
-      }
-      // Key by machine AND arity: Replicate stamps one fixed-shape template, so
-      // instances of the same machine over different cell counts (e.g. a
-      // degree check over 2/3/4 neighbours) can't share one Replicate.
-      const copyKey = `NFA\0${constraint.encodedNFA}\0${cells.length}`;
-      if (!copiesByKey.has(copyKey)) copiesByKey.set(copyKey, []);
-      copiesByKey.get(copyKey).push(cells);
+  return {
+    lines,
+    root,
+    leaves,
+    geometry,
+    shapeIsExtended,
+    houses: enforcedHouseSets(geometry, hasNoBoxes),
+    pairRelations: nativePairRelations(geometry),
+    sameValuesKey: binaryKey((a, b) => a === b),
+    allDifferentKey: binaryKey((a, b) => a !== b),
+    pairGroups,
+    replicateNodes,
+    cellContext,
+    positionOf: cellContext?.positionOf ?? null,
+    findLine: (type, firstCell) => findLine(lines, type, firstCell),
 
-      let nfaGroup = nfaGroups.get(constraint.encodedNFA);
-      if (!nfaGroup) {
-        nfaGroup = { count: 0, allTwoCell: true, line: line() };
-        nfaGroups.set(constraint.encodedNFA, nfaGroup);
-      }
-      nfaGroup.count++;
-      nfaGroup.allTwoCell &&= cells.length === 2;
-    }
-
-    // --- Given: redundant-full-range, else a stamped-copy candidate ---
-    if (type === 'Given') {
-      const values = constraint.values || [];
-      const valueSet = new Set(values);
-      let fullRange = valueSet.size === geometry.numValues && parseGridCell(constraint.cell);
+    // What a Given is, which three rules key off: an Or-branch hypothesis, a
+    // no-op that the Shape already allows, or a plain repeated fact.
+    givenRole(leaf) {
+      if (leaf.inOr) return 'conditional';
+      const values = new Set(leaf.constraint.values || []);
+      let fullRange = values.size === geometry.numValues
+        && parseGridCell(leaf.constraint.cell);
       for (let v = geometry.minValue(); fullRange && v <= geometry.maxValue(); v++) {
-        fullRange = valueSet.has(v);
+        fullRange = values.has(v);
       }
-      if (inOr) {
-        // Conditional givens (Or/And hypothesis branches) are not standalone
-        // repeated facts, so they are neither redundant nor Replicate copies.
-      } else if (!shapeIsExtended && fullRange) {
-        add(line(), 'redundant-full-range-given',
-          `Given on ${constraint.cell} allows every value the Shape already `
-          + 'allows; it does nothing');
-      } else {
-        // Identical Givens (same value set) are Replicate candidates -- Replicate
-        // shifts the cell and keeps the values -- even though they serialize onto
-        // one line. Common as "restrict every cell to 1-N" on an extended Shape.
-        // The single cell is the template; isReplicableGroup still has to confirm
-        // they all sit in one cell group, since Replicate cannot span the grid
-        // and a Var overlay.
-        const valueSig = [...values].sort((a, b) => a - b).join('_');
-        const copyKey = `Given\0${valueSig}`;
-        if (!copiesByKey.has(copyKey)) copiesByKey.set(copyKey, []);
-        copiesByKey.get(copyKey).push([constraint.cell]);
-        givenLeaves.push({ cell: constraint.cell, values: valueSet, line: line() });
-      }
-    }
-
-    // --- Duplicate cells within an all-different constraint ---
-    if (['AllDifferent', 'Cage', 'Renban'].includes(type)
-      && new Set(cells).size !== cells.length) {
-      add(line(), 'duplicate-cells',
-        `${type} on ${describeCells(cells)} repeats a cell, making it `
-        + 'unsatisfiable under its all-different semantics');
-    }
-
-    // --- AllDifferent duplicating an enforced house ---
-    if (type === 'AllDifferent' && !inOr) {
-      const house = houses.get([...cells].sort().join(','));
-      if (house) {
-        add(line(), 'redundant-all-different',
-          `AllDifferent duplicates ${house}, which the engine already enforces`);
-      }
-    }
-  }
-
-  // --- Sum groups that fully re-encode EqualSum ---
-  // A coefficient family is one authored rule: the same linear expression
-  // stamped over different cells. EqualSum needs a target of 0, which varies
-  // within a family, so it is suggested only when EVERY member has target 0 --
-  // converting just the members that happen to balance would split one rule
-  // across two constraint types.
-  for (const group of sumGroups.values()) {
-    if (!group.allZeroTarget) continue;
-    const count = `${group.count} coefficient Sum${group.count === 1 ? '' : 's'}`;
-    add(group.line, 'sum-equal-sum',
-      group.twoCell
-        ? `${count} express cell equality; prefer SameValues (or EqualSum) `
-        + 'with the cells as two segments'
-        : `${count} express two cell sets with equal sums; prefer EqualSum `
-        + 'with the cells as two segments');
-  }
-
-  // --- Pair groups that fully re-encode a native relation ---
-  // Suggested only when EVERY constraint sharing the key is a 2-cell
-  // adjacent grid pair: a partial replacement would split one drawn rule
-  // into two constraint types and stop the pairs compressing together.
-  for (const group of pairGroups.values()) {
-    const count = `${group.count} ${group.type} constraint${group.count === 1 ? '' : 's'}`;
-    // A Pair keyed on == / != is a two-cell SameValues / AllDifferent expressed
-    // as a custom binary function; the native class is the direct form. This
-    // holds per pair (no adjacency, no clique, and inside an Or too), so it is
-    // judged for every such group -- merging into one larger set is a separate,
-    // optional step the author can take when the pairs form a clique.
-    if (group.key === sameValuesKey) {
-      add(group.line, 'pair-same-values',
-        `${count} re-encode a two-cell equality; use SameValues`);
-      continue;
-    }
-    if (group.key === allDifferentKey) {
-      add(group.line, 'pair-all-different',
-        `${count} re-encode a two-cell all-different; use AllDifferent`);
-      continue;
-    }
-    if (!group.allReplaceable) continue;
-    const relation = pairRelations.find(r => r.key === group.key);
-    if (!relation) continue;
-    add(group.line, 'pair-native-relation',
-      `${count} re-encode ${relation.name} on adjacent cells; use the native constraint`);
-  }
-
-  // --- NFA machines applied only to 2-cell inputs (a binary relation) ---
-  for (const group of nfaGroups.values()) {
-    if (!group.allTwoCell) continue;
-    add(group.line, 'nfa-two-cell-use-pair',
-      `${group.count} NFA constraint${group.count === 1 ? '' : 's'} apply one `
-      + 'machine to 2 cells; a 2-cell relation is a Pair — use Pair.fnToKey instead');
-  }
-
-  // --- A Replicate'd domain that skips the cells its own clues pin ---
-  // Two RAW Givens on a cell merge (Given's uniqueness key is the cell), so a
-  // hand-stamped domain and one that filtered its clue cells out serialize
-  // identically -- indistinguishable, hence not linted. But a Given inside a
-  // Replicate does NOT merge with a raw Given: both survive. So once the domain
-  // is Replicate'd, the cells it skips are visible, and skipping them is pointless
-  // -- the two constraints intersect, so the narrower clue still wins. Extend the
-  // targets over the whole group and drop the filtering.
-  //
-  // Only fires when the clue is a strict subset of the domain: a clue outside it
-  // (a placeholder range, an out-of-set marker) would intersect to nothing.
-  for (const replicate of replicateNodes) {
-    if (!cellContext) break;
-    let targets;
-    try {
-      targets = new Set(SudokuConstraint.Replicate
-        .decodeTargetCells(replicate.targetBitset, replicate.origin, cellContext.geometry)
-        .map(index => cellContext.geometry.makeCellIdFromIndex(index)));
-    } catch (e) {
-      continue;
-    }
-    for (const child of replicate.constraints) {
-      if (child.type !== 'Given' || child.cell !== replicate.origin) continue;
-      const domain = new Set(child.values || []);
-      const subgraph = positionOf(replicate.origin)?.[2];
-      if (subgraph === undefined) continue;
-      // Raw Givens elsewhere in the same cell group. The template itself sits on
-      // the origin, which is always a target, so it can never appear here.
-      const skipped = givenLeaves.filter(given =>
-        !targets.has(given.cell)
-        && positionOf(given.cell)?.[2] === subgraph
-        && given.values.size < domain.size
-        && [...given.values].every(value => domain.has(value)));
-      if (!skipped.length) continue;
-      add(findLine(lines, 'Replicate', null), 'replicated-domain-skips-clue-cells',
-        `a Replicate stamps a Given domain over this cell group but skips `
-        + `${skipped.length} cell(s) that a narrower Given already pins; the two `
-        + 'intersect, so stamp the domain over the whole group instead');
-    }
-  }
-
-  // --- Stamped copies that suggest Replicate ---
-  // Decided, not guessed: isReplicableGroup checks that the instances really are
-  // one template under a shift, in one cell group. Sharing a machine is not
-  // enough -- the same machine applied to many differently-shaped cell sets (a
-  // rule run over every region, say) has no single template to stamp.
-  // Judged per group, not per script: a script that already uses Replicate for
-  // one rule can still stamp another group by hand. Constraints already inside a
-  // Replicate are excluded when the groups are collected, so they never appear.
-  for (const [copyKey, instances] of copiesByKey) {
-    if (instances.length < STAMPED_COPY_THRESHOLD) continue;
-    if (!isReplicableGroup(instances, positionOf)) continue;
-    const type = copyKey.split('\0')[0];
-    const shared = type === 'Given' ? 'one value set' : 'one machine';
-    add(1, 'stamped-copies-without-replicate',
-      `${instances.length} ${type} constraints share ${shared} and are shifted `
-      + 'copies of one template; use Replicate to shorten the encoding');
-  }
-
-  const seen = new Set();
-  const deduped = items.filter((item) => {
-    const key = `${item.line}\0${item.code}\0${item.message}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-  deduped.sort((a, b) => a.line - b.line || a.code.localeCompare(b.code));
-  return deduped;
+      return (!shapeIsExtended && fullRange) ? 'redundant' : 'fact';
+    },
+  };
 };
 
-export const main = async (argv) => {
-  const args = parseArgs(argv);
-  if (args.help) { printUsage(); return; }
-  if (!args.files.length) {
-    throw new Error('No inputs specified. Pass .iss files, or - for stdin.');
-  }
+// ---------------------------------------------------------------------------
+// Rules
+// ---------------------------------------------------------------------------
 
-  let total = 0;
-  for (const file of args.files) {
-    const raw = readFileSync(file === '-' ? 0 : file, 'utf8');
-    let guidance;
+export const OUTPUT_RULES = [
+  {
+    code: 'sum-unit-coefficients',
+    tier: 'exact',
+    summary: 'coefficient Sum with all-1 coefficients; use the plain Sum form '
+      + '(or Cage if values are also all-different)',
+    docs: 'Decided by the coefficients alone, so it is judged per constraint\n'
+      + 'rather than per family.',
+    make: () => ({
+      collect(leaf, ctx, add) {
+        if (leaf.type !== 'Sum' || !leaf.constraint.coeffs) return;
+        if (!leaf.constraint.coeffs.every(c => c === 1)) return;
+        add(leaf.line(), 'coefficient Sum with all-1 coefficients; use the plain Sum form '
+          + '(or Cage if values are also all-different)');
+      },
+    }),
+  },
+  {
+    code: 'sum-equal-sum',
+    tier: 'exact',
+    summary: 'coefficient Sums that express two cell sets with equal sums; prefer EqualSum',
+    docs: 'A coefficient family (the same all-±1 expression stamped over different\n'
+      + 'cells) is one authored rule. EqualSum needs a target of 0, which varies\n'
+      + 'within a family, so it is suggested only when EVERY member has target 0 --\n'
+      + 'converting just the members that balance would split one rule in two.',
+    make: () => {
+      const groups = new Map();
+      return {
+        collect(leaf) {
+          if (leaf.type !== 'Sum' || !leaf.constraint.coeffs) return;
+          const coeffs = leaf.constraint.coeffs;
+          if (!(coeffs.every(c => c === 1 || c === -1)
+            && coeffs.some(c => c === 1) && coeffs.some(c => c === -1))) return;
+          const groupKey = [...coeffs].sort((a, b) => a - b).join(',');
+          if (!groups.has(groupKey)) {
+            groups.set(groupKey, {
+              line: leaf.line(), count: 0, allZeroTarget: true, twoCell: true,
+            });
+          }
+          const group = groups.get(groupKey);
+          group.count++;
+          group.allZeroTarget &&= leaf.constraint.sum === 0;
+          group.twoCell &&= leaf.cells.length === 2;
+        },
+        finalize(ctx, add) {
+          for (const group of groups.values()) {
+            if (!group.allZeroTarget) continue;
+            const count = `${group.count} coefficient Sum${group.count === 1 ? '' : 's'}`;
+            add(group.line, group.twoCell
+              ? `${count} express cell equality; prefer SameValues (or EqualSum) `
+                + 'with the cells as two segments'
+              : `${count} express two cell sets with equal sums; prefer EqualSum `
+                + 'with the cells as two segments');
+          }
+        },
+      };
+    },
+  },
+  {
+    code: 'pair-same-values',
+    tier: 'exact',
+    summary: 'Pair constraints that re-encode a two-cell equality; use SameValues',
+    docs: 'A Pair keyed on == is a two-cell SameValues expressed as a custom binary\n'
+      + 'function. This holds per pair (no adjacency, no clique, and inside an Or\n'
+      + 'too), so every such group is reported. Merging the pairs into one larger\n'
+      + 'SameValues is a separate, optional step where they form a clique.',
+    make: () => ({
+      finalize(ctx, add) {
+        for (const group of ctx.pairGroups.values()) {
+          if (group.key !== ctx.sameValuesKey) continue;
+          add(group.line, `${group.count} ${group.type} constraint`
+            + `${group.count === 1 ? '' : 's'} re-encode a two-cell equality; use SameValues`);
+        }
+      },
+    }),
+  },
+  {
+    code: 'pair-all-different',
+    tier: 'exact',
+    summary: 'Pair constraints that re-encode a two-cell all-different; use AllDifferent',
+    docs: 'The != twin of pair-same-values, with the same per-pair reasoning.',
+    make: () => ({
+      finalize(ctx, add) {
+        for (const group of ctx.pairGroups.values()) {
+          if (group.key !== ctx.allDifferentKey) continue;
+          add(group.line, `${group.count} ${group.type} constraint`
+            + `${group.count === 1 ? '' : 's'} re-encode a two-cell all-different; use AllDifferent`);
+        }
+      },
+    }),
+  },
+  {
+    code: 'pair-native-relation',
+    tier: 'exact',
+    summary: 'Pair key whose decoded truth table is a native relation '
+      + '(WhiteDot, BlackDot, X, V, GreaterThan) on adjacent cells',
+    docs: 'Suggested only when EVERY constraint sharing the key is a 2-cell\n'
+      + 'orthogonally-adjacent grid pair: the native classes require adjacency, and a\n'
+      + 'partial replacement would split one drawn rule into two constraint types and\n'
+      + 'stop the pairs compressing together.',
+    make: () => ({
+      finalize(ctx, add) {
+        for (const group of ctx.pairGroups.values()) {
+          if (group.key === ctx.sameValuesKey || group.key === ctx.allDifferentKey) continue;
+          if (!group.allReplaceable) continue;
+          const relation = ctx.pairRelations.find(r => r.key === group.key);
+          if (!relation) continue;
+          add(group.line, `${group.count} ${group.type} constraint`
+            + `${group.count === 1 ? '' : 's'} re-encode ${relation.name} on adjacent cells; `
+            + 'use the native constraint');
+        }
+      },
+    }),
+  },
+  {
+    code: 'nfa-alphabet-mismatch',
+    tier: 'exact',
+    summary: 'NFA has transitions for more symbols than the grid has values; '
+      + 'the machine was compiled for a larger Shape',
+    docs: 'The serialized machine stores a trimmed symbol count (the highest symbol\n'
+      + 'with any transition), so a count BELOW numValues is legitimate. Only\n'
+      + 'overshoot is a definite mismatch, allowing one extra symbol for the\n'
+      + 'multi-segment break.',
+    make: () => ({
+      collect(leaf, ctx, add) {
+        if (leaf.type !== 'NFA') return;
+        const numSymbols = nfaSymbolCount(leaf.constraint.encodedNFA);
+        if (numSymbols <= ctx.geometry.numValues + 1) return;
+        add(leaf.line(),
+          `NFA has transitions for ${numSymbols} symbols but the grid has `
+          + `${ctx.geometry.numValues} values (${ctx.geometry.numValues + 1} with a `
+          + 'segment break); the machine was compiled for a larger Shape');
+      },
+    }),
+  },
+  {
+    code: 'nfa-two-cell-use-pair',
+    tier: 'exact',
+    summary: 'one NFA machine applied only to 2-cell inputs; a 2-cell relation is a Pair',
+    docs: 'Per machine, not per constraint: a machine used over both 2 and 3 cells is\n'
+      + 'not a binary relation.',
+    make: () => {
+      const groups = new Map();
+      return {
+        collect(leaf) {
+          if (leaf.type !== 'NFA') return;
+          let group = groups.get(leaf.constraint.encodedNFA);
+          if (!group) {
+            group = { count: 0, allTwoCell: true, line: leaf.line() };
+            groups.set(leaf.constraint.encodedNFA, group);
+          }
+          group.count++;
+          group.allTwoCell &&= leaf.cells.length === 2;
+        },
+        finalize(ctx, add) {
+          for (const group of groups.values()) {
+            if (!group.allTwoCell) continue;
+            add(group.line,
+              `${group.count} NFA constraint${group.count === 1 ? '' : 's'} apply one `
+              + 'machine to 2 cells; a 2-cell relation is a Pair — use Pair.fnToKey instead');
+          }
+        },
+      };
+    },
+  },
+  {
+    code: 'redundant-full-range-given',
+    tier: 'exact',
+    summary: 'Given allows every value the Shape already allows; it does nothing',
+    docs: 'Only on an unextended Shape, where the full range IS the default domain.\n'
+      + 'On an extended Shape the same Given is the rule that restricts the cell.\n'
+      + 'Or-branch givens are hypotheses, not facts, so they are skipped.',
+    make: () => ({
+      collect(leaf, ctx, add) {
+        if (leaf.type !== 'Given') return;
+        if (ctx.givenRole(leaf) !== 'redundant') return;
+        add(leaf.line(),
+          `Given on ${leaf.constraint.cell} allows every value the Shape already `
+          + 'allows; it does nothing');
+      },
+    }),
+  },
+  {
+    code: 'duplicate-cells',
+    tier: 'exact',
+    summary: 'an all-different constraint repeats a cell, making it unsatisfiable',
+    docs: 'AllDifferent / Cage / Renban all carry all-different semantics, so a\n'
+      + 'repeated cell cannot differ from itself. Always a bug in the cell list.',
+    make: () => ({
+      collect(leaf, ctx, add) {
+        if (!['AllDifferent', 'Cage', 'Renban'].includes(leaf.type)) return;
+        if (new Set(leaf.cells).size === leaf.cells.length) return;
+        add(leaf.line(),
+          `${leaf.type} on ${describeCells(leaf.cells)} repeats a cell, making it `
+          + 'unsatisfiable under its all-different semantics');
+      },
+    }),
+  },
+  {
+    code: 'redundant-all-different',
+    tier: 'exact',
+    summary: 'AllDifferent duplicates a row/column/box the engine already enforces',
+    docs: 'Boxes count only when NoBoxes is absent. Or-branch constraints are\n'
+      + 'alternatives, not facts, so they are skipped.',
+    make: () => ({
+      collect(leaf, ctx, add) {
+        if (leaf.type !== 'AllDifferent' || leaf.inOr) return;
+        const house = ctx.houses.get([...leaf.cells].sort().join(','));
+        if (!house) return;
+        add(leaf.line(),
+          `AllDifferent duplicates ${house}, which the engine already enforces`);
+      },
+    }),
+  },
+  {
+    code: 'stamped-copies-without-replicate',
+    tier: 'exact',
+    summary: 'many constraints share one machine (or one Given value set) and are '
+      + 'shifted copies of one template; use Replicate',
+    docs: 'Decided, not guessed: the instances must really be one template under a\n'
+      + 'shift, inside one cell group. Sharing a machine is not enough -- the same\n'
+      + 'machine over differently-shaped cell sets has no single template to stamp.\n'
+      + 'Judged per group, so a script already using Replicate for one rule can still\n'
+      + 'be flagged for another it stamped by hand.',
+    make: () => {
+      const copiesByKey = new Map();
+      const addCopy = (key, cells) => {
+        if (!copiesByKey.has(key)) copiesByKey.set(key, []);
+        copiesByKey.get(key).push(cells);
+      };
+      return {
+        collect(leaf, ctx) {
+          // A constraint inside a Replicate is already stamped: it is the
+          // template, not an un-Replicated copy of one.
+          if (leaf.inReplicate) return;
+          if (leaf.type === 'NFA') {
+            // Key by machine AND arity: Replicate stamps one fixed-shape template,
+            // so instances of the same machine over different cell counts (a degree
+            // check over 2/3/4 neighbours, say) cannot share one Replicate.
+            addCopy(`NFA\0${leaf.constraint.encodedNFA}\0${leaf.cells.length}`, leaf.cells);
+          } else if (leaf.type === 'Given' && ctx.givenRole(leaf) === 'fact') {
+            // Identical Givens (same value set) are Replicate candidates -- Replicate
+            // shifts the cell and keeps the values -- even though they serialize onto
+            // one line. Common as "restrict every cell to 1-N" on an extended Shape.
+            const valueSig = [...(leaf.constraint.values || [])]
+              .sort((a, b) => a - b).join('_');
+            addCopy(`Given\0${valueSig}`, [leaf.constraint.cell]);
+          }
+        },
+        finalize(ctx, add) {
+          for (const [copyKey, instances] of copiesByKey) {
+            if (instances.length < STAMPED_COPY_THRESHOLD) continue;
+            if (!isReplicableGroup(instances, ctx.positionOf)) continue;
+            const type = copyKey.split('\0')[0];
+            const shared = type === 'Given' ? 'one value set' : 'one machine';
+            add(1, `${instances.length} ${type} constraints share ${shared} and are shifted `
+              + 'copies of one template; use Replicate to shorten the encoding');
+          }
+        },
+      };
+    },
+  },
+  {
+    code: 'replicated-domain-skips-clue-cells',
+    tier: 'exact',
+    summary: 'a Replicate stamps a Given domain over a cell group but skips cells '
+      + 'a narrower Given already pins; stamp it over the whole group',
+    docs: 'Two RAW Givens on a cell merge (Given\'s uniqueness key is the cell), so a\n'
+      + 'hand-stamped domain and one that filtered its clue cells out serialize\n'
+      + 'identically -- indistinguishable, hence not linted. A Given inside a\n'
+      + 'Replicate does NOT merge with a raw one, so once the domain is Replicate\'d\n'
+      + 'the skipped cells are visible, and skipping them is pointless: the two\n'
+      + 'intersect, so the narrower clue still wins. Fires only when the clue is a\n'
+      + 'strict subset of the domain -- a clue outside it would intersect to nothing.',
+    make: () => {
+      const givens = [];
+      return {
+        collect(leaf, ctx) {
+          if (leaf.type !== 'Given' || ctx.givenRole(leaf) !== 'fact') return;
+          givens.push({
+            cell: leaf.constraint.cell,
+            values: new Set(leaf.constraint.values || []),
+          });
+        },
+        finalize(ctx, add) {
+          if (!ctx.cellContext) return;
+          for (const replicate of ctx.replicateNodes) {
+            let targets;
+            try {
+              targets = new Set(SudokuConstraint.Replicate
+                .decodeTargetCells(
+                  replicate.targetBitset, replicate.origin, ctx.cellContext.geometry)
+                .map(index => ctx.cellContext.geometry.makeCellIdFromIndex(index)));
+            } catch (e) {
+              continue;
+            }
+            for (const child of replicate.constraints) {
+              if (child.type !== 'Given' || child.cell !== replicate.origin) continue;
+              const domain = new Set(child.values || []);
+              const subgraph = ctx.positionOf(replicate.origin)?.[2];
+              if (subgraph === undefined) continue;
+              // Raw Givens elsewhere in the same cell group. The template sits on the
+              // origin, which is always a target, so it never appears here.
+              const skipped = givens.filter(given =>
+                !targets.has(given.cell)
+                && ctx.positionOf(given.cell)?.[2] === subgraph
+                && given.values.size < domain.size
+                && [...given.values].every(value => domain.has(value)));
+              if (!skipped.length) continue;
+              add(ctx.findLine('Replicate', null),
+                'a Replicate stamps a Given domain over this cell group but skips '
+                + `${skipped.length} cell(s) that a narrower Given already pins; the two `
+                + 'intersect, so stamp the domain over the whole group instead');
+            }
+          }
+        },
+      };
+    },
+  },
+  {
+    code: 'cell-context-unavailable',
+    tier: 'info',
+    summary: 'cell positions are unavailable, so the Replicate rules did not run',
+    docs: 'Not a finding about the constraints: a coverage note. Cell positions come\n'
+      + 'from resolving the tree through SudokuBuilder, and when that fails,\n'
+      + 'stamped-copies-without-replicate and replicated-domain-skips-clue-cells\n'
+      + 'cannot run. Silence would report the file as OK with two rules quietly off.',
+    make: () => ({
+      finalize(ctx, add) {
+        if (ctx.cellContext) return;
+        add(1, 'the builder could not resolve this constraint tree, so cell positions '
+          + 'are unavailable; stamped-copies-without-replicate and '
+          + 'replicated-domain-skips-clue-cells were not checked');
+      },
+    }),
+  },
+];
+
+export const lintConstraintText = (text) => {
+  const ctx = makeContext(text);
+  const items = [];
+  const rules = OUTPUT_RULES.map(
+    rule => ({ code: rule.code, ...rule.make() }));
+  const adder = (rule) =>
+    (line, message) => items.push({ line, code: rule.code, message });
+
+  // Leaves outer, rules inner: every rule sees the leaves in file order, which
+  // is the order its findings are reported in.
+  for (const leaf of ctx.leaves) {
+    for (const rule of rules) rule.collect?.(leaf, ctx, adder(rule));
+  }
+  for (const rule of rules) rule.finalize?.(ctx, adder(rule));
+
+  return dedupeGuidance(items);
+};
+
+export const main = async (argv) => runLintCli({
+  argv,
+  usage: USAGE,
+  rules: OUTPUT_RULES,
+  flags: { '--script': 'script' },
+  noFilesError: 'No inputs specified. Pass .iss files, or - for stdin.',
+  lintFile: async (file, raw, args) => {
     try {
       const text = args.script ? await runSandboxToConstraint(raw) : raw;
-      guidance = lintConstraintText(text);
+      return lintConstraintText(text);
     } catch (err) {
-      console.log(`${file}:1: error: failed to lint constraints: ${err.message}`);
-      total += 1;
-      continue;
+      // The shell reports this as `<file>:1: error:` and fails the run; say
+      // which stage failed, since a bare parser message has no context.
+      throw new Error(`failed to lint constraints: ${err.message}`);
     }
-    if (!guidance.length) {
-      console.log(`${file}: OK`);
-      continue;
-    }
-    total += guidance.length;
-    for (const item of guidance) {
-      console.log(`${file}:${item.line}: guidance ${item.code}: ${item.message}`);
-    }
-  }
-
-  if (total) {
-    console.log(`\n${total} guidance item${total === 1 ? '' : 's'} found.`);
-    if (args.failOnGuidance) process.exitCode = 1;
-  }
-};
+  },
+});
 
 runAsCli(import.meta.url, main);

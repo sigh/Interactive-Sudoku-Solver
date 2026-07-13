@@ -14,14 +14,51 @@
 // main does internally.
 
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
-import { main as lintScriptMain, lintSource } from '../../tools/dev/lint_sandbox_script.js';
-import { lintConstraintText } from '../../tools/dev/lint_constraints.js';
+import {
+  main as lintScriptMain, lintSource, SOURCE_RULES,
+} from '../../tools/dev/lint_sandbox_script.js';
+import {
+  main as lintConstraintsMain, lintConstraintText, OUTPUT_RULES,
+} from '../../tools/dev/lint_constraints.js';
+import { TIERS } from '../../tools/lib/lint_cli.js';
 import { runSandboxToConstraint } from '../../tools/lib/sandbox_runner.js';
+
+// Run a tool's CLI main in-process: capture stdout and the exit code it sets,
+// without letting that exit code escape into this suite's own result.
+const runCli = async (main, argv) => {
+  const out = [];
+  const { log } = console;
+  const priorExitCode = process.exitCode;
+  console.log = (...a) => out.push(a.join(' '));
+  try {
+    await main(['node', 'tool', ...argv]);
+  } finally {
+    console.log = log;
+  }
+  const exitCode = process.exitCode ?? 0;
+  process.exitCode = priorExitCode;
+  return { stdout: out.join('\n'), exitCode };
+};
+
+// A temp directory with the given files, removed afterwards.
+const withFiles = async (files, fn) => {
+  const dir = mkdtempSync(join(tmpdir(), 'lint-cli-'));
+  const paths = {};
+  for (const [name, content] of Object.entries(files)) {
+    paths[name] = join(dir, name);
+    writeFileSync(paths[name], content);
+  }
+  try {
+    return await fn(paths, dir);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+};
 
 // Guidance items as one string, "code: message" per line, so a single
 // assert.match can span a code and its message text (as the CLI output did).
@@ -289,6 +326,200 @@ await runTest('lint_sandbox_script passes a declaratively-built constraint list'
   const expression = lintSource(SCRIPT_HEADER
     + 'return segments.map(seg => new NFA(nfa, \'\', ...seg));\n');
   assert.equal(expression.length, 0, report(expression));
+});
+
+// Both tools run on one CLI shell (tools/lib/lint_cli.js), so this covers what
+// the source linter's main() above does not: the error path. A file that cannot
+// be linted is not guidance — it prints `error:`, stays out of the guidance
+// total, and fails the run even without --fail-on-guidance (an unlintable file
+// reporting success is how a broken puzzle used to pass the pipeline's checks).
+await runTest('lint_constraints.js main() fails on an unlintable file', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'lint-cli-'));
+  const broken = join(dir, 'broken.iss');
+  const guidance = join(dir, 'guidance.iss');
+  writeFileSync(broken, '.Bogus~R1C1\n');
+  writeFileSync(guidance,
+    '.Shape~9x9\n.AllDifferent~R1C1~R1C2~R1C3~R1C4~R1C5~R1C6~R1C7~R1C8~R1C9\n');
+  const out = [];
+  const { log } = console;
+  const priorExitCode = process.exitCode;
+  console.log = (...a) => out.push(a.join(' '));
+  try {
+    await lintConstraintsMain(['node', 'lint_constraints.js', broken, guidance]);
+  } finally {
+    console.log = log;
+    rmSync(dir, { recursive: true, force: true });
+  }
+  const stdout = out.join('\n');
+  assert.match(stdout, new RegExp(`${broken}:1: error: failed to lint constraints:`));
+  assert.match(stdout, new RegExp(`${guidance}:\\d+: guidance redundant-all-different:`));
+  // The error does not inflate the guidance count (the good file's one item)...
+  assert.match(stdout, /1 guidance item found\./);
+  // ...but the run still fails, with no --fail-on-guidance passed.
+  assert.equal(process.exitCode, 1);
+  process.exitCode = priorExitCode;
+});
+
+// Cell positions come from resolving the tree through SudokuBuilder, which can
+// fail. When it does, the two Replicate rules cannot run — so say so rather than
+// print OK with two rules silently disabled. Here 2000 Var cells exceed the
+// geometry's cell limit.
+await runTest('lint_constraints notes when cell positions are unavailable', () => {
+  const degraded = lintConstraintText('.Shape~9x9\n.Var~Q~~2000\n');
+  assert.match(report(degraded), /cell-context-unavailable/);
+
+  const resolvable = lintConstraintText('.Shape~9x9\n.Given~R1C1~1\n');
+  assert.doesNotMatch(report(resolvable), /cell-context-unavailable/);
+});
+
+// `R${r}C${c}` is one problem. It used to match two overlapping rules
+// (manual-cell-id-builder and manual-cell-id-template), and their differing
+// codes meant dedupe could not merge them: one line, two near-identical
+// findings. They are one rule.
+await runTest('lint_sandbox_script reports a cell-id template once', () => {
+  const items = lintSource(SCRIPT_HEADER
+    + 'const cells = rows.map(r => `R${r}C${c}`);\n'
+    + "return [new Shape('9x9')];\n");
+  assert.deepEqual(items.map((i) => i.code), ['manual-cell-id-template'], report(items));
+});
+
+// The registry is the ONLY description of a rule: --list-rules prints it, and
+// neither the usage text nor tools/dev/README.md enumerates the rules. A rule
+// with no docs is therefore an undocumented rule, so require them here rather
+// than pinning a second copy of the prose somewhere it can drift.
+await runTest('every rule carries a tier and its own docs', () => {
+  for (const rule of [...SOURCE_RULES, ...OUTPUT_RULES]) {
+    assert.ok(TIERS.includes(rule.tier), `${rule.code}: bad tier ${rule.tier}`);
+    assert.ok(rule.summary && rule.docs, `${rule.code}: missing summary/docs`);
+  }
+});
+
+// Only the exact tier is safe to gate on, so the gate has to be per-tier: an
+// `exact` finding fails the run while a `heuristic` or `info` one does not.
+// This is what lets the pipeline gate on the output linter at all.
+await runTest('--fail-on=exact gates on the exact tier only', async () => {
+  await withFiles({
+    // A redundant AllDifferent (exact) and, separately, a tree the builder
+    // cannot resolve, which yields only the info-tier coverage note.
+    'exact.iss': '.Shape~9x9\n.AllDifferent~R1C1~R1C2~R1C3~R1C4~R1C5~R1C6~R1C7~R1C8~R1C9\n',
+    'info.iss': '.Shape~9x9\n.Var~Q~~2000\n',
+  }, async ({ 'exact.iss': exact, 'info.iss': info }) => {
+    const gated = await runCli(lintConstraintsMain, ['--fail-on=exact', exact]);
+    assert.match(gated.stdout, /guidance redundant-all-different:/);
+    assert.equal(gated.exitCode, 1);
+
+    // The note is reported, but it is not a finding about the constraints.
+    const noted = await runCli(lintConstraintsMain, ['--fail-on=exact', info]);
+    assert.match(noted.stdout, /guidance cell-context-unavailable:/);
+    assert.equal(noted.exitCode, 0);
+
+    // Every source rule is heuristic, so this tool never trips an exact gate.
+    const advisory = await runCli(lintConstraintsMain, ['--fail-on=heuristic', exact]);
+    assert.equal(advisory.exitCode, 0);
+  });
+});
+
+await runTest('--only / --ignore select rules, and reject unknown codes', async () => {
+  await withFiles({
+    'p.iss': '.Shape~9x9\n.AllDifferent~R1C1~R1C2~R1C3~R1C4~R1C5~R1C6~R1C7~R1C8~R1C9\n',
+  }, async ({ 'p.iss': file }) => {
+    const ignored = await runCli(lintConstraintsMain, ['--ignore=redundant-all-different', file]);
+    assert.match(ignored.stdout, /: OK$/m);
+
+    const only = await runCli(lintConstraintsMain, ['--only=redundant-all-different', file]);
+    assert.match(only.stdout, /guidance redundant-all-different:/);
+
+    // A typo'd code must not silently select nothing.
+    await assert.rejects(
+      () => runCli(lintConstraintsMain, ['--only=redundant-alldifferent', file]),
+      /no such rule/);
+  });
+});
+
+await runTest('--format=json emits the items, errors and tiers', async () => {
+  await withFiles({
+    'p.iss': '.Shape~9x9\n.AllDifferent~R1C1~R1C2~R1C3~R1C4~R1C5~R1C6~R1C7~R1C8~R1C9\n',
+    'broken.iss': '.Bogus~R1C1\n',
+  }, async ({ 'p.iss': file, 'broken.iss': broken }) => {
+    const { stdout, exitCode } = await runCli(
+      lintConstraintsMain, ['--format=json', file, broken]);
+    const result = JSON.parse(stdout);
+    assert.deepEqual(result.items.map(i => [i.code, i.tier, i.file]),
+      [['redundant-all-different', 'exact', file]]);
+    assert.equal(result.errors.length, 1);
+    assert.equal(result.errors[0].file, broken);
+    assert.equal(exitCode, 1);
+  });
+});
+
+// `.iss` files are generated, so they cannot carry inline suppressions. A
+// baseline is how a known, accepted set of findings (the corpus triage's
+// deferred items) stays silent while a NEW one still fails the run.
+await runTest('--baseline suppresses recorded findings but not new ones', async () => {
+  const oneRow = '.AllDifferent~R1C1~R1C2~R1C3~R1C4~R1C5~R1C6~R1C7~R1C8~R1C9\n';
+  const twoRows = oneRow + '.AllDifferent~R2C1~R2C2~R2C3~R2C4~R2C5~R2C6~R2C7~R2C8~R2C9\n';
+  await withFiles({
+    'p.iss': `.Shape~9x9\n${oneRow}`,
+    'base.json': '',
+  }, async ({ 'p.iss': file, 'base.json': base }) => {
+    await runCli(lintConstraintsMain, [`--write-baseline=${base}`, file]);
+    assert.deepEqual(JSON.parse(readFileSync(base, 'utf8')),
+      { [file]: { 'redundant-all-different': 1 } });
+
+    const accepted = await runCli(
+      lintConstraintsMain, [`--baseline=${base}`, '--fail-on=exact', file]);
+    assert.match(accepted.stdout, /: OK$/m);
+    assert.equal(accepted.exitCode, 0);
+
+    // A second redundant AllDifferent is one more than the baseline allows.
+    writeFileSync(file, `.Shape~9x9\n${twoRows}`);
+    const regressed = await runCli(
+      lintConstraintsMain, [`--baseline=${base}`, '--fail-on=exact', file]);
+    assert.match(regressed.stdout, /guidance redundant-all-different: .*row 2/);
+    assert.match(regressed.stdout, /1 guidance item found \(1 suppressed by baseline\)\./);
+    assert.equal(regressed.exitCode, 1);
+  });
+});
+
+// Source rules read a comment-stripped view, so prose ABOUT an idiom is not the
+// idiom. String and template-literal bodies are kept: that is where the idioms
+// being hunted (`R${r}C${c}` ids, the `_=_` wire format) actually live.
+await runTest('source rules see code, not comments', () => {
+  const prose = lintSource('// Title: t\n'
+    + '// The box origins are [1, 4, 7], and the Sum wire format is `0_=_1_1`.\n'
+    + "return [new Shape('9x9')];\n");
+  assert.equal(prose.length, 0, report(prose));
+
+  // The same idioms in code still fire.
+  const code = lintSource(SCRIPT_HEADER
+    + 'const origins = [1, 4, 7];\n'
+    + "const sum = new Sum('0_=_1_1', 'R1C1', 'R1C2');\n"
+    + "return [new Shape('9x9'), sum];\n");
+  assert.match(report(code), /manual-box-arithmetic/);
+  assert.match(report(code), /sum-wire-format/);
+});
+
+// An intentional local implementation is documented in the file itself, rather
+// than being re-litigated on every run.
+await runTest('// lint-ok silences one code on one line', () => {
+  const trailing = lintSource(SCRIPT_HEADER
+    + 'const origins = [1, 4, 7]; // lint-ok: manual-box-arithmetic\n'
+    + 'const others = [1, 4, 7];\n'
+    + "return [new Shape('9x9')];\n");
+  // The trailing comment excuses its own line, and only its own line.
+  assert.deepEqual(trailing.map(i => i.line), [7], report(trailing));
+
+  const standalone = lintSource(SCRIPT_HEADER
+    + '// lint-ok: manual-box-arithmetic\n'
+    + 'const origins = [1, 4, 7];\n'
+    + "return [new Shape('9x9')];\n");
+  assert.equal(standalone.length, 0, report(standalone));
+
+  // It silences the named code, not the line.
+  const otherCode = lintSource(SCRIPT_HEADER
+    + 'const origins = [1, 4, 7]; // lint-ok: manual-house-lookup\n'
+    + "return [new Shape('9x9')];\n");
+  assert.match(report(otherCode), /manual-box-arithmetic/);
 });
 
 logSuiteComplete('Lint tools');
