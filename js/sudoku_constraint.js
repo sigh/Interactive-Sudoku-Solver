@@ -2487,11 +2487,16 @@ export class SudokuConstraint {
       values must form a single orthogonally-connected region.`);
     static CATEGORY = 'Experimental';
 
+    // Values may be a number, an array, or the serialized '1_2' string.
     constructor(groupPrefix, values) {
       super(groupPrefix, values);
       this.groupPrefix = groupPrefix;
-      this.values = values;
-      this.valueStr = values.replace(/_/g, ',');
+      this.values = String(values).replace(/,/g, '_');
+    }
+
+    static serialize(constraints) {
+      return constraints.map(
+        c => this._argsToString(c.groupPrefix, c.values)).join('');
     }
 
     getCells(geometry) {
@@ -2500,7 +2505,7 @@ export class SudokuConstraint {
     }
 
     chipLabel() {
-      return `ConnectedValues (${this.groupPrefix}: ${this.valueStr})`;
+      return `ConnectedValues (${this.groupPrefix}: ${this.values.replace(/_/g, ',')})`;
     }
   };
 

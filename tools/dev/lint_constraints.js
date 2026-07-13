@@ -23,10 +23,11 @@ import { runSandboxToConstraint } from '../lib/sandbox_runner.js';
 import { ensureGlobalEnvironment } from '../../tests/helpers/test_env.js';
 
 ensureGlobalEnvironment();
-const { fnToBinaryKey } = await import('../../js/sudoku_constraint.js' + self.VERSION_PARAM);
+const { fnToBinaryKey, SudokuConstraint } = await import('../../js/sudoku_constraint.js' + self.VERSION_PARAM);
 const { SudokuParser } = await import('../../js/sudoku_parser.js' + self.VERSION_PARAM);
 const { CellGeometry } = await import('../../js/cell_geometry.js' + self.VERSION_PARAM);
-const { NFASerializer } = await import('../../js/nfa_builder.js' + self.VERSION_PARAM);
+const { SudokuBuilder } = await import('../../js/solver/sudoku_builder.js' + self.VERSION_PARAM);
+const { NFASerializer, SEGMENT_BREAK } = await import('../../js/nfa_builder.js' + self.VERSION_PARAM);
 
 const STAMPED_COPY_THRESHOLD = 50;
 
@@ -67,29 +68,74 @@ const parseGridCell = (cell) => {
 const isOrthAdjacent = (a, b) =>
   Math.abs(a.row - b.row) + Math.abs(a.col - b.col) === 1;
 
-// A cell's subgraph: the main grid, or a specific Var overlay (by prefix).
-// Replicate shifts a template within one subgraph only, so a constraint whose
-// cells span more than one (e.g. a grid cell together with a VS overlay cell)
-// is structurally not Replicable however regular its offsets look.
-const cellSubgraph = (cell) => {
-  if (/^R[0-9a-z]+C[0-9a-z]+$/i.test(cell)) return 'grid';
-  const m = /^(V[A-Za-z]*)/.exec(cell);
-  return m ? m[1] : 'other';
+// Position cells as [row, col, subgraph] in the cell graph -- the same space
+// Replicate shifts in. Var overlay cells only become positionable once they are
+// registered on the geometry, so resolve the constraint first; a bare
+// CellGeometry throws on 'VQ1'. Returns null if the tree cannot be resolved.
+// Returns { positionOf, geometry }, or null if the tree cannot be resolved.
+const makeCellContext = (root) => {
+  let geometry;
+  let graph;
+  try {
+    const resolved = SudokuBuilder.resolveConstraint(root);
+    geometry = resolved.getGeometry();
+    geometry.addVarCellsForConstraints([].concat(...resolved.toMap().values()));
+    graph = geometry.cellGraph();
+  } catch (e) {
+    return null;
+  }
+  const positionOf = (cell) => {
+    // SEGMENT_BREAK separates multi-segment cell lists; it is not a cell.
+    if (cell === SEGMENT_BREAK) return null;
+    try {
+      return graph.cellPosition(geometry.parseCellId(cell).cellIndex);
+    } catch (e) {
+      return null;
+    }
+  };
+  return { positionOf, geometry };
 };
-const spansSubgraphs = (cells) => new Set(cells.map(cellSubgraph)).size > 1;
+
+// Can one Replicate stamp this whole group? Replicate shifts a template by
+// graph.traverse(dRow, dCol) and requires the origin, every target, and every
+// template cell to lie in ONE cell group (see SudokuBuilder's Replicate case).
+// So the instances must all be the same shape up to a shift, and confined to a
+// single subgraph. A single-cell template (a repeated Given) passes the shape
+// test trivially, but still has to clear the one-cell-group requirement.
+const isReplicableGroup = (instances, positionOf) => {
+  if (!positionOf) return false;
+  const shapes = new Set();
+  const subgraphs = new Set();
+  for (const cells of instances) {
+    const positions = cells.map(positionOf);
+    if (positions.some(p => p === null)) return false;
+    for (const [, , subgraph] of positions) subgraphs.add(subgraph);
+    if (subgraphs.size > 1) return false;
+    const [baseRow, baseCol] = positions[0];
+    shapes.add(JSON.stringify(
+      positions.map(([row, col]) => [row - baseRow, col - baseCol])));
+    if (shapes.size > 1) return false;
+  }
+  return true;
+};
 
 // Flatten the parsed tree. Composites (And/Or/Replicate) expose
 // `.constraints`; leaves are everything else. `inOr` marks constraints that
 // are alternatives rather than facts, where redundancy rules must not fire.
-const collectLeaves = (constraint, inOr, out) => {
+// `inReplicate` marks a Replicate's template children -- already stamped, so
+// they must not themselves be counted as un-Replicated stamped copies.
+const collectLeaves = (constraint, flags, out) => {
   if (Array.isArray(constraint.constraints)) {
-    const branchOr = inOr || constraint.type === 'Or';
+    const childFlags = {
+      inOr: flags.inOr || constraint.type === 'Or',
+      inReplicate: flags.inReplicate || constraint.type === 'Replicate',
+    };
     for (const child of constraint.constraints) {
-      collectLeaves(child, branchOr, out);
+      collectLeaves(child, childFlags, out);
     }
     return out;
   }
-  out.push({ constraint, inOr });
+  out.push({ constraint, ...flags });
   return out;
 };
 
@@ -176,18 +222,13 @@ const describeCells = (cells) =>
 export const lintConstraintText = (text) => {
   const lines = text.split('\n');
   const root = SudokuParser.parseText(text);
-  const leaves = collectLeaves(root, false, []);
+  const leaves = collectLeaves(root, { inOr: false, inReplicate: false }, []);
 
   const shapeLeaf = leaves.find(({ constraint }) => constraint.type === 'Shape');
   const geometry = shapeLeaf
     ? CellGeometry.fromShapeSpec(shapeLeaf.constraint.shapeSpec)
     : CellGeometry.newDefault();
   const hasNoBoxes = leaves.some(({ constraint }) => constraint.type === 'NoBoxes');
-  // collectLeaves flattens composites (including Replicate) into their children,
-  // so a Replicate node never appears among the leaves; walk the tree for it.
-  const treeHasType = (c, type) => c.type === type ||
-    (Array.isArray(c.constraints) && c.constraints.some(ch => treeHasType(ch, type)));
-  const hasReplicate = treeHasType(root, 'Replicate');
   const shapeIsExtended = geometry.numValues !==
     CellGeometry.defaultNumValues(geometry.numRows, geometry.numCols);
 
@@ -203,30 +244,46 @@ export const lintConstraintText = (text) => {
   const items = [];
   const add = (line, code, message) => items.push({ line, code, message });
 
+  const cellContext = makeCellContext(root);
+  const positionOf = cellContext?.positionOf ?? null;
+  const givenLeaves = [];
+  const replicateNodes = [];
+  (function walk(c) {
+    if (c.type === 'Replicate') replicateNodes.push(c);
+    if (Array.isArray(c.constraints)) c.constraints.forEach(walk);
+  })(root);
   const copiesByKey = new Map();
   const pairGroups = new Map();
   const nfaGroups = new Map();
+  const sumGroups = new Map();
 
-  for (const { constraint, inOr } of leaves) {
+  for (const { constraint, inOr, inReplicate } of leaves) {
     const type = constraint.type;
     const cells = constraint.cells || [];
     const line = () => findLine(lines, type, cells[0]);
 
-    // --- Sum canonicalization ---
+    // --- Sum canonicalization (collected; judged per coefficient group) ---
+    // All-1 coefficients are decided by the coefficients alone, so they can be
+    // judged here. EqualSum additionally needs a target of 0, which varies
+    // *within* a coefficient family -- so it is judged per group below.
     if (type === 'Sum' && constraint.coeffs) {
       const coeffs = constraint.coeffs;
       if (coeffs.every(c => c === 1)) {
         add(line(), 'sum-unit-coefficients',
           'coefficient Sum with all-1 coefficients; use the plain Sum form '
           + '(or Cage if values are also all-different)');
-      } else if (constraint.sum === 0 && coeffs.every(c => c === 1 || c === -1)
+      } else if (coeffs.every(c => c === 1 || c === -1)
         && coeffs.some(c => c === 1) && coeffs.some(c => c === -1)) {
-        add(line(), 'sum-equal-sum',
-          cells.length === 2
-            ? 'coefficient Sum expresses cell equality; prefer SameValues '
-            + '(or EqualSum) with the cells as two segments'
-            : 'coefficient Sum expresses two cell sets with equal sums; '
-            + 'prefer EqualSum with the cells as two segments');
+        const groupKey = [...coeffs].sort((a, b) => a - b).join(',');
+        if (!sumGroups.has(groupKey)) {
+          sumGroups.set(groupKey, {
+            line: line(), count: 0, allZeroTarget: true, twoCell: true,
+          });
+        }
+        const group = sumGroups.get(groupKey);
+        group.count++;
+        group.allZeroTarget &&= constraint.sum === 0;
+        group.twoCell &&= cells.length === 2;
       }
     }
 
@@ -261,10 +318,8 @@ export const lintConstraintText = (text) => {
       // instances of the same machine over different cell counts (e.g. a
       // degree check over 2/3/4 neighbours) can't share one Replicate.
       const copyKey = `NFA\0${constraint.encodedNFA}\0${cells.length}`;
-      let copy = copiesByKey.get(copyKey);
-      if (!copy) { copy = { count: 0, allCross: true }; copiesByKey.set(copyKey, copy); }
-      copy.count++;
-      copy.allCross &&= spansSubgraphs(cells);
+      if (!copiesByKey.has(copyKey)) copiesByKey.set(copyKey, []);
+      copiesByKey.get(copyKey).push(cells);
 
       let nfaGroup = nfaGroups.get(constraint.encodedNFA);
       if (!nfaGroup) {
@@ -294,14 +349,14 @@ export const lintConstraintText = (text) => {
         // Identical Givens (same value set) are Replicate candidates -- Replicate
         // shifts the cell and keeps the values -- even though they serialize onto
         // one line. Common as "restrict every cell to 1-N" on an extended Shape.
-        // Key by subgraph too: one Replicate can't span the grid and a Var
-        // overlay, so same-valued Givens in different subgraphs are separate.
+        // The single cell is the template; isReplicableGroup still has to confirm
+        // they all sit in one cell group, since Replicate cannot span the grid
+        // and a Var overlay.
         const valueSig = [...values].sort((a, b) => a - b).join('_');
-        const copyKey = `Given\0${valueSig}\0${cellSubgraph(constraint.cell)}`;
-        let copy = copiesByKey.get(copyKey);
-        if (!copy) { copy = { count: 0, allCross: true }; copiesByKey.set(copyKey, copy); }
-        copy.count++;
-        copy.allCross &&= spansSubgraphs([constraint.cell]);
+        const copyKey = `Given\0${valueSig}`;
+        if (!copiesByKey.has(copyKey)) copiesByKey.set(copyKey, []);
+        copiesByKey.get(copyKey).push([constraint.cell]);
+        givenLeaves.push({ cell: constraint.cell, values: valueSet, line: line() });
       }
     }
 
@@ -321,6 +376,23 @@ export const lintConstraintText = (text) => {
           `AllDifferent duplicates ${house}, which the engine already enforces`);
       }
     }
+  }
+
+  // --- Sum groups that fully re-encode EqualSum ---
+  // A coefficient family is one authored rule: the same linear expression
+  // stamped over different cells. EqualSum needs a target of 0, which varies
+  // within a family, so it is suggested only when EVERY member has target 0 --
+  // converting just the members that happen to balance would split one rule
+  // across two constraint types.
+  for (const group of sumGroups.values()) {
+    if (!group.allZeroTarget) continue;
+    const count = `${group.count} coefficient Sum${group.count === 1 ? '' : 's'}`;
+    add(group.line, 'sum-equal-sum',
+      group.twoCell
+        ? `${count} express cell equality; prefer SameValues (or EqualSum) `
+        + 'with the cells as two segments'
+        : `${count} express two cell sets with equal sums; prefer EqualSum `
+        + 'with the cells as two segments');
   }
 
   // --- Pair groups that fully re-encode a native relation ---
@@ -359,19 +431,63 @@ export const lintConstraintText = (text) => {
       + 'machine to 2 cells; a 2-cell relation is a Pair — use Pair.fnToKey instead');
   }
 
-  // --- Stamped copies that suggest Replicate ---
-  if (!hasReplicate) {
-    for (const [copyKey, copy] of copiesByKey) {
-      if (copy.count < STAMPED_COPY_THRESHOLD) continue;
-      // Every instance spans multiple cell subgraphs, so Replicate cannot
-      // express them regardless of how uniform the offsets are.
-      if (copy.allCross) continue;
-      const type = copyKey.split('\0')[0];
-      const shared = type === 'Given' ? 'value set' : 'machine';
-      add(1, 'stamped-copies-without-replicate',
-        `${copy.count} ${type} constraints share one ${shared}; if they are shifted `
-        + 'copies, use Replicate to shorten the encoding');
+  // --- A Replicate'd domain that skips the cells its own clues pin ---
+  // Two RAW Givens on a cell merge (Given's uniqueness key is the cell), so a
+  // hand-stamped domain and one that filtered its clue cells out serialize
+  // identically -- indistinguishable, hence not linted. But a Given inside a
+  // Replicate does NOT merge with a raw Given: both survive. So once the domain
+  // is Replicate'd, the cells it skips are visible, and skipping them is pointless
+  // -- the two constraints intersect, so the narrower clue still wins. Extend the
+  // targets over the whole group and drop the filtering.
+  //
+  // Only fires when the clue is a strict subset of the domain: a clue outside it
+  // (a placeholder range, an out-of-set marker) would intersect to nothing.
+  for (const replicate of replicateNodes) {
+    if (!cellContext) break;
+    let targets;
+    try {
+      targets = new Set(SudokuConstraint.Replicate
+        .decodeTargetCells(replicate.targetBitset, replicate.origin, cellContext.geometry)
+        .map(index => cellContext.geometry.makeCellIdFromIndex(index)));
+    } catch (e) {
+      continue;
     }
+    for (const child of replicate.constraints) {
+      if (child.type !== 'Given' || child.cell !== replicate.origin) continue;
+      const domain = new Set(child.values || []);
+      const subgraph = positionOf(replicate.origin)?.[2];
+      if (subgraph === undefined) continue;
+      // Raw Givens elsewhere in the same cell group. The template itself sits on
+      // the origin, which is always a target, so it can never appear here.
+      const skipped = givenLeaves.filter(given =>
+        !targets.has(given.cell)
+        && positionOf(given.cell)?.[2] === subgraph
+        && given.values.size < domain.size
+        && [...given.values].every(value => domain.has(value)));
+      if (!skipped.length) continue;
+      add(findLine(lines, 'Replicate', null), 'replicated-domain-skips-clue-cells',
+        `a Replicate stamps a Given domain over this cell group but skips `
+        + `${skipped.length} cell(s) that a narrower Given already pins; the two `
+        + 'intersect, so stamp the domain over the whole group instead');
+    }
+  }
+
+  // --- Stamped copies that suggest Replicate ---
+  // Decided, not guessed: isReplicableGroup checks that the instances really are
+  // one template under a shift, in one cell group. Sharing a machine is not
+  // enough -- the same machine applied to many differently-shaped cell sets (a
+  // rule run over every region, say) has no single template to stamp.
+  // Judged per group, not per script: a script that already uses Replicate for
+  // one rule can still stamp another group by hand. Constraints already inside a
+  // Replicate are excluded when the groups are collected, so they never appear.
+  for (const [copyKey, instances] of copiesByKey) {
+    if (instances.length < STAMPED_COPY_THRESHOLD) continue;
+    if (!isReplicableGroup(instances, positionOf)) continue;
+    const type = copyKey.split('\0')[0];
+    const shared = type === 'Given' ? 'one value set' : 'one machine';
+    add(1, 'stamped-copies-without-replicate',
+      `${instances.length} ${type} constraints share ${shared} and are shifted `
+      + 'copies of one template; use Replicate to shorten the encoding');
   }
 
   const seen = new Set();

@@ -463,7 +463,7 @@ const EXAMPLE_OTHER_VARIANTS = [
     src: 'https://sudokupad.app/gdc/loop-pack/entropic',
     input: '/data/scripts/loop_entropic.js',
     solution: '641523253416362154514632136245425361',
-    constraintTypes: ['6x6', 'Var', 'Replicate', 'NFA: degree', 'NFA: no-touch', 'NFA: entropic', 'NFA: vision'],
+    constraintTypes: ['6x6', 'Var', 'Replicate', 'ConnectedValues', 'NFA: degree', 'NFA: no-touch', 'NFA: entropic', 'NFA: vision'],
   },
   {
     name: 'Nordschleife',
@@ -471,7 +471,7 @@ const EXAMPLE_OTHER_VARIANTS = [
     src: ['https://www.youtube.com/watch?v=A8GBl5GGypA', 'https://sudokupad.app/0pshsj5ykr'],
     input: '/data/scripts/nordschleife.js',
     solution: '526973148384165972917824356145782693279436581638519724793648215852391467461257839',
-    constraintTypes: ['Var', 'Replicate', 'NFA: degree', 'NFA: no-touch', 'NFA: count', 'NFA: mult'],
+    constraintTypes: ['Var', 'Replicate', 'ConnectedValues', 'NFA: degree', 'NFA: no-touch', 'NFA: count', 'NFA: mult'],
   },
   {
     name: 'Wendezäune',

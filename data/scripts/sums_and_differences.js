@@ -9,6 +9,9 @@
 // One multiSegment NFA per rule, run over both lines so its period carries across
 // the SEGMENT_BREAK and stays shared.
 
+const graph = cellGraph('9x9');
+const geometry = cellGeometry('9x9');
+
 const navyLines = [
   ['R2C2', 'R1C3', 'R2C4', 'R3C4', 'R4C3', 'R5C3', 'R6C2', 'R7C2', 'R8C3',
     'R9C4', 'R8C5', 'R8C6', 'R8C7', 'R7C7', 'R6C6', 'R5C6', 'R4C5', 'R3C6'],
@@ -66,6 +69,6 @@ return [
   new BlackDot('R4C7', 'R4C8'),
   new BlackDot('R4C9', 'R5C9'),
 
-  new LittleKiller('R7C1', 14),
-  new LittleKiller('R2C9', 10),
+  LittleKiller.fromCells(14, graph.ray('R7C1', 1, 1), geometry),
+  LittleKiller.fromCells(10, graph.ray('R2C9', -1, -1), geometry),
 ];

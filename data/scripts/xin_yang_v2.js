@@ -16,24 +16,10 @@ const shade = graph.makeOverlay('VS');
 const shadeCell = cell => shade.at(cell);
 const gridCells = graph.cells();
 
-const constraints = [
-  new Shape('9x9'),
-  shade.toVar('shade'),
-  new Given('R2C6', 6),
-  new Given('R2C8', 8),
-  new Given('R6C2', 7),
-  new Given('R7C6', 5),
-];
-const add = (...items) => constraints.push(...items);
-
 // Every shade Var is either shaded or unshaded.
 const firstShade = shade.cells()[0];
-add(new Replicate([new Given(firstShade, SHADED, UNSHADED)],
-  Replicate.encodeTargetCells(shade.cells(), firstShade, shade), firstShade));
-
-// Yin-Yang connectivity: each shade forms one orthogonally connected region.
-add(new ConnectedValues('VS', String(SHADED)));
-add(new ConnectedValues('VS', String(UNSHADED)));
+const shadeDomain = new Replicate([new Given(firstShade, SHADED, UNSHADED)],
+  Replicate.encodeTargetCells(shade.cells(), firstShade, shade), firstShade);
 
 const dots = [
   ['R1C4', 'R2C4'],
@@ -45,9 +31,10 @@ const dots = [
 
 // White dots mark consecutive digits, and their two cells take opposite
 // shades (with two shades, "opposite" is just all-different).
-for (const [a, b] of dots) {
-  add(new WhiteDot(a, b), new AllDifferent(shadeCell(a), shadeCell(b)));
-}
+const dotRules = dots.flatMap(([a, b]) => [
+  new WhiteDot(a, b),
+  new AllDifferent(shadeCell(a), shadeCell(b)),
+]);
 
 // No 2x2 block may be all shaded or all unshaded: one NFA on the top-left
 // block, replicated to every block origin.
@@ -63,11 +50,11 @@ const noMono2x2Machine = NFA.encodeSpec({
   accept: ({ done }) => done === true,
 }, geometry.numValues);
 const blockOrigins = gridCells.filter(cell => graph.block(cell, 2, 2));
-add(new Replicate(
+const noMono2x2 = new Replicate(
   [new NFA(noMono2x2Machine, 'no-mono-2x2',
     ...graph.block(gridCells[0], 2, 2).map(shadeCell))],
   Replicate.encodeTargetCells(blockOrigins.map(shadeCell), firstShade, shade),
-  firstShade));
+  firstShade);
 
 const arrows = [
   {
@@ -96,33 +83,54 @@ const arrows = [
   },
 ];
 
-for (const { pill, line } of arrows) {
-  add(new PillArrow(2, ...pill, ...line.slice(1)));
-}
+const pillArrows = arrows.map(
+  ({ pill, line }) => new PillArrow(2, ...pill, ...line.slice(1)));
 
+// The clue sees an unbroken run of its own shade covering its own cell, bounded
+// by the opposite shade (or the line's end). Enumerate every window [start..end]
+// containing the clue: one And per window, pinning the digit to the window's
+// length, the window to the target shade, and each in-line boundary to the
+// blocker. Exactly one window is the true run, so the clue is their Or.
 function sightCountConstraint(digitCell, lineCells, index, targetShade) {
   const blocker = targetShade === SHADED ? UNSHADED : SHADED;
-  const branches = [];
-  for (let start = 0; start <= index; start++) {
-    for (let end = index; end < lineCells.length; end++) {
-      const length = end - start + 1;
-      const branch = [new Given(digitCell, length)];
-      for (let i = start; i <= end; i++) {
-        branch.push(new Given(shadeCell(lineCells[i]), targetShade));
-      }
-      if (start > 0) branch.push(new Given(shadeCell(lineCells[start - 1]), blocker));
-      if (end + 1 < lineCells.length) branch.push(new Given(shadeCell(lineCells[end + 1]), blocker));
-      branches.push(new And(branch));
-    }
-  }
-  return new Or(branches);
+  const starts = Array.from({ length: index + 1 }, (_, start) => start);
+  const ends = Array.from(
+    { length: lineCells.length - index }, (_, i) => index + i);
+
+  return new Or(starts.flatMap(start => ends.map(end => new And([
+    new Given(digitCell, end - start + 1),
+    ...lineCells.slice(start, end + 1)
+      .map(cell => new Given(shadeCell(cell), targetShade)),
+    ...(start > 0
+      ? [new Given(shadeCell(lineCells[start - 1]), blocker)] : []),
+    ...(end + 1 < lineCells.length
+      ? [new Given(shadeCell(lineCells[end + 1]), blocker)] : []),
+  ]))));
 }
 
-for (const { pill } of arrows) {
-  const tens = parseCellId(pill[0]);
-  const ones = parseCellId(pill[1]);
-  add(sightCountConstraint(pill[0], graph.row(pill[0]), tens.col - 1, SHADED));
-  add(sightCountConstraint(pill[1], graph.column(pill[1]), ones.row - 1, UNSHADED));
-}
+// The pill's tens digit counts shaded cells seen along its row, the ones digit
+// counts unshaded cells seen down its column; the index is the clue's own
+// position in that line.
+const sightCounts = arrows.flatMap(({ pill }) => [
+  sightCountConstraint(
+    pill[0], graph.row(pill[0]), parseCellId(pill[0]).col - 1, SHADED),
+  sightCountConstraint(
+    pill[1], graph.column(pill[1]), parseCellId(pill[1]).row - 1, UNSHADED),
+]);
 
-return constraints;
+return [
+  new Shape('9x9'),
+  shade.toVar('shade'),
+  new Given('R2C6', 6),
+  new Given('R2C8', 8),
+  new Given('R6C2', 7),
+  new Given('R7C6', 5),
+  shadeDomain,
+  // Yin-Yang connectivity: each shade forms one orthogonally connected region.
+  new ConnectedValues('VS', SHADED),
+  new ConnectedValues('VS', UNSHADED),
+  ...dotRules,
+  noMono2x2,
+  ...pillArrows,
+  ...sightCounts,
+];

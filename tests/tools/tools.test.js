@@ -24,6 +24,9 @@ import { main as stepMain } from '../../tools/debug/step_analysis.js';
 import { main as hotspotsMain } from '../../tools/debug/search_hotspots.js';
 import { main as traceMain } from '../../tools/debug/decision_trace.js';
 import { main as sandboxMain } from '../../tools/debug/run_sandbox.js';
+import {
+  injectSolutionGivens, injectSolutionGivensForGroup,
+} from '../../tools/lib/puzzle_runner.js';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 
@@ -104,6 +107,70 @@ await runTest('verify_solution.js rejects a wrong solution with an explicit cap'
   assert.match(thrown?.message ?? '', /rejected/);
   assert.match(stdout, /Backtracks: \d+ \(cap 5\)/);
   assert.match(stdout, /Result: REJECTED/);
+});
+
+// --solution-group pins the answer onto a named cell group rather than the main
+// grid, for puzzles the grid cannot hold. The fixture is that shape in miniature:
+// a placeholder 1x1 grid whose real cells are the four-cell Var group VX.
+// The injector's own rules are unit-tested below; this only checks the CLI wires
+// the flag through to a real accept/reject.
+const GROUP_PUZZLE = '.Shape~1x1~4.Var~X~Test~4.AllDifferent~VX1~VX2~VX3~VX4';
+
+await runTest('verify_solution.js --solution-group pins the answer onto the group', async () => {
+  const good = await capture(() =>
+    verifyMain(argv('verify_solution.js', '--input', GROUP_PUZZLE,
+      '--solution', '1234', '--solution-group', 'VX')));
+  assert.equal(good.thrown, null, good.thrown?.message);
+  assert.match(good.stdout, /Result: ACCEPTED/);
+
+  // A repeat breaks the group's AllDifferent, so the pin must actually bind.
+  const bad = await capture(() =>
+    verifyMain(argv('verify_solution.js', '--input', GROUP_PUZZLE,
+      '--solution', '1134', '--solution-group', 'VX')));
+  assert.match(bad.thrown?.message ?? '', /rejected/);
+  assert.match(bad.stdout, /Result: REJECTED/);
+});
+
+await runTest('injectSolutionGivens takes the grid dims from the puzzle, not sqrt(length)', () => {
+  // 4x6 is not square, so a sqrt(length) reading would mis-shape it (or refuse).
+  const givens = injectSolutionGivens('.Shape~4x6', '123456'.repeat(4));
+  assert.match(givens, /\.~R1C1_1/);
+  assert.match(givens, /\.~R1C6_6/);   // 6 columns, not sqrt(24)
+  assert.match(givens, /\.~R4C6_6/);   // 4 rows
+  assert.equal(givens.match(/\.~R/g).length, 24);
+
+  assert.throws(() => injectSolutionGivens('.Shape~4x6', '12345'),
+    /5 chars but the grid is 4x6/);
+});
+
+await runTest("injectSolutionGivens leaves '.' cells unpinned", () => {
+  // An irregular grid modelled inside a rectangular Shape has holes: those cells
+  // are not part of the answer and must not be pinned as givens.
+  const givens = injectSolutionGivens('.Shape~4x6', '..3456' + '123456'.repeat(3));
+  assert.doesNotMatch(givens, /\.~R1C1_/);
+  assert.doesNotMatch(givens, /\.~R1C2_/);
+  assert.match(givens, /\.~R1C3_3/);
+  assert.equal(givens.match(/\.~R/g).length, 22);
+});
+
+// The injector is a pure string transform: test it directly rather than paying
+// for a solver build per case.
+await runTest('injectSolutionGivensForGroup maps digits onto the group in order', () => {
+  const input = injectSolutionGivensForGroup(GROUP_PUZZLE, '1234', 'VX');
+  assert.equal(input, GROUP_PUZZLE + '.~VX1_1.~VX2_2.~VX3_3.~VX4_4');
+});
+
+await runTest('injectSolutionGivensForGroup rejects a bad group or size', () => {
+  // `new Var('X', ...)` makes the group VX, so a bare 'X' is the predictable
+  // slip: it must name the real groups, not silently pin nothing.
+  assert.throws(
+    () => injectSolutionGivensForGroup(GROUP_PUZZLE, '1234', 'X'),
+    /unknown cell group 'X'.*VX/);
+  // The group must BE the answer: a size mismatch would otherwise map the
+  // solution onto the wrong cells.
+  assert.throws(
+    () => injectSolutionGivensForGroup(GROUP_PUZZLE, '123', 'VX'),
+    /has 4 cells but the solution has 3 digits/);
 });
 
 // One call exercises the whole step-inspection surface: the walk table, the

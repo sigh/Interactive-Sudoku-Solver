@@ -1329,3 +1329,35 @@ await runTest('fromCells throws when no clue covers the cells', () => {
 });
 
 logSuiteComplete('OutsideConstraintBase.fromCells');
+
+// ============================================================================
+// ConnectedValues
+// ============================================================================
+
+await runTest('ConnectedValues accepts a number value', () => {
+  const constraint = new SudokuConstraint.ConnectedValues('VS', 1);
+  assert.equal(constraint.values, '1');
+  assert.equal(constraint.toString(), '.ConnectedValues~VS~1');
+});
+
+await runTest('ConnectedValues accepts an array of values', () => {
+  const constraint = new SudokuConstraint.ConnectedValues('VS', [1, 2, 3]);
+  assert.equal(constraint.values, '1_2_3');
+  assert.equal(constraint.toString(), '.ConnectedValues~VS~1_2_3');
+});
+
+await runTest('ConnectedValues accepts the serialized string', () => {
+  const constraint = new SudokuConstraint.ConnectedValues('VS', '1_2');
+  assert.equal(constraint.values, '1_2');
+  assert.equal(constraint.toString(), '.ConnectedValues~VS~1_2');
+});
+
+await runTest('ConnectedValues serializes each input form identically', () => {
+  const expected = '.ConnectedValues~VS~1_2';
+  for (const values of [[1, 2], ['1', '2'], '1_2']) {
+    assert.equal(
+      new SudokuConstraint.ConnectedValues('VS', values).toString(), expected);
+  }
+});
+
+logSuiteComplete('ConnectedValues');

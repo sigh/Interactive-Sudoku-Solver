@@ -11,8 +11,10 @@
 //   node tools/debug/verify_solution.js --solution <digits> (--puzzle <name> | --input <str> | --input-file <path>)
 //
 // Required:
-//   --solution <digits>   The full solution as a row-major digit string. The
-//                         grid side is inferred as sqrt(length).
+//   --solution <digits>   The full solution as a row-major digit string, one
+//                         char per main-grid cell (the grid's own dimensions, so
+//                         non-square shapes work). '.' leaves a cell unpinned,
+//                         for an irregular grid whose Shape has holes.
 //
 // Puzzle source (pick one):
 //   --puzzle <name>       Named puzzle from data/collections.js.
@@ -20,6 +22,16 @@
 //   --input-file <path>   Read the constraint string from a file.
 //
 // Options:
+//   --solution-group <prefix>
+//                         Pin the solution onto a named cell group instead of
+//                         the main grid, in group order -- for puzzles whose
+//                         answer does not live in the grid (e.g. a grid modelled
+//                         as a Var group because its rows are a multiset). The
+//                         prefix is the cell-id prefix: 'VG' for
+//                         `new Var('G', ...)` (Var prepends the V), or a
+//                         solver-owned group such as 'CC'. The group must be the
+//                         whole answer: its cell count must equal the solution
+//                         length, and the digit string need not be square.
 //   --max-backtracks <n|none>
 //                         Backtrack cap for verification. Defaults to 1; "none"
 //                         is unlimited and should be rare.
@@ -28,14 +40,11 @@
 //
 // Prints "Result: ACCEPTED" (exit 0) or "Result: REJECTED" (exit non-zero), so
 // it doubles as an assertion in scripts/CI. "Result: CAPPED" is inconclusive.
-//
-// Note: the digit string fixes main-grid cells. For puzzles whose answer lives
-// in Var cells (e.g. Chaos region labels), use solve.js and read the printed
-// Var groups instead.
 
 import { runAsCli } from '../lib/cli_entry.js';
 import {
   allPuzzles, loadPuzzle, buildSolver, injectSolutionGivens,
+  injectSolutionGivensForGroup,
 } from '../lib/puzzle_runner.js';
 
 const DEFAULT_MAX_BACKTRACKS = 1;
@@ -43,7 +52,7 @@ const DEFAULT_MAX_BACKTRACKS = 1;
 const parseArgs = (argv) => {
   const args = {
     puzzle: null, input: null, inputFile: null, solution: null,
-    maxBacktracksRaw: undefined, list: false, help: false,
+    solutionGroup: null, maxBacktracksRaw: undefined, list: false, help: false,
   };
   for (let i = 2; i < argv.length; i++) {
     const [key, inlineValue] = argv[i].split(/=(.*)/s);
@@ -55,6 +64,7 @@ const parseArgs = (argv) => {
       case '--input': args.input = next(); break;
       case '--input-file': args.inputFile = next(); break;
       case '--solution': args.solution = next(); break;
+      case '--solution-group': args.solutionGroup = next(); break;
       case '--max-backtracks': args.maxBacktracksRaw = next(); break;
       default: throw new Error(`Unknown argument: ${argv[i]}\nRun with --help for usage.`);
     }
@@ -79,8 +89,8 @@ Checks whether the puzzle encoding accepts the given solution. Defaults to a
 one-backtrack cap because this is meant to be quick verification, not search.
 
 Required:
-  --solution <digits>   Full solution as a row-major digit string
-                        (grid side = sqrt(length)).
+  --solution <digits>   Full solution as a row-major digit string, one char per
+                        main-grid cell. '.' leaves that cell unpinned.
 
 Puzzle source (pick one):
   --puzzle <name>       Named puzzle from data/collections.js.
@@ -88,6 +98,12 @@ Puzzle source (pick one):
   --input-file <path>   Read the constraint string from a file.
 
 Options:
+  --solution-group <prefix>
+                        Pin the solution onto a named cell group (in group
+                        order) instead of the main grid, for puzzles whose
+                        answer is not in the grid. Use the cell-id prefix:
+                        'VG' for new Var('G', ...), or e.g. 'CC'. The group's
+                        cell count must equal the solution length.
   --max-backtracks <n|none>
                         Backtrack cap. Default: 1. Use "none" only for rare
                         deliberately unbounded checks.
@@ -106,7 +122,9 @@ export const main = async (argv) => {
   const maxBacktracks = parseVerifyBacktrackLimit(args.maxBacktracksRaw);
 
   const puzzle = await loadPuzzle(args);
-  const input = injectSolutionGivens(puzzle.input, args.solution);
+  const input = args.solutionGroup === null
+    ? injectSolutionGivens(puzzle.input, args.solution)
+    : injectSolutionGivensForGroup(puzzle.input, args.solution, args.solutionGroup);
   const { internal } = buildSolver(input);
 
   // With the solution pinned as givens, one accepting completion is enough;

@@ -83,15 +83,10 @@ const GUIDANCE_DEFS = [
   },
   {
     code: 'outside-clue-by-arrow-id',
-    message: 'outside clue built from a raw corner/arrow id; prefer '
-      + 'Class.fromCells(value, cells, geometry) so the canonical corner and '
-      + 'direction come from the cells',
-    patterns: [
-      /\bnew\s+(?:LittleKiller|Sandwich|XSum|Skyscraper|HiddenSkyscraper|NumberedRoom|FullRank)\s*\(/g,
-    ],
-  },
-  {
-    code: 'outside-clue-by-arrow-id',
+    // The raw constructor takes an arrowId ("<id>[,<dir>]") -- an internal
+    // detail that is easy to get wrong: a bare corner id silently defaults the
+    // direction, picking one of the two lines through that corner. There is no
+    // good reason to write one by hand, so every direct construction is flagged.
     message: 'outside clue built from a raw corner/arrow id; prefer '
       + 'Class.fromCells(value, cells, geometry) so the canonical corner and '
       + 'direction come from the cells',
@@ -139,6 +134,23 @@ const GUIDANCE_DEFS = [
     patterns: [
       /`[^`\n]*_=_/g,
       /['"]-?\d+_=_/g,
+    ],
+  },
+  {
+    code: 'mutable-constraint-accumulator',
+    message: 'constraint list built by mutation; return it declaratively instead — '
+      + 'one `return [...]` of new Shape(...), the givens, and a named group per '
+      + 'rule spread in (`...whispers`), building each group with .map()/.flatMap()',
+    patterns: [
+      // The `add()` helper, whatever the array is named.
+      /\bconst\s+add\s*=\s*\([^)]*\)\s*=>\s*\w+\.push\(/g,
+      /\bconstraints\.push\(/g,
+      // The general tell, whatever the accumulator is named: the script returns
+      // a bare variable rather than an array literal (`return [...]`) or an
+      // expression (`return segments.map(...)`). Anchored to column 0 so a
+      // helper's own indented `return out;` is out of scope -- a sandbox script
+      // runs as a function body, so its top-level return is unindented.
+      /^return\s+[A-Za-z_$][\w$]*\s*;/gm,
     ],
   },
   {

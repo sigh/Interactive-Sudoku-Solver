@@ -113,6 +113,23 @@ await runTest('lint_constraints --script runs inputs through the sandbox', async
   assert.match(report(items), /sum-equal-sum/);
 });
 
+await runTest('lint_constraints suggests EqualSum only for a whole coefficient family', () => {
+  // EqualSum needs a target of 0, but the target varies *within* one authored
+  // rule: the same linear expression stamped over different cells. Converting
+  // only the members that happen to balance would split one rule across two
+  // constraint types, so the whole family must qualify.
+  const mixedFamily = lintConstraintText(
+    '.Sum~0_=_1_1_-1_-1~R1C1~R1C2~R2C1~R2C2\n'
+    + '.Sum~-3_=_1_1_-1_-1~R3C1~R3C2~R4C1~R4C2\n');
+  assert.doesNotMatch(report(mixedFamily), /sum-equal-sum/);
+
+  // Every member of the family balances, so the rule applies to all of them.
+  const wholeFamily = lintConstraintText(
+    '.Sum~0_=_1_1_-1_-1~R1C1~R1C2~R2C1~R2C2\n'
+    + '.Sum~0_=_1_1_-1_-1~R3C1~R3C2~R4C1~R4C2\n');
+  assert.match(report(wholeFamily), /sum-equal-sum.*2 coefficient Sums/);
+});
+
 await runTest('lint_constraints flags redundant houses', () => {
   const items = lintConstraintText(
     '.AllDifferent~R1C1~R1C2~R1C3~R1C4~R1C5~R1C6~R1C7~R1C8~R1C9\n');
@@ -144,7 +161,8 @@ await runTest('lint_constraints flags a 2-cell NFA as a Pair, but not a wider on
 
 await runTest('lint_constraints flags many identical Givens, but not conditional ones', async () => {
   // 55 identical range-restriction Givens on an extended Shape: a Replicate
-  // candidate even though they serialize onto one line.
+  // candidate even though they serialize onto one line. The template is the
+  // single cell, so they are shifted copies by construction.
   const gs = 'const gs = Array.from({ length: 55 }, (_, i) =>\n'
     + '  new Given(makeCellId(i % 9 + 1, Math.floor(i / 9) + 1), 1, 2));\n';
   const flagged = await lintScript(gs + "return [new Shape('9x9', 10), ...gs];\n");
@@ -153,6 +171,54 @@ await runTest('lint_constraints flags many identical Givens, but not conditional
   // The same Givens inside an Or are conditional hypotheses, not repeated facts.
   const conditional = await lintScript(gs + "return [new Shape('9x9', 10), new Or(gs)];\n");
   assert.doesNotMatch(report(conditional), /stamped-copies-without-replicate/);
+});
+
+// The recommended way to write a group domain is to stamp it over the WHOLE cell
+// group and let the clue Givens narrow it, rather than filtering the clue cells
+// out of the domain. That is a source-level style point and is deliberately NOT
+// linted here: Given's UNIQUENESS_KEY_FIELD is 'cell', so the clue replaces the
+// domain's entry for its cell and BOTH spellings emit the identical constraint
+// set. This test pins that equivalence, so no one re-adds an undecidable rule.
+await runTest('a group domain and its filtered spelling emit identical constraints', async () => {
+  const stamped = await runSandboxToConstraint(
+    "return [new Shape('4x4'),\n"
+    + "  ...cellGraph('4x4').cells().map(c => new Given(c, 1, 2, 3)),\n"
+    + "  new Given('R1C1', 2)];\n");
+  const filtered = await runSandboxToConstraint(
+    "const cells = cellGraph('4x4').cells();\n"
+    + "return [new Shape('4x4'),\n"
+    + "  ...cells.filter(c => c !== 'R1C1').map(c => new Given(c, 1, 2, 3)),\n"
+    + "  new Given('R1C1', 2)];\n");
+  const givens = (text) => text.split('.').filter(c => c.startsWith('~'))
+    .flatMap(c => c.split('~').slice(1)).sort();
+  assert.deepEqual(givens(stamped), givens(filtered));
+});
+
+// Replicate stamps ONE template under a shift, within one cell group. Sharing a
+// machine is not the same thing: the same machine run over every region of a
+// grid has no single template to stamp. The rule has to check the offsets rather
+// than hedge "if they are shifted copies".
+await runTest('lint_constraints flags stamped NFA copies only when the offsets match', async () => {
+  const spec = '{ startState: 0, transition: (s) => s >= 3 ? undefined : s + 1,'
+    + ' accept: (s) => s === 3 }';
+  // 63 copies of one 3-cell machine, every one with offsets (0,0) (0,1) (0,2).
+  const shifted = await lintScript(
+    `const nfa = NFA.encodeSpec(${spec}, 9);\n`
+    + 'const cs = [];\n'
+    + 'for (let r = 1; r <= 9; r++) for (let c = 1; c <= 7; c++)\n'
+    + "  cs.push(new NFA(nfa, 'm', makeCellId(r, c), makeCellId(r, c + 1), makeCellId(r, c + 2)));\n"
+    + "return [new Shape('9x9'), ...cs];\n");
+  assert.match(report(shifted), /stamped-copies-without-replicate.*NFA constraints share one machine/);
+
+  // Same machine, same count, but anchored at column 1 so each instance is a
+  // different shape. No single template exists, so Replicate cannot express it.
+  const noTemplate = await lintScript(
+    `const nfa = NFA.encodeSpec(${spec}, 9);\n`
+    + 'const cs = [];\n'
+    + 'for (let r = 1; r <= 9; r++) for (let c = 1; c <= 7; c++)\n'
+    + "  cs.push(new NFA(nfa, 'm', makeCellId(r, 1), makeCellId(r, c + 1), makeCellId(r, c + 2)));\n"
+    + "return [new Shape('9x9'), ...cs];\n");
+  assert.doesNotMatch(report(noTemplate), /stamped-copies-without-replicate/);
 });
 
 // The cases above test the pure lint logic directly. This one exercises the CLI
@@ -175,6 +241,54 @@ await runTest('lint_sandbox_script.js main() lints a file and formats output', a
   const stdout = out.join('\n');
   assert.match(stdout, new RegExp(`${file}:\\d+: guidance outside-clue-by-arrow-id:`));
   assert.match(stdout, /1 guidance item found\./);
+});
+
+// The accumulator pattern spread from the curated data/scripts/ into ~40% of
+// downstream encodings before it was caught, so the lint has to see every shape
+// of it -- including the `add()` helper it was most often copied as.
+await runTest('lint_sandbox_script flags a mutable constraint accumulator', () => {
+  const accumulator = lintSource(SCRIPT_HEADER
+    + "const constraints = [new Shape('6x6')];\n"
+    + "for (const cell of cells) constraints.push(new Given(cell, 3));\n"
+    + 'return constraints;\n');
+  assert.match(report(accumulator), /mutable-constraint-accumulator/);
+
+  const addHelper = lintSource(SCRIPT_HEADER
+    + "const constraints = [new Shape('6x6')];\n"
+    + 'const add = (...items) => constraints.push(...items);\n'
+    + "add(new Given('R1C1', 3));\n"
+    + 'return constraints;\n');
+  assert.match(report(addHelper), /mutable-constraint-accumulator/);
+
+  // Renaming the accumulator must not evade the rule: returning a bare variable
+  // is the tell, whatever it is called.
+  const renamed = lintSource(SCRIPT_HEADER
+    + "const cs = [new Shape('6x6')];\n"
+    + 'for (const cell of cells) cs.push(new Given(cell, 3));\n'
+    + 'return cs;\n');
+  assert.match(report(renamed), /mutable-constraint-accumulator/);
+});
+
+await runTest('lint_sandbox_script passes a declaratively-built constraint list', () => {
+  // Local accumulation that is not the constraint list -- here, collecting the
+  // branches of one Or, and a helper returning its own bare local -- is not the
+  // pattern and must not be flagged.
+  const items = lintSource(SCRIPT_HEADER
+    + 'function windows(values) {\n'
+    + '  const out = [];\n'
+    + '  for (const v of values) out.push(v);\n'
+    + '  return out;\n'
+    + '}\n'
+    + 'const branches = [];\n'
+    + 'for (const v of values) branches.push(new Given(cell, v));\n'
+    + 'const givens = cells.map(cell => new Given(cell, 3));\n'
+    + "return [new Shape('6x6'), ...givens, new Or(branches)];\n");
+  assert.equal(items.length, 0, report(items));
+
+  // A script may also return an expression rather than an array literal.
+  const expression = lintSource(SCRIPT_HEADER
+    + 'return segments.map(seg => new NFA(nfa, \'\', ...seg));\n');
+  assert.equal(expression.length, 0, report(expression));
 });
 
 logSuiteComplete('Lint tools');

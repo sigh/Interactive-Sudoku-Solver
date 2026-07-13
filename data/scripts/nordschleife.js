@@ -10,6 +10,9 @@
 //
 // Loop membership is a Var cell per grid cell (1 = on, 2 = off), shaped into a
 // loop by the same degree-2 + no-diagonal-touch NFAs as the other loop scripts.
+// The degree-2 NFA makes the on-loop cells 2-regular under orthogonal adjacency,
+// so adding ConnectedValues (one connected region) forces exactly one simple
+// cycle: disjoint loops are excluded whether or not they touch.
 
 const ON = 1;                  // loop-membership values, stored in the Var cells
 const OFF = 2;
@@ -23,18 +26,17 @@ const loopCell = cell => loop.at(cell);
 
 const gridCells = graph.cells();
 
-const constraints = [new Shape('9x9'), loop.toVar('loop')];
-const add = (...newConstraints) => constraints.push(...newConstraints);
-
 const circles = ['R2C8', 'R1C2', 'R2C1', 'R1C6', 'R2C6', 'R4C2', 'R8C7', 'R9C4'];
 const rectangle = 'R6C1';
 
 // --- Loop membership: every cell is on (1) or off (2); circles off, rectangle on.
 const originCell = loop.cells()[0];
-add(new Replicate([new Given(originCell, ON, OFF)],
-  Replicate.encodeTargetCells(loop.cells(), originCell, loop), originCell));
-for (const cell of circles) add(new Given(loopCell(cell), OFF));
-add(new Given(loopCell(rectangle), ON));
+const membership = [
+  new Replicate([new Given(originCell, ON, OFF)],
+    Replicate.encodeTargetCells(loop.cells(), originCell, loop), originCell),
+  ...circles.map(cell => new Given(loopCell(cell), OFF)),
+  new Given(loopCell(rectangle), ON),
+];
 
 // --- Degree 2: each on cell has exactly two on-loop orthogonal neighbours. ---
 // Reads the membership of the cell, then of each neighbour. Off cells are free.
@@ -50,10 +52,8 @@ const degreeMachine = NFA.encodeSpec({
   },
   accept: ({ phase, onNeighbours }) => phase === 'off' || onNeighbours === 2,
 }, geometry.numValues);
-for (const cell of gridCells) {
-  add(new NFA(degreeMachine, 'degree',
-    loopCell(cell), ...graph.neighbours(cell).map(loopCell)));
-}
+const degrees = gridCells.map(cell => new NFA(degreeMachine, 'degree',
+  loopCell(cell), ...graph.neighbours(cell).map(loopCell)));
 
 // --- No diagonal self-touch: forbid a 2x2 whose only on cells are a diagonal. ---
 // Reads the four membership cells of a 2x2 block, left-to-right, top-to-bottom.
@@ -73,10 +73,11 @@ const noDiagonalTouchMachine = NFA.encodeSpec({
   },
   accept: ({ block }) => block === null,
 }, geometry.numValues);
-for (const cell of gridCells) {
-  const block = graph.block(cell, 2, 2);
-  if (block) add(new NFA(noDiagonalTouchMachine, 'no-touch', ...block.map(loopCell)));
-}
+// Cells on the bottom/right edge start no 2x2 block.
+const noDiagonalTouches = gridCells
+  .map(cell => graph.block(cell, 2, 2))
+  .filter(Boolean)
+  .map(block => new NFA(noDiagonalTouchMachine, 'no-touch', ...block.map(loopCell)));
 
 // --- Circle counts: the circle's digit equals the number of its king neighbours
 // that are on the loop. Reads the digit, then each neighbour's membership.
@@ -89,9 +90,8 @@ const countMachine = NFA.encodeSpec({
   },
   accept: ({ target, count }) => target !== null && count === target,
 }, geometry.numValues);
-for (const cell of circles) {
-  add(new NFA(countMachine, 'count', cell, ...graph.kingNeighbours(cell).map(loopCell)));
-}
+const circleCounts = circles.map(cell => new NFA(countMachine, 'count',
+  cell, ...graph.kingNeighbours(cell).map(loopCell)));
 
 // --- Loop multiples: for two orthogonally adjacent on-loop cells, the larger
 // digit must be a multiple of the smaller. Reads (membership, digit) for each
@@ -119,14 +119,22 @@ const multipleMachine = NFA.encodeSpec({
   },
   accept: ({ phase }) => phase === 'done',
 }, geometry.numValues);
-for (const cell of gridCells) {
-  for (const [dR, dC] of [[0, 1], [1, 0]]) {
-    const other = graph.step(cell, dR, dC);
-    if (other) {
-      add(new NFA(multipleMachine, 'mult',
-        loopCell(cell), cell, loopCell(other), other));
-    }
-  }
-}
+// Right/down steps only: each orthogonal pair is covered once. The step falls off
+// the grid at the last column/row.
+const multiples = gridCells.flatMap(cell => [[0, 1], [1, 0]]
+  .map(([dR, dC]) => graph.step(cell, dR, dC))
+  .filter(Boolean)
+  .map(other => new NFA(multipleMachine, 'mult',
+    loopCell(cell), cell, loopCell(other), other)));
 
-return constraints;
+return [
+  new Shape('9x9'),
+  loop.toVar('loop'),
+  ...membership,
+  // Single loop: the on-loop cells form one orthogonally-connected region.
+  new ConnectedValues('VL', ON),
+  ...degrees,
+  ...noDiagonalTouches,
+  ...circleCounts,
+  ...multiples,
+];

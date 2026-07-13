@@ -95,20 +95,56 @@ export const buildSolver = (input) => {
   return { internal, geometry: internal._geometry };
 };
 
-// Append a full solution digit string as `.~RrCc_v` givens (main-grid cells,
-// row-major). The grid side is inferred as sqrt(length).
-export const injectSolutionGivens = (input, digits) => {
-  const D = Math.round(Math.sqrt(digits.length));
-  if (D * D !== digits.length) {
-    throw new Error(`solution must be a perfect-square digit string (got length ${digits.length})`);
+// Append a full solution digit string as givens on a named cell group, in group
+// order (`VG` for `new Var('G', ...)`, `CC` for chaos-construction regions, ...).
+// For puzzles whose answer does not live in the main grid: the group must BE the
+// answer, so its cell count has to match the solution length.
+export const injectSolutionGivensForGroup = (input, digits, prefix) => {
+  // Resolve the geometry only -- building a solver here would compile every
+  // handler (and any NFA) a second time just to read the group's cell ids.
+  const constraint = SudokuBuilder.resolveConstraint(SudokuParser.parseText(input));
+  const geometry = constraint.getGeometry();
+  geometry.addVarCellsForConstraints([].concat(...constraint.toMap().values()));
+
+  const cells = geometry.varCellsForGroup(prefix);
+  if (!cells) {
+    const known = geometry.varCellGroups().map(g => g.prefix).join(', ') || 'none';
+    throw new Error(
+      `unknown cell group '${prefix}' (groups in this puzzle: ${known})`);
   }
-  // Cell ids use one base-17 character per coordinate (column 10 is 'a'), so
-  // decimal interpolation would build invalid ids on grids wider than 9.
+  if (cells.length !== digits.length) {
+    throw new Error(
+      `group '${prefix}' has ${cells.length} cells but the solution has ` +
+      `${digits.length} digits`);
+  }
   let givens = '';
   for (let i = 0; i < digits.length; i++) {
-    const r = (Math.floor(i / D) + 1).toString(17);
-    const c = ((i % D) + 1).toString(17);
-    givens += `.~R${r}C${c}_${digits[i]}`;
+    givens += `.~${geometry.makeCellIdFromIndex(cells[i])}_${digits[i]}`;
+  }
+  return input + givens;
+};
+
+// Append a full solution digit string as `.~RrCc_v` givens (main-grid cells,
+// row-major). A '.' marks a cell that is not part of the answer -- an irregular
+// grid modelled inside a rectangular Shape (a staircase, say) leaves holes -- and
+// is left unpinned.
+export const injectSolutionGivens = (input, digits) => {
+  // Read the dimensions off the puzzle rather than inferring them from the
+  // solution length, which can only ever describe a square grid.
+  const constraint = SudokuBuilder.resolveConstraint(SudokuParser.parseText(input));
+  const geometry = constraint.getGeometry();
+  const { numRows, numCols } = geometry;
+  if (digits.length !== numRows * numCols) {
+    throw new Error(
+      `solution has ${digits.length} chars but the grid is ${numRows}x${numCols} ` +
+      `(${numRows * numCols} cells)`);
+  }
+  let givens = '';
+  for (let i = 0; i < digits.length; i++) {
+    if (digits[i] === '.') continue;
+    // Cell ids use one base-17 character per coordinate (column 10 is 'a'), so
+    // decimal interpolation would build invalid ids on grids wider than 9.
+    givens += `.~${geometry.makeCellId(...geometry.splitCellIndex(i))}_${digits[i]}`;
   }
   return input + givens;
 };

@@ -13,6 +13,14 @@
 // Each cell has a "shape" Var recording which of its four edges the loop uses:
 // off, a straight (horizontal/vertical), or one of four corners (turns). Edge
 // agreement between neighbours makes the shapes join up into loops.
+//
+// ConnectedValues is deliberately NOT used here, unlike nordschleife.js. It tests
+// *cell* adjacency, but this puzzle's loop may run alongside itself, so two
+// disjoint loops can be cell-adjacent while sharing no used edge -- connectivity
+// would not see them. Degree comes from each cell's own shape code rather than a
+// neighbour count, so the "connected + 2-regular = one cycle" argument that closes
+// nordschleife.js does not apply. Proving one loop here needs connectivity over
+// the used-edge graph, which ISS does not have.
 
 // Shape codes (the value stored in each VS cell).
 const OFF = 1, HORIZ = 2, VERT = 3, UL = 4, UR = 5, DL = 6, DR = 7;
@@ -28,9 +36,6 @@ const shape = graph.makeOverlay('VS');
 const shapeCell = cell => shape.at(cell);
 const gridCells = graph.cells();
 
-const constraints = [new Shape('9x9'), new Given('R1C1', 6), shape.toVar('shape')];
-const add = (...newConstraints) => constraints.push(...newConstraints);
-
 // Each circle sits on a grid vertex, keyed by the top-left cell of the 2x2 it
 // constrains; the value is the clue digit.
 const circleClues = {
@@ -41,13 +46,13 @@ const circleClues = {
 // --- Shape domains: a cell may use an edge only if the neighbour exists, so
 // border cells can't take shapes that point off the grid.
 const ALL_SHAPES = [OFF, HORIZ, VERT, UL, UR, DL, DR];
-for (const cell of gridCells) {
+const shapeDomains = gridCells.map(cell => {
   const { row, col } = parseCellId(cell);
   const allowed = ALL_SHAPES.filter(s =>
     !(row === 1 && usesUp(s)) && !(row === geometry.numRows && usesDown(s)) &&
     !(col === 1 && usesLeft(s)) && !(col === geometry.numCols && usesRight(s)));
-  add(new Given(shapeCell(cell), ...allowed));
-}
+  return new Given(shapeCell(cell), ...allowed);
+});
 
 // --- Edge agreement: neighbours must agree on the shared edge. Reads the two
 // cells' shapes; the first uses the edge towards the second iff the second uses
@@ -74,21 +79,24 @@ const diffEdge = (toB) => NFA.encodeSpec({
   accept: ({ done }) => done === true,
 }, geometry.numValues);
 
-// Apply both to every right and down neighbour pair.
+// Apply both to every right and down neighbour pair, which covers each orthogonal
+// pair once. The step falls off the grid at the last column/row.
 const edgeRight = edgeAgree(usesRight, usesLeft), edgeDown = edgeAgree(usesDown, usesUp);
 const diffRight = diffEdge(usesRight), diffDown = diffEdge(usesDown);
-for (const cell of gridCells) {
+const pairRules = gridCells.flatMap(cell => {
   const right = graph.step(cell, 0, 1);
   const down = graph.step(cell, 1, 0);
-  if (right) {
-    add(new NFA(edgeRight, 'edge-h', shapeCell(cell), shapeCell(right)));
-    add(new NFA(diffRight, 'diff-h', shapeCell(cell), cell, right));
-  }
-  if (down) {
-    add(new NFA(edgeDown, 'edge-v', shapeCell(cell), shapeCell(down)));
-    add(new NFA(diffDown, 'diff-v', shapeCell(cell), cell, down));
-  }
-}
+  return [
+    ...(right ? [
+      new NFA(edgeRight, 'edge-h', shapeCell(cell), shapeCell(right)),
+      new NFA(diffRight, 'diff-h', shapeCell(cell), cell, right),
+    ] : []),
+    ...(down ? [
+      new NFA(edgeDown, 'edge-v', shapeCell(cell), shapeCell(down)),
+      new NFA(diffDown, 'diff-v', shapeCell(cell), cell, down),
+    ] : []),
+  ];
+});
 
 // --- Circle clues. Each vertex's clue does two things: at least one of the four
 // cells around it holds the clue digit (a Quad on that 2x2), and exactly that many
@@ -102,10 +110,17 @@ const turnsExactly = memo((target) => NFA.encodeSpec({
   },
   accept: ({ count }) => count === target,
 }, geometry.numValues));
-for (const [topLeft, d] of Object.entries(circleClues)) {
-  add(new Quad(topLeft, d));
-  add(new NFA(turnsExactly(d), 'circle-turns',
-    ...graph.block(topLeft, 2, 2).map(shapeCell)));
-}
+const circleRules = Object.entries(circleClues).flatMap(([topLeft, digit]) => [
+  new Quad(topLeft, digit),
+  new NFA(turnsExactly(digit), 'circle-turns',
+    ...graph.block(topLeft, 2, 2).map(shapeCell)),
+]);
 
-return constraints;
+return [
+  new Shape('9x9'),
+  new Given('R1C1', 6),
+  shape.toVar('shape'),
+  ...shapeDomains,
+  ...pairRules,
+  ...circleRules,
+];

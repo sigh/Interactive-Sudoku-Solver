@@ -57,32 +57,48 @@ const parityNFA = (parity) => NFA.encodeSpec({
 }, 6);
 const ODD = parityNFA(1);
 const EVEN = parityNFA(0);
-const constraints = [new Shape('6x6'), new NoBoxes()];
-for (let i = 1; i < GRIDS.length; i++) {
-  constraints.push(vars[i]);
-}
-const parityAt = new Map();
-for (const [r, c] of ODD_SINGLES) parityAt.set(key(r, c), 1);
-for (const [r, c] of EVEN_SINGLES) parityAt.set(key(r, c), 0);
-for (const [k, id] of idOf) {
+const parityAt = new Map([
+  ...ODD_SINGLES.map(([r, c]) => [key(r, c), 1]),
+  ...EVEN_SINGLES.map(([r, c]) => [key(r, c), 0]),
+]);
+
+// A cell's candidates are the values that fit the smallest grid covering it, and
+// the parity if it carries an odd/even clue. Full-range unclued cells need none.
+const domains = [...idOf].flatMap(([k, id]) => {
   const [r, c] = k.split(',').map(Number);
   const hi = minN(r, c);
   const par = parityAt.get(k);
-  const cands = [];
-  for (let v = 1; v <= hi; v++) if (par === undefined || v % 2 === par) cands.push(v);
-  if (hi < 6 || par !== undefined) constraints.push(new Given(id, ...cands));
-}
-for (const g of GRIDS) {
-  if (g.N === 6) continue;
-  for (let i = 0; i < g.N; i++) {
-    const row = []; for (let j = 0; j < g.N; j++) row.push(cid(g.r0 + i, g.c0 + j));
-    constraints.push(new AllDifferent(...row));
-  }
-  for (let j = 0; j < g.N; j++) {
-    const col = []; for (let i = 0; i < g.N; i++) col.push(cid(g.r0 + i, g.c0 + j));
-    constraints.push(new AllDifferent(...col));
-  }
-}
-for (const cells of ODD_SHAPES) constraints.push(new NFA(ODD, 'odd sum', ...cells.map(([r, c]) => cid(r, c))));
-for (const cells of EVEN_SHAPES) constraints.push(new NFA(EVEN, 'even sum', ...cells.map(([r, c]) => cid(r, c))));
-return constraints;
+  if (hi === 6 && par === undefined) return [];
+  const candidates = [];
+  for (let v = 1; v <= hi; v++) if (par === undefined || v % 2 === par) candidates.push(v);
+  return [new Given(id, ...candidates)];
+});
+
+// The main 6x6 already has its own row/column groups; the inset grids need theirs
+// stated explicitly over their Var cells.
+const insetGroups = GRIDS.filter(g => g.N !== 6).flatMap(g => {
+  const line = (pick) => new AllDifferent(
+    ...Array.from({ length: g.N }, (_, i) => pick(i)));
+  return [
+    ...Array.from({ length: g.N }, (_, i) =>
+      line((j) => cid(g.r0 + i, g.c0 + j))),      // rows
+    ...Array.from({ length: g.N }, (_, j) =>
+      line((i) => cid(g.r0 + i, g.c0 + j))),      // columns
+  ];
+});
+
+const paritySums = [
+  ...ODD_SHAPES.map(cells =>
+    new NFA(ODD, 'odd sum', ...cells.map(([r, c]) => cid(r, c)))),
+  ...EVEN_SHAPES.map(cells =>
+    new NFA(EVEN, 'even sum', ...cells.map(([r, c]) => cid(r, c)))),
+];
+
+return [
+  new Shape('6x6'),
+  new NoBoxes(),
+  ...vars.slice(1),        // vars[0] is the main grid, which needs no Var group
+  ...domains,
+  ...insetGroups,
+  ...paritySums,
+];

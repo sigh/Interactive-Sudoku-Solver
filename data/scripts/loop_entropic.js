@@ -16,7 +16,8 @@
 //                           three bands
 //   - vision counting    -> count the same-type cells the clue can see along its
 //                           row and column, stopping at the opposite type
-// One loop (not several) is left to the other clues, which already force it here.
+// One loop (not several) is ConnectedValues: degree-2 makes the on cells 2-regular
+// under orthogonal adjacency, and a connected 2-regular graph is a single cycle.
 
 const ON = 1;                  // loop-membership values, stored in the Var cells
 const OFF = 2;
@@ -34,17 +35,16 @@ const loopCell = cell => loop.at(cell);
 
 const gridCells = graph.cells();
 
-const constraints = [new Shape('6x6'), loop.toVar('loop')];
-const add = (...newConstraints) => constraints.push(...newConstraints);
-
 // --- Loop membership: every cell is on (1) or off (2); circles on, squares off.
 const circles = ['R1C1', 'R1C4'];
 const squares = ['R1C5', 'R4C5', 'R5C2'];
 const originCell = loop.cells()[0];
-add(new Replicate([new Given(originCell, ON, OFF)],
-  Replicate.encodeTargetCells(loop.cells(), originCell, loop), originCell));
-for (const cell of circles) add(new Given(loopCell(cell), ON));
-for (const cell of squares) add(new Given(loopCell(cell), OFF));
+const membership = [
+  new Replicate([new Given(originCell, ON, OFF)],
+    Replicate.encodeTargetCells(loop.cells(), originCell, loop), originCell),
+  ...circles.map(cell => new Given(loopCell(cell), ON)),
+  ...squares.map(cell => new Given(loopCell(cell), OFF)),
+];
 
 // --- Degree 2: each on cell has exactly two on-loop orthogonal neighbours. ---
 // Reads the membership of the cell, then of each neighbour. Off cells are free.
@@ -60,10 +60,8 @@ const degreeMachine = NFA.encodeSpec({
   },
   accept: ({ phase, onNeighbours }) => phase === 'off' || onNeighbours === 2,
 }, geometry.numValues);
-for (const cell of gridCells) {
-  add(new NFA(degreeMachine, 'degree',
-    loopCell(cell), ...graph.neighbours(cell).map(loopCell)));
-}
+const degrees = gridCells.map(cell => new NFA(degreeMachine, 'degree',
+  loopCell(cell), ...graph.neighbours(cell).map(loopCell)));
 
 // --- No diagonal self-touch: forbid a 2x2 whose only on cells are a diagonal. ---
 // Reads the four membership cells of a 2x2 block, left-to-right, top-to-bottom.
@@ -83,10 +81,11 @@ const noDiagonalTouchMachine = NFA.encodeSpec({
   },
   accept: ({ block }) => block === null,
 }, geometry.numValues);
-for (const cell of gridCells) {
-  const block = graph.block(cell, 2, 2);
-  if (block) add(new NFA(noDiagonalTouchMachine, 'no-touch', ...block.map(loopCell)));
-}
+// Cells on the bottom/right edge start no 2x2 block.
+const noDiagonalTouches = gridCells
+  .map(cell => graph.block(cell, 2, 2))
+  .filter(Boolean)
+  .map(block => new NFA(noDiagonalTouchMachine, 'no-touch', ...block.map(loopCell)));
 
 // --- Entropic loop: each on cell, with its two on-loop neighbours, must show one
 // digit from each band. Reads (membership, digit) pairs for the cell, then for
@@ -113,11 +112,9 @@ const entropicMachine = NFA.encodeSpec({
   accept: ({ phase, bands }) => phase === 'off' ||
     (phase === 'membership' && bands === ALL_BANDS),
 }, geometry.numValues);
-for (const cell of gridCells) {
-  const cells = [loopCell(cell), cell];
-  for (const neighbour of graph.neighbours(cell)) cells.push(loopCell(neighbour), neighbour);
-  add(new NFA(entropicMachine, 'entropic', ...cells));
-}
+const entropics = gridCells.map(cell => new NFA(entropicMachine, 'entropic',
+  loopCell(cell), cell,
+  ...graph.neighbours(cell).flatMap(n => [loopCell(n), n])));
 
 // --- Vision: the clue counts same-type cells it sees along its row and column,
 // itself included, with the opposite type blocking sight. Equivalently, it counts
@@ -152,12 +149,22 @@ const visionMachine = NFA.encodeSpec({
 // Circles count loop cells, squares count non-loop; the machine reads the type
 // from each clue's own membership.
 const RAY_DIRS = [[-1, 0], [1, 0], [0, -1], [0, 1]];
-for (const clue of [...circles, ...squares]) {
+const visions = [...circles, ...squares].map(clue => new NFA(
+  visionMachine, 'vision',
+  [loopCell(clue), clue],
   // Each ray excludes the clue itself (slice(1)); drop rays that run off-grid.
-  const rays = RAY_DIRS
+  ...RAY_DIRS
     .map(([dR, dC]) => graph.ray(clue, dR, dC).slice(1).map(loopCell))
-    .filter(ray => ray.length);
-  add(new NFA(visionMachine, 'vision', [loopCell(clue), clue], ...rays));
-}
+    .filter(ray => ray.length)));
 
-return constraints;
+return [
+  new Shape('6x6'),
+  loop.toVar('loop'),
+  ...membership,
+  // Single loop: the on-loop cells form one orthogonally-connected region.
+  new ConnectedValues('VL', ON),
+  ...degrees,
+  ...noDiagonalTouches,
+  ...entropics,
+  ...visions,
+];

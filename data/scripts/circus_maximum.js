@@ -64,31 +64,30 @@ const circleAdjacencies = () => circleCells
 
 const allCircleEntries = circleCells.flatMap(cell => [cell, color.at(cell)]);
 
-function colorDigitSpec(color, digit) {
+// `colorValue`, not `color`: `color` is the overlay above, and shadowing it here
+// would hide the thing these NFAs are written against.
+function colorDigitSpec(colorValue, digit) {
   return NFA.encodeSpec({
     startState: { count: 0 },
     transition: ({ count, digitMatch }, value) =>
       (digitMatch === undefined) ? { count, digitMatch: value == digit }
-        : (digitMatch && value == color) ? ((count == digit) ? [] : { count: count + 1 })
+        : (digitMatch && value == colorValue) ? ((count == digit) ? [] : { count: count + 1 })
           : { count },
     accept: ({ count, digitMatch }) =>
       (digitMatch === undefined) && (count == 0 || count == digit),
   }, 9);
 }
 
+// One NFA per (colour, digit): of the circles of that colour, either none or
+// exactly `digit` of them hold `digit`.
 function colorDigitNFAs() {
   const colorNames = `RGB`;
-  const constraints = [];
-  for (const color of rangeI(1, 3)) {
-    for (const digit of rangeI(1, 9)) {
-      constraints.push(new NFA(
-        colorDigitSpec(color, digit),
-        `${colorNames[color - 1]}${digit}`,
-        ...allCircleEntries,
-      ));
-    }
-  }
-  return constraints;
+  return [...rangeI(1, 3)].flatMap(colorValue =>
+    [...rangeI(1, 9)].map(digit => new NFA(
+      colorDigitSpec(colorValue, digit),
+      `${colorNames[colorValue - 1]}${digit}`,
+      ...allCircleEntries,
+    )));
 }
 
 return [

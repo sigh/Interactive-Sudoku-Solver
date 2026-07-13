@@ -38,13 +38,6 @@ const circles = [
 ];
 
 const distinct = new Var('D', 'distinct', N);   // a distinct-digit count per false region
-const constraints = [
-  new Shape('8x8'),
-  new NoBoxes(),
-  new ChaosConstruction(),
-  distinct,
-];
-for (const [cell, v] of givens) constraints.push(new Given(cell, v));
 
 const falseCells = new Map();   // region id -> [cellId...]
 for (let r = 1; r <= N; r++)
@@ -57,23 +50,35 @@ for (let r = 1; r <= N; r++)
 // "Destroy" each false region: it must hold fewer than 8 distinct digits, so it
 // can't be a full 1-8 set. CountDistinct ties a control cell to the distinct
 // count; capping the control at 7 forbids a complete region.
-for (const [f, cells] of falseCells) {
+const destroyed = [...falseCells].flatMap(([f, cells]) => {
   const control = distinct.cell(f + 1);
-  constraints.push(new Given(control, 1, 2, 3, 4, 5, 6, 7));
-  constraints.push(new CountDistinct(control, ...cells));
-}
+  return [
+    new Given(control, 1, 2, 3, 4, 5, 6, 7),
+    new CountDistinct(control, ...cells),
+  ];
+});
 
 // Circle overlap counts. The candidate set is fixed (3x3 cells that share the
 // circle's false region); ChaosCount then counts how many share its real region.
-for (const circle of circles) {
+const overlaps = circles.map(circle => {
   const { row: r, col: c } = parseCellId(circle);
-  const fr = falseAt(r, c);
-  const set = [cc.at(circle)];   // the circle's own real-region cell is the reference
-  for (const neighbour of graph.kingNeighbours(circle)) {
-    const { row: nr, col: nc } = parseCellId(neighbour);
-    if (falseAt(nr, nc) === fr) set.push(cc.at(neighbour));
-  }
-  constraints.push(new ChaosCount(circle, 0, ...set));
-}
+  const falseRegion = falseAt(r, c);
+  const set = [
+    cc.at(circle),   // the circle's own real-region cell is the reference
+    ...graph.kingNeighbours(circle).filter(neighbour => {
+      const { row: nr, col: nc } = parseCellId(neighbour);
+      return falseAt(nr, nc) === falseRegion;
+    }).map(neighbour => cc.at(neighbour)),
+  ];
+  return new ChaosCount(circle, 0, ...set);
+});
 
-return constraints;
+return [
+  new Shape('8x8'),
+  new NoBoxes(),
+  new ChaosConstruction(),
+  distinct,
+  ...givens.map(([cell, v]) => new Given(cell, v)),
+  ...destroyed,
+  ...overlaps,
+];
