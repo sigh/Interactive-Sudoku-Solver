@@ -36,7 +36,7 @@ import { runSandboxToConstraint } from '../lib/sandbox_runner.js';
 import { ensureGlobalEnvironment } from '../../tests/helpers/test_env.js';
 
 ensureGlobalEnvironment();
-const { fnToBinaryKey, SudokuConstraint } = await import('../../js/sudoku_constraint.js' + self.VERSION_PARAM);
+const { fnToBinaryKey, SudokuConstraint, SudokuConstraintBase } = await import('../../js/sudoku_constraint.js' + self.VERSION_PARAM);
 const { SudokuParser } = await import('../../js/sudoku_parser.js' + self.VERSION_PARAM);
 const { CellGeometry } = await import('../../js/cell_geometry.js' + self.VERSION_PARAM);
 const { SudokuBuilder } = await import('../../js/solver/sudoku_builder.js' + self.VERSION_PARAM);
@@ -170,9 +170,14 @@ const nativePairRelations = (geometry) => {
   ];
 };
 
+// The box size the engine will actually use: an explicit RegionSize, else the grid's
+// default. See SudokuBuilder._getEffectiveBoxSize.
+const boxSize = (geometry, regionSize) =>
+  regionSize ?? CellGeometry.defaultNumValues(geometry.numRows, geometry.numCols);
+
 // House cell sets that the engine already enforces as all-different:
 // every row and column, plus default boxes unless NoBoxes is present.
-const enforcedHouseSets = (geometry, hasNoBoxes) => {
+const enforcedHouseSets = (geometry, hasNoBoxes, regionSize) => {
   const houses = new Map();
   const addHouse = (label, cells) => {
     houses.set(cells.map(c => `R${c.row}C${c.col}`).sort().join(','), label);
@@ -188,8 +193,13 @@ const enforcedHouseSets = (geometry, hasNoBoxes) => {
   }
 
   if (!hasNoBoxes) {
+    // Mirror SudokuBuilder._getBoxRegions exactly: NoBoxes wins, then a RegionSize
+    // constraint, and only then the grid's default. `numValues` is NOT the box size --
+    // a widened alphabet (Shape 6x6~1-9) leaves the 2x3 boxes alone, so sizing houses
+    // by it invents boxes the solver never enforces and every rule built on this set
+    // then reasons about the wrong grid.
     const [boxH, boxW] = CellGeometry.boxDimsForSize(
-      geometry.numRows, geometry.numCols, geometry.numValues) || [null, null];
+      geometry.numRows, geometry.numCols, boxSize(geometry, regionSize)) || [null, null];
     if (boxH) {
       for (let r = 1; r <= geometry.numRows; r += boxH) {
         for (let c = 1; c <= geometry.numCols; c += boxW) {
@@ -261,6 +271,9 @@ const makeContext = (text) => {
     ? CellGeometry.fromShapeSpec(shapeLeaf.constraint.shapeSpec)
     : CellGeometry.newDefault();
   const hasNoBoxes = leaves.some(({ type }) => type === 'NoBoxes');
+  // The box size is a constraint, not a property of the Shape: RegionSize sets it.
+  const regionSize =
+    leaves.find(({ type }) => type === 'RegionSize')?.constraint?.size ?? null;
   const shapeIsExtended = geometry.numValues !==
     CellGeometry.defaultNumValues(geometry.numRows, geometry.numCols);
 
@@ -302,7 +315,9 @@ const makeContext = (text) => {
     leaves,
     geometry,
     shapeIsExtended,
-    houses: enforcedHouseSets(geometry, hasNoBoxes),
+    regionSize,
+    hasNoBoxes,
+    houses: enforcedHouseSets(geometry, hasNoBoxes, regionSize),
     pairRelations: nativePairRelations(geometry),
     sameValuesKey: binaryKey((a, b) => a === b),
     allDifferentKey: binaryKey((a, b) => a !== b),
@@ -544,6 +559,60 @@ export const OUTPUT_RULES = [
           `AllDifferent duplicates ${house}, which the engine already enforces`);
       },
     }),
+  },
+  {
+    code: 'handrolled-boxes',
+    tier: 'exact',
+    summary: 'NoBoxes plus AllDifferent groups that rebuild a tiling the engine can '
+      + 'give you; drop them, or name it with RegionSize',
+    docs: 'NoBoxes exists for a jigsaw -- regions the engine cannot derive. Rebuilding\n'
+      + 'a tiling it *can* derive is dead weight that hides the real jigsaws, and it is\n'
+      + 'usually written by an author unsure whether a widened alphabet moves the boxes\n'
+      + '(it does not; only RegionSize does).\n'
+      + 'Checked against every size the engine could tile this grid with, not just the\n'
+      + 'default: a match on the default means delete both, a match on another size\n'
+      + 'means say RegionSize~<n> instead. A tiling it cannot produce is a real jigsaw,\n'
+      + 'and stays silent.',
+    make: () => {
+      const groups = [];
+      let firstLine = null;
+      return {
+        collect(leaf) {
+          if (leaf.type !== 'AllDifferent' || leaf.inOr) return;
+          groups.push(new Set(leaf.cells));
+          firstLine ??= leaf.line();
+        },
+        finalize(ctx, add) {
+          if (!ctx.hasNoBoxes || !groups.length) return;
+          const { geometry } = ctx;
+
+          const covers = (boxes) => boxes.length && boxes.every(
+            box => groups.some(group =>
+              group.size === box.length && box.every(cell => group.has(cell))));
+
+          const defaultSize = CellGeometry.defaultNumValues(
+            geometry.numRows, geometry.numCols);
+
+          // Every size the engine could actually tile this grid with. A size with no
+          // valid dims yields no boxes at all, and a box larger than the alphabet
+          // cannot be all-different -- neither is a tiling anyone could have meant.
+          for (let size = 2; size <= geometry.numValues; size++) {
+            if (geometry.numGridCells % size !== 0) continue;
+            const boxes = SudokuConstraintBase.boxRegions(geometry, size)
+              .map(cells => cells.map(index => geometry.makeCellIdFromIndex(index)));
+            if (!covers(boxes)) continue;
+
+            add(firstLine, size === defaultSize
+              ? `NoBoxes plus ${boxes.length} AllDifferent groups that are exactly the `
+                + 'default boxes; delete both -- a widened alphabet does not move the '
+                + 'box tiling, only RegionSize does'
+              : `NoBoxes plus ${boxes.length} AllDifferent groups that are exactly the `
+                + `boxes for RegionSize~${size}; use RegionSize~${size} instead`);
+            return;
+          }
+        },
+      };
+    },
   },
   {
     code: 'stamped-copies-without-replicate',

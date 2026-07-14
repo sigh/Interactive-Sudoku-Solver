@@ -1,4 +1,4 @@
-const { SudokuConstraint } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
+const { SudokuConstraint, SudokuConstraintBase } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
 const { SudokuParser } = await import('../sudoku_parser.js' + self.VERSION_PARAM);
 const { SEGMENT_BREAK } = await import('../nfa_builder.js' + self.VERSION_PARAM);
 const { CellGeometry, CellGraph, GEOMETRY_9x9, GEOMETRY_MAX } = await import('../cell_geometry.js' + self.VERSION_PARAM);
@@ -211,32 +211,29 @@ class SandboxCellGraph {
     return this.ray(upward[upward.length - 1], 1, 0);
   }
 
-  // The nth default box region (1-based, reading order), row-major, or null
-  // when the geometry has no box regions.
-  box(n) {
-    const { numRows, numCols, numValues } = this._geometry;
-    const [height, width] = CellGeometry.boxDimsForSize(numRows, numCols, numValues);
-    if (!height) return null;
-    const perRow = numCols / width;
-    const row = Math.floor((n - 1) / perRow) * height + 1;
-    const col = ((n - 1) % perRow) * width + 1;
-    return this.block(makeCellId(row, col), height, width);
+  // The nth box region (1-based, reading order), row-major, or null if there is
+  // no such box.
+  box(n, size = null) {
+    const regions = this.boxes(size);
+    return n >= 1 && n <= regions.length ? regions[n - 1] : null;
   }
 
-  // All rows / columns / default boxes, each an array of cells; boxes() is
-  // empty when the geometry has no box regions. houses() concatenates them.
+  // All rows / columns / boxes, each an array of cells; boxes() is empty when
+  // the geometry has no box regions. houses() concatenates them. `size` matches
+  // a RegionSize constraint; the default tiling is sized from the grid, not the
+  // value range.
   rows() {
     return Array.from({ length: this._geometry.numRows }, (_, i) => this.row(i + 1));
   }
   columns() {
     return Array.from({ length: this._geometry.numCols }, (_, i) => this.column(i + 1));
   }
-  boxes() {
-    const count = this.box(1) ? this._geometry.numGridCells / this.box(1).length : 0;
-    return Array.from({ length: count }, (_, i) => this.box(i + 1));
+  boxes(size = null) {
+    return SudokuConstraintBase.boxRegions(this._geometry, size)
+      .map(region => region.map(index => this._cell(index)));
   }
-  houses() {
-    return [...this.rows(), ...this.columns(), ...this.boxes()];
+  houses(size = null) {
+    return [...this.rows(), ...this.columns(), ...this.boxes(size)];
   }
 
   // The cells of a numRows x numCols block with topLeft as its top-left corner,

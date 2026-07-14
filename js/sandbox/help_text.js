@@ -90,8 +90,9 @@ CELL GEOMETRY
       .ray(cell, dR, dC)       cells to the grid edge, inclusive of cell
       .row(n | cell)           the whole grid row, by 1-based index or through cell
       .column(n | cell)        the whole grid column, likewise
-      .box(n)                  the nth default box region (1-based, reading order)
-      .rows() / .columns() / .boxes() / .houses()  all such cell lists
+      .box(n[, size])          the nth box region (1-based, reading order)
+      .rows() / .columns() / .boxes([size]) / .houses([size])  all such cell lists
+                               size matches a RegionSize constraint
       .block(topLeft, h, w)    cells of an h x w block, or null if off-grid
       .connected(cells)        is the set one orthogonally-connected group?
       .makeOverlay(prefix[, cells])  a cell graph over a var group (e.g. 'CC',
