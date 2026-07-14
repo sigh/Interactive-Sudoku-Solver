@@ -110,27 +110,45 @@ const makeCellContext = (root) => {
   return { positionOf, geometry };
 };
 
-// Can one Replicate stamp this whole group? Replicate shifts a template by
-// graph.traverse(dRow, dCol) and requires the origin, every target, and every
-// template cell to lie in ONE cell group (see SudokuBuilder's Replicate case).
-// So the instances must all be the same shape up to a shift, and confined to a
-// single subgraph. A single-cell template (a repeated Given) passes the shape
-// test trivially, but still has to clear the one-cell-group requirement.
-const isReplicableGroup = (instances, positionOf) => {
-  if (!positionOf) return false;
-  const shapes = new Set();
-  const subgraphs = new Set();
+// Partition instances by the template one Replicate could stamp. Replicate
+// shifts by graph.traverse(dRow, dCol), and requires the origin, every target,
+// and every template cell to lie in ONE cell group (see SudokuBuilder's
+// Replicate case). A machine may have several independently replicable shapes
+// (horizontal and vertical Pair edges, for example), so judge each shape rather
+// than rejecting the whole machine group when its orientations differ.
+const replicableTemplateGroups = (instances, positionOf) => {
+  if (!positionOf) return [];
+  const groups = new Map();
   for (const cells of instances) {
     const positions = cells.map(positionOf);
-    if (positions.some(p => p === null)) return false;
-    for (const [, , subgraph] of positions) subgraphs.add(subgraph);
-    if (subgraphs.size > 1) return false;
+    if (positions.some(p => p === null)) continue;
+    const subgraphs = new Set(positions.map(([, , subgraph]) => subgraph));
+    if (subgraphs.size > 1) continue;
     const [baseRow, baseCol] = positions[0];
-    shapes.add(JSON.stringify(
-      positions.map(([row, col]) => [row - baseRow, col - baseCol])));
-    if (shapes.size > 1) return false;
+    const shape = JSON.stringify(
+      positions.map(([row, col]) => [row - baseRow, col - baseCol]));
+    const key = `${positions[0][2]}\0${shape}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(cells);
   }
-  return true;
+  return [...groups.values()];
+};
+
+const quadTopLeft = (cells, positionOf) => {
+  if (!positionOf || cells.length !== 4 || new Set(cells).size !== 4) return null;
+  const positions = cells.map(positionOf);
+  if (positions.some(p => p === null)) return null;
+  if (new Set(positions.map(([, , subgraph]) => subgraph)).size !== 1) return null;
+
+  const rows = [...new Set(positions.map(([row]) => row))].sort((a, b) => a - b);
+  const cols = [...new Set(positions.map(([, col]) => col))].sort((a, b) => a - b);
+  if (rows.length !== 2 || cols.length !== 2
+    || rows[1] !== rows[0] + 1 || cols[1] !== cols[0] + 1) return null;
+
+  const occupied = new Set(positions.map(([row, col]) => `${row},${col}`));
+  if (rows.some(row => cols.some(col => !occupied.has(`${row},${col}`)))) return null;
+  const index = positions.findIndex(([row, col]) => row === rows[0] && col === cols[0]);
+  return cells[index];
 };
 
 // Flatten the parsed tree. Composites (And/Or/Replicate) expose
@@ -347,6 +365,42 @@ const makeContext = (text) => {
 // ---------------------------------------------------------------------------
 
 export const OUTPUT_RULES = [
+  {
+    code: 'contain-at-least-use-quad',
+    tier: 'exact',
+    summary: 'a family of ContainAtLeast clues all use 2x2 squares; use Quad',
+    docs: 'Quad is the native spelling of "these values occur in this 2x2 square".\n'
+      + 'ContainAtLeast clues with the same value-count pattern are one authored\n'
+      + 'family. A self-length family (the sole required value equals the number of\n'
+      + 'cells) is grouped across its varying lengths. Suggest Quad only when EVERY\n'
+      + 'member of that family is a 2x2 square, so a square-shaped thermo or other\n'
+      + 'line clue is not renamed in isolation.',
+    make: () => {
+      const families = new Map();
+      return {
+        collect(leaf, ctx) {
+          if (leaf.type !== 'ContainAtLeast') return;
+          const values = String(leaf.constraint.values).split('_');
+          const familyKey = values.length === 1 && +values[0] === leaf.cells.length
+            ? 'self-length' : `value-count:${values.length}`;
+          if (!families.has(familyKey)) families.set(familyKey, []);
+          families.get(familyKey).push({
+            leaf,
+            topLeft: quadTopLeft(leaf.cells, ctx.positionOf),
+          });
+        },
+        finalize(ctx, add) {
+          for (const family of families.values()) {
+            if (!family.length || family.some(({ topLeft }) => !topLeft)) continue;
+            for (const { leaf, topLeft } of family) {
+              add(leaf.line(), `ContainAtLeast on ${leaf.cells.join(' ')} is a 2x2 square; `
+                + `use Quad at ${topLeft}`);
+            }
+          }
+        },
+      };
+    },
+  },
   {
     code: 'sum-unit-coefficients',
     tier: 'exact',
@@ -617,11 +671,11 @@ export const OUTPUT_RULES = [
   {
     code: 'stamped-copies-without-replicate',
     tier: 'exact',
-    summary: 'many constraints share one machine (or one Given value set) and are '
+    summary: 'many constraints share one machine/key (or one Given value set) and are '
       + 'shifted copies of one template; use Replicate',
-    docs: 'Decided, not guessed: the instances must really be one template under a\n'
-      + 'shift, inside one cell group. Sharing a machine is not enough -- the same\n'
-      + 'machine over differently-shaped cell sets has no single template to stamp.\n'
+    docs: 'Decided, not guessed: each reported subset is one template under a shift,\n'
+      + 'inside one cell group. A machine used in several orientations is partitioned\n'
+      + 'into independently replicable templates. Sharing a machine is not enough.\n'
       + 'Judged per group, so a script already using Replicate for one rule can still\n'
       + 'be flagged for another it stamped by hand.',
     make: () => {
@@ -634,12 +688,19 @@ export const OUTPUT_RULES = [
         collect(leaf, ctx) {
           // A constraint inside a Replicate is already stamped: it is the
           // template, not an un-Replicated copy of one.
-          if (leaf.inReplicate) return;
+          // A constraint in an Or is an alternative, not an independently
+          // asserted fact. Stamping only the similar branches would change the
+          // disjunction's structure, so it cannot be a safe Replicate rewrite.
+          if (leaf.inReplicate || leaf.inOr) return;
           if (leaf.type === 'NFA') {
             // Key by machine AND arity: Replicate stamps one fixed-shape template,
             // so instances of the same machine over different cell counts (a degree
             // check over 2/3/4 neighbours, say) cannot share one Replicate.
             addCopy(`NFA\0${leaf.constraint.encodedNFA}\0${leaf.cells.length}`, leaf.cells);
+          } else if (leaf.type === 'Pair' || leaf.type === 'PairX') {
+            // Pair and PairX are distinct machines. Within either type, the truth-table
+            // key and arity completely determine the template semantics and shape.
+            addCopy(`${leaf.type}\0${leaf.constraint.key}\0${leaf.cells.length}`, leaf.cells);
           } else if (leaf.type === 'Given' && ctx.givenRole(leaf) === 'fact') {
             // Identical Givens (same value set) are Replicate candidates -- Replicate
             // shifts the cell and keeps the values -- even though they serialize onto
@@ -651,12 +712,17 @@ export const OUTPUT_RULES = [
         },
         finalize(ctx, add) {
           for (const [copyKey, instances] of copiesByKey) {
-            if (instances.length < STAMPED_COPY_THRESHOLD) continue;
-            if (!isReplicableGroup(instances, ctx.positionOf)) continue;
+            const templates = replicableTemplateGroups(instances, ctx.positionOf)
+              .filter(group => group.length >= STAMPED_COPY_THRESHOLD);
+            if (!templates.length) continue;
             const type = copyKey.split('\0')[0];
-            const shared = type === 'Given' ? 'one value set' : 'one machine';
-            add(1, `${instances.length} ${type} constraints share ${shared} and are shifted `
-              + 'copies of one template; use Replicate to shorten the encoding');
+            const shared = type === 'Given' ? 'one value set'
+              : type === 'NFA' ? 'one machine' : 'one key';
+            const count = templates.reduce((sum, group) => sum + group.length, 0);
+            const templateText = templates.length === 1
+              ? 'one template' : `${templates.length} templates`;
+            add(1, `${count} ${type} constraints share ${shared} and are shifted `
+              + `copies of ${templateText}; use Replicate to shorten the encoding`);
           }
         },
       };

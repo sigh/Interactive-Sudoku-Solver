@@ -95,6 +95,8 @@ CELL GEOMETRY
                                size matches a RegionSize constraint
       .block(topLeft, h, w)    cells of an h x w block, or null if off-grid
       .connected(cells)        is the set one orthogonally-connected group?
+      .makeReplicate(constraintOrArray[, cells])  build a Replicate using this
+                            graph; cells defaults to .cells()
       .makeOverlay(prefix[, cells])  a cell graph over a var group (e.g. 'CC',
                             'VL'), connected as its paired grid cells are; adds
                             .at(cell) / .gridAt(varCell), each null if unpaired,

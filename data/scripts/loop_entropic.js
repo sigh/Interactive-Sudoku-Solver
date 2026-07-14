@@ -40,8 +40,7 @@ const circles = ['R1C1', 'R1C4'];
 const squares = ['R1C5', 'R4C5', 'R5C2'];
 const originCell = loop.cells()[0];
 const membership = [
-  new Replicate([new Given(originCell, ON, OFF)],
-    Replicate.encodeTargetCells(loop.cells(), originCell, loop), originCell),
+  loop.makeReplicate(new Given(originCell, ON, OFF)),
   ...circles.map(cell => new Given(loopCell(cell), ON)),
   ...squares.map(cell => new Given(loopCell(cell), OFF)),
 ];

@@ -32,8 +32,7 @@ const rectangle = 'R6C1';
 // --- Loop membership: every cell is on (1) or off (2); circles off, rectangle on.
 const originCell = loop.cells()[0];
 const membership = [
-  new Replicate([new Given(originCell, ON, OFF)],
-    Replicate.encodeTargetCells(loop.cells(), originCell, loop), originCell),
+  loop.makeReplicate(new Given(originCell, ON, OFF)),
   ...circles.map(cell => new Given(loopCell(cell), OFF)),
   new Given(loopCell(rectangle), ON),
 ];

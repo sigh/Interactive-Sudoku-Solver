@@ -232,6 +232,17 @@ export const SOURCE_RULES = [
     }),
   },
   {
+    code: 'bare-replicate-constructor',
+    tier: 'heuristic',
+    summary: 'bare new Replicate found; prefer graph.makeReplicate() or overlay.makeReplicate()',
+    docs: 'The graph or overlay already owns the cell ordering and locator needed\n'
+      + 'to encode Replicate targets. Its makeReplicate() helper keeps that wire-format\n'
+      + 'plumbing out of sandbox scripts.',
+    check: patternRule({
+      patterns: [/\bnew\s+Replicate\s*\(/g],
+    }),
+  },
+  {
     code: 'manual-box-arithmetic',
     tier: 'heuristic',
     summary: 'manual box construction found; prefer graph.box(n) / graph.boxes()',

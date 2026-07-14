@@ -126,6 +126,19 @@ await runTest('lint_sandbox_script flags outside clues built by arrow id', () =>
   assert.doesNotMatch(report(clean), /outside-clue-by-arrow-id/);
 });
 
+await runTest('lint_sandbox_script flags bare Replicate construction', () => {
+  const flagged = lintSource(SCRIPT_HEADER
+    + "const graph = cellGraph('9x9');\n"
+    + "return [new Replicate([new Given('R1C1', 1, 2)],\n"
+    + "  Replicate.encodeTargetCells(graph.cells(), 'R1C1', graph), 'R1C1')];\n");
+  assert.match(report(flagged), /bare-replicate-constructor.*makeReplicate/);
+
+  const clean = lintSource(SCRIPT_HEADER
+    + "const graph = cellGraph('9x9');\n"
+    + "return [graph.makeReplicate(new Given('R1C1', 1, 2))];\n");
+  assert.doesNotMatch(report(clean), /bare-replicate-constructor/);
+});
+
 await runTest('lint_constraints suggests native constraints per key group', () => {
   // The native suggestion fires only when EVERY Pair sharing the key is a
   // 2-cell adjacent pair — a partial replacement would split one drawn rule
@@ -256,6 +269,65 @@ await runTest('lint_constraints flags stamped NFA copies only when the offsets m
     + "  cs.push(new NFA(nfa, 'm', makeCellId(r, 1), makeCellId(r, c + 1), makeCellId(r, c + 2)));\n"
     + "return [new Shape('9x9'), ...cs];\n");
   assert.doesNotMatch(report(noTemplate), /stamped-copies-without-replicate/);
+});
+
+await runTest('lint_constraints flags stamped Pair copies in each orientation', async () => {
+  const flagged = await lintScript(
+    "const graph = cellGraph('9x9');\n"
+    + "const key = Pair.fnToKey((a, b) => a + b !== 10, 9);\n"
+    + 'const pairs = [];\n'
+    + 'for (const cell of graph.cells()) {\n'
+    + '  for (const [dr, dc] of [[0, 1], [1, 0]]) {\n'
+    + '    const other = graph.step(cell, dr, dc);\n'
+    + "    if (other) pairs.push(new Pair(key, 'not X', cell, other));\n"
+    + '  }\n'
+    + '}\n'
+    + "return [new Shape('9x9'), ...pairs];\n");
+  assert.match(report(flagged),
+    /stamped-copies-without-replicate.*144 Pair constraints share one key.*2 templates/);
+
+  // Sixty-three uses of one Pair key are not enough when every offset shape has
+  // only nine copies. No individual Replicate template clears the threshold.
+  const noTemplate = await lintScript(
+    "const key = Pair.fnToKey((a, b) => a + b !== 10, 9);\n"
+    + 'const pairs = [];\n'
+    + 'for (let r = 1; r <= 9; r++) for (let c = 2; c <= 8; c++)\n'
+    + "  pairs.push(new Pair(key, 'varied', makeCellId(r, 1), makeCellId(r, c)));\n"
+    + "return [new Shape('9x9'), ...pairs];\n");
+  assert.doesNotMatch(report(noTemplate), /stamped-copies-without-replicate/);
+});
+
+await runTest('lint_constraints does not stamp alternatives inside an Or', async () => {
+  const machine = '{ startState: 0, transition: s => s < 2 ? s + 1 : undefined,'
+    + ' accept: s => s === 2 }';
+  const conditional = await lintScript(
+    `const nfa = NFA.encodeSpec(${machine}, 9);\n`
+    + 'const branches = [];\n'
+    + 'for (let r = 1; r <= 9; r++) for (let c = 1; c <= 7; c++)\n'
+    + "  branches.push(new And([new NFA(nfa, 'conditional', makeCellId(r, c), makeCellId(r, c + 1))]));\n"
+    + "return [new Shape('9x9'), new Or(branches)];\n");
+  assert.doesNotMatch(report(conditional), /stamped-copies-without-replicate/);
+});
+
+await runTest('lint_constraints suggests Quad for a 2x2 ContainAtLeast', async () => {
+  const quad = await lintScript(
+    "return [new Shape('9x9'),\n"
+    + "  new ContainAtLeast('1_2_3', 'R7C4', 'R8C3', 'R7C3', 'R8C4')];\n");
+  assert.match(report(quad), /contain-at-least-use-quad.*use Quad at R7C3/);
+
+  const arbitraryRegion = await lintScript(
+    "return [new Shape('9x9'),\n"
+    + "  new ContainAtLeast('1_2_3', 'R7C3', 'R7C4', 'R8C3', 'R9C3')];\n");
+  assert.doesNotMatch(report(arbitraryRegion), /contain-at-least-use-quad/);
+
+  // These are one self-length clue family. One four-cell thermo happens to
+  // occupy a 2x2 square, but its three-cell sibling proves the family is not
+  // a set of Quad clues, so neither member should be renamed in isolation.
+  const thermoFamily = await lintScript(
+    "return [new Shape('9x9'),\n"
+    + "  new ContainAtLeast('4', 'R1C1', 'R1C2', 'R2C1', 'R2C2'),\n"
+    + "  new ContainAtLeast('3', 'R3C1', 'R3C2', 'R3C3')];\n");
+  assert.doesNotMatch(report(thermoFamily), /contain-at-least-use-quad/);
 });
 
 // The cases above test the pure lint logic directly. This one exercises the CLI

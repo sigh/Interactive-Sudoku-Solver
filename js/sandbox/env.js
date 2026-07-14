@@ -260,6 +260,19 @@ class SandboxCellGraph {
     return indices.size === 0 || this._graph.cellsAreConnected(indices);
   }
 
+  // Build a Replicate using this graph as the cell locator.
+  makeReplicate(constraintOrArray, cells) {
+    const allCells = this.cells();
+    cells ??= allCells;
+    const constraints = Array.isArray(constraintOrArray)
+      ? constraintOrArray
+      : [constraintOrArray];
+    const origin = allCells[0];
+    const targetBitset = SudokuConstraint.Replicate.encodeTargetCells(
+      cells, origin, this);
+    return new SudokuConstraint.Replicate(constraints, targetBitset, origin);
+  }
+
   // A cell graph over a var-cell group, paired 1:1 with an ordered list of grid
   // cells (default: the whole grid). `prefix` is the var group's id
   // prefix, e.g. 'CC' for chaos construction or 'VL' for a Var('L', ...).

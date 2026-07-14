@@ -123,6 +123,30 @@ await runTest('encodeTargetCells accepts a sandbox grid graph as the locator', (
   assert.deepEqual(decoded, targets);
 });
 
+await runTest('sandbox graph makeReplicate accepts one constraint and defaults to all cells', () => {
+  const g = cellGraph('9x9');
+  const template = new SudokuConstraint.Given('R1C1', 5);
+  const replicate = g.makeReplicate(template);
+
+  assert.deepEqual(replicate.constraints, [template]);
+  assert.equal(replicate.origin, 'R1C1');
+  assert.deepEqual(replicate.getCells(GEOMETRY_9x9), g.cells());
+});
+
+await runTest('sandbox graph makeReplicate accepts a constraint array and target subset', () => {
+  const g = cellGraph('9x9');
+  const targets = ['R2C2', 'R3C2', 'R4C2'];
+  const templates = [
+    new SudokuConstraint.Given('R1C1', 1, 2),
+    new SudokuConstraint.Pair('A', 'pair', 'R1C1', 'R1C2'),
+  ];
+  const replicate = g.makeReplicate(templates, targets);
+
+  assert.deepEqual(replicate.constraints, templates);
+  assert.equal(replicate.origin, 'R1C1');
+  assert.deepEqual(replicate.getCells(GEOMETRY_9x9), targets);
+});
+
 await runTest('encodeTargetCells accepts a var-cell overlay as the locator', () => {
   // The overlay's ids ('VY1'..) aren't in a bare geometry, but the overlay is
   // itself a locator, so it can both mint and index them.
@@ -138,6 +162,18 @@ await runTest('encodeTargetCells accepts a var-cell overlay as the locator', () 
   const decoded = new SudokuConstraint.Replicate([], bitset, 'VY1')
     .getCells(geometry);
   assert.deepEqual(decoded, targets);
+});
+
+await runTest('sandbox overlay inherits makeReplicate and defaults to overlay cells', () => {
+  const y = cellGraph('9x9').makeOverlay('VY');
+  const template = new SudokuConstraint.Given('VY1', 1, 2);
+  const replicate = y.makeReplicate(template);
+
+  const geometry = CellGeometry.newDefault();
+  geometry.addVarCellsForConstraints([new SudokuConstraint.Var('Y', 'Y', 81)]);
+  assert.deepEqual(replicate.constraints, [template]);
+  assert.equal(replicate.origin, 'VY1');
+  assert.deepEqual(replicate.getCells(geometry), y.cells());
 });
 
 await runTest('encodeTargetCells rejects targets before the origin', () => {
