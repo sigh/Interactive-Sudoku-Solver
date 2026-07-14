@@ -3,9 +3,9 @@
 // The "does my encoding accept this answer?" tool: it injects a full solution as
 // givens and reports whether the solver accepts it. This is distinct from
 // solve.js, which searches for solutions. Verification is meant to be a quick
-// yes/no check, so it defaults to a one-backtrack cap; raise the cap only when
-// the encoding needs a little Var-cell search after the main-grid solution is
-// pinned.
+// yes/no check, so it defaults to a one-backtrack cap. When auxiliary state
+// remains after the main-grid solution is pinned, provide a concrete assignment
+// with --witness-constraints.
 //
 // Usage:
 //   node tools/debug/verify_solution.js --solution <digits> (--puzzle <name> | --input <str> | --input-file <path>)
@@ -22,6 +22,10 @@
 //   --input-file <path>   Read the constraint string from a file.
 //
 // Options:
+//   --witness-constraints <string>
+//                         Append serialized constraints only for this
+//                         verification run. Usually auxiliary-cell givens for
+//                         a known satisfying witness.
 //   --solution-group <prefix>
 //                         Pin the solution onto a named cell group instead of
 //                         the main grid, in group order -- for puzzles whose
@@ -52,7 +56,8 @@ const DEFAULT_MAX_BACKTRACKS = 1;
 const parseArgs = (argv) => {
   const args = {
     puzzle: null, input: null, inputFile: null, solution: null,
-    solutionGroup: null, maxBacktracksRaw: undefined, list: false, help: false,
+    solutionGroup: null, witnessConstraints: null,
+    maxBacktracksRaw: undefined, list: false, help: false,
   };
   for (let i = 2; i < argv.length; i++) {
     const [key, inlineValue] = argv[i].split(/=(.*)/s);
@@ -65,6 +70,7 @@ const parseArgs = (argv) => {
       case '--input-file': args.inputFile = next(); break;
       case '--solution': args.solution = next(); break;
       case '--solution-group': args.solutionGroup = next(); break;
+      case '--witness-constraints': args.witnessConstraints = next(); break;
       case '--max-backtracks': args.maxBacktracksRaw = next(); break;
       default: throw new Error(`Unknown argument: ${argv[i]}\nRun with --help for usage.`);
     }
@@ -86,7 +92,8 @@ const printUsage = () => console.log(`\
 Usage: node tools/debug/verify_solution.js --solution <digits> (--puzzle <name> | --input <str> | --input-file <path>)
 
 Checks whether the puzzle encoding accepts the given solution. Defaults to a
-one-backtrack cap because this is meant to be quick verification, not search.
+one-backtrack cap because this is meant to be verification, not search. Supply
+auxiliary assignments with --witness-constraints rather than raising the cap.
 
 Required:
   --solution <digits>   Full solution as a row-major digit string, one char per
@@ -98,6 +105,9 @@ Puzzle source (pick one):
   --input-file <path>   Read the constraint string from a file.
 
 Options:
+  --witness-constraints <string>
+                        Append serialized constraints for this verification
+                        run only, normally auxiliary-cell witness givens.
   --solution-group <prefix>
                         Pin the solution onto a named cell group (in group
                         order) instead of the main grid, for puzzles whose
@@ -122,9 +132,12 @@ export const main = async (argv) => {
   const maxBacktracks = parseVerifyBacktrackLimit(args.maxBacktracksRaw);
 
   const puzzle = await loadPuzzle(args);
+  const puzzleInput = args.witnessConstraints === null
+    ? puzzle.input
+    : `${puzzle.input}\n${args.witnessConstraints}`;
   const input = args.solutionGroup === null
-    ? injectSolutionGivens(puzzle.input, args.solution)
-    : injectSolutionGivensForGroup(puzzle.input, args.solution, args.solutionGroup);
+    ? injectSolutionGivens(puzzleInput, args.solution)
+    : injectSolutionGivensForGroup(puzzleInput, args.solution, args.solutionGroup);
   const { internal } = buildSolver(input);
 
   // With the solution pinned as givens, one accepting completion is enough;

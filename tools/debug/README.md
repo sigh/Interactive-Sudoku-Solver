@@ -43,9 +43,10 @@ node tools/debug/solve.js --max-backtracks none --input-file puzzle.txt --soluti
 row-major) and reports `ACCEPTED` (exit 0) or `REJECTED` (exit non-zero), so it
 doubles as an assertion in scripts/CI. Verifying an answer is meant to be quick,
 so `--max-backtracks` defaults to `1`: the pinned grid should usually accept or
-reject after at most the first failed branch/search unwind. Raise it only for
-encodings that need a small amount of Var-cell search; use `none` only for rare
-deliberately unbounded checks. A `CAPPED` result is inconclusive.
+reject after at most the first failed branch/search unwind. If auxiliary state
+remains after the grid is pinned, supply its concrete assignment with
+`--witness-constraints` rather than increasing the cap. A `CAPPED` result is
+inconclusive.
 
 ```sh
 # Confirm the encoding accepts a known-good solution after a constraint change.
@@ -53,7 +54,15 @@ node tools/debug/verify_solution.js --puzzle "Chaos Construction" --solution 123
 
 # Same, from a raw constraint string / file.
 node tools/debug/verify_solution.js --input-file puzzle.txt --solution 123456789... --max-backtracks 100
+
+# Pin a known auxiliary witness for this check only.
+node tools/debug/verify_solution.js --input-file puzzle.txt --solution 123456789... \
+  --witness-constraints '.~VH1_2~VL1_3'
 ```
+
+`--witness-constraints` appends a serialized constraint string only to the
+verification input. It is intended for concrete auxiliary-cell witnesses that
+would otherwise be expensive to rediscover. It does not modify the input file.
 
 A `REJECTED` result means the constraints reject that assignment — useful for
 narrowing which constraint causes it (combine with manual constraint removal in

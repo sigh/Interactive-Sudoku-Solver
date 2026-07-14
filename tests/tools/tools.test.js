@@ -90,6 +90,20 @@ await runTest('verify_solution.js accepts an explicit backtrack cap', async () =
   assert.match(stdout, /Result: ACCEPTED/);
 });
 
+await runTest('verify_solution.js appends witness constraints only for verification', async () => {
+  const good = await capture(() =>
+    verifyMain(argv('verify_solution.js', '--puzzle', VERIFY_PUZZLE,
+      '--solution', VERIFY_SOLUTION, '--witness-constraints', '.~R1C1_5')));
+  assert.equal(good.thrown, null, good.thrown?.message);
+  assert.match(good.stdout, /Result: ACCEPTED/);
+
+  const bad = await capture(() =>
+    verifyMain(argv('verify_solution.js', '--puzzle', VERIFY_PUZZLE,
+      '--solution', VERIFY_SOLUTION, '--witness-constraints', '.~R1C1_6')));
+  assert.match(bad.thrown?.message ?? '', /rejected/);
+  assert.match(bad.stdout, /Result: REJECTED/);
+});
+
 await runTest('verify_solution.js rejects a wrong solution with the default cap', async () => {
   const wrong = '6' + VERIFY_SOLUTION.slice(1); // duplicate a digit in row 1 → conflict
   const { stdout, thrown } = await capture(() =>
