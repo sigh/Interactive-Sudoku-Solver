@@ -89,9 +89,7 @@ export class ConnectedValues extends SudokuConstraintHandler {
       }
       return valueMask;
     });
-    // Merged instances must be pairwise-disjoint single-value sets, so a
-    // decided cell's candidates match exactly one set mask — the owner tokens
-    // the crossing/border handlers depend on (§5).
+    // With multiple sets, a decided cell's candidates must identify one set.
     const numSets = this._valueMasks.length;
     let allSetsMask = 0;
     for (const mask of this._valueMasks) {
@@ -120,7 +118,6 @@ export class ConnectedValues extends SudokuConstraintHandler {
     this._neighbors = layerNeighborTable(
       numCells, layer.columns || geometry.numCols);
     this._traversalBuffer = new Uint16Array(numCells);
-    // One extra entry for the sentinel neighbor index numCells.
     this._states = new Uint8Array(numCells + 1);
 
     return true;
@@ -134,7 +131,6 @@ export class ConnectedValues extends SudokuConstraintHandler {
     return true;
   }
 
-  // Enforces the value set with index `s` (§2-4).
   _enforceSet(grid, pQueue, s) {
     const cellOffset = this._cellOffset;
     const numCells = this.cells.length;
@@ -224,7 +220,6 @@ export class ConnectedValues extends SudokuConstraintHandler {
         continue;
       }
 
-      // Nothing left to expand, or every possible cell is already marked.
       if (queueHead === queueSize ||
         visitedDecided + queueSize === numPossible) break;
 
@@ -284,7 +279,6 @@ export class ConnectedValues extends SudokuConstraintHandler {
     }
   }
 
-  // One round of one-door forcing (§4), returning the number of cells forced.
   _forceDoors(grid, pQueue, valueMask, numDecided, unvisitedDecidedState) {
     const cellOffset = this._cellOffset;
     const numCells = this.cells.length;
@@ -331,7 +325,7 @@ export class ConnectedValues extends SudokuConstraintHandler {
     for (let blobId = 0; blobId < numBlobs; blobId++) {
       const door = buffer[blobId];
       if (door >= MULTI_DOOR) continue;
-      if (states[door] !== undecidedState) continue;  // Forced by an earlier blob.
+      if (states[door] !== undecidedState) continue;
 
       // Take the visited polarity, so the next round toggles the decided cells
       // as one.
@@ -347,8 +341,7 @@ export class ConnectedValues extends SudokuConstraintHandler {
 
 // Crossing rule (§5.2) over one 2x2 block `[nw, ne, sw, se]`: when one diagonal
 // is decided into set X and one cell of the other diagonal into set Y ≠ X, the
-// fourth cell cannot complete the checkerboard by taking Y. Woken only when a
-// corner changes, so it needs no sweep or scratch. `values` is the sets' union.
+// fourth cell cannot complete the checkerboard by taking Y.
 export class ConnectedCrossing extends SudokuConstraintHandler {
   constructor(cells, values) {
     super(cells);
@@ -365,22 +358,27 @@ export class ConnectedCrossing extends SudokuConstraintHandler {
   enforceConsistency(grid, pQueue) {
     const cells = this.cells;
     const setMask = this._setMask;
-    // Owner token per corner: the single set bit a decided cell holds, else 0
-    // (undecided or out-of-set). Equal nonzero tokens mean the same set.
-    let v;
-    v = grid[cells[0]]; const nw = (v & setMask) && !(v & (v - 1)) ? v : 0;
-    v = grid[cells[1]]; const ne = (v & setMask) && !(v & (v - 1)) ? v : 0;
-    v = grid[cells[2]]; const sw = (v & setMask) && !(v & (v - 1)) ? v : 0;
-    v = grid[cells[3]]; const se = (v & setMask) && !(v & (v - 1)) ? v : 0;
+    const nw = grid[cells[0]];
+    const ne = grid[cells[1]];
+    const sw = grid[cells[2]];
+    const se = grid[cells[3]];
 
     let target = 0;
     let forbidden = 0;
-    if (nw && nw === se) {
-      if (ne && ne !== nw) { target = cells[2]; forbidden = ne; }
-      else if (sw && sw !== nw) { target = cells[1]; forbidden = sw; }
-    } else if (ne && ne === sw) {
-      if (nw && nw !== ne) { target = cells[3]; forbidden = nw; }
-      else if (se && se !== ne) { target = cells[0]; forbidden = se; }
+    // Raw equality is checked before proving that the matching candidates are
+    // a single set bit with no other candidates.
+    if (nw === se && (nw & setMask) && !(nw & (nw - 1))) {
+      if (ne !== nw && (ne & setMask) && !(ne & (ne - 1))) {
+        target = cells[2]; forbidden = ne;
+      } else if (sw !== nw && (sw & setMask) && !(sw & (sw - 1))) {
+        target = cells[1]; forbidden = sw;
+      }
+    } else if (ne === sw && (ne & setMask) && !(ne & (ne - 1))) {
+      if (nw !== ne && (nw & setMask) && !(nw & (nw - 1))) {
+        target = cells[3]; forbidden = nw;
+      } else if (se !== ne && (se & setMask) && !(se & (se - 1))) {
+        target = cells[0]; forbidden = se;
+      }
     }
     if (forbidden && (grid[target] & forbidden)) {
       const restricted = grid[target] & ~forbidden;
@@ -438,20 +436,20 @@ export class ConnectedBorder extends SudokuConstraintHandler {
       let j = start + step;
       if (j >= numPerimeter) j -= numPerimeter;
       const v = grid[cells[j]];
+      if (v === prev) {
+        if (gapUnion & (setMask ^ v)) needsStrip = true;
+        gapUnion = 0;
+        continue;
+      }
       if (!(v & setMask) || (v & (v - 1))) {  // not decided into a set: a gap
         gapUnion |= v;
         continue;
       }
-      if (v !== prev) {
-        transitions++;
-        prev = v;
-      } else if (gapUnion & (setMask ^ v)) {
-        needsStrip = true;
-      }
+      if (++transitions > 2) return false;
+      prev = v;
       gapUnion = 0;
     }
-    if (transitions === 0) return true;   // At most one set on the border.
-    if (transitions > 2) return false;    // Interleaved.
+    if (transitions === 0) return true;
     if (!needsStrip) return true;
 
     // Enforcement pass: the same lap, stripping each gap flanked by matching
@@ -462,7 +460,6 @@ export class ConnectedBorder extends SudokuConstraintHandler {
       let j = start + step;
       if (j >= numPerimeter) j -= numPerimeter;
       const v = grid[cells[j]];
-      if (!(v & setMask) || (v & (v - 1))) continue;  // skip gaps
       if (v === prevToken) {
         const stripMask = setMask ^ v;
         for (let i = gapStart; i !== j;) {
@@ -476,6 +473,8 @@ export class ConnectedBorder extends SudokuConstraintHandler {
           }
           if (++i >= numPerimeter) i -= numPerimeter;
         }
+      } else if (!(v & setMask) || (v & (v - 1))) {
+        continue;
       }
       prevToken = v;
       gapStart = j + 1 >= numPerimeter ? 0 : j + 1;
