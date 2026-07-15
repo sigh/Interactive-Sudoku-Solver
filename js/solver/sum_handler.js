@@ -505,18 +505,26 @@ export class Sum extends SudokuConstraintHandler {
     const valuesToRemove0 = values0 & ~possibilities0;
     if (valuesToRemove0) {
       for (let i = 0; i < set0.length; i++) {
-        if (grid[set0[i]] & valuesToRemove0) {
-          if (!(grid[set0[i]] &= ~valuesToRemove0)) return false;
-          pQueue.addForCell(set0[i]);
+        const cell = set0[i];
+        const value = grid[cell];
+        if (value & valuesToRemove0) {
+          const restricted = value & ~valuesToRemove0;
+          if (!restricted) return false;
+          grid[cell] = restricted;
+          pQueue.addForCell(cell);
         }
       }
     }
     const valuesToRemove1 = values1 & ~possibilities1;
     if (valuesToRemove1) {
       for (let i = 0; i < set1.length; i++) {
-        if (grid[set1[i]] & valuesToRemove1) {
-          if (!(grid[set1[i]] &= ~valuesToRemove1)) return false;
-          pQueue.addForCell(set1[i]);
+        const cell = set1[i];
+        const value = grid[cell];
+        if (value & valuesToRemove1) {
+          const restricted = value & ~valuesToRemove1;
+          if (!restricted) return false;
+          grid[cell] = restricted;
+          pQueue.addForCell(cell);
         }
       }
     }

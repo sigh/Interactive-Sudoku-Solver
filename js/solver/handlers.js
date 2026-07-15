@@ -275,8 +275,11 @@ export class UniqueValueExclusion extends SudokuConstraintHandler {
 
     for (let i = 0; i < numExclusions; i++) {
       const exclusionCell = exclusionCells[i];
-      if (grid[exclusionCell] & value) {
-        if (!(grid[exclusionCell] ^= value)) return false;
+      const current = grid[exclusionCell];
+      if (current & value) {
+        const restricted = current ^ value;
+        if (!restricted) return false;
+        grid[exclusionCell] = restricted;
         pQueue.addForCell(exclusionCell);
       }
     }
@@ -321,8 +324,11 @@ export class ValueDependentUniqueValueExclusion extends SudokuConstraintHandler 
     const numExclusions = exclusionCells.length;
     for (let i = 0; i < numExclusions; i++) {
       const exclusionCell = exclusionCells[i];
-      if (grid[exclusionCell] & v) {
-        if (!(grid[exclusionCell] ^= v)) return false;
+      const current = grid[exclusionCell];
+      if (current & v) {
+        const restricted = current ^ v;
+        if (!restricted) return false;
+        grid[exclusionCell] = restricted;
         pQueue.addForCell(exclusionCell);
       }
     }
@@ -359,9 +365,13 @@ export class PerfectAllDifferentValueExclusion extends SudokuConstraintHandler {
     if (exclusionCells.length > 0) {
       // Remove the value from the exclusion cells.
       for (let i = 0; i < exclusionCells.length; i++) {
-        if (grid[exclusionCells[i]] & v) {
-          if (!(grid[exclusionCells[i]] ^= v)) return false;
-          pQueue.addForCell(exclusionCells[i]);
+        const cell = exclusionCells[i];
+        const current = grid[cell];
+        if (current & v) {
+          const restricted = current ^ v;
+          if (!restricted) return false;
+          grid[cell] = restricted;
+          pQueue.addForCell(cell);
         }
       }
     }
@@ -460,9 +470,13 @@ export class HandlerUtil {
   static removeRequiredValueExclusions(grid, exclusionCells, value, pQueue) {
     // Remove the value from the exclusion cells.
     for (let i = 0; i < exclusionCells.length; i++) {
-      if (grid[exclusionCells[i]] & value) {
-        if (!(grid[exclusionCells[i]] ^= value)) return false;
-        if (pQueue) pQueue.addForCell(exclusionCells[i]);
+      const cell = exclusionCells[i];
+      const current = grid[cell];
+      if (current & value) {
+        const restricted = current ^ value;
+        if (!restricted) return false;
+        grid[cell] = restricted;
+        if (pQueue) pQueue.addForCell(cell);
       }
     }
 
@@ -861,15 +875,19 @@ export class BinaryConstraint extends SudokuConstraintHandler {
   }
 
   enforceConsistency(grid, pQueue) {
-    const v0 = grid[this.cells[0]];
-    const v1 = grid[this.cells[1]];
+    const cells = this.cells;
+    const cell0 = cells[0];
+    const cell1 = cells[1];
+    const tables = this._tables;
+    const v0 = grid[cell0];
+    const v1 = grid[cell1];
 
-    const v0New = grid[this.cells[0]] = v0 & this._tables[1][v1];
-    const v1New = grid[this.cells[1]] = v1 & this._tables[0][v0];
+    const v0New = grid[cell0] = v0 & tables[1][v1];
+    const v1New = grid[cell1] = v1 & tables[0][v0];
 
     if (!(v0New && v1New)) return false;
-    if (v0 !== v0New) pQueue.addForCell(this.cells[0]);
-    if (v1 !== v1New) pQueue.addForCell(this.cells[1]);
+    if (v0 !== v0New) pQueue.addForCell(cell0);
+    if (v1 !== v1New) pQueue.addForCell(cell1);
 
     // If transitive, then required value exclusion is not possible.
     if (this._exclusionsCellsForRequiredValues === null) return true;
@@ -887,7 +905,7 @@ export class BinaryConstraint extends SudokuConstraintHandler {
       // Check if this value is required if the other cell doesn't have it.
       // Checking in one direction is sufficient, since this proves that no
       // valid pair exists.
-      if ((this._tables[0][v0New ^ value] & v1New) === value) {
+      if ((tables[0][v0New ^ value] & v1New) === value) {
         requiredValues |= value;
       }
     }
@@ -1868,9 +1886,13 @@ export class SameValues extends SudokuConstraintHandler {
         if (valueBuffer[i] === valueIntersection) continue;
         const s = this._cellSets[i];
         for (let j = setLen - 1; j >= 0; j--) {
-          if (grid[s[j]] & ~valueIntersection) {
-            if (!(grid[s[j]] &= valueIntersection)) return false;
-            pQueue.addForCell(s[j]);
+          const cell = s[j];
+          const value = grid[cell];
+          if (value & ~valueIntersection) {
+            const restricted = value & valueIntersection;
+            if (!restricted) return false;
+            grid[cell] = restricted;
+            pQueue.addForCell(cell);
           }
         }
       }
@@ -1933,17 +1955,21 @@ export class SameValues extends SudokuConstraintHandler {
           if (requiredBuffer[i] === maxRequired && countBuffer[i] > maxRequired) {
             // Remove unfixed values from require is at the max.
             for (let j = 0; j < setLen; j++) {
-              if ((grid[s[j]] & v) && grid[s[j]] !== v) {
-                grid[s[j]] &= ~v;
-                pQueue.addForCell(s[j]);
+              const cell = s[j];
+              const value = grid[cell];
+              if (value !== v && (value & v)) {
+                grid[cell] = value & ~v;
+                pQueue.addForCell(cell);
               }
             }
           } else if (countBuffer[i] === maxRequired && requiredBuffer[i] < maxRequired) {
             // Set fixed values when count is already equal to the maxRequired.
             for (let j = 0; j < setLen; j++) {
-              if ((grid[s[j]] & v) && grid[s[j]] !== v) {
-                grid[s[j]] = v;
-                pQueue.addForCell(s[j]);
+              const cell = s[j];
+              const value = grid[cell];
+              if (value !== v && (value & v)) {
+                grid[cell] = v;
+                pQueue.addForCell(cell);
               }
             }
           }
@@ -2841,8 +2867,9 @@ export class CountingCircles extends SudokuConstraintHandler {
         let count = 0;
         const group = groups[i];
         for (let k = 0; k < group.length; k++) {
-          if (grid[group[k]] & v) {
-            fixedCount += (grid[group[k]] === v);
+          const value = grid[group[k]];
+          if (value & v) {
+            fixedCount += value === v;
             count++;
           }
         }
@@ -3830,8 +3857,11 @@ export class Rellik extends SudokuConstraintHandler {
 
     for (let i = 0; i < numCells; i++) {
       const cell = cells[i];
-      if (grid[cell] & valuesToRemove) {
-        if (!(grid[cell] &= ~valuesToRemove)) return false;
+      const value = grid[cell];
+      if (value & valuesToRemove) {
+        const restricted = value & ~valuesToRemove;
+        if (!restricted) return false;
+        grid[cell] = restricted;
         pQueue.addForCell(cell);
       }
     }
@@ -3983,9 +4013,13 @@ export class DoppelgangerZero extends SudokuConstraintHandler {
         if (si & (si - 1)) continue;
         for (let j = 0; j < n; j++) {
           if (j === i) continue;
-          if (si & grid[s[j]]) {
-            if (!(grid[s[j]] &= ~si)) return false;
-            pQueue.addForCell(s[j]);
+          const cell = s[j];
+          const value = grid[cell];
+          if (si & value) {
+            const restricted = value & ~si;
+            if (!restricted) return false;
+            grid[cell] = restricted;
+            pQueue.addForCell(cell);
           }
         }
       }
@@ -3995,8 +4029,8 @@ export class DoppelgangerZero extends SudokuConstraintHandler {
       const s1 = grid[s[1]];
       const s2 = n === 3 ? grid[s[2]] : 0;
       const varCellConflict = (
-        (!(s0 & (s0 - 1)) && (s0 === s1 || s0 === s2))
-        || (!(s1 & (s1 - 1)) && s1 === s2)
+        ((s0 === s1 || s0 === s2) && !(s0 & (s0 - 1)))
+        || (s1 === s2 && !(s1 & (s1 - 1)))
       );
       if (varCellConflict) {
         if (!(grid[this._gridCell] &= ~1)) return false;
