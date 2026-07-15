@@ -50,7 +50,10 @@ const thermoSpec = {
   accept: ({ done, stage }) => done || stage === 'cellRegion',
 };
 const thermoNFA = NFA.encodeSpec(thermoSpec, 9);
-const stream = (cells) => cells.flatMap((g) => [cc.at(g), g]);
+const stream = (cells) => {
+  const regions = cc.at(cells);
+  return cells.flatMap((gridCell, i) => [regions[i], gridCell]);
+};
 
 return [
   new Shape('9x9'),
@@ -58,12 +61,12 @@ return [
   new NoBoxes(),
   new Given('R9C9', 1),
 
-  ...DOTS.flatMap(([a, b]) => [new WhiteDot(a, b), new AllDifferent(cc.at(a), cc.at(b))]),
+  ...DOTS.flatMap(([a, b]) => [new WhiteDot(a, b), new AllDifferent(...cc.at([a, b]))]),
 
   ...rays.map((cells) => new NFA(thermoNFA, 'thermo', ...stream(cells))),
 
   // The ">= 2 cells" rule: every on-grid neighbour of a hub is in the hub's region.
   // Not enforced by the NFA. Done with SameValues so that the chaos handler
   // can merge the regions.
-  ...rays.map((cells) => new SameValues(2, cc.at(cells[0]), cc.at(cells[1]))),
+  ...rays.map((cells) => new SameValues(2, ...cc.at(cells.slice(0, 2)))),
 ];

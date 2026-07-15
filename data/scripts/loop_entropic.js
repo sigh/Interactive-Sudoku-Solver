@@ -31,7 +31,6 @@ const geometry = graph.gridGeometry();
 
 // The loop-membership Var cell paired with each grid cell (VL1..VL36, in grid order).
 const loop = graph.makeOverlay('VL');
-const loopCell = cell => loop.at(cell);
 
 const gridCells = graph.cells();
 
@@ -41,8 +40,8 @@ const squares = ['R1C5', 'R4C5', 'R5C2'];
 const originCell = loop.cells()[0];
 const membership = [
   loop.makeReplicate(new Given(originCell, ON, OFF)),
-  ...circles.map(cell => new Given(loopCell(cell), ON)),
-  ...squares.map(cell => new Given(loopCell(cell), OFF)),
+  ...loop.at(circles).map(cell => new Given(cell, ON)),
+  ...loop.at(squares).map(cell => new Given(cell, OFF)),
 ];
 
 // --- Degree 2: each on cell has exactly two on-loop orthogonal neighbours. ---
@@ -60,7 +59,7 @@ const degreeMachine = NFA.encodeSpec({
   accept: ({ phase, onNeighbours }) => phase === 'off' || onNeighbours === 2,
 }, geometry.numValues);
 const degrees = gridCells.map(cell => new NFA(degreeMachine, 'degree',
-  loopCell(cell), ...graph.neighbours(cell).map(loopCell)));
+  ...loop.at([cell, ...graph.neighbours(cell)])));
 
 // --- No diagonal self-touch: forbid a 2x2 whose only on cells are a diagonal. ---
 // Reads the four membership cells of a 2x2 block, left-to-right, top-to-bottom.
@@ -84,7 +83,7 @@ const noDiagonalTouchMachine = NFA.encodeSpec({
 const noDiagonalTouches = gridCells
   .map(cell => graph.block(cell, 2, 2))
   .filter(Boolean)
-  .map(block => new NFA(noDiagonalTouchMachine, 'no-touch', ...block.map(loopCell)));
+  .map(block => new NFA(noDiagonalTouchMachine, 'no-touch', ...loop.at(block)));
 
 // --- Entropic loop: each on cell, with its two on-loop neighbours, must show one
 // digit from each band. Reads (membership, digit) pairs for the cell, then for
@@ -112,8 +111,8 @@ const entropicMachine = NFA.encodeSpec({
     (phase === 'membership' && bands === ALL_BANDS),
 }, geometry.numValues);
 const entropics = gridCells.map(cell => new NFA(entropicMachine, 'entropic',
-  loopCell(cell), cell,
-  ...graph.neighbours(cell).flatMap(n => [loopCell(n), n])));
+  loop.at(cell), cell,
+  ...graph.neighbours(cell).flatMap(n => [loop.at(n), n])));
 
 // --- Vision: the clue counts same-type cells it sees along its row and column,
 // itself included, with the opposite type blocking sight. Equivalently, it counts
@@ -150,10 +149,10 @@ const visionMachine = NFA.encodeSpec({
 const RAY_DIRS = [[-1, 0], [1, 0], [0, -1], [0, 1]];
 const visions = [...circles, ...squares].map(clue => new NFA(
   visionMachine, 'vision',
-  [loopCell(clue), clue],
+  [loop.at(clue), clue],
   // Each ray excludes the clue itself (slice(1)); drop rays that run off-grid.
   ...RAY_DIRS
-    .map(([dR, dC]) => graph.ray(clue, dR, dC).slice(1).map(loopCell))
+    .map(([dR, dC]) => loop.at(graph.ray(clue, dR, dC).slice(1)))
     .filter(ray => ray.length)));
 
 return [

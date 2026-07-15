@@ -98,9 +98,14 @@ CELL GEOMETRY
       .makeReplicate(constraintOrArray[, cells])  build a Replicate using this
                             graph; cells defaults to .cells()
       .makeOverlay(prefix[, cells])  a cell graph over a var group (e.g. 'CC',
-                            'VL'), connected as its paired grid cells are; adds
-                            .at(cell) / .gridAt(varCell), each null if unpaired,
-                            and .toVar(label) -> the matching Var (V-prefix only)
+                            'VL'), connected as its paired grid cells are
+
+    Overlay methods (on the result of .makeOverlay()):
+      .at(gridCellOrArray)    the paired var cell, or an array of paired var
+                            cells; unpaired entries are null
+      .gridAt(varCellOrArray) the paired grid cell, or an array of paired grid
+                            cells; unpaired entries are null
+      .toVar(label)           create a matching Var constraint
 
 STATE MACHINES (NFA)
 

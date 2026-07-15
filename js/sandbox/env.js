@@ -322,13 +322,17 @@ class SandboxOverlay extends SandboxCellGraph {
   cells() { return [...this._cells]; }
 
   // The var cell shadowing `gridCell`, or null if `gridCell` has no overlay cell.
+  // Arrays are translated element-by-element and returned as arrays.
   at(gridCell) {
+    if (Array.isArray(gridCell)) return gridCell.map(cell => this.at(cell));
     const pos = this._gridPos.get(gridCell);
     return pos === undefined ? null : this._cells[pos];
   }
 
   // The grid cell shadowed by `varCell`, or null if `varCell` isn't in the overlay.
+  // Arrays are translated element-by-element and returned as arrays.
   gridAt(varCell) {
+    if (Array.isArray(varCell)) return varCell.map(cell => this.gridAt(cell));
     const pos = this._varPos.get(varCell);
     return pos === undefined ? null : this._gridCells[pos];
   }

@@ -470,6 +470,17 @@ await runTest('overlay at()/gridAt() return null when unpaired', () => {
   assert.equal(sparse.gridAt('VC9'), null);
 });
 
+await runTest('overlay at()/gridAt() translate arrays in order', () => {
+  const sparse = cellGraph('4x4').makeOverlay(
+    'VC', ['R1C1', 'R1C2', 'R3C3']);
+  assert.deepEqual(
+    sparse.at(['R3C3', 'R2C2', 'R1C1']),
+    ['VC3', null, 'VC1']);
+  assert.deepEqual(
+    sparse.gridAt(['VC2', 'VC9', 'VC1']),
+    ['R1C2', null, 'R1C1']);
+});
+
 await runTest('overlay defaults to the whole grid, and honours a prefix', () => {
   const overlay = cellGraph('4x4').makeOverlay('VL');
   assert.equal(overlay.cells().length, 16);

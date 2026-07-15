@@ -63,12 +63,13 @@ const destroyed = [...falseCells].flatMap(([f, cells]) => {
 const overlaps = circles.map(circle => {
   const { row: r, col: c } = parseCellId(circle);
   const falseRegion = falseAt(r, c);
+  const neighbours = graph.kingNeighbours(circle).filter(neighbour => {
+    const { row: nr, col: nc } = parseCellId(neighbour);
+    return falseAt(nr, nc) === falseRegion;
+  });
   const set = [
     cc.at(circle),   // the circle's own real-region cell is the reference
-    ...graph.kingNeighbours(circle).filter(neighbour => {
-      const { row: nr, col: nc } = parseCellId(neighbour);
-      return falseAt(nr, nc) === falseRegion;
-    }).map(neighbour => cc.at(neighbour)),
+    ...cc.at(neighbours),
   ];
   return new ChaosCount(circle, 0, ...set);
 });

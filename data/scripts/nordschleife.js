@@ -22,7 +22,6 @@ const geometry = graph.gridGeometry();
 
 // The loop-membership Var cell paired with each grid cell (VL1..VL81, in grid order).
 const loop = graph.makeOverlay('VL');
-const loopCell = cell => loop.at(cell);
 
 const gridCells = graph.cells();
 
@@ -33,8 +32,8 @@ const rectangle = 'R6C1';
 const originCell = loop.cells()[0];
 const membership = [
   loop.makeReplicate(new Given(originCell, ON, OFF)),
-  ...circles.map(cell => new Given(loopCell(cell), OFF)),
-  new Given(loopCell(rectangle), ON),
+  ...loop.at(circles).map(cell => new Given(cell, OFF)),
+  new Given(loop.at(rectangle), ON),
 ];
 
 // --- Degree 2: each on cell has exactly two on-loop orthogonal neighbours. ---
@@ -52,7 +51,7 @@ const degreeMachine = NFA.encodeSpec({
   accept: ({ phase, onNeighbours }) => phase === 'off' || onNeighbours === 2,
 }, geometry.numValues);
 const degrees = gridCells.map(cell => new NFA(degreeMachine, 'degree',
-  loopCell(cell), ...graph.neighbours(cell).map(loopCell)));
+  ...loop.at([cell, ...graph.neighbours(cell)])));
 
 // --- No diagonal self-touch: forbid a 2x2 whose only on cells are a diagonal. ---
 // Reads the four membership cells of a 2x2 block, left-to-right, top-to-bottom.
@@ -76,7 +75,7 @@ const noDiagonalTouchMachine = NFA.encodeSpec({
 const noDiagonalTouches = gridCells
   .map(cell => graph.block(cell, 2, 2))
   .filter(Boolean)
-  .map(block => new NFA(noDiagonalTouchMachine, 'no-touch', ...block.map(loopCell)));
+  .map(block => new NFA(noDiagonalTouchMachine, 'no-touch', ...loop.at(block)));
 
 // --- Circle counts: the circle's digit equals the number of its king neighbours
 // that are on the loop. Reads the digit, then each neighbour's membership.
@@ -90,7 +89,7 @@ const countMachine = NFA.encodeSpec({
   accept: ({ target, count }) => target !== null && count === target,
 }, geometry.numValues);
 const circleCounts = circles.map(cell => new NFA(countMachine, 'count',
-  cell, ...graph.kingNeighbours(cell).map(loopCell)));
+  cell, ...loop.at(graph.kingNeighbours(cell))));
 
 // --- Loop multiples: for two orthogonally adjacent on-loop cells, the larger
 // digit must be a multiple of the smaller. Reads (membership, digit) for each
@@ -124,7 +123,7 @@ const multiples = gridCells.flatMap(cell => [[0, 1], [1, 0]]
   .map(([dR, dC]) => graph.step(cell, dR, dC))
   .filter(Boolean)
   .map(other => new NFA(multipleMachine, 'mult',
-    loopCell(cell), cell, loopCell(other), other)));
+    loop.at(cell), cell, loop.at(other), other)));
 
 return [
   new Shape('9x9'),

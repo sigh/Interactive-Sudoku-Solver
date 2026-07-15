@@ -139,6 +139,33 @@ await runTest('lint_sandbox_script flags bare Replicate construction', () => {
   assert.doesNotMatch(report(clean), /bare-replicate-constructor/);
 });
 
+await runTest('lint_sandbox_script prefers overlay array translation over map', () => {
+  const flagged = lintSource(SCRIPT_HEADER
+    + "const graph = cellGraph('9x9');\n"
+    + "const shade = graph.makeOverlay('VS');\n"
+    + 'const shadeCell = cell => shade.at(cell);\n'
+    + 'const a = cells.map(cell => shade.at(cell));\n'
+    + 'const b = vars.map(id => shade.gridAt(id));\n'
+    + 'const c = otherCells.map(shadeCell);\n'
+    + "return [new Shape('9x9')];\n");
+  assert.equal(flagged.filter(i => i.code === 'overlay-map-use-array').length, 3,
+    report(flagged));
+  assert.match(report(flagged), /shade\.at\(\) accepts the array directly/);
+  assert.match(report(flagged), /shade\.gridAt\(\) accepts the array directly/);
+  assert.match(report(flagged), /shadeCell is only shade\.at\(\)/);
+
+  const clean = lintSource(SCRIPT_HEADER
+    + "const graph = cellGraph('9x9');\n"
+    + "const shade = graph.makeOverlay('VS');\n"
+    + 'const a = shade.at(cells);\n'
+    + 'const b = shade.gridAt(vars);\n'
+    + 'const shadeCell = cell => shade.at(cell);\n'
+    + 'const scalar = shadeCell(oneCell);\n'
+    + 'const unrelated = records.map(record => records.at(record));\n'
+    + "return [new Shape('9x9')];\n");
+  assert.doesNotMatch(report(clean), /overlay-map-use-array/);
+});
+
 await runTest('lint_constraints suggests native constraints per key group', () => {
   // The native suggestion fires only when EVERY Pair sharing the key is a
   // 2-cell adjacent pair — a partial replacement would split one drawn rule

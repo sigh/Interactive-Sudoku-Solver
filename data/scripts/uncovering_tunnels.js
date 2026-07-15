@@ -60,12 +60,12 @@ const cc = cellGraph('9x9').makeOverlay('CC');
 const chaosArrows = ARROW_DEFS.map(({ origin, arm }) => new ChaosArrow(origin, 1, ...arm));
 
 const parityCounts = ARROW_DEFS.map(({ origin, arm }) =>
-  new NFA(parityCountNFA, 'ParityCount', origin, ...arm.slice(1).map(id => cc.gridAt(id)))
+  new NFA(parityCountNFA, 'ParityCount', origin, ...cc.gridAt(arm.slice(1)))
 );
 
 const orangeLines = ORANGE_LINE_PAIRS.flatMap(([a, b]) => [
   new Whisper(4, a, b),
-  new AllDifferent(cc.at(a), cc.at(b)),
+  new AllDifferent(...cc.at([a, b])),
 ]);
 
 const circles = CIRCLE_CELLS.map(cell => new CountDistinct(cell, ...cc.row(cc.at(cell))));

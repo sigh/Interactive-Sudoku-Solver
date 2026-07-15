@@ -243,6 +243,65 @@ export const SOURCE_RULES = [
     }),
   },
   {
+    code: 'overlay-map-use-array',
+    tier: 'heuristic',
+    summary: 'overlay at()/gridAt() mapped element-by-element; pass the array '
+      + 'directly instead',
+    docs: 'The overlay methods accept either one cell or an array. This catches\n'
+      + '`.map(cell => overlay.at(cell))` / `.map(cell => overlay.gridAt(cell))`\n'
+      + 'and pass-through helpers such as `const overlayCell = cell =>\n'
+      + 'overlay.at(cell); cells.map(overlayCell)`. Only variables assigned from\n'
+      + 'makeOverlay() are considered, so unrelated APIs with an at() method are\n'
+      + 'left alone.',
+    check(ctx) {
+      const source = ctx.view('code');
+      const overlays = new Set([...source.matchAll(
+        /\bconst\s+([A-Za-z_$][\w$]*)\s*=\s*[^;]*?\.makeOverlay\s*\(/g,
+      )].map(match => match[1]));
+      if (!overlays.size) return [];
+
+      const items = [];
+      const direct = /\.(?:map|flatMap)\(\s*\(?\s*([A-Za-z_$][\w$]*)\s*\)?\s*=>\s*([A-Za-z_$][\w$]*)\.(at|gridAt)\(\s*\1\s*\)\s*\)/g;
+      for (const match of source.matchAll(direct)) {
+        const [, , overlay, method] = match;
+        if (!overlays.has(overlay)) continue;
+        items.push({
+          line: ctx.lineAt(match.index),
+          code: this.code,
+          message: `${overlay}.${method}() accepts the array directly; use `
+            + `${overlay}.${method}(cells) instead of mapping each element`,
+        });
+      }
+
+      const helpers = new Map();
+      const arrowHelper = /\bconst\s+([A-Za-z_$][\w$]*)\s*=\s*\(?\s*([A-Za-z_$][\w$]*)\s*\)?\s*=>\s*([A-Za-z_$][\w$]*)\.(at|gridAt)\(\s*\2\s*\)/g;
+      for (const match of source.matchAll(arrowHelper)) {
+        const [, helper, , overlay, method] = match;
+        if (overlays.has(overlay)) helpers.set(helper, { overlay, method });
+      }
+      const functionHelper = /\bfunction\s+([A-Za-z_$][\w$]*)\s*\(\s*([A-Za-z_$][\w$]*)\s*\)\s*\{\s*return\s+([A-Za-z_$][\w$]*)\.(at|gridAt)\(\s*\2\s*\)\s*;?\s*\}/g;
+      for (const match of source.matchAll(functionHelper)) {
+        const [, helper, , overlay, method] = match;
+        if (overlays.has(overlay)) helpers.set(helper, { overlay, method });
+      }
+
+      for (const [helper, { overlay, method }] of helpers) {
+        const escaped = helper.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const mappedHelper = new RegExp(
+          `\\.(?:map|flatMap)\\(\\s*${escaped}\\s*\\)`, 'g');
+        for (const match of source.matchAll(mappedHelper)) {
+          items.push({
+            line: ctx.lineAt(match.index),
+            code: this.code,
+            message: `${helper} is only ${overlay}.${method}(); pass the array to `
+              + `${overlay}.${method}() directly`,
+          });
+        }
+      }
+      return items;
+    },
+  },
+  {
     code: 'manual-box-arithmetic',
     tier: 'heuristic',
     summary: 'manual box construction found; prefer graph.box(n) / graph.boxes()',

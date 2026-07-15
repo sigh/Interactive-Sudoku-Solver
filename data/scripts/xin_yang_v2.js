@@ -13,7 +13,6 @@ const UNSHADED = 2;
 const graph = cellGraph('9x9');
 const geometry = graph.gridGeometry();
 const shade = graph.makeOverlay('VS');
-const shadeCell = cell => shade.at(cell);
 const gridCells = graph.cells();
 
 // Every shade Var is either shaded or unshaded.
@@ -33,7 +32,7 @@ const dots = [
 // shades (with two shades, "opposite" is just all-different).
 const dotRules = dots.flatMap(([a, b]) => [
   new WhiteDot(a, b),
-  new AllDifferent(shadeCell(a), shadeCell(b)),
+  new AllDifferent(...shade.at([a, b])),
 ]);
 
 // No 2x2 block may be all shaded or all unshaded: one NFA on the top-left
@@ -52,8 +51,8 @@ const noMono2x2Machine = NFA.encodeSpec({
 const blockOrigins = gridCells.filter(cell => graph.block(cell, 2, 2));
 const noMono2x2 = shade.makeReplicate(
   new NFA(noMono2x2Machine, 'no-mono-2x2',
-    ...graph.block(gridCells[0], 2, 2).map(shadeCell)),
-  blockOrigins.map(shadeCell));
+    ...shade.at(graph.block(gridCells[0], 2, 2))),
+  shade.at(blockOrigins));
 
 const arrows = [
   {
@@ -98,12 +97,12 @@ function sightCountConstraint(digitCell, lineCells, index, targetShade) {
 
   return new Or(starts.flatMap(start => ends.map(end => new And([
     new Given(digitCell, end - start + 1),
-    ...lineCells.slice(start, end + 1)
-      .map(cell => new Given(shadeCell(cell), targetShade)),
+    ...shade.at(lineCells.slice(start, end + 1))
+      .map(cell => new Given(cell, targetShade)),
     ...(start > 0
-      ? [new Given(shadeCell(lineCells[start - 1]), blocker)] : []),
+      ? [new Given(shade.at(lineCells[start - 1]), blocker)] : []),
     ...(end + 1 < lineCells.length
-      ? [new Given(shadeCell(lineCells[end + 1]), blocker)] : []),
+      ? [new Given(shade.at(lineCells[end + 1]), blocker)] : []),
   ]))));
 }
 

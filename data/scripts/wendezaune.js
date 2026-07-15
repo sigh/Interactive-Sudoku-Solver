@@ -33,7 +33,6 @@ const isTurn = s => s >= UL;   // the four corners
 const graph = cellGraph('9x9');
 const geometry = graph.gridGeometry();
 const shape = graph.makeOverlay('VS');
-const shapeCell = cell => shape.at(cell);
 const gridCells = graph.cells();
 
 // Each circle sits on a grid vertex, keyed by the top-left cell of the 2x2 it
@@ -51,7 +50,7 @@ const shapeDomains = gridCells.map(cell => {
   const allowed = ALL_SHAPES.filter(s =>
     !(row === 1 && usesUp(s)) && !(row === geometry.numRows && usesDown(s)) &&
     !(col === 1 && usesLeft(s)) && !(col === geometry.numCols && usesRight(s)));
-  return new Given(shapeCell(cell), ...allowed);
+  return new Given(shape.at(cell), ...allowed);
 });
 
 // --- Edge agreement: neighbours must agree on the shared edge. Reads the two
@@ -88,12 +87,12 @@ const pairRules = gridCells.flatMap(cell => {
   const down = graph.step(cell, 1, 0);
   return [
     ...(right ? [
-      new NFA(edgeRight, 'edge-h', shapeCell(cell), shapeCell(right)),
-      new NFA(diffRight, 'diff-h', shapeCell(cell), cell, right),
+      new NFA(edgeRight, 'edge-h', ...shape.at([cell, right])),
+      new NFA(diffRight, 'diff-h', shape.at(cell), cell, right),
     ] : []),
     ...(down ? [
-      new NFA(edgeDown, 'edge-v', shapeCell(cell), shapeCell(down)),
-      new NFA(diffDown, 'diff-v', shapeCell(cell), cell, down),
+      new NFA(edgeDown, 'edge-v', ...shape.at([cell, down])),
+      new NFA(diffDown, 'diff-v', shape.at(cell), cell, down),
     ] : []),
   ];
 });
@@ -113,7 +112,7 @@ const turnsExactly = memo((target) => NFA.encodeSpec({
 const circleRules = Object.entries(circleClues).flatMap(([topLeft, digit]) => [
   new Quad(topLeft, digit),
   new NFA(turnsExactly(digit), 'circle-turns',
-    ...graph.block(topLeft, 2, 2).map(shapeCell)),
+    ...shape.at(graph.block(topLeft, 2, 2))),
 ]);
 
 return [
