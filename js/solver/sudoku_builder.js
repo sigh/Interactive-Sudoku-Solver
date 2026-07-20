@@ -10,6 +10,46 @@ const ConnectedHandlerModule = await import('./connected_handler.js' + self.VERS
 
 const { InvalidConstraintError } = HandlerModule;
 
+// Facts about a puzzle, derived once from its constraint set.
+// Information constraint cases need to know about *other* constraints.
+export class PuzzleSpec {
+  constructor(constraintMap, geometry) {
+    this.geometry = geometry;
+
+    // The explicit RegionSize override, or null for the default. Box-shaped
+    // regions (boxes, windoku, disjoint sets) treat null as "derive from the
+    // grid", so it is kept distinct from `regionSize` below.
+    this.regionSizeOption =
+      constraintMap.get('RegionSize')?.[0]?.size ?? null;
+
+    // The effective region size: the number of cells in a full region.
+    this.regionSize = this.regionSizeOption
+      ?? geometry.constructor.defaultNumValues(geometry.numRows, geometry.numCols);
+
+    this.boxRegions = constraintMap.has('NoBoxes')
+      ? []
+      : SudokuConstraintBase.boxRegions(geometry, this.regionSizeOption);
+
+    this.hasChaosConstruction = constraintMap.has('ChaosConstruction');
+
+    this.fullRankTieMode = fullRankTieMode(
+      constraintMap.get('FullRankTies')?.[0]);
+
+    this._jigsawConstraints = constraintMap.get('Jigsaw') || [];
+    this._jigsawRegions = null;
+  }
+
+  hasJigsaw() {
+    return this._jigsawConstraints.length > 0;
+  }
+
+  // Jigsaw pieces as cell-index arrays. Lazy: most puzzles have none.
+  jigsawRegions() {
+    return this._jigsawRegions ??= this._jigsawConstraints.map(
+      c => c.cells.map(id => this.geometry.parseCellId(id).cellIndex));
+  }
+}
+
 export class SudokuBuilder {
   static build(constraint, debugOptions) {
     const geometry = constraint.getGeometry();
@@ -34,27 +74,14 @@ export class SudokuBuilder {
   }
 
   static *_handlers(constraintMap, geometry) {
+    const spec = new PuzzleSpec(constraintMap, geometry);
+
     yield* this._rowColHandlers(geometry);
 
-    const boxRegions = this._getBoxRegions(geometry, constraintMap);
-    yield new HandlerModule.BoxRegionInfo(boxRegions);
-    yield* this._boxHandlers(boxRegions);
+    yield new HandlerModule.BoxRegionInfo(spec.boxRegions);
+    yield* this._boxHandlers(spec.boxRegions);
 
-    yield* this._constraintHandlers(constraintMap, geometry);
-  }
-
-  // Get box regions, respecting NoBoxes and RegionSize constraints.
-  static _getBoxRegions(geometry, constraintMap) {
-    if (constraintMap.has('NoBoxes')) return [];
-
-    const size = this._getEffectiveBoxSize(constraintMap);
-    return SudokuConstraintBase.boxRegions(geometry, size);
-  }
-
-  // Get the effective box size from RegionSize constraint, or null for default.
-  static _getEffectiveBoxSize(constraintMap) {
-    const regionSizeConstraints = constraintMap.get('RegionSize');
-    return regionSizeConstraints?.[0]?.size ?? null;
+    yield* this._constraintHandlers(constraintMap, geometry, spec);
   }
 
   static *_rowColHandlers(geometry) {
@@ -154,12 +181,8 @@ export class SudokuBuilder {
     }
   }
 
-  static _regionSize(constraintMap, geometry) {
-    return constraintMap.get('RegionSize')?.[0]?.size
-      ?? geometry.constructor.defaultNumValues(geometry.numRows, geometry.numCols);
-  }
-
-  static * _constraintHandlers(constraintMap, geometry) {
+  static * _constraintHandlers(constraintMap, geometry,
+    spec = new PuzzleSpec(constraintMap, geometry)) {
     const constraints = [].concat(...constraintMap.values());
 
     for (const constraint of constraints) {
@@ -174,7 +197,7 @@ export class SudokuBuilder {
       let cells;
       switch (constraint.type) {
         case 'Doppelganger':
-          yield* this._doppelgangerHandlers(geometry, constraintMap);
+          yield* this._doppelgangerHandlers(geometry, spec);
           break;
 
         case 'AntiKnight':
@@ -217,7 +240,7 @@ export class SudokuBuilder {
                 `puzzle geometry ${geometry.name}`);
             }
             cells = constraint.cells.map(c => geometry.parseCellId(c).cellIndex);
-            const regionSize = this._regionSize(constraintMap, geometry);
+            const regionSize = spec.regionSize;
             if (cells.length !== regionSize) {
               throw new InvalidConstraintError(
                 `Jigsaw pieces must have ${regionSize} cells for the current geometry.`);
@@ -230,7 +253,7 @@ export class SudokuBuilder {
 
         case 'ChaosConstruction':
           {
-            const regionSize = this._regionSize(constraintMap, geometry);
+            const regionSize = spec.regionSize;
             if (regionSize < 2) {
               throw new InvalidConstraintError(
                 'Chaos Construction requires a region size of at least 2.');
@@ -273,7 +296,7 @@ export class SudokuBuilder {
             const regionRunArms = chaosArms.map(arm => arm.map(c => c - regionCellOffset));
             yield new ChaosHandlerModule.ChaosArrow(
               controlCell, chaosArms, regionRunArms, constraint.offset,
-              this._regionSize(constraintMap, geometry));
+              spec.regionSize);
           }
           break;
 
@@ -579,20 +602,17 @@ export class SudokuBuilder {
 
         case 'RegionSumLine':
           {
-            if (constraintMap.has('ChaosConstruction')) {
+            if (spec.hasChaosConstruction) {
               throw new InvalidConstraintError(
                 'RegionSumLine is not supported with Chaos Construction.');
             }
             cells = constraint.cells.map(c => geometry.parseCellId(c).cellIndex);
-            const boxRegions = this._getBoxRegions(geometry, constraintMap);
-            if (boxRegions.length) {
-              yield* this._regionSumLineHandlers(cells, boxRegions, geometry);
-            } else if (constraintMap.has('Jigsaw')) {
+            if (spec.boxRegions.length) {
+              yield* this._regionSumLineHandlers(cells, spec.boxRegions, geometry);
+            } else if (spec.hasJigsaw()) {
               // If no boxes, try to use the jigsaw regions.
-              const jigsawConstraints = constraintMap.get('Jigsaw');
-              const regions = jigsawConstraints.map(
-                c => c.cells.map(c => geometry.parseCellId(c).cellIndex));
-              yield* this._regionSumLineHandlers(cells, regions, geometry);
+              yield* this._regionSumLineHandlers(
+                cells, spec.jigsawRegions(), geometry);
             } else {
               // There are no regions, so the constraint is trivially satisfied.
             }
@@ -711,14 +731,14 @@ export class SudokuBuilder {
           break;
         case 'Windoku':
           for (const cells of SudokuConstraint.Windoku.regions(
-            geometry, this._getEffectiveBoxSize(constraintMap))) {
+            geometry, spec.regionSizeOption)) {
             yield new HandlerModule.AllDifferent(cells);
           }
           break;
 
         case 'DisjointSets':
           for (const cells of SudokuConstraintBase.disjointSetRegions(
-            geometry, this._getEffectiveBoxSize(constraintMap))) {
+            geometry, spec.regionSizeOption)) {
             yield new HandlerModule.AllDifferent(cells);
           }
           break;
@@ -786,17 +806,13 @@ export class SudokuBuilder {
           {
             const regions = [];
 
-            if (constraintMap.has('Jigsaw')) {
-              const jigsawConstraints = constraintMap.get('Jigsaw');
-              const jigsawRegions = jigsawConstraints.map(
-                c => c.cells.map(id => geometry.parseCellId(id).cellIndex));
-
-              regions.push(...jigsawRegions);
+            if (spec.hasJigsaw()) {
+              regions.push(...spec.jigsawRegions());
             }
 
             regions.push(...SudokuConstraintBase.rowRegions(geometry));
             regions.push(...SudokuConstraintBase.colRegions(geometry));
-            regions.push(...this._getBoxRegions(geometry, constraintMap));
+            regions.push(...spec.boxRegions);
 
             // We only want the largest regions.
             const maxSize = Math.max(...regions.map(r => r.length));
@@ -890,7 +906,7 @@ export class SudokuBuilder {
             yield new HandlerModule.FullRank(
               geometry.numGridCells,
               [{ rank: constraint.value, line }],
-              fullRankTieMode(constraintMap.get('FullRankTies')?.[0]));
+              spec.fullRankTieMode);
           }
           break;
 
@@ -1019,8 +1035,8 @@ export class SudokuBuilder {
       ...branches.map(b => this._wrapAnd(b)));
   }
 
-  static * _doppelgangerHandlers(geometry, constraintMap) {
-    const regionSize = this._regionSize(constraintMap, geometry);
+  static * _doppelgangerHandlers(geometry, spec) {
+    const regionSize = spec.regionSize;
     const gridSize = geometry.numValues - 1;
     if (geometry.valueOffset !== -1
       || gridSize !== geometry.numRows
@@ -1033,7 +1049,7 @@ export class SudokuBuilder {
 
     const rowRegions = SudokuConstraintBase.rowRegions(geometry);
     const colRegions = SudokuConstraintBase.colRegions(geometry);
-    const boxRegions = this._getBoxRegions(geometry, constraintMap);
+    const boxRegions = spec.boxRegions;
 
     const [zeroCell] = geometry.varCellsForGroup('DGZ');
     const colVarCells = geometry.varCellsForGroup('DGC');
