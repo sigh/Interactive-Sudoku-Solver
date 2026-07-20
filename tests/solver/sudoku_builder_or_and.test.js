@@ -15,8 +15,8 @@ const { Sum } = await import('../../js/solver/sum_handler.js');
 // constraint on a standard 9x9 geometry.
 const collectHandlers = (constraint) => {
   const geometry = CellGeometry.newDefault();
-  const constraintMap = constraint.toMap();
-  return [...SudokuBuilder._constraintHandlers(constraintMap, geometry)];
+  const constraints = [].concat(...constraint.toMap().values());
+  return [...SudokuBuilder._constraintHandlers(constraints, geometry)];
 };
 
 // -- _wrapAnd tests --

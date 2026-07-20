@@ -13,29 +13,35 @@ const { InvalidConstraintError } = HandlerModule;
 // Facts about a puzzle, derived once from its constraint set.
 // Information constraint cases need to know about *other* constraints.
 export class PuzzleSpec {
-  constructor(constraintMap, geometry) {
+  constructor(constraints, geometry) {
     this.geometry = geometry;
+
+    const byType = new Map();
+    for (const c of constraints) {
+      const existing = byType.get(c.type);
+      if (existing) existing.push(c);
+      else byType.set(c.type, [c]);
+    }
 
     // The explicit RegionSize override, or null for the default. Box-shaped
     // regions (boxes, windoku, disjoint sets) treat null as "derive from the
     // grid", so it is kept distinct from `regionSize` below.
     this.regionSizeOption =
-      constraintMap.get('RegionSize')?.[0]?.size ?? null;
+      byType.get('RegionSize')?.[0]?.size ?? null;
 
     // The effective region size: the number of cells in a full region.
     this.regionSize = this.regionSizeOption
       ?? geometry.constructor.defaultNumValues(geometry.numRows, geometry.numCols);
 
-    this.boxRegions = constraintMap.has('NoBoxes')
+    this.boxRegions = byType.has('NoBoxes')
       ? []
       : SudokuConstraintBase.boxRegions(geometry, this.regionSizeOption);
 
-    this.hasChaosConstruction = constraintMap.has('ChaosConstruction');
+    this.hasChaosConstruction = byType.has('ChaosConstruction');
 
-    this.fullRankTieMode = fullRankTieMode(
-      constraintMap.get('FullRankTies')?.[0]);
+    this.fullRankTieMode = fullRankTieMode(byType.get('FullRankTies')?.[0]);
 
-    this._jigsawConstraints = constraintMap.get('Jigsaw') || [];
+    this._jigsawConstraints = byType.get('Jigsaw') || [];
     this._jigsawRegions = null;
   }
 
@@ -74,14 +80,15 @@ export class SudokuBuilder {
   }
 
   static *_handlers(constraintMap, geometry) {
-    const spec = new PuzzleSpec(constraintMap, geometry);
+    const constraints = [].concat(...constraintMap.values());
+    const spec = new PuzzleSpec(constraints, geometry);
 
     yield* this._rowColHandlers(geometry);
 
     yield new HandlerModule.BoxRegionInfo(spec.boxRegions);
     yield* this._boxHandlers(spec.boxRegions);
 
-    yield* this._constraintHandlers(constraintMap, geometry, spec);
+    yield* this._constraintHandlers(constraints, geometry, spec);
   }
 
   static *_rowColHandlers(geometry) {
@@ -181,9 +188,9 @@ export class SudokuBuilder {
     }
   }
 
-  static * _constraintHandlers(constraintMap, geometry,
-    spec = new PuzzleSpec(constraintMap, geometry)) {
-    const constraints = [].concat(...constraintMap.values());
+  // Build the handlers for a list of constraints.
+  static * _constraintHandlers(constraints, geometry, spec = null) {
+    spec ??= new PuzzleSpec(constraints, geometry);
 
     for (const constraint of constraints) {
       // Validate constraint is compatible with the geometry.
@@ -927,7 +934,7 @@ export class SudokuBuilder {
           {
             const types = ['BlackDot', 'WhiteDot'];
             yield* SudokuBuilder._strictAdjHandlers(
-              types.flatMap(t => constraintMap.get(t) || []),
+              constraints.filter(c => types.includes(c.type)),
               geometry,
               SudokuConstraint.StrictKropki.fnKey(geometry.numValues, geometry.valueOffset));
           }
@@ -937,7 +944,7 @@ export class SudokuBuilder {
           {
             const types = ['X', 'V'];
             yield* SudokuBuilder._strictAdjHandlers(
-              types.flatMap(t => constraintMap.get(t) || []),
+              constraints.filter(c => types.includes(c.type)),
               geometry,
               SudokuConstraint.StrictXV.fnKey(geometry.numValues, geometry.valueOffset));
           }
@@ -951,7 +958,7 @@ export class SudokuBuilder {
         case 'Or':
           {
             const branches = constraint.constraints.map(
-              c => [...this._constraintHandlers(c.toMap(), geometry)]);
+              c => [...this._constraintHandlers([c], geometry)]);
             yield* this._yieldOr(branches);
           }
           break;
@@ -987,17 +994,16 @@ export class SudokuBuilder {
                 if (newCell === null) throw new Error('Shifted cell is out of bounds.');
                 return geometry.makeCellIdFromIndex(newCell);
               };
-              for (const child of constraint.constraints) {
-                yield* this._constraintHandlers(child.makeShifted(shiftFn).toMap(), geometry);
-              }
+              yield* this._constraintHandlers(
+                constraint.constraints.map(c => c.makeShifted(shiftFn)),
+                geometry);
             }
           }
           break;
 
         case 'And':
-          for (const c of constraint.constraints) {
-            yield* this._constraintHandlers(c.toMap(), geometry);
-          }
+          yield* this._constraintHandlers(
+            constraint.constraints, geometry);
 
         case 'NoBoxes':
         case 'Shape':
