@@ -39,6 +39,9 @@ export class PuzzleSpec {
 
     this.hasChaosConstruction = byType.has('ChaosConstruction');
 
+    this._strictTypes = new Set(
+      ['StrictKropki', 'StrictXV'].filter(t => byType.has(t)));
+
     this.fullRankTieMode = fullRankTieMode(byType.get('FullRankTies')?.[0]);
 
     this._jigsawConstraints = byType.get('Jigsaw') || [];
@@ -47,6 +50,10 @@ export class PuzzleSpec {
 
   hasJigsaw() {
     return this._jigsawConstraints.length > 0;
+  }
+
+  hasStrict(strictType) {
+    return this._strictTypes.has(strictType);
   }
 
   // Jigsaw pieces as cell-index arrays. Lazy: most puzzles have none.
@@ -58,20 +65,35 @@ export class PuzzleSpec {
 
 // State carried through a single build of a puzzle's handlers.
 export class BuildContext {
-  constructor(spec) {
+  constructor(spec, visited, inOr) {
     // Puzzle-level facts. See PuzzleSpec.
     this.spec = spec;
     this.geometry = spec.geometry;
+    // Constraints visited by the build, in their final expanded form
+    // (composite children, Replicate-shifted copies). `conditional` holds
+    // those inside an 'Or' branch.
+    this.visited = visited;
+    // True while building an 'Or' branch.
+    this.inOr = inOr;
   }
 
   static forConstraints(constraints, geometry) {
-    return new BuildContext(new PuzzleSpec(constraints, geometry));
+    return new BuildContext(
+      new PuzzleSpec(constraints, geometry),
+      { unconditional: [], conditional: [] },
+      false);
   }
 
-  // The context used to build the children of a composite constraint.
-  // Fields are propagated (shared, copied, or recomputed) here explicitly.
-  branch(childConstraints) {
-    return BuildContext.forConstraints(childConstraints, this.geometry);
+  // The context for building 'Or' branches. Unconditional composites
+  // (And/Replicate) reuse the parent context instead.
+  branchIntoOr() {
+    return new BuildContext(this.spec, this.visited, true);
+  }
+
+  recordConstraint(constraint) {
+    (this.inOr
+      ? this.visited.conditional
+      : this.visited.unconditional).push(constraint);
   }
 }
 
@@ -108,6 +130,37 @@ export class SudokuBuilder {
     yield* this._boxHandlers(context.spec.boxRegions);
 
     yield* this._constraintHandlers(constraints, context);
+    yield* this._strictConstraintHandlers(context);
+  }
+
+  // Negative constraints for StrictKropki/StrictXV. Emitted after the main
+  // pass so that marking constraints inside composites are seen.
+  static *_strictConstraintHandlers(context) {
+    const geometry = context.geometry;
+    if (context.spec.hasStrict('StrictKropki')) {
+      yield* this._strictHandlersForType(
+        context, 'StrictKropki', ['BlackDot', 'WhiteDot'],
+        SudokuConstraint.StrictKropki.fnKey(geometry.numValues, geometry.valueOffset));
+    }
+    if (context.spec.hasStrict('StrictXV')) {
+      yield* this._strictHandlersForType(
+        context, 'StrictXV', ['X', 'V'],
+        SudokuConstraint.StrictXV.fnKey(geometry.numValues, geometry.valueOffset));
+    }
+  }
+
+  static *_strictHandlersForType(context, strictType, markedTypes, fnKey) {
+    const conditional = context.visited.conditional.find(
+      c => markedTypes.includes(c.type));
+    if (conditional) {
+      throw new InvalidConstraintError(
+        `${strictType} is not well defined with ` +
+        `${conditional.constructor.displayName()} inside an 'Or' constraint.`);
+    }
+
+    yield* this._strictAdjHandlers(
+      context.visited.unconditional.filter(c => markedTypes.includes(c.type)),
+      context.geometry, fnKey);
   }
 
   static *_rowColHandlers(geometry) {
@@ -212,6 +265,8 @@ export class SudokuBuilder {
     const { spec, geometry } = context;
 
     for (const constraint of constraints) {
+      context.recordConstraint(constraint);
+
       // Validate constraint is compatible with the geometry.
       const validateShape = constraint.constructor.VALIDATE_SHAPE_FN;
       if (validateShape && !validateShape(geometry)) {
@@ -950,23 +1005,8 @@ export class SudokuBuilder {
           break;
 
         case 'StrictKropki':
-          {
-            const types = ['BlackDot', 'WhiteDot'];
-            yield* SudokuBuilder._strictAdjHandlers(
-              constraints.filter(c => types.includes(c.type)),
-              geometry,
-              SudokuConstraint.StrictKropki.fnKey(geometry.numValues, geometry.valueOffset));
-          }
-          break;
-
         case 'StrictXV':
-          {
-            const types = ['X', 'V'];
-            yield* SudokuBuilder._strictAdjHandlers(
-              constraints.filter(c => types.includes(c.type)),
-              geometry,
-              SudokuConstraint.StrictXV.fnKey(geometry.numValues, geometry.valueOffset));
-          }
+          // Handled after the main pass (see _strictConstraintHandlers).
           break;
 
         case 'SearchPriority':
@@ -976,8 +1016,9 @@ export class SudokuBuilder {
 
         case 'Or':
           {
+            const branchContext = context.branchIntoOr();
             const branches = constraint.constraints.map(
-              c => [...this._constraintHandlers([c], context.branch([c]))]);
+              c => [...this._constraintHandlers([c], branchContext)]);
             yield* this._yieldOr(branches);
           }
           break;
@@ -1016,16 +1057,14 @@ export class SudokuBuilder {
               {
                 const shifted = constraint.constraints.map(
                   c => c.makeShifted(shiftFn));
-                yield* this._constraintHandlers(
-                  shifted, context.branch(shifted));
+                yield* this._constraintHandlers(shifted, context);
               }
             }
           }
           break;
 
         case 'And':
-          yield* this._constraintHandlers(
-            constraint.constraints, context.branch(constraint.constraints));
+          yield* this._constraintHandlers(constraint.constraints, context);
 
         case 'NoBoxes':
         case 'Shape':
