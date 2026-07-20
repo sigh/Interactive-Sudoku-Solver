@@ -5,7 +5,7 @@ import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 
 ensureGlobalEnvironment();
 
-const { SudokuBuilder } = await import('../../js/solver/sudoku_builder.js');
+const { SudokuBuilder, BuildContext } = await import('../../js/solver/sudoku_builder.js');
 const { SudokuConstraint } = await import('../../js/sudoku_constraint.js');
 const { CellGeometry } = await import('../../js/cell_geometry.js');
 const { And, Or, True, False, AllDifferent, GivenCandidates } = await import('../../js/solver/handlers.js');
@@ -16,7 +16,8 @@ const { Sum } = await import('../../js/solver/sum_handler.js');
 const collectHandlers = (constraint) => {
   const geometry = CellGeometry.newDefault();
   const constraints = [].concat(...constraint.toMap().values());
-  return [...SudokuBuilder._constraintHandlers(constraints, geometry)];
+  const context = BuildContext.forConstraints(constraints, geometry);
+  return [...SudokuBuilder._constraintHandlers(constraints, context)];
 };
 
 // -- _wrapAnd tests --

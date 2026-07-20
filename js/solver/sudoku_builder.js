@@ -56,6 +56,25 @@ export class PuzzleSpec {
   }
 }
 
+// State carried through a single build of a puzzle's handlers.
+export class BuildContext {
+  constructor(spec) {
+    // Puzzle-level facts. See PuzzleSpec.
+    this.spec = spec;
+    this.geometry = spec.geometry;
+  }
+
+  static forConstraints(constraints, geometry) {
+    return new BuildContext(new PuzzleSpec(constraints, geometry));
+  }
+
+  // The context used to build the children of a composite constraint.
+  // Fields are propagated (shared, copied, or recomputed) here explicitly.
+  branch(childConstraints) {
+    return BuildContext.forConstraints(childConstraints, this.geometry);
+  }
+}
+
 export class SudokuBuilder {
   static build(constraint, debugOptions) {
     const geometry = constraint.getGeometry();
@@ -81,14 +100,14 @@ export class SudokuBuilder {
 
   static *_handlers(constraintMap, geometry) {
     const constraints = [].concat(...constraintMap.values());
-    const spec = new PuzzleSpec(constraints, geometry);
+    const context = BuildContext.forConstraints(constraints, geometry);
 
     yield* this._rowColHandlers(geometry);
 
-    yield new HandlerModule.BoxRegionInfo(spec.boxRegions);
-    yield* this._boxHandlers(spec.boxRegions);
+    yield new HandlerModule.BoxRegionInfo(context.spec.boxRegions);
+    yield* this._boxHandlers(context.spec.boxRegions);
 
-    yield* this._constraintHandlers(constraints, geometry, spec);
+    yield* this._constraintHandlers(constraints, context);
   }
 
   static *_rowColHandlers(geometry) {
@@ -189,8 +208,8 @@ export class SudokuBuilder {
   }
 
   // Build the handlers for a list of constraints.
-  static * _constraintHandlers(constraints, geometry, spec = null) {
-    spec ??= new PuzzleSpec(constraints, geometry);
+  static * _constraintHandlers(constraints, context) {
+    const { spec, geometry } = context;
 
     for (const constraint of constraints) {
       // Validate constraint is compatible with the geometry.
@@ -958,7 +977,7 @@ export class SudokuBuilder {
         case 'Or':
           {
             const branches = constraint.constraints.map(
-              c => [...this._constraintHandlers([c], geometry)]);
+              c => [...this._constraintHandlers([c], context.branch([c]))]);
             yield* this._yieldOr(branches);
           }
           break;
@@ -994,16 +1013,19 @@ export class SudokuBuilder {
                 if (newCell === null) throw new Error('Shifted cell is out of bounds.');
                 return geometry.makeCellIdFromIndex(newCell);
               };
-              yield* this._constraintHandlers(
-                constraint.constraints.map(c => c.makeShifted(shiftFn)),
-                geometry);
+              {
+                const shifted = constraint.constraints.map(
+                  c => c.makeShifted(shiftFn));
+                yield* this._constraintHandlers(
+                  shifted, context.branch(shifted));
+              }
             }
           }
           break;
 
         case 'And':
           yield* this._constraintHandlers(
-            constraint.constraints, geometry);
+            constraint.constraints, context.branch(constraint.constraints));
 
         case 'NoBoxes':
         case 'Shape':
