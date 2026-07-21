@@ -421,6 +421,13 @@ await runTest('Base64Codec should encode and decode strings', () => {
   assert.equal(decoded, original);
 });
 
+await runTest('Base64Codec should encode and decode byte arrays', () => {
+  const original = Uint8Array.from([0, 1, 127, 128, 255]);
+  const encoded = Base64Codec.encodeBytes(original);
+  const decoded = Base64Codec.decodeToBytes(encoded);
+  assert.deepEqual([...decoded], [...original]);
+});
+
 await runTest('Base64Codec should encode and decode 6-bit arrays', () => {
   const original = [0, 1, 62, 63, 32];
   const encoded = Base64Codec.encode6BitArray(original);

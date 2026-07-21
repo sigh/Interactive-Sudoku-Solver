@@ -618,6 +618,16 @@ export class Base64Codec {
   static lengthOf6BitArray(numBits) {
     return Math.ceil(numBits / 6);
   }
+
+  static encodeBytes(bytes) {
+    let binaryStr = '';
+    for (const b of bytes) binaryStr += String.fromCharCode(b);
+    return this.encodeString(binaryStr);
+  }
+
+  static decodeToBytes(b64str) {
+    return Uint8Array.from(this.decodeToString(b64str), c => c.charCodeAt(0));
+  }
 }
 
 // Bit set implementation for efficient set operations on integers.

@@ -10,6 +10,25 @@ const {
   SANDBOX_WARNING_TEXT
 } = await import('./help_text.js' + self.VERSION_PARAM);
 
+const COMPRESSED_PREFIX = '.';
+
+export const encodeCodeParam = async (code) => {
+  const stream = new Blob([code]).stream().pipeThrough(
+    new CompressionStream('deflate-raw'));
+  const bytes = new Uint8Array(await new Response(stream).arrayBuffer());
+  return COMPRESSED_PREFIX + Base64Codec.encodeBytes(bytes);
+};
+
+export const decodeCodeParam = async (param) => {
+  if (!param.startsWith(COMPRESSED_PREFIX)) {
+    return Base64Codec.decodeToString(param);
+  }
+  const bytes = Base64Codec.decodeToBytes(param.slice(1));
+  const stream = new Blob([bytes]).stream().pipeThrough(
+    new DecompressionStream('deflate-raw'));
+  return new Response(stream).text();
+};
+
 export class EmbeddedSandbox {
   constructor(container, onConstraintGenerated, getCurrentConstraintStr) {
     this._container = container;
@@ -116,7 +135,7 @@ export class EmbeddedSandbox {
     this._statusElement.textContent = text;
   }
 
-  _initEditor() {
+  async _initEditor() {
     const highlight = (editor) => {
       const code = editor.textContent;
       editor.innerHTML = Prism.highlight(code, Prism.languages.javascript, 'javascript');
@@ -140,16 +159,13 @@ export class EmbeddedSandbox {
     // Track if we loaded from a non-empty code param (for clearing on first edit).
     let shouldClearCodeParamOnFirstEdit = encoded !== null && encoded !== '';
 
-    let initialCode;
+    let initialCode = savedCode || DEFAULT_CODE;
     if (encoded) {
       try {
-        initialCode = Base64Codec.decodeToString(encoded);
+        initialCode = await decodeCodeParam(encoded);
       } catch (e) {
         this._setError('Failed to decode code from URL');
-        initialCode = savedCode || DEFAULT_CODE;
       }
-    } else {
-      initialCode = savedCode || DEFAULT_CODE;
     }
 
     this._jar.updateCode(initialCode);
@@ -185,26 +201,11 @@ export class EmbeddedSandbox {
     this._jar.updateCode(code);
   }
 
-  _copyShareableLink() {
-    const code = this._jar.toString();
-    // Base64Codec relies on btoa, which corrupts (or throws on) any non-ASCII
-    // character, so reject those explicitly rather than share a broken link.
-    if (/[^\x00-\x7F]/.test(code)) {
-      this._setError('Cannot create link: code contains non-ASCII characters');
-      this._flashButtonError(this._shareBtn);
-      return;
-    }
-    const encoded = Base64Codec.encodeString(code);
+  async _copyShareableLink() {
+    const encoded = await encodeCodeParam(this._jar.toString());
     const url = new URL(window.location.pathname, window.location.origin);
     url.searchParams.set('code', encoded);
     copyToClipboard(url.toString(), this._shareBtn);
-  }
-
-  _flashButtonError(button) {
-    if (!button) return;
-    const CLASSNAME = 'copy-to-clipboard-failed';
-    button.classList.add(CLASSNAME);
-    window.setTimeout(() => button.classList.remove(CLASSNAME), 1000);
   }
 
   _initExamples() {

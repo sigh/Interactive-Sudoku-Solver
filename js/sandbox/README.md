@@ -38,7 +38,7 @@ User code has access to everything in `SANDBOX_GLOBALS` (defined in [env.js](env
 
 ### Code Sharing
 
-Code is encoded as Base64 in the URL `?code=` parameter, enabling shareable sandbox links. The editor also auto-saves to localStorage on every change.
+Code is deflate-compressed and encoded as `.`-prefixed Base64 in the URL `?code=` parameter, enabling shareable sandbox links (bare-Base64 uncompressed values from older links are still accepted).
 
 ## Encoding puzzles
 
