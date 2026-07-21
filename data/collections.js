@@ -563,6 +563,13 @@ const EXAMPLE_OTHER_VARIANTS = [
     input: '.RellikCage~8~R1C1~R2C1~R3C1~R3C2~R3C3.RellikCage~7~R1C2~R1C3~R2C2~R2C3~R2C4.RellikCage~5~R1C4~R1C5~R1C6~R2C5~R2C6.RellikCage~8~R3C4~R3C5~R3C6~R4C4~R4C5.RellikCage~6~R5C4~R5C5~R6C4~R6C5.RellikCage~11~R4C6~R5C6~R5C7~R6C6.RellikCage~10~R4C7~R4C8~R4C9.RellikCage~11~R5C8~R5C9~R6C7~R6C8~R6C9.RellikCage~7~R1C8~R1C9~R2C9.RellikCage~10~R4C1~R4C2~R5C1~R5C2~R6C1.RellikCage~7~R6C2~R7C1~R7C2~R7C3~R8C2.RellikCage~6~R7C4~R8C3~R8C4~R8C5~R9C4.RellikCage~8~R9C7~R9C8.RellikCage~7~R7C7~R7C8~R8C8~R8C9~R9C9.WhiteDot~R5C6~R5C7.WhiteDot~R3C8~R4C8.WhiteDot~R8C8~R9C8',
     solution: '438617592521938674769254831854791326392546718617382945945163287283475169176829453',
   },
+  {
+    name: 'Odd Blockade Runners',
+    src: ['https://www.youtube.com/watch?v=yNeV4kcQQ0M', 'https://sudokupad.app/bq8jTQjhMd'],
+    input: '/data/scripts/odd_blockade_runners.js',
+    solution: '817562493352489176946731258591376824764928531283154967639815742175243689428697315',
+    constraintTypes: ['Quad', 'Regex', 'ConnectedValues'],
+  },
 
 ];
 

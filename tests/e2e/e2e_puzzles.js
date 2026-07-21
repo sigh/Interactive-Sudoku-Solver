@@ -239,6 +239,10 @@ const puzzles9x9 = [
     'Classic sudoku',
     '.Modular~1~R1C1~R1C2',
     { name: 'Classic sudoku [vacuous Modular 1]' }),  // Modular (degenerate)
+  {
+    ...PUZZLE_INDEX.get('Odd Blockade Runners'),  // ConnectedValues (main grid), Quad, Regex
+    input: '/data/scripts/odd_blockade_runners.iss',
+  },
 ];
 
 const puzzles16x16 = [

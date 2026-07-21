@@ -871,14 +871,18 @@ export class SudokuBuilder {
 
         case 'ConnectedValues':
           {
-            const groupCells = geometry.varCellsForGroup(constraint.groupPrefix);
-            if (!groupCells) {
-              throw new InvalidConstraintError(
-                `Connected Values: unknown variable group '${constraint.groupPrefix}'.`);
+            let cellOffset = 0;
+            if (constraint.groupPrefix) {
+              const groupCells = geometry.varCellsForGroup(constraint.groupPrefix);
+              if (!groupCells) {
+                throw new InvalidConstraintError(
+                  `Connected Values: unknown cell group '${constraint.groupPrefix}'.`);
+              }
+              cellOffset = groupCells[0];
             }
             yield new ConnectedHandlerModule.ConnectedValues(
               geometry.numGridCells,
-              groupCells[0],
+              cellOffset,
               constraint.values.split('_').map(v => +v));
           }
           break;

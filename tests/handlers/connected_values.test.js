@@ -447,6 +447,40 @@ await runTest('ConnectedValues: unknown variable group fails to build', () => {
   assert.throws(() => solver.countSolutions('.Shape~4x4.ConnectedValues~VX~1'));
 });
 
+// An empty group prefix puts the constraint on the main grid. There is no
+// overlay to enumerate, so the oracle enumerates the base grid's solutions
+// instead and filters them with the reference flood fill.
+const assertGridOracle = (shape, numRows, numCols, valueSets) => {
+  const solver = new SimpleSolver();
+
+  let expected = 0;
+  let total = 0;
+  for (const solution of solver.solutions(shape)) {
+    const values = solution.getArray();
+    total++;
+    if (valueSets.every(
+      set => referenceIsConnected(values, set, numRows, numCols))) expected++;
+  }
+  assert.ok(expected > 0 && expected < total);
+
+  const input = shape + valueSets.map(
+    set => `.ConnectedValues~~${set.join('_')}`).join('');
+  assert.equal(solver.countSolutions(input), expected);
+};
+
+await runTest('ConnectedValues: solver matches brute-force oracle (main grid)', () => {
+  // A single value can never connect on the main grid (two cells holding it
+  // are never adjacent), so the set must span enough values to be satisfiable.
+  assertGridOracle('.Shape~4x4', 4, 4, [[1, 2, 3]]);
+});
+
+await runTest('ConnectedValues: solver matches brute-force oracle (main grid, merged)', () => {
+  // With more values than columns a value may appear just once, which is
+  // connected. Two sets exercise the merged handler plus the crossing/border
+  // rules the optimizer adds for the grid layer.
+  assertGridOracle('.Shape~3x3~5', 3, 3, [[4], [5]]);
+});
+
 // ===========================================================================
 // One-door forcing.
 // ===========================================================================
@@ -693,6 +727,16 @@ await runTest('ConnectedValues: serialization round trip', async () => {
   assert.equal(constraint.values, '1_2');
 });
 
+await runTest('ConnectedValues: serialization round trip (main grid)', async () => {
+  const { SudokuParser } = await import('../../js/sudoku_parser.js');
+  const str = '.ConnectedValues~~1_2';
+  const parsed = SudokuParser.parseText(str);
+  assert.equal(parsed.toString(), str);
+  const constraint = parsed.toMap().get('ConnectedValues')[0];
+  assert.equal(constraint.groupPrefix, '');
+  assert.equal(constraint.values, '1_2');
+});
+
 // ===========================================================================
 // Multi-set handlers (the optimizer merges same-cell instances into one).
 // ===========================================================================
@@ -927,6 +971,22 @@ await runTest('ConnectedValues: optimizer merges same-cell instances', async () 
   assert.deepEqual(merged.connected[0].valueSets(), [[1], [2]]);
   assert.equal(merged.crossing, 9);
   assert.equal(merged.border, 1);
+
+  // The main grid (empty prefix) is a layer like any other.
+  const mergedGrid = build(
+    '.Shape~4x4.ConnectedValues~~1.ConnectedValues~~2');
+  assert.equal(mergedGrid.connected.length, 1);
+  assert.equal(mergedGrid.connected[0].cells[0], 0);
+  assert.deepEqual(mergedGrid.connected[0].valueSets(), [[1], [2]]);
+  assert.equal(mergedGrid.crossing, 9);
+  assert.equal(mergedGrid.border, 1);
+
+  // The grid and a var group are separate layers.
+  const gridAndGroup = build(
+    '.Shape~4x4.Var~S~~16.ConnectedValues~~1.ConnectedValues~VS~1');
+  assert.equal(gridAndGroup.connected.length, 2);
+  assert.equal(gridAndGroup.crossing, 0);
+  assert.equal(gridAndGroup.border, 0);
 
   // Different groups: left alone, and no joint rules added.
   const separate = build(

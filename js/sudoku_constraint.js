@@ -1226,8 +1226,9 @@ export class SudokuConstraint {
   static Regex = class Regex extends SudokuConstraintBase {
     static DESCRIPTION = (`
       Digits along the line, read in order, must match the provided regular
-      expression. Grouping '()', alternation '|', wildcard '.', and the
-      quantifiers '*', '+', '?', and '{n}', '{n,}', '{n,m}' are supported.`);
+      expression. Grouping '()', alternation '|', wildcard '.', character
+      classes '[...]', and the quantifiers '*', '+', '?', and '{n}', '{n,}',
+      '{n,m}' are supported.`);
     static CATEGORY = 'LinesAndSets';
     static DISPLAY_CONFIG = {
       displayClass: 'CustomLine',
@@ -2483,14 +2484,14 @@ export class SudokuConstraint {
 
   static ConnectedValues = class ConnectedValues extends SudokuConstraintBase {
     static DESCRIPTION = (`
-      The cells of the given var group which contain any of the
+      The cells of the given cell group which contain any of the
       values must form a single orthogonally-connected region.`);
     static CATEGORY = 'Experimental';
 
     // Values may be a number, an array, or the serialized '1_2' string.
     constructor(groupPrefix, values) {
       super(groupPrefix, values);
-      this.groupPrefix = groupPrefix;
+      this.groupPrefix = groupPrefix || '';
       this.values = String(values).replace(/,/g, '_');
     }
 
@@ -2500,12 +2501,14 @@ export class SudokuConstraint {
     }
 
     getCells(geometry) {
+      if (!this.groupPrefix) return [];
       return (geometry.varCellsForGroup(this.groupPrefix) || []).map(
         c => geometry.makeCellIdFromIndex(c));
     }
 
     chipLabel() {
-      return `ConnectedValues (${this.groupPrefix}: ${this.values.replace(/_/g, ',')})`;
+      const group = this.groupPrefix || 'grid';
+      return `ConnectedValues (${group}: ${this.values.replace(/_/g, ',')})`;
     }
   };
 

@@ -1360,4 +1360,11 @@ await runTest('ConnectedValues serializes each input form identically', () => {
   }
 });
 
+await runTest('ConnectedValues accepts an empty group prefix (the main grid)', () => {
+  const constraint = new SudokuConstraint.ConnectedValues('', [1, 2]);
+  assert.equal(constraint.groupPrefix, '');
+  assert.equal(constraint.toString(), '.ConnectedValues~~1_2');
+  assert.deepEqual(constraint.getCells(geometry9x9), []);
+});
+
 logSuiteComplete('ConnectedValues');
