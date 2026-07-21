@@ -810,6 +810,7 @@ export class SudokuConstraintOptimizer {
     // Exclude handlers with cells outside the grid.
     const gridHandlers = sumHandlers.filter(
       h => h.cells.every(c => c < geometry.numGridCells));
+    if (gridHandlers.length === 0) return [];
 
     const numNonSumCells = geometry.numGridCells - gridHandlers.reduce(
       (n, h) => n + h.cells.length, 0);

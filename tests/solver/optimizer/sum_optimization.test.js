@@ -461,6 +461,32 @@ await runTest('_fillInSumGap: returns empty when only outside-grid handlers', ()
   assert.deepEqual(result, []);
 });
 
+await runTest('_fillInSumGap: returns empty for only Var sums on a widened tiny grid', () => {
+  const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
+  const geometry = CellGeometry.fromGridSize(1, 1, 10, -1);
+  const varCell = geometry.numGridCells;
+  const varHandler = new SumHandlerModule.Sum([varCell], 0);
+  const sumHandlers = [varHandler];
+  const sumCells = new Set([varCell]);
+
+  const result = optimizer._fillInSumGap(sumHandlers, sumCells, geometry);
+
+  assert.deepEqual(result, []);
+  assert.deepEqual(sumHandlers, [varHandler]);
+  assert.deepEqual(sumCells, new Set([varCell]));
+});
+
+await runTest('optimizer builds a Sum containing only a Var cell', async () => {
+  const { SudokuParser } = await import('../../../js/sudoku_parser.js' + self.VERSION_PARAM);
+  const { SudokuBuilder } = await import('../../../js/solver/sudoku_builder.js' + self.VERSION_PARAM);
+  const input = '.Shape~1x1~0-9.Var~A~x~1.Sum~0~VA';
+
+  assert.doesNotThrow(() => {
+    const constraint = SudokuBuilder.resolveConstraint(SudokuParser.parseText(input));
+    SudokuBuilder.build(constraint);
+  });
+});
+
 await runTest('_fillInSumGap: mixed inside/outside handler is excluded', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
   const geometry = CellGeometry.fromGridSize(4);
