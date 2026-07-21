@@ -198,10 +198,11 @@ export class SudokuBuilder {
     }
   }
 
-  // Helper to create a given handler for a single cell/value pair.
+  // Helper to create a given handler restricting a single cell to the given
+  // value (or iterable of values).
   static _givenHandler(cell, value) {
     const givensMap = new Map();
-    givensMap.set(cell, [value]);
+    givensMap.set(cell, value);
     return new HandlerModule.GivenCandidates(givensMap);
   }
 
@@ -458,9 +459,11 @@ export class SudokuBuilder {
 
             yield new SumHandlerModule.Sum(cells, 0, coeffs);
 
-            if (geometry.numValues > 9) {
-              // Limit pill values to 1-9, other than the first cell.
-              const values = [...Array(9).keys()].map(i => i + 1);
+            if (geometry.maxValue() > 9) {
+              // Non-leading pill cells must be single decimal digits.
+              const minValue = geometry.minValue();
+              const values = [...Array(10 - minValue).keys()].map(
+                i => i + minValue);
               for (let i = 1; i < pillSize; i++) {
                 yield this._givenHandler(pillCells[i], values);
               }

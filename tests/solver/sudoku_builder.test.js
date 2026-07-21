@@ -224,6 +224,67 @@ await runTest('PillArrow produces place-value Sum coefficients', () => {
   assert.equal(sumHandlers[0].sum(), 0);
 });
 
+// Applies all GivenCandidates handlers to a fresh grid, returning the
+// resulting candidate masks.
+const applyGivenCandidates = (constraint) => {
+  const geometry = constraint.getGeometry();
+  const grid = new Uint16Array(geometry.totalCells()).fill(
+    (1 << geometry.numValues) - 1);
+  for (const h of buildHandlers(constraint)) {
+    if (h instanceof HandlerModule.GivenCandidates) {
+      h.applyValues(grid, geometry.valueOffset);
+    }
+  }
+  return grid;
+};
+
+await runTest('PillArrow clamps non-leading pill cells to decimal digits', () => {
+  const constraint = SudokuParser.parseString(
+    '.Shape~16x16.PillArrow~2~R1C1~R1C2~R1C3~R1C4~R1C5');
+  const grid = applyGivenCandidates(constraint);
+  assert.equal(grid[1], 0x01FF);  // R1C2 restricted to 1-9.
+  assert.equal(grid[0], 0xFFFF);  // Leading cell is unrestricted.
+});
+
+await runTest('PillArrow decimal-digit clamp includes 0 on 0-based grids', () => {
+  const constraint = SudokuParser.parseString(
+    '.Shape~16x16~0-15.PillArrow~2~R1C1~R1C2~R1C3~R1C4~R1C5');
+  const grid = applyGivenCandidates(constraint);
+  assert.equal(grid[1], 0x03FF);  // R1C2 restricted to 0-9.
+  assert.equal(grid[0], 0xFFFF);  // Leading cell is unrestricted.
+});
+
+await runTest('PillArrow adds no digit clamp when all values are digits', () => {
+  const constraint = SudokuParser.parseString(
+    '.Shape~9x9~0-9.PillArrow~2~R1C1~R1C2~R1C3~R1C4');
+  const handlers = buildHandlers(constraint);
+  assert.ok(!hasHandler(handlers, 'GivenCandidates'));
+});
+
+await runTest('PillArrow allows 0 as a non-leading pill digit', () => {
+  // Pill reads "10"; shaft sums to 4 + 6.
+  const constraint = SudokuParser.parseString(
+    '.Shape~9x9~0-9.PillArrow~2~R1C1~R1C2~R1C3~R1C4' +
+    '.~R1C1_1~R1C2_0~R1C3_4~R1C4_6');
+  const solver = SudokuBuilder.build(constraint);
+  assert.ok(solver.nthSolution(0));
+});
+
+await runTest('PillArrow allows 0 as the leading pill digit', () => {
+  // Pill reads "05" = 5; shaft sums to 1 + 4.
+  const satisfiable = SudokuParser.parseString(
+    '.Shape~9x9~0-8.PillArrow~2~R1C1~R1C2~R1C3~R1C4' +
+    '.~R1C1_0~R1C2_5~R1C3_1~R1C4_4');
+  assert.ok(SudokuBuilder.build(satisfiable).nthSolution(0));
+
+  // Shaft sums to 5 - 1 = 4: the pill must still be enforced, not vacuously
+  // accepted, when the leading digit is 0.
+  const unsatisfiable = SudokuParser.parseString(
+    '.Shape~9x9~0-8.PillArrow~2~R1C1~R1C2~R1C3~R1C4' +
+    '.~R1C1_0~R1C2_5~R1C3_1~R1C4_3');
+  assert.ok(!SudokuBuilder.build(unsatisfiable).nthSolution(0));
+});
+
 await runTest('Thermo produces BinaryConstraint handlers', () => {
   const constraint = new SudokuConstraint.Container([
     new SudokuConstraint.Thermo('R1C1', 'R2C1', 'R3C1'),

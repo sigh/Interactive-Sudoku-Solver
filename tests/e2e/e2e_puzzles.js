@@ -308,6 +308,12 @@ const puzzles0Indexed = [
   'Zeroed In',  // RegionSumLine
   'A Very Full Quiver', // Arrow
   {
+    ...PUZZLE_INDEX.get('0-indexed: Classic sudoku'),
+    name: '0-indexed: Pill Arrow',  // PillArrow (0 as a non-leading pill digit)
+    comment: "'0-indexed: Classic sudoku' with the R2C4/R4C5 givens replaced by a pill arrow reading \"10\".",
+    input: '.Shape~9x9~0-8.PillArrow~2~R2C3~R2C4~R3C4~R3C5~R4C5.~R1C1_4~R1C2_2~R1C5_6~R2C1_5~R2C5_8~R2C6_4~R3C2_8~R3C3_7~R3C8_5~R4C1_7~R4C9_2~R5C1_3~R5C4_7~R5C6_2~R5C9_0~R6C1_6~R6C5_1~R6C9_5~R7C2_5~R7C7_1~R7C8_7~R8C4_3~R8C5_0~R8C6_8~R8C9_4~R9C5_7~R9C8_6~R9C9_8',
+  },
+  {
     name: "Let's Build a Snowman [0-indexed]",  // Arrow, BlackDot, WhiteDot, Thermo, Whisper
     comment: "0-based re-encoding; the domino clue was dropped because it doesn't work with shifted (0-based) indices.",
     src: ['https://www.youtube.com/watch?v=L-cbtgqTE9M', 'https://sudokupad.app/HmMdQDq98p'],
