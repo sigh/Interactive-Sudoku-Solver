@@ -2098,7 +2098,8 @@ export class SudokuConstraint {
     static DESCRIPTION = (`
       The sum of the values along the line equal the 2-digit or 3-digit
       number in the pill.
-      Numbers in the pill are read from left to right, top to bottom.`);
+      Numbers in the pill are read from left to right, top to bottom.
+      Pill cells must be adjacent or diagonal.`);
     static CATEGORY = 'LinesAndSets';
     static DISPLAY_CONFIG = {
       displayClass: 'PillArrow',

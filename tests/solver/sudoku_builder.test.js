@@ -261,6 +261,36 @@ await runTest('PillArrow adds no digit clamp when all values are digits', () => 
   assert.ok(!hasHandler(handlers, 'GivenCandidates'));
 });
 
+await runTest('PillArrow rejects pills with ambiguous reading order', () => {
+  const build = (input) => buildHandlers(SudokuParser.parseString(input));
+  // Anti-diagonal pill: "top beats left" contradicts left-to-right reading.
+  assert.throws(
+    () => build('.PillArrow~2~R2C1~R1C2~R1C3~R1C4'),
+    /reading order/);
+  // Bent pill that backtracks left in scan order.
+  assert.throws(
+    () => build('.PillArrow~3~R2C1~R2C2~R1C2~R3C2~R4C2'),
+    /reading order/);
+  // Non-contiguous pill.
+  assert.throws(
+    () => build('.PillArrow~2~R1C1~R1C3~R2C3~R2C4'),
+    /reading order/);
+  // Repeated pill cell.
+  assert.throws(
+    () => build('.PillArrow~2~R1C1~R1C1~R1C2~R1C3'),
+    /reading order/);
+  // Mixed grid/var-cell pill.
+  assert.throws(
+    () => build('.Var~X~X~2.PillArrow~2~R9C9~VX1~R1C1~R1C2'),
+    /reading order/);
+  // A straight pill drawn in reverse order is still valid.
+  assert.ok(build('.PillArrow~2~R2C1~R1C1~R2C2~R2C3').length);
+  // A down-right diagonal pill reads from its top-left end: valid.
+  assert.ok(build('.PillArrow~2~R1C1~R2C2~R2C3~R2C4').length);
+  // A monotone bend (right, then down) follows reading order: valid.
+  assert.ok(build('.PillArrow~3~R1C1~R1C2~R2C2~R3C2~R4C2').length);
+});
+
 await runTest('PillArrow allows 0 as a non-leading pill digit', () => {
   // Pill reads "10"; shaft sums to 4 + 6.
   const constraint = SudokuParser.parseString(

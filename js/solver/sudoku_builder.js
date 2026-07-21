@@ -1,4 +1,5 @@
 const { SudokuConstraint, SudokuConstraintBase, CellArgs } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
+const { CellGraph } = await import('../cell_geometry.js' + self.VERSION_PARAM);
 const { SudokuSolver } = await import('./engine.js' + self.VERSION_PARAM);
 const { regexToNFA, NFASerializer } = await import('../nfa_builder.js' + self.VERSION_PARAM);
 const { memoize } = await import('../util.js' + self.VERSION_PARAM);
@@ -449,6 +450,20 @@ export class SudokuBuilder {
 
             const pillCells = cells.slice(0, pillSize);
             pillCells.sort((a, b) => a - b);
+
+            // Sorting the pill cells only gives an unambiguous reading order
+            // when each successive cell is one step right, down, or down-right
+            // of the previous.
+            const graph = geometry.cellGraph();
+            const pillIsReadable = pillCells.every((c, i) => i === 0 ||
+              c === graph.adjacent(pillCells[i - 1], CellGraph.RIGHT) ||
+              c === graph.adjacent(pillCells[i - 1], CellGraph.DOWN) ||
+              c === graph.diagonal(
+                pillCells[i - 1], CellGraph.DOWN, CellGraph.RIGHT));
+            if (!pillIsReadable) {
+              throw new InvalidConstraintError(
+                'Pill cells must be adjacent and in reading order when sorted');
+            }
 
             cells.splice(0, pillSize, ...pillCells);
             const coeffs = cells.map(_ => 1);
