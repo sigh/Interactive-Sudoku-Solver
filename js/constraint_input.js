@@ -255,15 +255,11 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
   }
 
   _setUpValueRangeDropdowns() {
-    this._minSelect.onchange = () => {
-      // Shift max by the same amount to prevent invalid ranges.
-      const newMin = +this._minSelect.value;
-      const newMax = this._geometry.maxValue() + (newMin - this._geometry.minValue());
-      this._applyValueRange(newMin, newMax);
-    };
-    this._maxSelect.onchange = () => {
+    const onchange = () => {
       this._applyValueRange(+this._minSelect.value, +this._maxSelect.value);
     };
+    this._minSelect.onchange = onchange;
+    this._maxSelect.onchange = onchange;
   }
 
   _applyShape() {
