@@ -730,8 +730,11 @@ button.copy-to-clipboard-failed::after {
   line-height: 1;
 }
 
-#outside-clue-input .collapsible-body>* {
-  margin-top: 5px;
+#outside-clue-input fieldset {
+  border: none;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
 }
 
 #composite-constraint-input button {

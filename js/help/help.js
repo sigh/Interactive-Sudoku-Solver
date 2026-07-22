@@ -157,6 +157,10 @@ const CATEGORY_CONFIGS = {
       Click on an arrow outside the grid then select a constraint from the
       "Outside Clues" panel.`
   },
+  'OutsideClueOption': {
+    description: 'Options that modify outside clue constraints',
+    instructions: `Use the controls in the "Outside clues" panel.`
+  },
   'LayoutCheckbox': {
     description: 'Layout and structural constraints',
     instructions: `Use checkboxes in the "Layout constraints" panel.`

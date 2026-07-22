@@ -806,6 +806,7 @@ class ConstraintManager {
         selectedConstraintCollection, inputManager, this._userScriptExecutor),
       new ConstraintCategoryInput.OutsideClue(
         selectedConstraintCollection, inputManager),
+      new ConstraintCategoryInput.OutsideClueOption(selectedConstraintCollection),
       new ConstraintCategoryInput.GivenCandidates(
         selectedConstraintCollection, inputManager),
       new ConstraintCategoryInput.Experimental(selectedConstraintCollection),

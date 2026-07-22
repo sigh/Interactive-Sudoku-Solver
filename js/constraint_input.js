@@ -437,8 +437,6 @@ class CheckboxCategoryInput extends ConstraintCategoryInput {
     super(collection);
 
     this._checkboxes = new Map();
-    this._selects = new Map();
-    this._geometry = null;
 
     const initSingleCheckbox = (constraintClass, container, option) => {
       const constraint = new constraintClass(...(option ? [option.value] : []));
@@ -485,80 +483,10 @@ class CheckboxCategoryInput extends ConstraintCategoryInput {
       });
     };
 
-    const initSelectDropdown = (constraintClass, container, argConfig) => {
-      const selectId = `${containerId}-select-${this._selects.size}`;
-
-      // Create a template constraint so we can compute uniqueness keys and type.
-      const defaultValue = argConfig.default ?? argConfig.options?.[0]?.value;
-      if (defaultValue === undefined) {
-        throw new Error(
-          `Select constraint ${constraintClass.name} must define a default or at least one option.`);
-      }
-      const templateConstraint = new constraintClass(defaultValue);
-
-      const div = document.createElement('div');
-
-      const label = document.createElement('label');
-      label.htmlFor = selectId;
-      label.textContent = `${constraintClass.displayName()}: `;
-      div.appendChild(label);
-
-      const tooltip = document.createElement('span');
-      tooltip.className = 'tooltip';
-      tooltip.setAttribute('data-text', constraintClass.DESCRIPTION);
-      div.appendChild(tooltip);
-
-      const select = document.createElement('select');
-      select.id = selectId;
-
-      for (const opt of (argConfig.options || [])) {
-        const option = document.createElement('option');
-        option.value = opt.value;
-        option.textContent = opt.text;
-        select.appendChild(option);
-      }
-
-      // Default selection should reflect default behaviour.
-      // If the selected value matches the default, we keep the constraint unset
-      // (implicit default) to keep serialized strings clean.
-      select.value = defaultValue;
-
-      select.onchange = () => {
-        const value = select.value;
-        removeAllOfType(this.collection, templateConstraint);
-        if (value !== defaultValue) {
-          try {
-            this.collection.addConstraint(new constraintClass(value));
-            this._clearError();
-          } catch (e) {
-            select.value = defaultValue;  // Revert: the constraint was not added.
-            this._showError(e.message || e);
-          }
-        } else {
-          this._clearError();
-        }
-      };
-      div.appendChild(select);
-
-      container.appendChild(div);
-
-      this._selects.set(templateConstraint.type, {
-        element: select,
-        constraintClass,
-        defaultValue,
-      });
-    };
-
     const container = document.getElementById(containerId);
     const constraintClasses = this.constructor.constraintClasses();
-
-    // Render checkboxes first, then select dropdowns.
-    // This keeps the UI predictable when mixing input types.
     for (const constraintClass of constraintClasses) {
-      const argConfig = constraintClass.ARGUMENT_CONFIG;
-      if (argConfig?.inputType === 'select') continue;
-
-      if (argConfig) {
+      if (constraintClass.ARGUMENT_CONFIG) {
         for (const option of constraintClass.ARGUMENT_CONFIG.options) {
           initSingleCheckbox(constraintClass, container, option);
         }
@@ -567,56 +495,27 @@ class CheckboxCategoryInput extends ConstraintCategoryInput {
       }
     }
 
-    for (const constraintClass of constraintClasses) {
-      const argConfig = constraintClass.ARGUMENT_CONFIG;
-      if (argConfig?.inputType !== 'select') continue;
-      initSelectDropdown(constraintClass, container, argConfig);
-    }
-
     this._errorElem = document.getElementById(`${containerId}-error`);
     container.appendChild(this._errorElem);
   }
 
   onAddConstraint(c) {
     const checkbox = this._checkboxes.get(c.toString());
-    if (checkbox) {
-      checkbox.element.checked = true;
-      return;
-    }
-
-    const select = this._selects.get(c.type);
-    if (select) {
-      // For select constraints, the first arg is the selected value.
-      select.element.value = c.args[0] ?? select.defaultValue;
-    }
+    checkbox.element.checked = true;
   }
 
   onRemoveConstraint(c) {
     const checkbox = this._checkboxes.get(c.toString());
-    if (checkbox) {
-      checkbox.element.checked = false;
-      return;
-    }
-
-    const select = this._selects.get(c.type);
-    if (select) {
-      select.element.value = select.defaultValue;
-    }
+    checkbox.element.checked = false;
   }
 
   clear() {
     for (const item of this._checkboxes.values()) {
       item.element.checked = false;
     }
-
-    for (const item of this._selects.values()) {
-      item.element.value = item.defaultValue;
-    }
   }
 
   reshape(geometry) {
-    this._geometry = geometry;
-
     for (const item of this._checkboxes.values()) {
       const constr = item.constraint.constructor;
       const disabled = !!(constr.VALIDATE_SHAPE_FN && !constr.VALIDATE_SHAPE_FN(geometry));
@@ -629,12 +528,6 @@ class CheckboxCategoryInput extends ConstraintCategoryInput {
     // Check if this checkbox category has this constraint type.
     for (const item of this._checkboxes.values()) {
       if (item.constraint.constructor === constraintClass) {
-        return item.element;
-      }
-    }
-    // Check select dropdowns.
-    for (const item of this._selects.values()) {
-      if (item.constraintClass === constraintClass) {
         return item.element;
       }
     }
@@ -1303,7 +1196,7 @@ ConstraintCategoryInput.OutsideClue = class OutsideClue extends ConstraintCatego
     this._outsideClueForm = outsideClueForm;
 
     this._collapsibleContainer = new CollapsibleContainer(
-      outsideClueForm.firstElementChild,
+      document.getElementById('outside-clue-container'),
       /* defaultOpen= */ false).allowInComposite();
 
     this._populateOutsideClueForm(outsideClueForm);
@@ -1339,7 +1232,7 @@ ConstraintCategoryInput.OutsideClue = class OutsideClue extends ConstraintCatego
       this.runUpdateCallback();
       return false;
     };
-    inputManager.addSelectionPreserver(outsideClueForm);
+    inputManager.addSelectionPreserver(this._collapsibleContainer.element());
     inputManager.onOutsideArrowSelection(
       this._handleOutsideArrowSelection.bind(this));
 
@@ -1431,6 +1324,112 @@ ConstraintCategoryInput.OutsideClue = class OutsideClue extends ConstraintCatego
     this._outsideClueForm.type.value = constraintClass.name;
     this._outsideClueForm.dispatchEvent(new Event('change'));
     return this._outsideClueForm[`${constraintClass.name}-option`].parentNode;
+  }
+}
+
+// Options which modify outside clue constraints. These are not tied to an
+// arrow, so they live below the arrow-driven controls and are always enabled.
+ConstraintCategoryInput.OutsideClueOption = class OutsideClueOption extends ConstraintCategoryInput {
+  constructor(collection) {
+    super(collection);
+    this._selects = new Map();
+
+    const container = document.getElementById('outside-clue-options');
+    for (const constraintClass of this.constructor.constraintClasses()) {
+      this._addSelect(constraintClass, container);
+    }
+
+    this._errorElem = document.getElementById('outside-clue-options-error');
+    container.appendChild(this._errorElem);
+  }
+
+  _addSelect(constraintClass, container) {
+    const argConfig = constraintClass.ARGUMENT_CONFIG;
+    const defaultValue = argConfig.default ?? argConfig.options[0].value;
+    // Template constraint so we can compute uniqueness keys and type.
+    const templateConstraint = new constraintClass(defaultValue);
+    const selectId = `outside-clue-options-select-${this._selects.size}`;
+
+    const label = document.createElement('label');
+    label.htmlFor = selectId;
+    label.textContent = `${constraintClass.displayName()}: `;
+
+    const tooltip = document.createElement('span');
+    tooltip.className = 'tooltip';
+    tooltip.setAttribute('data-text', constraintClass.DESCRIPTION);
+
+    const select = document.createElement('select');
+    select.id = selectId;
+    for (const opt of argConfig.options) {
+      const option = document.createElement('option');
+      option.value = opt.value;
+      option.textContent = opt.text;
+      select.appendChild(option);
+    }
+
+    // If the selected value matches the default, we keep the constraint unset
+    // (implicit default) to keep serialized strings clean.
+    select.value = defaultValue;
+
+    select.onchange = () => {
+      removeAllOfType(this.collection, templateConstraint);
+      if (select.value !== defaultValue) {
+        try {
+          this.collection.addConstraint(new constraintClass(select.value));
+          this._clearError();
+        } catch (e) {
+          select.value = defaultValue;  // Revert: the constraint was not added.
+          this._showError(e.message || e);
+        }
+      } else {
+        this._clearError();
+      }
+    };
+
+    const div = document.createElement('div');
+    div.append(label, tooltip, ' ', select);
+    container.appendChild(div);
+
+    this._selects.set(templateConstraint.type, {
+      element: select,
+      constraintClass,
+      defaultValue,
+    });
+  }
+
+  onAddConstraint(c) {
+    const select = this._selects.get(c.type);
+    // The first arg is the selected value.
+    select.element.value = c.args[0];
+  }
+
+  onRemoveConstraint(c) {
+    const select = this._selects.get(c.type);
+    select.element.value = select.defaultValue;
+  }
+
+  clear() {
+    for (const item of this._selects.values()) {
+      item.element.value = item.defaultValue;
+    }
+  }
+
+  reshape(geometry) {
+    for (const item of this._selects.values()) {
+      const constr = item.constraintClass;
+      const disabled = !!(constr.VALIDATE_SHAPE_FN && !constr.VALIDATE_SHAPE_FN(geometry));
+      item.element.disabled = disabled;
+      item.element.parentElement.classList.toggle('disabled', disabled);
+    }
+  }
+
+  getConstraintInputElement(constraintClass) {
+    for (const item of this._selects.values()) {
+      if (item.constraintClass === constraintClass) {
+        return item.element;
+      }
+    }
+    return null;
   }
 }
 

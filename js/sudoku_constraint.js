@@ -1811,14 +1811,12 @@ export class SudokuConstraint {
       Configures when ties are allowed for Full Rank ordering, where all rows
       and columns are ranked in order when read as numbers, with the forward
       and reverse directions considered separately.
-      Note that "No ranks can tie" affects the grid even when there are no
+      Note that "No ranks" affects the grid even when there are no
       FullRank clues present.`);
-    static CATEGORY = 'Global';
+    static CATEGORY = 'OutsideClueOption';
     static UNIQUENESS_KEY_FIELD = 'type';
     static VALIDATE_SHAPE_FN = (geometry) => geometry.isSquare();
     static ARGUMENT_CONFIG = {
-      inputType: 'select',
-      label: 'FullRank ties',
       default: 'only-unclued',
       options: [
         { value: 'none', text: 'No ranks' },
@@ -2419,8 +2417,8 @@ export class SudokuConstraint {
     static DESCRIPTION = (`
       Considering all rows and columns as numbers read from the direction
       of the clue and ranked from lowest (1) to highest, a clue represents
-      where in the ranking that row/column lies. For tie handling, set the
-      Full Rank Mode in the Global constraints.`);
+      where in the ranking that row/column lies. For tie handling, use the
+      "Full Rank Ties" option in the "Outside clues" panel.`);
     static CATEGORY = 'OutsideClue';
     static DISPLAY_CONFIG = {
       displayClass: 'OutsideClue',
