@@ -2929,69 +2929,76 @@ export class SudokuConstraint {
 
   static Var = class Var extends SudokuConstraintBase {
     static DESCRIPTION = (
-      "Adds variables to use as extra cells outside the grid.");
+      "Adds variables to use as extra cells outside the grid. " +
+      "Size is a cell count, or rowsxcolumns dimensions (e.g. 9x9).");
     static CATEGORY = 'Shape';
     static UNIQUENESS_KEY_FIELD = 'prefix';
 
-    constructor(prefix, label, count) {
-      super(prefix, label, count);
+    constructor(prefix, label, size) {
+      super(prefix, label, size);
       if (!/^[A-Z]+$/.test(prefix)) {
         throw new Error(
           `Var prefix must be upper-case letters A-Z, got: ${prefix}`);
       }
       this.prefix = prefix;
       this.label = label || '';
-      this.count = +count || 1;
-      this.groups = [
-        { prefix: 'V' + this.prefix, label: this.label, count: this.count }
-      ];
+      // Size is a cell count or 'RxC' dimensions; anything else means 1.
+      const m = /^(?:([1-9]\d*)x)?([1-9]\d*)$/.exec(size);
+      this.count = m ? (+m[1] || 1) * +m[2] : 1;
+      this.columns = m?.[1] ? +m[2] : 0;
+      if (this.columns > CellGeometry.MAX_SIZE) {
+        throw new Error(
+          `Var columns must be at most ${CellGeometry.MAX_SIZE}, got: ${this.columns}`);
+      }
     }
 
-    // The member cell ids, in order: 'V{prefix}{n}' with 1-based n, or the
-    // bare 'V{prefix}' for a single-cell group.
+    // The member cell ids, in order.
     cells() {
-      if (this.count === 1) return ['V' + this.prefix];
-      return Array.from(
-        { length: this.count }, (_, i) => `V${this.prefix}${i + 1}`);
+      return Array.from({ length: this.count }, (_, i) => this.cell(i + 1));
     }
 
-    // The nth member cell id (1-based).
+    // The nth member cell id (1-based): 'V{prefix}{n}', or the bare
+    // 'V{prefix}' for a single-cell group.
     cell(n) {
       return this.count === 1 ? 'V' + this.prefix : `V${this.prefix}${n}`;
     }
 
     static *makeFromArgs(args, geometry) {
-      const [prefix, encodedLabel, count] = args;
-      const label = this.uriDecodeArg(encodedLabel || '');
-      yield new this(prefix, label, count);
+      const [prefix, encodedLabel, size] = args;
+      yield new this(prefix, this.uriDecodeArg(encodedLabel || ''), size);
     }
 
     static serialize(constraints) {
       return constraints.map(c => {
-        if (c.count === 1 && !c.label) {
-          return this._argsToString(c.prefix);
-        }
-        const encodedLabel = this.uriEncodeArg(c.label);
-        if (c.count === 1) {
-          return this._argsToString(c.prefix, encodedLabel);
-        }
-        return this._argsToString(c.prefix, encodedLabel, c.count);
+        // Omit trailing default args.
+        const args = [c.prefix, this.uriEncodeArg(c.label), c._sizeString()];
+        if (args.at(-1) === '1') args.pop();
+        if (args.at(-1) === '') args.pop();
+        return this._argsToString(...args);
       }).join('');
     }
 
+    _sizeString() {
+      return this.columns
+        ? `${this.count / this.columns}x${this.columns}` : `${this.count}`;
+    }
+
     getCells(geometry) {
-      return this.groups.flatMap(
-        g => (geometry.varCellsForGroup(g.prefix) || []).map(
-          c => geometry.makeCellIdFromIndex(c)));
+      return (geometry.varCellsForGroup('V' + this.prefix) || []).map(
+        c => geometry.makeCellIdFromIndex(c));
     }
 
     getVarCellGroups(geometry) {
-      return this.groups;
+      return [{
+        prefix: 'V' + this.prefix, label: this.label,
+        count: this.count, columns: this.columns
+      }];
     }
 
     chipLabel() {
-      const countStr = this.count > 1 ? `[${this.count}]` : '';
-      return `Extra Cells: ${CellGeometry.displayCellId('V' + this.prefix)}${countStr}`;
+      const size = this._sizeString();
+      const sizeStr = size === '1' ? '' : `[${size}]`;
+      return `Extra Cells: ${CellGeometry.displayCellId('V' + this.prefix)}${sizeStr}`;
     }
   }
 }

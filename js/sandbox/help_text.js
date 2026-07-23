@@ -105,7 +105,8 @@ CELL GEOMETRY
                             cells; unpaired entries are null
       .gridAt(varCellOrArray) the paired grid cell, or an array of paired grid
                             cells; unpaired entries are null
-      .toVar(label)           create a matching Var constraint
+      .toVar(label)           create a matching Var constraint; a full-grid
+                            overlay keeps its grid shape
 
 STATE MACHINES (NFA)
 

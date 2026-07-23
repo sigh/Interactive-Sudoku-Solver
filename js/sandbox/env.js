@@ -337,13 +337,16 @@ class SandboxOverlay extends SandboxCellGraph {
     return pos === undefined ? null : this._gridCells[pos];
   }
 
-  // The Var constraint that registers this overlay's cells.
+  // The Var constraint that registers this overlay's cells. A full-grid
+  // overlay carries its grid shape as dimensions; a sparse one just its count.
   toVar(label) {
     if (this._prefix[0] !== 'V' || this._prefix.length < 2) {
       throw new Error(`toVar() needs a 'V'-prefixed overlay, got: '${this._prefix}'`);
     }
     const name = this._prefix.slice(1);
-    return new SudokuConstraint.Var(name, label ?? name, this._cells.length);
+    const size = this._cells.length === this._geometry.numGridCells
+      ? this._geometry.gridDimsStr : this._cells.length;
+    return new SudokuConstraint.Var(name, label ?? name, size);
   }
 }
 

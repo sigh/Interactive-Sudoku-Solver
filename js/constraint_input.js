@@ -340,10 +340,10 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
       e.preventDefault();
       const prefix = prefixInput.value.trim();
       const label = form['var-label'].value.trim();
-      const count = +form['var-count'].value || 1;
+      const size = form['var-count'].value.trim();
 
       try {
-        const constraint = new SudokuConstraint.Var(prefix, label, count);
+        const constraint = new SudokuConstraint.Var(prefix, label, size);
         this.collection.addConstraint(constraint);
         this.runUpdateCallback();
         errorElem.textContent = '';

@@ -1262,6 +1262,43 @@ await runTest('Var exposes its member cell ids', () => {
   assert.equal(single.cell(1), 'VM');
 });
 
+await runTest('Var size accepts rowsxcolumns dimensions', () => {
+  const grid = new SudokuConstraint.Var('A', '', '2x3');
+  assert.equal(grid.count, 6);
+  assert.equal(grid.columns, 3);
+  assert.deepEqual(grid.getVarCellGroups(null), [
+    { prefix: 'VA', label: '', count: 6, columns: 3 }]);
+  // A raw count leaves columns unset (display falls back to the grid width).
+  const flat = new SudokuConstraint.Var('B', '', 6);
+  assert.equal(flat.count, 6);
+  assert.equal(flat.columns, 0);
+  // Zero dimensions are not dims; like any other junk size they coerce to 1.
+  const zero = new SudokuConstraint.Var('C', '', '0x5');
+  assert.equal(zero.count, 1);
+  assert.equal(zero.columns, 0);
+  // Columns are capped at the max grid dimension.
+  assert.equal(new SudokuConstraint.Var('D', '', '2x16').columns, 16);
+  assert.throws(() => new SudokuConstraint.Var('E', '', '2x17'),
+    /columns must be at most 16/);
+});
+
+await runTest('Var.serialize round-trips both size forms', () => {
+  const serialize = cs => SudokuConstraint.Var.serialize(cs);
+  assert.equal(serialize([new SudokuConstraint.Var('A', '', '9x9')]),
+    '.Var~A~~9x9');
+  assert.equal(serialize([new SudokuConstraint.Var('A', '', 27)]),
+    '.Var~A~~27');
+  assert.equal(serialize([new SudokuConstraint.Var('A', '', 1)]), '.Var~A');
+  assert.equal(serialize([new SudokuConstraint.Var('A', 'x', '1x1')]),
+    '.Var~A~x~1x1');
+  for (const size of ['9x9', '2x3', 27, 1]) {
+    const c = new SudokuConstraint.Var('Q', 'lbl', size);
+    const [reparsed] = SudokuConstraint.Var.makeFromArgs(
+      serialize([c]).slice('.Var~'.length).split('~'), null);
+    assert.deepEqual(reparsed.getVarCellGroups(null), c.getVarCellGroups(null));
+  }
+});
+
 logSuiteComplete('Structured args and member ids');
 
 // ============================================================================

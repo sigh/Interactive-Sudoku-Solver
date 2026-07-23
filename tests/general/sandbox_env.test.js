@@ -514,17 +514,20 @@ await runTest('overlay graph methods throw for a foreign cell', () => {
 });
 
 await runTest('overlay toVar() derives the matching Var constraint', () => {
-  // Dense: name is the prefix minus its leading 'V', count is the cell count.
+  // Dense: name is the prefix minus its leading 'V', size is the grid shape.
   const dense = cellGraph('4x4').makeOverlay('VL').toVar('loop');
   assert.equal(dense.type, 'Var');
-  assert.deepEqual(dense.args, ['L', 'loop', 16]);
+  assert.deepEqual(dense.args, ['L', 'loop', '4x4']);
+  assert.equal(dense.count, 16);
+  assert.equal(dense.columns, 4);
 
   // Sparse: count follows the overlay, not the grid.
   const sparse = cellGraph('4x4').makeOverlay('VC', ['R1C1', 'R2C2', 'R3C3']);
   assert.deepEqual(sparse.toVar('Color').args, ['C', 'Color', 3]);
 
   // Label defaults to the name.
-  assert.deepEqual(cellGraph('4x4').makeOverlay('VS').toVar().args, ['S', 'S', 16]);
+  assert.deepEqual(cellGraph('4x4').makeOverlay('VS').toVar().args,
+    ['S', 'S', '4x4']);
 });
 
 await runTest('overlay toVar() rejects a non-var prefix', () => {
