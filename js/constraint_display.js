@@ -810,9 +810,9 @@ class ShadedRegion extends BaseConstraintDisplayItem {
       this._cellColors.addItem(region, color, ...cellIndexes);
     }
 
-    // Draw the sum in the top-left most cell. Luckily, this is the sort order.
-    const topLeftCell = cells.reduce((a, b) => a < b ? a : b);
-    [x, y] = this.cellIdTopLeftCorner(topLeftCell);
+    // Draw the sum in the top-left most cell, i.e. the smallest index.
+    const topLeftCell = cellIndexes.reduce((a, b) => a < b ? a : b);
+    [x, y] = this.cellIndexTopLeftCorner(topLeftCell);
 
     if (label !== undefined) {
       const text = this.makeTextNode(label, x, y, 'shaded-region-label');

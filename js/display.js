@@ -39,7 +39,11 @@ export class DisplayItem {
   }
 
   cellIdTopLeftCorner(cellId) {
-    const center = this.cellIdCenter(cellId);
+    return this.cellIndexTopLeftCorner(this._geometry.parseCellId(cellId).cellIndex);
+  }
+
+  cellIndexTopLeftCorner(cellIndex) {
+    const center = this.cellIndexCenter(cellIndex);
     if (!center) return null;
     const cellWidth = DisplayItem.CELL_SIZE;
     const [x, y] = center;
