@@ -1797,9 +1797,10 @@ export class JigsawPiece extends SudokuConstraintHandler {
 
 export class SameValues extends SudokuConstraintHandler {
   constructor(...cellSets) {
-    // Sort to canonicalize the order.
+    // Sort to canonicalize the order, both within and between sets.
     // NOTE: We must copy before sorting (to avoid messing up order for the caller).
-    cellSets = cellSets.map(s => [...s].sort((a, b) => a - b));
+    cellSets = cellSets.map(s => [...s].sort((a, b) => a - b))
+      .sort((a, b) => a[0] - b[0]);
 
     const setLen = cellSets[0].length;
     if (!cellSets.every(s => s.length === setLen)) {

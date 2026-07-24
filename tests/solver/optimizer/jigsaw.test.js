@@ -173,9 +173,43 @@ await runTest('_makeJigsawIntersections: creates intersections from PerfectAllDi
   optimizer._addPerfectAllDifferentHandlers(handlerSet, geometry, optimizer._computeEffectiveValues(handlerSet, geometry));
   assert.equal(
     handlerSet.getAllofType(HandlerModule.PerfectAllDifferent).length, 2);
-  const result = optimizer._makeJigsawIntersections(handlerSet);
+  const pieces = [new HandlerModule.JigsawPiece(new Uint8Array(regionA))];
+  const result = optimizer._makeJigsawIntersections(handlerSet, pieces);
   assert.ok(result.length > 0,
     'should create SameValuesIgnoreCount from PerfectAllDifferent pairs');
+
+  // Pairs without a jigsaw piece are left to _addGridHouseIntersections.
+  assert.equal(optimizer._makeJigsawIntersections(handlerSet, []).length, 0,
+    'should not pair handlers when neither is a jigsaw piece');
+});
+
+await runTest('_makeJigsawIntersections: skips disjoint regions', () => {
+  const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
+  const geometry = CellGeometry.fromGridSize(6, 6, 10);
+  const numCells = geometry.numGridCells;
+
+  // Restrict all cells to values 1-6.
+  const valueMap = new Map();
+  for (let i = 0; i < numCells; i++) {
+    valueMap.set(i, [1, 2, 3, 4, 5, 6]);
+  }
+  const givenHandler = new HandlerModule.GivenCandidates(valueMap);
+
+  // Two disjoint 6-cell regions: each must contain all 6 values, so a
+  // same-values constraint between them would be trivially true.
+  const regionA = [0, 1, 2, 3, 4, 5];
+  const regionB = [6, 7, 8, 9, 10, 11];
+
+  const handlerSet = new HandlerSet([
+    givenHandler,
+    new HandlerModule.AllDifferent(regionA),
+    new HandlerModule.AllDifferent(regionB),
+  ], numCells);
+
+  optimizer._addPerfectAllDifferentHandlers(handlerSet, geometry, optimizer._computeEffectiveValues(handlerSet, geometry));
+  const pieces = [new HandlerModule.JigsawPiece(new Uint8Array(regionA))];
+  assert.equal(optimizer._makeJigsawIntersections(handlerSet, pieces).length, 0,
+    'should not pair disjoint regions');
 });
 
 await runTest('_makeJigsawIntersections: skips pairing with different value masks', () => {
@@ -183,25 +217,22 @@ await runTest('_makeJigsawIntersections: skips pairing with different value mask
   const geometry = CellGeometry.fromGridSize(6, 6, 10);
   const numCells = geometry.numGridCells;
 
-  // Region A cells restricted to {1,2,3,4,5,6}.
-  // Region B cells restricted to {4,5,6,7,8,9}.
+  // Overlapping regions with different value masks: the shared cells
+  // {3,4,5,6} support both masks, region A adds {1,2} and region B adds
+  // {7,8}, giving masks {1..6} and {3..8}.
   const valueMap = new Map();
-  for (let i = 0; i < 6; i++) {
-    valueMap.set(i, [1, 2, 3, 4, 5, 6]);
+  valueMap.set(0, [1, 2]);
+  valueMap.set(1, [1, 2]);
+  for (let i = 2; i < 6; i++) {
+    valueMap.set(i, [3, 4, 5, 6]);
   }
-  for (let i = 6; i < 12; i++) {
-    valueMap.set(i, [4, 5, 6, 7, 8, 9]);
-  }
-  // Shared cells get the intersection so both regions can form
-  // PerfectAllDifferent with their own masks.
-  // Actually, shared cells need to support both regions.
-  // Use non-overlapping regions to test the valueMask guard directly.
+  valueMap.set(6, [7, 8]);
+  valueMap.set(7, [7, 8]);
   const givenHandler = new HandlerModule.GivenCandidates(valueMap);
 
-  // Two non-overlapping 6-cell regions with different value masks.
   // These would normally be paired but the valueMask check should skip them.
   const regionA = [0, 1, 2, 3, 4, 5];
-  const regionB = [6, 7, 8, 9, 10, 11];
+  const regionB = [2, 3, 4, 5, 6, 7];
 
   const handlerSet = new HandlerSet([
     givenHandler,
@@ -215,7 +246,11 @@ await runTest('_makeJigsawIntersections: skips pairing with different value mask
   assert.equal(perfects.length, 2);
   assert.notEqual(perfects[0].valueMask(), perfects[1].valueMask());
 
-  const result = optimizer._makeJigsawIntersections(handlerSet);
+  const pieces = [
+    new HandlerModule.JigsawPiece(new Uint8Array(regionA)),
+    new HandlerModule.JigsawPiece(new Uint8Array(regionB)),
+  ];
+  const result = optimizer._makeJigsawIntersections(handlerSet, pieces);
   assert.equal(result.length, 0,
     'should not pair handlers with different value masks');
 });

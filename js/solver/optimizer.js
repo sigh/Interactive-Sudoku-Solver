@@ -514,7 +514,7 @@ export class SudokuConstraintOptimizer {
     if (jigsawPieces.length === 0) return;
 
     handlerSet.addNonEssential(
-      ...this._makeJigsawIntersections(handlerSet));
+      ...this._makeJigsawIntersections(handlerSet, jigsawPieces));
 
     handlerSet.addNonEssential(
       ...this._makeJigsawLawOfLeftoverHandlers(
@@ -1183,26 +1183,34 @@ export class SudokuConstraintOptimizer {
     return newHandlers;
   }
 
-  // Add same value handlers for intersections between fixed-value regions.
-  _makeJigsawIntersections(handlerSet) {
+  // Add same value handlers for intersections between jigsaw pieces and other
+  // fixed-value regions.
+  _makeJigsawIntersections(handlerSet, jigsawPieces) {
     const allHandlers = handlerSet.getAllofType(HandlerModule.PerfectAllDifferent);
+    const cellsKey = (cells) => [...cells].sort((a, b) => a - b).join(',');
+    const pieceKeys = new Set(jigsawPieces.map(p => cellsKey(p.cells)));
+    const isPiece = allHandlers.map(h => pieceKeys.has(cellsKey(h.cells)));
     const newHandlers = [];
 
-    // Add constraints due to overlapping regions.
-    for (const h0 of allHandlers) {
-      for (const h1 of allHandlers) {
-        if (h0 === h1) continue;
+    // Add constraints due to overlapping regions. Pairs of plain grid houses
+    // are handled by _addGridHouseIntersections, so require a jigsaw piece in
+    // each pair.
+    for (let i = 1; i < allHandlers.length; i++) {
+      const h0 = allHandlers[i];
+      for (let j = 0; j < i; j++) {
+        if (!isPiece[i] && !isPiece[j]) continue;
+        const h1 = allHandlers[j];
         if (h0.cells.length !== h1.cells.length) continue;
         if (h0.valueMask() !== h1.valueMask()) continue;
 
         const diff0 = arrayDifference(h0.cells, h1.cells);
         if (
-          // Skip empty diffs.
+          // Skip identical regions.
           diff0.length === 0
           // Also diffs that are too large.
           || diff0.length > this._MAX_SUM_SIZE
           // Ensure overlap is more than one cell.
-          || diff0.length === h0.cells.length - 1) continue;
+          || diff0.length >= h0.cells.length - 1) continue;
 
         // We have some overlapping cells!
         // This means diff0 and diff1 must contain the same values.
