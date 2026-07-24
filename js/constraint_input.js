@@ -324,6 +324,21 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
     this._shapeSpecInput.value = geometry.gridDimsStr;
     this._shapeSpecInput.setCustomValidity('');
     this._updateValueRangeDropdowns(geometry);
+    this._varForm['var-count'].value = geometry.gridDimsStr;
+    this._updateVarPrefixDefault();
+    geometry.onVarCellsChanged(() => this._updateVarPrefixDefault());
+  }
+
+  // Prefill the prefix field with the first unused letter. A user-typed value
+  // (anything other than the previous prefill) is left alone.
+  _updateVarPrefixDefault() {
+    const input = this._varForm['var-prefix'];
+    if (input.value && input.value !== this._autoPrefix) return;
+    const used = new Set(
+      this._geometry.varCellGroups().map(g => g.prefix));
+    this._autoPrefix = [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'].find(
+      c => !used.has('V' + c)) || '';
+    input.value = this._autoPrefix;
   }
 
   _setUpVarInput() {
@@ -347,6 +362,12 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
         this.collection.addConstraint(constraint);
         this.runUpdateCallback();
         errorElem.textContent = '';
+        // A consumed single-letter prefix advances to the next free letter;
+        // a multi-letter prefix is deliberate and left alone.
+        if (prefix.length === 1) {
+          prefixInput.value = '';
+          this._updateVarPrefixDefault();
+        }
       } catch (err) {
         errorElem.textContent = err.message;
       }
