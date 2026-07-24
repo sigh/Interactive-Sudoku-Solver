@@ -23,52 +23,65 @@ export class CellGeometry {
     return new CellGeometry(numRows, numCols, numValues, valueOffset);
   }
 
+  // The subject is the main grid's dimensions ("9x9"), or a cell group
+  // prefix ("VA" — the group's own constraint carries its size, and the
+  // main grid does not exist).
   static fromShapeSpec(shapeSpec) {
-    const match = shapeSpec.match(/^(\d+)x(\d+)(?:~(\d+)(?:-(\d+))?)?$/);
+    const match = shapeSpec.match(
+      /^(?:(\d+)x(\d+)|([A-Z]+))(?:~(\d+)(?:-(\d+))?)?$/);
     if (!match) {
       throw new Error('Invalid shape spec format: ' + shapeSpec);
     }
 
+    const mainCellGroup = match[3];
     const numRows = parseInt(match[1]);
     const numCols = parseInt(match[2]);
 
     let numValues = null;
     let valueOffset = 0;
-    if (match[4] !== undefined) {
+    if (match[5] !== undefined) {
       // Range: "9x9~0-8"
-      const rangeStart = parseInt(match[3]);
-      numValues = parseInt(match[4]) - rangeStart + 1;
+      const rangeStart = parseInt(match[4]);
+      numValues = parseInt(match[5]) - rangeStart + 1;
       valueOffset = rangeStart - 1;
-    } else if (match[3] !== undefined) {
+    } else if (match[4] !== undefined) {
       // Bare number: "9x9~10"
-      numValues = parseInt(match[3]);
+      numValues = parseInt(match[4]);
     }
 
-    const geometry = this.fromGridSize(numRows, numCols, numValues, valueOffset);
-    if (!geometry) {
-      throw new Error('Invalid shape dimensions: ' + shapeSpec);
+    if (!mainCellGroup) {
+      const geometry = this.fromGridSize(numRows, numCols, numValues, valueOffset);
+      if (!geometry) {
+        throw new Error('Invalid shape dimensions: ' + shapeSpec);
+      }
+      return geometry;
     }
-    return geometry;
+
+    if (numValues === null) {
+      throw new Error('A value range is required for a cell group shape: ' + shapeSpec);
+    }
+    return new CellGeometry(0, 0, numValues, valueOffset, mainCellGroup);
   }
 
-  // The default grid geometry (9x9), as a fresh instance that is safe to add
-  // var cells to — unlike the shared GEOMETRY_* singletons.
+  // The default grid geometry (9x9), as a fresh mutable instance.
   static newDefault() {
     return this.fromGridSize(GEOMETRY_9x9.numRows, GEOMETRY_9x9.numCols);
   }
 
-  static makeName(numRows, numCols, numValues, valueOffset) {
-    const name = `${numRows}x${numCols}`;
-    if (valueOffset !== 0) {
-      return `${name}~${1 + valueOffset}-${numValues + valueOffset}`;
+  static makeName(numRows, numCols, numValues, valueOffset, mainCellGroup = null) {
+    const dims = `${numRows}x${numCols}`;
+    const range = valueOffset !== 0
+      ? `${1 + valueOffset}-${numValues + valueOffset}` : `${numValues}`;
+    if (mainCellGroup) {
+      return `${mainCellGroup}~${range}`;
     }
-    if (numValues !== this.defaultNumValues(numRows, numCols)) {
-      return `${name}~${numValues}`;
+    if (valueOffset !== 0 || numValues !== this.defaultNumValues(numRows, numCols)) {
+      return `${dims}~${range}`;
     }
-    return name;
+    return dims;
   }
 
-  constructor(numRows, numCols, numValues = null, valueOffset = 0) {
+  constructor(numRows, numCols, numValues = null, valueOffset = 0, mainCellGroup = null) {
     if (valueOffset !== 0 && valueOffset !== -1) {
       throw Error('Invalid valueOffset: ' + valueOffset);
     }
@@ -81,14 +94,19 @@ export class CellGeometry {
     const defaultNumValues = this.constructor.defaultNumValues(numRows, numCols);
     this.numValues = numValues ?? defaultNumValues;
 
-    if (!Number.isInteger(this.numValues) || this.numValues < defaultNumValues || this.numValues > this.constructor.MAX_SIZE) {
+    // At least one value; the main grid's dimensions floor numValues
+    // when they exist.
+    const minNumValues = Math.max(1, defaultNumValues);
+    if (!Number.isInteger(this.numValues) || this.numValues < minNumValues || this.numValues > this.constructor.MAX_SIZE) {
       throw Error('Invalid numValues: ' + this.numValues);
     }
 
+    // The cell group solved in the main grid's place, or null.
+    this.mainCellGroup = mainCellGroup;
     this.numGridCells = numRows * numCols;
 
     this.name = this.constructor.makeName(
-      numRows, numCols, this.numValues, valueOffset);
+      numRows, numCols, this.numValues, valueOffset, mainCellGroup);
     this.gridDimsStr = `${numRows}x${numCols}`;
 
     this._varCellRegistry = new VarCellRegistry(this.numGridCells);

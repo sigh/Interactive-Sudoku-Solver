@@ -64,6 +64,10 @@ export class SudokuConstraintBase {
   // Takes (geometry) argument, returns true if valid.
   static VALIDATE_SHAPE_FN = null;
 
+  // Constraints defined in terms of the main grid; the builder rejects
+  // them when the shape names a cell group instead.
+  static REQUIRES_MAIN_GRID = false;
+
   constructor(...args) {
     this.args = args;
     this.type = this.constructor.name;
@@ -415,6 +419,7 @@ export class ShadedRegionOptions {
 }
 
 export class OutsideConstraintBase extends SudokuConstraintBase {
+  static REQUIRES_MAIN_GRID = true;
   static CLUE_TYPE_DOUBLE_LINE = 'double-line';
   static CLUE_TYPE_DIAGONAL = 'diagonal';
   static CLUE_TYPE_SINGLE_LINE = 'single-line';
@@ -858,6 +863,7 @@ export class SudokuConstraint {
     static DESCRIPTION = (
       "An irregular region which must contain all digits without repetition.");
     static CATEGORY = 'Region';
+    static REQUIRES_MAIN_GRID = true;
     static DISPLAY_CONFIG = { displayClass: 'Jigsaw' };
     static UNIQUENESS_KEY_FIELD = 'cells';
 
@@ -1439,6 +1445,7 @@ export class SudokuConstraint {
     static DESCRIPTION = (`
       No standard box regions.`);
     static CATEGORY = 'LayoutCheckbox';
+    static REQUIRES_MAIN_GRID = true;
     static DISPLAY_CONFIG = { displayClass: 'DefaultRegions' };
     static UNIQUENESS_KEY_FIELD = 'type';
   }
@@ -1449,6 +1456,7 @@ export class SudokuConstraint {
       number of values, are orthogonally connected, and each region contains
       every value once.`);
     static CATEGORY = 'LayoutCheckbox';
+    static REQUIRES_MAIN_GRID = true;
     static UNIQUENESS_KEY_FIELD = 'type';
 
     getVarCellGroups(geometry) {
@@ -1559,6 +1567,7 @@ export class SudokuConstraint {
     static DESCRIPTION = (`
       The size of default boxes. Jigsaw pieces must be of this size.`);
     static CATEGORY = 'Region';
+    static REQUIRES_MAIN_GRID = true;
     static DISPLAY_CONFIG = { displayClass: 'DefaultRegions' };
     static UNIQUENESS_KEY_FIELD = 'type';
 
@@ -1577,6 +1586,7 @@ export class SudokuConstraint {
       All the largest-size regions (which could include rows, columns, boxes and
       jigsaw pieces) must contain the same set of values.`);
     static CATEGORY = 'Region';
+    static REQUIRES_MAIN_GRID = true;
     static UNIQUENESS_KEY_FIELD = 'type';
   }
 
@@ -1585,6 +1595,7 @@ export class SudokuConstraint {
       Only explicitly marked cell pairs satisfy Kropki (black/white dot)
       constraints.`);
     static CATEGORY = 'Global';
+    static REQUIRES_MAIN_GRID = true;
     static UNIQUENESS_KEY_FIELD = 'type';
 
     static fnKey = memoize((numValues, valueOffset = 0) =>
@@ -1598,6 +1609,7 @@ export class SudokuConstraint {
     static DESCRIPTION = (`
       Only explicitly marked cell pairs satisfy XV constraints.`);
     static CATEGORY = 'Global';
+    static REQUIRES_MAIN_GRID = true;
     static UNIQUENESS_KEY_FIELD = 'type';
 
     static fnKey = memoize((numValues, valueOffset = 0) =>
@@ -1654,6 +1666,7 @@ export class SudokuConstraint {
     static DESCRIPTION = (`
       Values in the 3x3 windoku boxes must be uniques.`);
     static CATEGORY = 'LayoutCheckbox';
+    static REQUIRES_MAIN_GRID = true;
     static DISPLAY_CONFIG = { displayClass: 'Windoku' };
     static UNIQUENESS_KEY_FIELD = 'type';
     static VALIDATE_SHAPE_FN = (geometry) => geometry.isSquare();
@@ -1688,6 +1701,7 @@ export class SudokuConstraint {
     static DESCRIPTION = (`
       No digit may appear in the same position in any two boxes.`);
     static CATEGORY = 'LayoutCheckbox';
+    static REQUIRES_MAIN_GRID = true;
     static UNIQUENESS_KEY_FIELD = 'type';
     static VALIDATE_SHAPE_FN = (geometry) => geometry.isSquare();
   }
@@ -1696,6 +1710,7 @@ export class SudokuConstraint {
     static DESCRIPTION = (`
       Cells which are a knight's move away cannot have the same value.`);
     static CATEGORY = 'LayoutCheckbox';
+    static REQUIRES_MAIN_GRID = true;
     static UNIQUENESS_KEY_FIELD = 'type';
 
     static displayName() {
@@ -1711,6 +1726,7 @@ export class SudokuConstraint {
       At each 0, the missing digits from each region differs.
       Only square grids with values 0-N are supported.`);
     static CATEGORY = 'LayoutCheckbox';
+    static REQUIRES_MAIN_GRID = true;
     static UNIQUENESS_KEY_FIELD = 'type';
     static VALIDATE_SHAPE_FN = (geometry) =>
       geometry.isSquare()
@@ -1736,6 +1752,7 @@ export class SudokuConstraint {
     static DESCRIPTION = (`
       Cells which are a king's move away cannot have the same value.`);
     static CATEGORY = 'LayoutCheckbox';
+    static REQUIRES_MAIN_GRID = true;
     static UNIQUENESS_KEY_FIELD = 'type';
 
     static displayName() {
@@ -1752,6 +1769,7 @@ export class SudokuConstraint {
       possible distance from cell A to cell B when traversed only through
       adjacent cells.`);
     static CATEGORY = 'Global';
+    static REQUIRES_MAIN_GRID = true;
     static UNIQUENESS_KEY_FIELD = 'type';
     static VALIDATE_SHAPE_FN = (geometry) => geometry.valueOffset === 0;
 
@@ -1785,6 +1803,7 @@ export class SudokuConstraint {
     static DESCRIPTION = (`
       No adjacent cells can have consecutive values.`);
     static CATEGORY = 'Global';
+    static REQUIRES_MAIN_GRID = true;
     static UNIQUENESS_KEY_FIELD = 'type';
 
     static fnKey = memoize((numValues, valueOffset = 0) =>
@@ -1803,6 +1822,7 @@ export class SudokuConstraint {
       Each 2x2 box in the grid has to contain a low digit (1, 2, 3),
       a middle digit (4, 5, 6) and a high digit (7, 8, 9).`);
     static CATEGORY = 'Global';
+    static REQUIRES_MAIN_GRID = true;
     static UNIQUENESS_KEY_FIELD = 'type';
     static VALIDATE_SHAPE_FN = (geometry) =>
       geometry.numValues === 9 && geometry.valueOffset === 0;
@@ -1815,6 +1835,7 @@ export class SudokuConstraint {
       Each 2x2 box in the grid has to contain a digit from (1, 4, 7),
       a digit from (2, 5, 8) and a digit from (3, 6, 9).`);
     static CATEGORY = 'Global';
+    static REQUIRES_MAIN_GRID = true;
     static UNIQUENESS_KEY_FIELD = 'type';
     static VALIDATE_SHAPE_FN = (geometry) => geometry.numValues === 9;
 
@@ -1831,6 +1852,7 @@ export class SudokuConstraint {
       Note that "No ranks" affects the grid even when there are no
       FullRank clues present.`);
     static CATEGORY = 'OutsideClueOption';
+    static REQUIRES_MAIN_GRID = true;
     static UNIQUENESS_KEY_FIELD = 'type';
     static VALIDATE_SHAPE_FN = (geometry) => geometry.isSquare();
     static ARGUMENT_CONFIG = {
@@ -1858,6 +1880,7 @@ export class SudokuConstraint {
       it. It may have both, but it doesn't need both.
       Only supported for when the allowed values are 1-9.`);
     static CATEGORY = 'Global';
+    static REQUIRES_MAIN_GRID = true;
     static UNIQUENESS_KEY_FIELD = 'type';
     static VALIDATE_SHAPE_FN = (geometry) =>
       geometry.numValues === 9 && geometry.valueOffset === 0;
@@ -1867,6 +1890,7 @@ export class SudokuConstraint {
     static DESCRIPTION = (`
       Values along the diagonal must be unique.`);
     static CATEGORY = 'LayoutCheckbox';
+    static REQUIRES_MAIN_GRID = true;
     static DISPLAY_CONFIG = { displayClass: 'Diagonal' };
     static ARGUMENT_CONFIG = {
       options: [
@@ -2850,6 +2874,7 @@ export class SudokuConstraint {
       cell has coordinates (R, C) and value V, then cell (R, V) has the
       value C.Row indexing is the same, but for rows.`);
     static CATEGORY = 'LinesAndSets';
+    static REQUIRES_MAIN_GRID = true;
     static DISPLAY_CONFIG = {
       displayClass: 'Indexing',
     };

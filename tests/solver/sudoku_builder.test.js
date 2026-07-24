@@ -8,6 +8,7 @@ ensureGlobalEnvironment();
 const { SudokuBuilder } = await import('../../js/solver/sudoku_builder.js');
 const { SudokuParser } = await import('../../js/sudoku_parser.js');
 const { SudokuConstraint, SudokuConstraintBase } = await import('../../js/sudoku_constraint.js');
+const { CellGeometry } = await import('../../js/cell_geometry.js');
 const HandlerModule = await import('../../js/solver/handlers.js');
 const SumHandlerModule = await import('../../js/solver/sum_handler.js');
 
@@ -16,9 +17,7 @@ const SumHandlerModule = await import('../../js/solver/sum_handler.js');
 // ============================================================================
 
 const buildHandlers = (constraint) => {
-  const geometry = constraint.getGeometry();
-  const constraintMap = constraint.toMap();
-  geometry.addVarCellsForConstraints([].concat(...constraintMap.values()));
+  const { geometry, constraintMap } = SudokuBuilder.buildGeometry(constraint);
   return [...SudokuBuilder._handlers(constraintMap, geometry)];
 };
 
@@ -142,6 +141,98 @@ await runTest('NoBoxes suppresses box AllDifferent handlers', () => {
   const adWithout = countHandlers(handlersWithout, 'AllDifferent');
   // Without boxes should have 9 fewer (no box handlers).
   assert.equal(adWith - adWithout, 9);
+});
+
+// ============================================================================
+// Cell group shapes
+// ============================================================================
+
+await runTest('a cell group shape removes the main grid', () => {
+  const constraint = SudokuParser.parseString('.Shape~VA~4.Var~A~~2x2');
+  const { geometry } = SudokuBuilder.buildGeometry(constraint);
+  assert.equal(geometry.mainCellGroup, 'VA');
+  assert.equal(geometry.numGridCells, 0);
+  assert.equal(geometry.totalCells(), 4);
+  assert.equal(geometry.parseCellId('VA1').cellIndex, 0);
+  assert.throws(() => geometry.parseCellId('R1C1'), /Invalid cell ID/);
+
+  assert.equal(countHandlers(buildHandlers(constraint), 'AllDifferent'), 0);
+});
+
+await runTest('a cell group shape requires a value range', () => {
+  assert.throws(() => CellGeometry.fromShapeSpec('VA'), /value range/);
+});
+
+await runTest('a cell group shape keeps constraint-provided handlers on var cells', () => {
+  const constraint = SudokuParser.parseString(
+    '.Shape~VA~4.Var~A~~2x2'
+    + '.Cage~6~VA1~VA2.AllDifferent~VA3~VA4');
+  const handlers = buildHandlers(constraint);
+  assert.equal(countHandlers(handlers, 'AllDifferent'), 2);
+  assert.ok(hasHandler(handlers, 'Sum'));
+});
+
+await runTest('a cell group shape requires the named group to exist', () => {
+  const constraint = SudokuParser.parseString('.Shape~VQ~4.Var~A~~4');
+  assert.throws(
+    () => SudokuBuilder.buildGeometry(constraint),
+    { name: 'InvalidConstraintError', message: /no cell group 'VQ'/ });
+});
+
+await runTest('a cell group shape makes grid cell references fail', () => {
+  const constraint = SudokuParser.parseString(
+    '.Shape~VA~4.Var~A~~4.Thermo~R1C1~R1C2');
+  assert.throws(() => buildHandlers(constraint), /Invalid cell ID/);
+});
+
+await runTestCases('a cell group shape rejects constraints defined on the main grid', [
+  ['Sandwich', '.Sandwich~8~C1'],
+  ['Skyscraper', '.Skyscraper~C5~5'],
+  ['HiddenSkyscraper', '.HiddenSkyscraper~R8~7~4'],
+  ['LittleKiller', '.LittleKiller~10~R1C1'],
+  ['XSum', '.XSum~C1~10~'],
+  ['NumberedRoom', '.NumberedRoom~C1~4~'],
+  ['FullRank', '.FullRank~C1~33~'],
+  ['FullRankTies', '.FullRankTies~any'],
+  ['RegionSameValues', '.RegionSameValues'],
+  ['RegionSize', '.RegionSize~4'],
+  ['NoBoxes', '.NoBoxes'],
+  ['Windoku', '.Windoku'],
+  ['DisjointSets', '.DisjointSets'],
+  ['Diagonal', '.Diagonal~1'],
+  ['Doppelganger', '.Doppelganger'],
+  ['AntiKnight', '.AntiKnight'],
+  ['AntiKing', '.AntiKing'],
+  ['AntiTaxicab', '.AntiTaxicab'],
+  ['AntiConsecutive', '.AntiConsecutive'],
+  ['GlobalEntropy', '.GlobalEntropy'],
+  ['GlobalMod', '.GlobalMod~3'],
+  ['DutchFlatmates', '.DutchFlatmates'],
+  ['StrictKropki', '.StrictKropki'],
+  ['StrictXV', '.StrictXV'],
+  ['ChaosConstruction', '.ChaosConstruction'],
+  ['Indexing', '.Indexing~C~VA1'],
+  // Blocked types nested inside composites must also be caught.
+  ['Sandwich inside Or', '.Or.Sandwich~8~C1.Sandwich~4~C2.End'],
+  ['Skyscraper inside And', '.And.Skyscraper~C5~5.End'],
+], (input) => {
+  const constraint = SudokuParser.parseString(
+    '.Shape~VA~9.Var~A~~2x2' + input);
+  assert.throws(
+    () => buildHandlers(constraint),
+    { name: 'InvalidConstraintError', message: /main grid/ },
+  );
+});
+
+// Jigsaw validates its layout size at parse time, so with no grid it fails
+// there — earlier than the builder flag, with its own message.
+await runTest('a cell group shape rejects Jigsaw at parse', () => {
+  assert.throws(
+    () => SudokuParser.parseString(
+      '.Shape~VA~9.Var~A~~2x2.Jigsaw~'
+      + '000111222000111222000111222333444555333444555'
+      + '333444555666777888666777888666777888'),
+    /Jigsaw layout expects 0 cells/);
 });
 
 // ============================================================================

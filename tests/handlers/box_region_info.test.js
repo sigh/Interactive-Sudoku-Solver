@@ -52,4 +52,15 @@ await runTest('BoxRegionInfo: NoBoxes constraint produces an empty boxRegions li
   assert.deepEqual(handler.boxRegions(), []);
 });
 
+await runTest('BoxRegionInfo: a cell group shape produces an empty boxRegions list', () => {
+  const constraint = new SudokuConstraint.Container([
+    new SudokuConstraint.Shape('VA', '4'),
+    new SudokuConstraint.Var('A', '', '2x2'),
+  ]);
+  const handlers = buildHandlers(constraint);
+  const handler = handlers.find(h => h instanceof BoxRegionInfo);
+
+  assert.deepEqual(handler.boxRegions(), []);
+});
+
 logSuiteComplete('box_region_info.test.js');

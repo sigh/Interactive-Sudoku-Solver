@@ -27,6 +27,10 @@ export class SudokuSolver {
     this._reset();
   }
 
+  geometry() {
+    return this._geometry;
+  }
+
   _reset() {
     this._internalSolver.reset();
     this._timer = new Timer();

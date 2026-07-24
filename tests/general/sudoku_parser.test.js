@@ -778,4 +778,11 @@ await runTest('parseText merges Givens across sections', () => {
   assert.deepEqual(r1c1.values, [2, 3]);
 });
 
+await runTest('parseString should parse and round-trip a cell group shape', () => {
+  const result = SudokuParser.parseString('.Shape~VA~0-8.Var~A~~9x9.');
+  assert.ok(result);
+  assertConstraintCount(result, 'Shape', 1);
+  assert.equal(result.toString(), '.Shape~VA~0-8.Var~A~~9x9');
+});
+
 logSuiteComplete('SudokuParser');

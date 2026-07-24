@@ -100,14 +100,26 @@ export class BuildContext {
 
 export class SudokuBuilder {
   static build(constraint, debugOptions) {
-    const geometry = constraint.getGeometry();
-    const constraintMap = constraint.toMap();
-    // The geometry enforces the cell-count limit here (throws if too many cells).
-    geometry.addVarCellsForConstraints([].concat(...constraintMap.values()));
-
+    const { geometry, constraintMap } = this.buildGeometry(constraint);
     const handlers = [...this._handlers(constraintMap, geometry)];
 
     return new SudokuSolver(handlers, geometry, debugOptions);
+  }
+
+  static buildGeometry(constraint) {
+    const geometry = constraint.getGeometry();
+    const constraintMap = constraint.toMap();
+
+    // The geometry enforces the cell-count limit here (throws if too many cells).
+    geometry.addVarCellsForConstraints([].concat(...constraintMap.values()));
+
+    const mainCellGroup = geometry.mainCellGroup;
+    if (mainCellGroup && !geometry.varCellsForGroup(mainCellGroup)) {
+      throw new InvalidConstraintError(
+        `Shape: no cell group '${mainCellGroup}'.`);
+    }
+
+    return { geometry, constraintMap };
   }
 
   static resolveConstraint(constraint) {
@@ -281,6 +293,11 @@ export class SudokuBuilder {
     for (const constraint of constraints) {
       context.recordConstraint(constraint);
 
+      if (geometry.mainCellGroup && constraint.constructor.REQUIRES_MAIN_GRID) {
+        throw new InvalidConstraintError(
+          `${constraint.constructor.displayName()} is defined in terms of ` +
+          'the main grid, which is not in use.');
+      }
       // Validate constraint is compatible with the geometry.
       const validateShape = constraint.constructor.VALIDATE_SHAPE_FN;
       if (validateShape && !validateShape(geometry)) {
