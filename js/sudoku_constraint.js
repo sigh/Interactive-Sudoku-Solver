@@ -369,6 +369,7 @@ export class LineOptions {
   startMarker;
   endMarker;
   nodeMarker;
+  midMarker;
   arrow = false;
   dashed = false;
 
@@ -1187,7 +1188,7 @@ export class SudokuConstraint {
     static DISPLAY_CONFIG = {
       displayClass: 'GenericLine',
       color: 'rgb(180, 180, 255)',
-      dashed: true,
+      midMarker: true,
     };
 
     constructor(...cells) {

@@ -206,6 +206,15 @@ class BaseConstraintDisplayItem extends DisplayItem {
           nodeMarker, points, i));
       }
     }
+    if (options.midMarker) {
+      // For even-length lines the middle is between the two central points.
+      const [p0, p1] = [points[(len - 1) >> 1], points[len >> 1]];
+      const circle = this._makeCircleAtPoint(
+        [(p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2]);
+      circle.setAttribute('r', this._CIRCLE_RADIUS / 2);
+      circle.setAttribute('stroke-width', 0);
+      g.append(circle);
+    }
 
     // Make and style the path.
     const path = this._makePath(points);
