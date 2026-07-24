@@ -35,6 +35,34 @@
   outline: 2px solid var(--color-primary);
 }
 
+/* URLs in code keep their token color; the underline marks them as openable. */
+#sandbox-container .editor a {
+  color: inherit;
+  text-decoration: underline dotted;
+}
+
+#sandbox-container .editor a:hover {
+  text-decoration: underline;
+}
+
+/* Floating open-link icon, positioned by the sandbox JS beside the link the
+   caret is in. */
+#sandbox-container .sandbox-link-open {
+  position: fixed;
+  z-index: 10;
+  padding: 3px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: white;
+  line-height: 0;
+}
+
+#sandbox-container .sandbox-link-open img {
+  display: block;
+  width: 14px;
+  height: 14px;
+}
+
 /* Console output */
 #sandbox-container .sandbox-output {
   background: white;

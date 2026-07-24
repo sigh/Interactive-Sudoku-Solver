@@ -2,7 +2,7 @@
 
 
 const { CodeJar } = await import('../../lib/codejar.min.js' + self.VERSION_PARAM);
-const { autoSaveField, Base64Codec, copyToClipboard } = await import('../util.js' + self.VERSION_PARAM);
+const { autoSaveField, Base64Codec, copyToClipboard, createSourceLinkIcon } = await import('../util.js' + self.VERSION_PARAM);
 const { DEFAULT_CODE, EXAMPLES } = await import('./examples.js' + self.VERSION_PARAM);
 const { UserScriptExecutor } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
 const {
@@ -138,7 +138,8 @@ export class EmbeddedSandbox {
   async _initEditor() {
     const highlight = (editor) => {
       const code = editor.textContent;
-      editor.innerHTML = Prism.highlight(code, Prism.languages.javascript, 'javascript');
+      editor.innerHTML = linkifyUrls(
+        Prism.highlight(code, Prism.languages.javascript, 'javascript'));
     };
 
     this._jar = CodeJar(
@@ -147,6 +148,7 @@ export class EmbeddedSandbox {
       { tab: '  ', addClosing: false });
 
     installLargeSelectionHandlers(this._editorElement, this._jar);
+    installLinkOpenIcon(this._editorElement);
 
     // Load saved code first so it is available as a fallback.
     autoSaveField(this._editorElement);
@@ -351,6 +353,46 @@ export class EmbeddedSandbox {
     this._clearOutput();
   }
 }
+
+// Wrap URLs (e.g. puzzle links in example comments) in anchors. Runs on the
+// highlighted HTML; the excluded characters mean a match can't cross Prism's
+// markup, and trailing punctuation (including a closing paren) stays outside
+// the link since URLs usually appear inside prose.
+const URL_REGEX = /https?:\/\/[^\s"'`<>]*[^\s"'`<>).,;:]/g;
+const linkifyUrls = (html) => html.replace(URL_REGEX, '<a href="$&">$&</a>');
+
+// A floating open-link icon beside the link the caret is in — clicking or
+// tapping a link places the caret inside it. The icon lives outside the
+// editor, so it adds no text to the code and CodeJar's text-offset caret
+// handling is untouched.
+const installLinkOpenIcon = (editor) => {
+  const icon = createSourceLinkIcon(
+    '', 'sandbox-link-open', 'img/open-in-new-48.png');
+  icon.title = 'Open link';
+  icon.hidden = true;
+  editor.parentNode.appendChild(icon);
+
+  // mousedown would move the caret out of the link, hiding the icon before
+  // the click lands on it.
+  icon.addEventListener('mousedown', (e) => e.preventDefault());
+
+  const update = () => {
+    const selection = document.getSelection();
+    const node = selection?.isCollapsed ? selection.anchorNode : null;
+    const link = node && editor.contains(node)
+      ? (node instanceof Element ? node : node.parentElement).closest('a')
+      : null;
+    icon.hidden = !link;
+    if (!link) return;
+    icon.href = link.href;
+    const rect = link.getBoundingClientRect();
+    icon.style.left = `${rect.right + 2}px`;
+    icon.style.top = `${rect.top - 2}px`;
+  };
+
+  document.addEventListener('selectionchange', update);
+  editor.addEventListener('scroll', update);
+};
 
 // Replacing a large selection through the browser's native contenteditable path
 // is O(n^2) in the number of highlighted spans, so any edit over a big selection

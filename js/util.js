@@ -66,7 +66,8 @@ const sourceIconForUrl = (url) => {
   return FALLBACK_SOURCE_ICON;
 };
 
-export const createSourceLinkIcon = (url, className) => {
+// `iconSrc` overrides the default per-domain source icon.
+export const createSourceLinkIcon = (url, className, iconSrc) => {
   const link = document.createElement('a');
   link.className = className;
   link.href = url;
@@ -76,7 +77,7 @@ export const createSourceLinkIcon = (url, className) => {
 
   const img = document.createElement('img');
   img.alt = 'source';
-  img.src = sourceIconForUrl(url);
+  img.src = iconSrc ?? sourceIconForUrl(url);
   img.onerror = () => {
     img.onerror = null;
     img.src = FALLBACK_SOURCE_ICON;
