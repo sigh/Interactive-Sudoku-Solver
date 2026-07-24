@@ -43,6 +43,7 @@ CONSTRAINT OBJECTS
   A Var constraint exposes its member cell ids:
     new Var('F', 'flags', 23).cells()      => ['VF1', ..., 'VF23']
     new Var('F', 'flags', 23).cell(5)      => 'VF5'  (bare 'VF' when count is 1)
+    new Var('G', 'grid', '9x9').cell(2, 3) => 'VG12' (row, col in declared dims)
 
   Outside clues (LittleKiller, Sandwich, XSum, ...) take a canonical arrowId,
   often not the cell nearest the drawn clue. Build one from its line of cells:

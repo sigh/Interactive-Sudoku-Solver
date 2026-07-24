@@ -359,6 +359,67 @@ export const SOURCE_RULES = [
     }),
   },
   {
+    code: 'overlay-at-make-cell-id',
+    tier: 'heuristic',
+    summary: 'at(makeCellId(...)) builds an id just to translate it; declare '
+      + 'RxC dimensions on the Var and use cell(row, col)',
+    docs: 'Matches <overlay>.at(makeCellId(...)) for variables assigned from\n'
+      + 'makeOverlay(). Coordinate access belongs on the Var itself:\n'
+      + 'cell(row, col) resolves against the declared dimensions with no id\n'
+      + 'round-trip. Overlays remain the tool for graph structure (rows,\n'
+      + 'neighbours, makeReplicate) keyed by real grid cells.',
+    check(ctx) {
+      const source = ctx.view('code');
+      const overlays = new Set([...source.matchAll(
+        /\bconst\s+([A-Za-z_$][\w$]*)\s*=\s*[^;]*?\.makeOverlay\s*\(/g,
+      )].map(match => match[1]));
+      if (!overlays.size) return [];
+      const items = [];
+      const call = /\b([A-Za-z_$][\w$]*)\.at\(\s*makeCellId\s*\(/g;
+      for (const match of source.matchAll(call)) {
+        if (!overlays.has(match[1])) continue;
+        items.push({
+          line: ctx.lineAt(match.index),
+          code: this.code,
+          message: `${match[1]}.at(makeCellId(...)) round-trips through a cell `
+            + `id; use the Var's cell(row, col) with declared dimensions`,
+        });
+      }
+      return items;
+    },
+  },
+  {
+    code: 'manual-var-cell-arithmetic',
+    tier: 'heuristic',
+    summary: 'row-major arithmetic into a Var\'s .cell(); pair the group with '
+      + 'makeOverlay()/at() instead',
+    docs: 'Matches <var>.cell(<expr containing *>) where <var> was assigned from\n'
+      + 'new Var(...). Hand-rolled row-major indexing is where a silent\n'
+      + 'off-by-one encodes the wrong puzzle while still linting and solving;\n'
+      + 'a grid-shaped Var group read through makeOverlay()/at() needs no index\n'
+      + 'math. Literal and additive indices (cell(9), cell(i + 1)) are left\n'
+      + 'alone: only multiplicative row/column folding is flagged.',
+    check(ctx) {
+      const source = ctx.view('code');
+      const vars = new Set([...source.matchAll(
+        /\bconst\s+([A-Za-z_$][\w$]*)\s*=\s*new\s+(?:SudokuConstraint\.)?Var\s*\(/g,
+      )].map(match => match[1]));
+      if (!vars.size) return [];
+      const items = [];
+      const call = /\b([A-Za-z_$][\w$]*)\.cell\(\s*([^()]*\*[^()]*)\)/g;
+      for (const match of source.matchAll(call)) {
+        if (!vars.has(match[1])) continue;
+        items.push({
+          line: ctx.lineAt(match.index),
+          code: this.code,
+          message: `${match[1]}.cell(${match[2].trim()}) hand-rolls row-major `
+            + `indexing; read the group through makeOverlay()/at() instead`,
+        });
+      }
+      return items;
+    },
+  },
+  {
     code: 'num-values-mismatch',
     tier: 'heuristic',
     summary: 'NFA.encodeSpec / Pair.fnToKey numValues literal disagrees with the declared Shape',

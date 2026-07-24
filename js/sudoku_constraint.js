@@ -2959,8 +2959,15 @@ export class SudokuConstraint {
     }
 
     // The nth member cell id (1-based): 'V{prefix}{n}', or the bare
-    // 'V{prefix}' for a single-cell group.
-    cell(n) {
+    // 'V{prefix}' for a single-cell group. cell(row, col) addresses the
+    // declared dimensions instead.
+    cell(n, col) {
+      if (col !== undefined) {
+        if (!this.columns || col < 1 || col > this.columns) {
+          throw new Error(`Var ${this.prefix} has no cell (${n}, ${col})`);
+        }
+        n = (n - 1) * this.columns + col;
+      }
       return this.count === 1 ? 'V' + this.prefix : `V${this.prefix}${n}`;
     }
 

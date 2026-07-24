@@ -166,6 +166,44 @@ await runTest('lint_sandbox_script prefers overlay array translation over map', 
   assert.doesNotMatch(report(clean), /overlay-map-use-array/);
 });
 
+await runTest('lint_sandbox_script flags at(makeCellId()) coordinate round-trips', () => {
+  const flagged = lintSource(SCRIPT_HEADER
+    + "const graph = cellGraph('9x9');\n"
+    + "const tbl = graph.makeOverlay('VG');\n"
+    + 'const cellAt = (r, c) => tbl.at(makeCellId(r + 1, c + 1));\n'
+    + "return [new Shape('9x9')];\n");
+  assert.equal(flagged.filter(i => i.code === 'overlay-at-make-cell-id').length, 1,
+    report(flagged));
+  assert.match(report(flagged), /tbl\.at\(makeCellId\(\.\.\.\)\) round-trips/);
+
+  const clean = lintSource(SCRIPT_HEADER
+    + "const graph = cellGraph('9x9');\n"
+    + "const tbl = graph.makeOverlay('VG');\n"
+    + 'const a = tbl.at(cells);\n'
+    + 'const id = makeCellId(2, 3);\n'
+    + 'const unrelated = records.at(makeCellId(1, 1));\n'
+    + "return [new Shape('9x9')];\n");
+  assert.doesNotMatch(report(clean), /overlay-at-make-cell-id/);
+});
+
+await runTest('lint_sandbox_script flags row-major arithmetic into Var cell()', () => {
+  const flagged = lintSource(SCRIPT_HEADER
+    + "const GRID = new Var('G', 'Grid', '9x9');\n"
+    + 'const cellAt = (r, c) => GRID.cell(r * 9 + c + 1);\n'
+    + "return [new Shape('1x1'), GRID];\n");
+  assert.equal(flagged.filter(i => i.code === 'manual-var-cell-arithmetic').length, 1,
+    report(flagged));
+  assert.match(report(flagged), /GRID\.cell\(r \* 9 \+ c \+ 1\) hand-rolls/);
+
+  const clean = lintSource(SCRIPT_HEADER
+    + "const GRID = new Var('G', 'Grid', '9x9');\n"
+    + 'const first = GRID.cell(1);\n'
+    + 'const next = i => GRID.cell(i + 1);\n'
+    + 'const unrelated = table.cell(r * 9 + c);\n'
+    + "return [new Shape('1x1'), GRID];\n");
+  assert.doesNotMatch(report(clean), /manual-var-cell-arithmetic/);
+});
+
 await runTest('lint_constraints suggests native constraints per key group', () => {
   // The native suggestion fires only when EVERY Pair sharing the key is a
   // 2-cell adjacent pair — a partial replacement would split one drawn rule
