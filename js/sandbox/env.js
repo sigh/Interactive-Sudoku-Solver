@@ -295,7 +295,8 @@ class SandboxOverlay extends SandboxCellGraph {
     // pair. Two arrays (pos -> cell) and two maps (cell -> pos) give O(1) both ways.
     this._prefix = prefix;
     this._gridCells = gridCells;
-    this._cells = gridCells.map((_, i) => `${prefix}${i + 1}`);
+    this._cells = gridCells.map((_, i) =>
+      gridCells.length === 1 ? prefix : `${prefix}${i + 1}`);
     this._gridPos = new Map(gridCells.map((cell, i) => [cell, i]));
     this._varPos = new Map(this._cells.map((varCell, i) => [varCell, i]));
 

@@ -530,6 +530,14 @@ await runTest('overlay toVar() derives the matching Var constraint', () => {
     ['S', 'S', '4x4']);
 });
 
+await runTest('a single-cell overlay uses the bare prefix, like the registry', () => {
+  const single = cellGraph('4x4').makeOverlay('VM', ['R2C2']);
+  assert.deepEqual(single.cells(), ['VM']);
+  assert.equal(single.at('R2C2'), 'VM');
+  assert.equal(single.gridAt('VM'), 'R2C2');
+  assert.equal(single.toVar().toString(), '.Var~M~M');
+});
+
 await runTest('overlay toVar() rejects a non-var prefix', () => {
   // 'CC' is a chaos-construction group, registered by its own constraint.
   assert.throws(() => cellGraph('4x4').makeOverlay('CC').toVar(), /'V'-prefixed/);
