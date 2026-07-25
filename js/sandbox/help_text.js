@@ -117,7 +117,8 @@ STATE MACHINES (NFA)
                              (which also supplies the default valueOffset);
                              Pair.fnToKey accepts the same forms
       opts.multiSegment      Compile with segments, with SEGMENT_BREAK passed into
-                             transition
+                             transition. maxDepth counts each SEGMENT_BREAK as a
+                             consumed symbol: bound = cells + (segments - 1)
       opts.valueOffset       offset added to cell values before transition, e.g.
                              -1 for a 0-based grid. Default 0.
     new NFA(encoded, name, ...cells)         => apply over an ordered cell list.
