@@ -186,4 +186,19 @@ await runTest('works with more than 16 exclusion groups', () => {
   assert.equal(grid[16], valueMask(1));
 });
 
+await runTest('failed init still rejects rather than throwing', () => {
+  // A handler that returns false from initialize stays in the handler set -- the
+  // grid is invalidated, the handler is not removed -- so enforceConsistency is
+  // still called on it. It must reject, not throw on state initialize never set.
+  // Here there is no combination of 5 distinct values summing to 5, so init fails.
+  const context = new GridTestContext({ gridSize: [1, 4], numValues: 4 });
+  const handler = new CountingCircles([0, 1, 2, 3, 4]);
+  assert.equal(
+    context.initializeHandler(handler, { cellExclusions: noExclusions(5) }),
+    false, 'this cell count should be unsatisfiable');
+
+  const acc = createAccumulator();
+  assert.equal(handler.enforceConsistency(context.grid, acc), false);
+});
+
 logSuiteComplete('counting_circles.test.js');

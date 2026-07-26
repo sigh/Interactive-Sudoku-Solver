@@ -2736,6 +2736,8 @@ export class Indexing extends SudokuConstraintHandler {
 }
 
 export class CountingCircles extends SudokuConstraintHandler {
+  static _emptyCombinations = new Uint16Array(0);
+
   constructor(cells) {
     // Ensure that cells are sorted:
     // - Makes sure that the constraint performance is independent of the sort
@@ -2764,6 +2766,10 @@ export class CountingCircles extends SudokuConstraintHandler {
     const numCells = this.cells.length;
     const valueOffset = geometry.valueOffset;
     this._valueOffset = valueOffset;
+
+    // A failed init leaves the handler in the set, so enforceConsistency still runs.
+    // No combinations means no allowed values, which it already rejects.
+    this._combinations = this.constructor._emptyCombinations;
 
     const allValues = HandlerUtil.cellsAllValues(initialGridCells, this.cells);
     const numValues = LookupTables.maxValue(allValues);
