@@ -171,6 +171,12 @@ const collectLeaves = (constraint, flags, out) => {
   return out;
 };
 
+// Classes that pair their cells by grid adjacency rather than by the order given.
+// Sequential-pair line classes (Whisper, Thermo, Palindrome, ...) bind by cell-list
+// order and are unaffected: do not add them here.
+const ADJACENCY_BOUND_TYPES = new Set(
+  ['WhiteDot', 'BlackDot', 'GreaterThan', 'X', 'V']);
+
 // Native binary relations a Pair key can re-encode. All but GreaterThan are
 // symmetric; GreaterThan is directed, so both orders are matched. The native
 // classes require orthogonally-adjacent grid cells
@@ -365,6 +371,46 @@ const makeContext = (text) => {
 // ---------------------------------------------------------------------------
 
 export const OUTPUT_RULES = [
+  {
+    code: 'adjacency-clue-drops-cells',
+    tier: 'exact',
+    summary: 'a WhiteDot/BlackDot/GreaterThan/X/V clue whose cell list is not fully '
+      + 'connected, so some of its cells are silently unconstrained',
+    docs: 'These classes pair their cells by grid adjacency, not by the order given,\n'
+      + 'so a cell with no adjacent neighbour in the list contributes nothing and the\n'
+      + 'clue quietly means less than it reads as. SudokuBuilder rejects the total\n'
+      + 'case (no pairs at all), but a partly-connected list builds happily with the\n'
+      + 'stray cells dropped -- that is what this catches. Split the clue, or use a\n'
+      + 'Pair key, which binds strictly by array position. Only grid cells are judged;\n'
+      + 'these classes are also used over Var-overlay cells, whose adjacency is a\n'
+      + 'separate question this rule does not answer.',
+    make: () => {
+      const dropped = [];
+      return {
+        collect(leaf, ctx) {
+          if (!ADJACENCY_BOUND_TYPES.has(leaf.type)) return;
+          const cells = leaf.cells || [];
+          if (cells.length < 2 || !cells.every(parseGridCell)) return;
+          let pairs;
+          try {
+            pairs = SudokuConstraintBase._adjacentCellPairs(cells, ctx.geometry);
+          } catch (e) {
+            return;
+          }
+          // Every cell should reach at least one other, so a fully connected list
+          // yields at least cells-1 pairs.
+          if (pairs.length < cells.length - 1) dropped.push({ leaf, cells, pairs });
+        },
+        finalize(ctx, add) {
+          for (const { leaf, cells, pairs } of dropped) {
+            add(leaf.line(),
+              `${leaf.type} on ${describeCells(cells)} binds ${pairs.length} pair(s) `
+              + `for ${cells.length} cells; the unpaired cells are unconstrained`);
+          }
+        },
+      };
+    },
+  },
   {
     code: 'contain-at-least-use-quad',
     tier: 'exact',

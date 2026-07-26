@@ -222,6 +222,23 @@ await runTest('lint_constraints suggests native constraints per key group', () =
   assert.doesNotMatch(report(mixedGroup), /pair-native-relation/);
 });
 
+await runTest('lint_constraints flags adjacency-paired clues that drop cells', () => {
+  // The builder rejects a clue that binds NO pairs, but a partly-connected list
+  // builds happily with the stray cells dropped -- nothing else catches that.
+  const partial = lintConstraintText('.Shape~4x4\n.WhiteDot~R1C1~R1C2~R4C4\n');
+  assert.match(report(partial),
+    /adjacency-clue-drops-cells.*binds 1 pair\(s\) for 3 cells/);
+
+  // A fully connected list is the normal case and must not fire.
+  const adjacent = lintConstraintText('.Shape~4x4\n.GreaterThan~R1C1~R1C2\n');
+  assert.doesNotMatch(report(adjacent), /adjacency-clue-drops-cells/);
+
+  // Sequential-pair line classes bind by cell-list order, not grid adjacency, so a
+  // diagonal Whisper is perfectly valid and must not be swept up.
+  const diagonalWhisper = lintConstraintText('.Shape~4x4\n.Whisper~2~R1C1~R2C2~R3C3\n');
+  assert.doesNotMatch(report(diagonalWhisper), /adjacency-clue-drops-cells/);
+});
+
 await runTest('lint_constraints --script runs inputs through the sandbox', async () => {
   const items = await lintScript(
     "return [new Shape('9x9'), new Sum('0_=_1_1_-1', 'R5C1', 'R5C2', 'R6C1')];\n");

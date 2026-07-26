@@ -262,6 +262,18 @@ export class SudokuBuilder {
     }
   }
 
+  // These clues pair their cells by grid adjacency, not by the order given, so a
+  // non-adjacent cell list binds nothing. Always a use error, never a valid clue.
+  static _adjacentPairsOrThrow(constraint, geometry) {
+    const pairs = constraint.adjacentPairs(geometry);
+    if (!pairs.length) {
+      throw new InvalidConstraintError(
+        `${constraint.type} enforces nothing: `
+        + `no adjacent cell pairs in [${constraint.cells}]`);
+    }
+    return pairs;
+  }
+
   // Build the handlers for a list of constraints.
   static * _constraintHandlers(constraints, context) {
     const { spec, geometry } = context;
@@ -773,53 +785,28 @@ export class SudokuBuilder {
             cells.cellIds(geometry), cells.isLoop(), constraint.sum);
           break;
 
-        case 'WhiteDot': {
-          const pairs = constraint.adjacentPairs(geometry);
-          if (!pairs.length) {
-            throw new InvalidConstraintError(
-              `WhiteDot enforces nothing: no adjacent cell pairs in [${constraint.cells}]`);
-          }
-          for (const [a, b] of pairs) {
-            yield new HandlerModule.BinaryConstraint(
-              a, b,
-              SudokuConstraint.WhiteDot.fnKey(geometry.numValues, geometry.valueOffset));
-          }
-          break;
-        }
-
-        case 'BlackDot': {
-          const pairs = constraint.adjacentPairs(geometry);
-          if (!pairs.length) {
-            throw new InvalidConstraintError(
-              `BlackDot enforces nothing: no adjacent cell pairs in [${constraint.cells}]`);
-          }
-          for (const [a, b] of pairs) {
-            yield new HandlerModule.BinaryConstraint(
-              a, b,
-              SudokuConstraint.BlackDot.fnKey(geometry.numValues, geometry.valueOffset));
+        case 'WhiteDot':
+        case 'BlackDot':
+        case 'GreaterThan': {
+          const fn = SudokuConstraint[constraint.type].fnKey(
+            geometry.numValues, geometry.valueOffset);
+          for (const [a, b] of this._adjacentPairsOrThrow(constraint, geometry)) {
+            yield new HandlerModule.BinaryConstraint(a, b, fn);
           }
           break;
         }
 
         case 'X':
-          for (const pair of constraint.adjacentPairs(geometry)) {
+          for (const pair of this._adjacentPairsOrThrow(constraint, geometry)) {
             yield new SumHandlerModule.Sum(pair, 10);
           }
           break;
 
         case 'V':
-          for (const pair of constraint.adjacentPairs(geometry)) {
+          for (const pair of this._adjacentPairsOrThrow(constraint, geometry)) {
             yield new SumHandlerModule.Sum(pair, 5);
           }
           break;
-
-        case 'GreaterThan': {
-          const fn = SudokuConstraint.GreaterThan.fnKey(geometry.numValues, geometry.valueOffset);
-          for (const [a, b] of constraint.adjacentPairs(geometry)) {
-            yield new HandlerModule.BinaryConstraint(a, b, fn);
-          }
-          break;
-        }
 
         case 'ValueIndexing':
           {

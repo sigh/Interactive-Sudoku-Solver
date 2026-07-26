@@ -410,24 +410,34 @@ await runTest('Given produces GivenCandidates handler', () => {
 // InvalidConstraintError
 // ============================================================================
 
-await runTest('WhiteDot with no adjacent pairs throws InvalidConstraintError', () => {
-  const constraint = new SudokuConstraint.Container([
-    new SudokuConstraint.WhiteDot('R1C1', 'R5C5'),
-  ]);
+// WhiteDot and BlackDot have been guarded for a while; X, V and GreaterThan pair
+// their cells the same way and were not, so a non-adjacent cell list built them into
+// zero handlers and the clue enforced nothing -- no error, and verify_solution would
+// accept a grid that plainly violated it. The guard belongs to the pairing behaviour,
+// not to any one class, so every class that pairs by adjacency is covered here.
+await runTestCases('adjacency-paired clue with no adjacent pairs throws', [
+  ['WhiteDot', () => new SudokuConstraint.WhiteDot('R1C1', 'R5C5')],
+  ['BlackDot', () => new SudokuConstraint.BlackDot('R1C1', 'R5C5')],
+  ['GreaterThan', () => new SudokuConstraint.GreaterThan('R1C1', 'R5C5')],
+  ['X', () => new SudokuConstraint.X('R1C1', 'R5C5')],
+  ['V', () => new SudokuConstraint.V('R1C1', 'R5C5')],
+], (make) => {
   assert.throws(
-    () => buildHandlers(constraint),
-    { name: 'InvalidConstraintError' },
-  );
+    () => buildHandlers(new SudokuConstraint.Container([make()])),
+    { name: 'InvalidConstraintError' });
 });
 
-await runTest('BlackDot with no adjacent pairs throws InvalidConstraintError', () => {
-  const constraint = new SudokuConstraint.Container([
-    new SudokuConstraint.BlackDot('R1C1', 'R5C5'),
-  ]);
-  assert.throws(
-    () => buildHandlers(constraint),
-    { name: 'InvalidConstraintError' },
-  );
+// The mirror of the above: adjacent cells are what these classes are for, so the
+// guard must not fire on them.
+await runTestCases('adjacency-paired clue with adjacent cells builds a handler', [
+  ['WhiteDot', () => new SudokuConstraint.WhiteDot('R1C1', 'R1C2')],
+  ['BlackDot', () => new SudokuConstraint.BlackDot('R1C1', 'R1C2')],
+  ['GreaterThan', () => new SudokuConstraint.GreaterThan('R1C1', 'R1C2')],
+  ['X', () => new SudokuConstraint.X('R1C1', 'R1C2')],
+  ['V', () => new SudokuConstraint.V('R1C1', 'R1C2')],
+], (make) => {
+  const handlers = buildHandlers(new SudokuConstraint.Container([make()]));
+  assert.ok(handlers.length > 0, 'should build at least one handler');
 });
 
 await runTest('Diagonal on non-square grid throws InvalidConstraintError', () => {
