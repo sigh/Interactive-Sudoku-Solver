@@ -80,6 +80,32 @@ await runTest('lint_sandbox_script passes idiomatic helpers', () => {
   assert.equal(items.length, 0, report(items));
 });
 
+await runTest('custom-neighbour-helper ignores a predicate that only borrows the name', () => {
+  // Taken from a real puzzle: a Pair key function named `pickyNeighbors`
+  // compares two digits and never touches the grid. The old name-only rule
+  // failed the whole evaluate run until the variable was renamed.
+  const items = lintSource(SCRIPT_HEADER
+    + 'const pickyNeighbors = Pair.fnToKey((a, b) => {\n'
+    + '  const d = Math.abs(a - b);\n'
+    + '  return d !== 0 && a % d === 0 && b % d === 0;\n'
+    + '}, 9);\n'
+    + "return [new Shape('9x9'), new Pair(pickyNeighbors, 'x', 'R1C1', 'R1C2')];\n");
+  assert.equal(items.length, 0, report(items));
+});
+
+await runTest('custom-neighbour-helper still flags a hand-rolled adjacency helper', () => {
+  const items = lintSource(SCRIPT_HEADER
+    + 'function kingNeighbourCells(row, col) {\n'
+    + '  const out = [];\n'
+    + '  for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {\n'
+    + '    out.push(makeCellId(row + dr, col + dc));\n'
+    + '  }\n'
+    + '  return out;\n'
+    + '}\n'
+    + "return [new Shape('9x9')];\n");
+  assert.match(report(items), /custom-neighbour-helper/);
+});
+
 await runTest('lint_sandbox_script flags numValues/Shape mismatch and id templates', () => {
   const items = lintSource(SCRIPT_HEADER
     + 'const key = Pair.fnToKey((a, b) => a < b, 9);\n'

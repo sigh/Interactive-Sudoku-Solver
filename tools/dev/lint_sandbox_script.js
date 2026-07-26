@@ -102,6 +102,35 @@ const patternRule = ({ patterns, excludeLine, scope = 'code' }) =>
     return items;
   };
 
+// The text of the declaration starting at `start`: brace-matched when it has a
+// block body, otherwise up to the end of the statement. Bounded, so an unclosed
+// brace cannot drag the scan through the rest of the file.
+const declarationBody = (source, start) => {
+  const end = Math.min(source.length, start + 2000);
+  const brace = source.indexOf('{', start);
+  const semi = source.indexOf(';', start);
+  if (brace !== -1 && brace < end && (semi === -1 || brace < semi)) {
+    let depth = 0;
+    for (let i = brace; i < end; i++) {
+      if (source[i] === '{') depth++;
+      else if (source[i] === '}' && --depth === 0) return source.slice(start, i + 1);
+    }
+    return source.slice(start, end);
+  }
+  return source.slice(start, semi === -1 ? end : Math.min(semi + 1, end));
+};
+
+// What a cell-neighbour helper actually *does*: steps a row/column by a small
+// offset, or builds the id of the cell it stepped to. A predicate over two
+// digits does none of this, whatever it is called.
+const ADJACENCY_BEHAVIOUR = new RegExp([
+  /\[\s*-?[01]\s*,\s*-?[01]\s*\]/,        // offset pairs: [-1, 0], [0, 1]
+  /\b(?:d[rc]|dRow|dCol|dx|dy)\b/,        // named deltas
+  /\b(?:row|col|r|c)\s*[+-]\s*\d/,        // row + 1, c - 1
+  /makeCellId\s*\(/,                      // building the stepped-to cell id
+  /`R\$\{/,                               // ... or its template form
+].map((r) => r.source).join('|'));
+
 export const SOURCE_RULES = [
   {
     code: 'manual-cell-id-regex',
@@ -152,17 +181,32 @@ export const SOURCE_RULES = [
     code: 'custom-neighbour-helper',
     tier: 'heuristic',
     summary: 'custom neighbour helper found; prefer cellGraph().neighbours/kingNeighbours when applicable',
-    docs: 'Name-based, so it is the most false-positive-prone rule here: King must\n'
-      + 'start the name or a camelCase word ("kingMoves", "antiKing"), since a bare\n'
-      + '[Kk]ing also matches "Marking". Helpers built ON the cell graph, and data\n'
-      + 'tables whose name merely contains the keyword, are excluded.',
-    check: patternRule({
-      patterns: [
+    docs: 'The name only nominates a candidate; the body decides. A declaration is\n'
+      + 'reported only when it also *computes* adjacency -- steps a row/column by a\n'
+      + 'small offset, or builds the id of the cell it stepped to. That keeps the\n'
+      + 'rule off predicates that merely borrow the vocabulary: a Pair key function\n'
+      + 'named `pickyNeighbors` compares two digits and never touches the grid.\n'
+      + 'King must still start the name or a camelCase word ("kingMoves",\n'
+      + '"antiKing"), since a bare [Kk]ing also matches "Marking". Helpers built ON\n'
+      + 'the cell graph, and data tables, are excluded by line as before.',
+    check: function check(ctx) {
+      const source = ctx.view('code');
+      const exclude = /\bcellGraph\(|\bgraph\.|\.step\(|\.neighbours\(|\.kingNeighbours\(|=\s*\[/;
+      const patterns = [
         /\bfunction\s+(?:\w*(?:[Nn]eighbou?r|[Oo]rthogonal|King)\w*|king\w*)\s*\(/g,
         /\bconst\s+(?:\w*(?:[Nn]eighbou?r|[Oo]rthogonal|King)\w*|king\w*)\s*=/g,
-      ],
-      excludeLine: /\bcellGraph\(|\bgraph\.|\.step\(|\.neighbours\(|\.kingNeighbours\(|=\s*\[/,
-    }),
+      ];
+      const items = [];
+      for (const pattern of patterns) {
+        for (const match of source.matchAll(pattern)) {
+          const line = ctx.lineAt(match.index);
+          if (exclude.test(ctx.lines[line - 1])) continue;
+          if (!ADJACENCY_BEHAVIOUR.test(declarationBody(source, match.index))) continue;
+          items.push({ line, code: this.code, message: this.summary });
+        }
+      }
+      return items;
+    },
   },
   {
     code: 'manual-cell-id-template',
