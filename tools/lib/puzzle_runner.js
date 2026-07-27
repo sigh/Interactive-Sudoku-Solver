@@ -98,7 +98,10 @@ export const buildSolver = (input) => {
 // Append a full solution digit string as givens on a named cell group, in group
 // order (`VG` for `new Var('G', ...)`, `CC` for chaos-construction regions, ...).
 // For puzzles whose answer does not live in the main grid: the group must BE the
-// answer, so its cell count has to match the solution length.
+// answer, so its cell count has to match the solution length. As on the main grid,
+// a '.' marks a cell that is not part of the answer and is left unpinned -- a group
+// modelling an irregular area has holes, and a filler digit would be wrong rather
+// than merely unpinned (on a 0-9 grid every filler is itself a legal value).
 export const injectSolutionGivensForGroup = (input, digits, prefix) => {
   // Resolve the geometry only -- building a solver here would compile every
   // handler (and any NFA) a second time just to read the group's cell ids.
@@ -119,6 +122,7 @@ export const injectSolutionGivensForGroup = (input, digits, prefix) => {
   }
   let givens = '';
   for (let i = 0; i < digits.length; i++) {
+    if (digits[i] === '.') continue;
     givens += `.~${geometry.makeCellIdFromIndex(cells[i])}_${digits[i]}`;
   }
   return input + givens;
@@ -173,7 +177,7 @@ const printVarGrid = (geometry, grid, cells, columns) => {
     for (let c = 0; c < columns; c++) {
       const idx = r * columns + c;
       if (idx >= cells.length) break;
-      row.push(decode(grid[cells[idx]], 0).padStart(2));
+      row.push(decode(grid[cells[idx]], geometry.valueOffset).padStart(2));
     }
     console.log(row.join(' '));
   }
@@ -191,7 +195,7 @@ export const printSolution = (geometry, grid, solutionNum) => {
     } else {
       for (const cell of group.cells) {
         const id = geometry.makeCellIdFromIndex(cell);
-        console.log(`  ${id} = ${decode(grid[cell], 0)}`);
+        console.log(`  ${id} = ${decode(grid[cell], geometry.valueOffset)}`);
       }
     }
   }

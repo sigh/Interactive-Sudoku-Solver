@@ -145,6 +145,40 @@ await runTest('verify_solution.js --solution-group pins the answer onto the grou
   assert.match(bad.stdout, /Result: REJECTED/);
 });
 
+// Var cells take the grid's value range, so their printout must use the shape's
+// valueOffset like the digit grid does. Hard-coding 0 printed every value one too
+// high on an offset shape -- and a Var holding the sentinel 0 showed up as a real
+// digit, which reads as a modelling error rather than a display one.
+await runTest('solve.js prints Var group values at the shape value offset', async () => {
+  const { stdout, thrown } = await capture(() =>
+    solveMain(argv('solve.js', '--max-backtracks', 'none', '--solutions', '1',
+      '--input', '.Shape~9x9~0-9.Var~A~offset~3.~VA1_0~VA2_5~VA3_9')));
+  assert.equal(thrown, null, thrown?.message);
+  assert.match(stdout, /VA1 = 0/);
+  assert.match(stdout, /VA2 = 5/);
+  assert.match(stdout, /VA3 = 9/);
+  // 10 is not even a legal value on a 0-9 shape.
+  assert.doesNotMatch(stdout, /VA3 = 10/);
+});
+
+await runTest('solve.js prints an offset Var grid at the shape value offset', async () => {
+  // The columns branch renders a grid rather than one line per cell.
+  const { stdout, thrown } = await capture(() =>
+    solveMain(argv('solve.js', '--max-backtracks', 'none', '--solutions', '1',
+      '--input', '.Shape~9x9~0-9.Var~B~grid~2x2.~VB1_0~VB2_1~VB3_2~VB4_3')));
+  assert.equal(thrown, null, thrown?.message);
+  assert.match(stdout, /\[VB\] grid:\n\s*0\s+1\n\s*2\s+3/);
+});
+
+await runTest('solve.js leaves an unoffset Var group unchanged', async () => {
+  const { stdout, thrown } = await capture(() =>
+    solveMain(argv('solve.js', '--max-backtracks', 'none', '--solutions', '1',
+      '--input', '.Var~A~plain~3.~VA1_1~VA2_5~VA3_9')));
+  assert.equal(thrown, null, thrown?.message);
+  assert.match(stdout, /VA1 = 1/);
+  assert.match(stdout, /VA3 = 9/);
+});
+
 await runTest('injectSolutionGivens takes the grid dims from the puzzle, not sqrt(length)', () => {
   // 4x6 is not square, so a sqrt(length) reading would mis-shape it (or refuse).
   const givens = injectSolutionGivens('.Shape~4x6', '123456'.repeat(4));
@@ -172,6 +206,19 @@ await runTest("injectSolutionGivens leaves '.' cells unpinned", () => {
 await runTest('injectSolutionGivensForGroup maps digits onto the group in order', () => {
   const input = injectSolutionGivensForGroup(GROUP_PUZZLE, '1234', 'VX');
   assert.equal(input, GROUP_PUZZLE + '.~VX1_1.~VX2_2.~VX3_3.~VX4_4');
+});
+
+await runTest("injectSolutionGivensForGroup leaves '.' cells unpinned", () => {
+  // Same hole convention as the main grid: a group modelling an irregular area
+  // has cells outside the answer. Pinning a filler digit instead would verify a
+  // different puzzle -- on a 0-9 grid every filler is itself a legal value.
+  const input = injectSolutionGivensForGroup(GROUP_PUZZLE, '1.34', 'VX');
+  assert.equal(input, GROUP_PUZZLE + '.~VX1_1.~VX3_3.~VX4_4');
+
+  // '.' still occupies a position, so the length check applies to it too.
+  assert.throws(
+    () => injectSolutionGivensForGroup(GROUP_PUZZLE, '1.3', 'VX'),
+    /has 4 cells but the solution has 3 digits/);
 });
 
 await runTest('injectSolutionGivensForGroup rejects a bad group or size', () => {

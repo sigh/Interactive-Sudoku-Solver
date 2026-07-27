@@ -248,6 +248,24 @@ await runTest('lint_constraints suggests native constraints per key group', () =
   assert.doesNotMatch(report(mixedGroup), /pair-native-relation/);
 });
 
+await runTest('lint_constraints flags a Given that pins a ChaosConstruction label', () => {
+  // CC labels are assigned by anchor seeding, so a constant label is unsound --
+  // and it fails as a rejected solve, which reads like an encoding bug.
+  const pinned = lintConstraintText(
+    '.Shape~9x9~9\n.ChaosConstruction\n.~CC1_1\n');
+  assert.match(report(pinned), /chaos-label-given.*CC1/);
+
+  // The same Given without ChaosConstruction is an ordinary Var pin.
+  const plainVar = lintConstraintText(
+    '.Shape~9x9~9\n.Var~C~lbl~9x9\n.~CC1_1\n');
+  assert.doesNotMatch(report(plainVar), /chaos-label-given/);
+
+  // ChaosConstruction with only grid-cell givens is the normal case.
+  const gridGiven = lintConstraintText(
+    '.Shape~9x9~9\n.ChaosConstruction\n.~R1C1_5\n');
+  assert.doesNotMatch(report(gridGiven), /chaos-label-given/);
+});
+
 await runTest('lint_constraints flags adjacency-paired clues that drop cells', () => {
   // The builder rejects a clue that binds NO pairs, but a partly-connected list
   // builds happily with the stray cells dropped -- nothing else catches that.

@@ -645,6 +645,26 @@ export const OUTPUT_RULES = [
     }),
   },
   {
+    code: 'chaos-label-given',
+    tier: 'exact',
+    summary: 'a Given pins a ChaosConstruction label, which the solver canonicalizes',
+    docs: 'The solver assigns CC labels, so a constant one is not the encoder\'s\n'
+      + 'to choose. Name a region with a Var per name + AllDifferent; witness a\n'
+      + 'partition with one SameValues per region.',
+    make: () => ({
+      collect(leaf, ctx, add) {
+        if (leaf.type !== 'Given') return;
+        if (!/^CC\d+$/.test(leaf.constraint.cell || '')) return;
+        if (!ctx.leaves.some(({ type }) => type === 'ChaosConstruction')) return;
+        add(leaf.line(),
+          `Given pins ChaosConstruction label cell ${leaf.constraint.cell}; CC labels `
+          + 'are canonicalized by anchor seeding, so a constant label is not the '
+          + 'encoder\'s to choose -- name regions with a Var per name, or witness a '
+          + 'partition with SameValues');
+      },
+    }),
+  },
+  {
     code: 'redundant-all-different',
     tier: 'exact',
     summary: 'AllDifferent duplicates a row/column/box the engine already enforces',
