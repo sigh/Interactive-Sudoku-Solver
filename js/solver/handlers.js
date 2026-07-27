@@ -959,7 +959,7 @@ export class BinaryPairwise extends SudokuConstraintHandler {
     return true;
   });
 
-  static _isAllDifferent(table, numValues) {
+  static _tableIsAllDifferent(table, numValues) {
     for (let i = 0; i < numValues; i++) {
       const v = 1 << i;
       // Check if both cells having the same value is legal.
@@ -974,7 +974,7 @@ export class BinaryPairwise extends SudokuConstraintHandler {
   //  - The values are only 1 or 0 to indicate validity.
   static _exactCombinationsTable = memoize((key, numValues) => {
     const table = LookupTables.get(numValues).forBinaryKey(key)[0];
-    if (!this._isAllDifferent(table, numValues)) throw new Error('Not implemented');
+    if (!this._tableIsAllDifferent(table, numValues)) throw new Error('Not implemented');
 
     const combinations = 1 << numValues;
     const exactCombinations = new Uint8Array(combinations);
@@ -1064,7 +1064,7 @@ export class BinaryPairwise extends SudokuConstraintHandler {
     // so it is trivially satisfied. Leave it as a non-all-different no-op.
     if (this.cells.length < 2) return true;
 
-    this._isAllDifferent = this.constructor._isAllDifferent(
+    this._isAllDifferent = this.constructor._tableIsAllDifferent(
       this._table, geometry.numValues);
     if (this._isAllDifferent) {
       // Only apply this for all-different constraints for now. Can generalize
@@ -1551,10 +1551,10 @@ export class Lunchbox extends SudokuConstraintHandler {
 
     if (sum > Lunchbox._maxSum(effectiveNumValues)) return false;
 
-    this._borderMask = Lunchbox._borderMask(effectiveNumValues);
+    this._borderMask = Lunchbox._borderMaskFor(effectiveNumValues);
     this._valueMask = ~this._borderMask & LookupTables.allValues(effectiveNumValues);
 
-    const allCombinations = Lunchbox._combinations(effectiveNumValues);
+    const allCombinations = Lunchbox._combinationsFor(effectiveNumValues);
     const distanceRange = Lunchbox._distanceRange(effectiveNumValues);
 
     this._combinations = allCombinations[sum];
@@ -1578,7 +1578,8 @@ export class Lunchbox extends SudokuConstraintHandler {
     return this.cells;
   }
 
-  static _borderMask(numValues) {
+  // Suffixed to keep it distinct from the cached `this._borderMask`.
+  static _borderMaskFor(numValues) {
     return 1 | LookupTables.fromValue(numValues);
   }
 
@@ -1589,10 +1590,10 @@ export class Lunchbox extends SudokuConstraintHandler {
 
   // Possible combinations for values between the sentinels for each possible sum.
   // Grouped by distance.
-  static _combinations = memoize((numValues) => {
+  static _combinationsFor = memoize((numValues) => {
     const lookupTables = LookupTables.get(numValues);
     const maxSum = this._maxSum(numValues);
-    const borderMask = this._borderMask(numValues);
+    const borderMask = this._borderMaskFor(numValues);
 
     let table = [];
     const maxD = numValues - 1;
@@ -1620,7 +1621,7 @@ export class Lunchbox extends SudokuConstraintHandler {
   // Distance range between the sentinels for each possible sum.
   // Map combination to [min, max].
   static _distanceRange = memoize((numValues) => {
-    const combinations = this._combinations(numValues);
+    const combinations = this._combinationsFor(numValues);
     const maxSum = this._maxSum(numValues);
 
     let table = [];
