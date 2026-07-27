@@ -297,7 +297,7 @@ export class Sum extends SudokuConstraintHandler {
         return targetSum < 0 && !!(grid[cell] = v & (1 << (-targetSum - 1)));
       } else {
         const coeff = this._coeffGroups[
-          exclusionGroupId & this._COEFF_GROUP_MASK].coeff;
+          exclusionGroupId & this.constructor._COEFF_GROUP_MASK].coeff;
         if (targetSum % coeff) return false;
         const targetValue = targetSum / coeff | 0;
         return targetValue > 0 && !!(grid[cell] = v & LookupTables.fromValue(targetValue));

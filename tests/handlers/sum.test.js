@@ -541,4 +541,87 @@ await runTest('Sum over > 255 cells maps every cell to its exclusion group', () 
     'every cell must be forced to value 1');
 });
 
+// The last unfixed cell is resolved by _enforceOneRemainingCell, which reads the
+// cell's coefficient out of _coeffGroups. initialize() sorts those groups by
+// descending |coeff|, so a handler that loses the group index silently applies the
+// LARGEST coefficient instead. Cells with |coeff| == 1 exit at an earlier fast path,
+// so only a non-unit coefficient outside the largest group exercises the lookup.
+await runTest('Sum resolves a last cell whose coefficient is not the largest', () => {
+  // 1*7 + 2*v + 9*1 = 18  =>  v = 1. The free cell's coeff (2) is neither the
+  // largest (9) nor a unit, so its group index must be read correctly.
+  const { handler, context } = initializeSum(
+    { numCells: 3, sum: 18, coeffs: [1, 2, 9] });
+  const grid = applyCandidates(context.grid, {
+    0: [7],
+    1: [1, 2, 3, 4, 5, 6, 7, 8, 9],
+    2: [1],
+  });
+
+  assert.equal(
+    handler.enforceConsistency(grid, createAccumulator()), true,
+    'the equation is satisfiable at v=1 and must not be reported unsatisfiable');
+  assert.equal(grid[1], valueMask(1), 'free cell must be forced to 18-7-9 = 2/2');
+});
+
+await runTest('Sum rejects a last cell whose required value is out of range', () => {
+  // 1*7 + 2*v + 9*1 = 40  =>  v = 12, which is not a value. Guards against a fix
+  // that makes the previous test pass by simply not enforcing anything.
+  const { handler, context } = initializeSum(
+    { numCells: 3, sum: 40, coeffs: [1, 2, 9] });
+  const grid = applyCandidates(context.grid, {
+    0: [7],
+    1: [1, 2, 3, 4, 5, 6, 7, 8, 9],
+    2: [1],
+  });
+
+  assert.equal(
+    handler.enforceConsistency(grid, createAccumulator()), false,
+    'v would have to be 12, so the handler must reject');
+});
+
+await runTest('Sum rejects a last cell whose coefficient does not divide the remainder', () => {
+  // 1*7 + 2*v + 9*1 = 19  =>  2v = 3, not an integer.
+  const { handler, context } = initializeSum(
+    { numCells: 3, sum: 19, coeffs: [1, 2, 9] });
+  const grid = applyCandidates(context.grid, {
+    0: [7],
+    1: [1, 2, 3, 4, 5, 6, 7, 8, 9],
+    2: [1],
+  });
+
+  assert.equal(
+    handler.enforceConsistency(grid, createAccumulator()), false,
+    'the remainder is not divisible by the coefficient, so the handler must reject');
+});
+
+await runTest('Sum resolves a last cell with a negative non-largest coefficient', () => {
+  // 1*7 + -2*v + 9*1 = 12  =>  v = 2. Same lookup, negative branch.
+  const { handler, context } = initializeSum(
+    { numCells: 3, sum: 12, coeffs: [1, -2, 9] });
+  const grid = applyCandidates(context.grid, {
+    0: [7],
+    1: [1, 2, 3, 4, 5, 6, 7, 8, 9],
+    2: [1],
+  });
+
+  assert.equal(
+    handler.enforceConsistency(grid, createAccumulator()), true,
+    'the equation is satisfiable at v=2');
+  assert.equal(grid[1], valueMask(2), 'free cell must be forced to 2');
+});
+
+// Direct guard on the cause: _COEFF_GROUP_MASK is a static field, so reading it as
+// `this._COEFF_GROUP_MASK` from an instance method yields undefined, and
+// `x & undefined` is 0 -- which silently selects _coeffGroups[0] every time.
+await runTest('Sum coefficient group mask is reachable from an instance', () => {
+  const { handler } = initializeSum({ numCells: 3, sum: 18, coeffs: [1, 2, 9] });
+
+  assert.equal(
+    handler.constructor._COEFF_GROUP_MASK, 255,
+    'the mask must be read via this.constructor, not this');
+  assert.ok(
+    (handler._coeffGroups.length - 1) <= handler.constructor._COEFF_GROUP_MASK,
+    'every group index must be representable within the mask');
+});
+
 logSuiteComplete('Sum handler');
