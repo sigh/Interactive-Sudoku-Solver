@@ -359,4 +359,23 @@ await runTest('CLI entry exits non-zero on error', () => {
   assert.match(r.stderr, /run with --help for usage/);
 });
 
+await runTest('searchedFraction sums the resolved share of the tree', async () => {
+  const { searchedFraction } = await import('../../tools/lib/solver_analysis.js');
+
+  // Exhausted subtrees plus those skipped as uninteresting, over run segments.
+  assert.strictEqual(searchedFraction(
+    { progressRatio: 0.25, progressRatioPrev: 0.5, branchesIgnored: 0.25 }), 1);
+  assert.strictEqual(searchedFraction({ progressRatio: 0.25 }), 0.25);
+
+  // A capped run on a hard puzzle resolves a tiny share, and that is exactly the
+  // number worth reporting -- it must survive to the caller.
+  assert.strictEqual(searchedFraction({ progressRatio: 1e-9 }), 1e-9);
+
+  // Missing counters read as zero rather than NaN.
+  assert.strictEqual(searchedFraction({}), 0);
+
+  // Accumulated float deltas can drift past 1; a share above 1 means nothing.
+  assert.strictEqual(searchedFraction({ progressRatio: 1.0000000002 }), 1);
+});
+
 logSuiteComplete('Debug tools smoke');

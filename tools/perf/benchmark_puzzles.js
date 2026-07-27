@@ -45,7 +45,10 @@
 //   --json                Emit a JSON array of result rows instead of TSV — a
 //                         stable, machine-readable contract for tooling (e.g.
 //                         bench_vs_ref.js). Each row: { puzzle, status, solutions,
-//                         guesses, backtracks, nodesSearched, ms, msMedian, msMax }.
+//                         guesses, backtracks, searchedFraction, nodesSearched,
+//                         ms, msMedian, msMax }. searchedFraction is the estimated
+//                         share of the search tree resolved -- for a capped run,
+//                         how close it came to exhausting the space.
 //                         Under --compare each row also carries { variant, vsBase }
 //                         (variant: null for the baseline row, else the ablation
 //                         name; `puzzle` stays the bare puzzle name). Counters the
@@ -66,6 +69,7 @@ import {
   resolvePuzzles, materializePuzzles, parseBacktrackLimit, parseSolutionLimit,
   warnIfFirstSolution, runSolve, applyAblations, validateAblations, ABLATIONS,
   extraCounters,
+  searchedFraction,
 } from '../lib/solver_analysis.js';
 import { readFileSync } from 'node:fs';
 
@@ -149,6 +153,9 @@ const toRow = (r, variant, vsBase) => {
     guesses: r.counters.guesses,
     backtracks: r.counters.backtracks,
     nodesSearched: r.counters.nodesSearched,
+    // Significant digits, not fixed decimals: a hard puzzle can resolve 1e-9 of
+    // its tree, which rounding to decimal places would report as a flat 0.
+    searchedFraction: Number(searchedFraction(r.counters).toPrecision(6)),
     ms: Number(r.elapsedMs.toFixed(1)),
     msMedian: Number(s.median.toFixed(1)),
     msMax: Number(s.max.toFixed(1)),

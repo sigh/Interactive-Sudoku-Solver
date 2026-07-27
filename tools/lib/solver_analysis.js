@@ -375,6 +375,23 @@ export const extraCounters = (counters) => {
   return extra;
 };
 
+// The share of the search tree a run resolved, in [0, 1]: subtrees exhausted
+// (`progressRatio`, plus `progressRatioPrev` for earlier run segments) and
+// subtrees skipped as holding nothing interesting (`branchesIgnored`).
+//
+// An ESTIMATE of tree share, not of remaining time: the engine splits a node's
+// remaining progress evenly over its value options (see InternalSolver's
+// progressDelta), so unequal subtrees skew it, and the tree's cost per unit
+// share is not uniform. Useful for the question it answers directly -- a capped
+// run that resolved 0.9 was close, one that resolved 1e-6 was not.
+export const searchedFraction = (counters) => {
+  const total = (counters.progressRatioPrev || 0) + (counters.progressRatio || 0)
+    + (counters.branchesIgnored || 0);
+  // Accumulating float deltas can drift a hair past 1; a share above 1 is
+  // meaningless to a reader, so clamp rather than report it.
+  return Math.max(0, Math.min(1, total));
+};
+
 export const counterRow = (result) =>
   [result.status, result.counters.solutions, result.counters.guesses,
   result.counters.backtracks, result.counters.nodesSearched];
