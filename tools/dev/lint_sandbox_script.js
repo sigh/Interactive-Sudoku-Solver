@@ -467,17 +467,44 @@ export const SOURCE_RULES = [
     code: 'num-values-mismatch',
     tier: 'heuristic',
     summary: 'NFA.encodeSpec / Pair.fnToKey numValues literal disagrees with the declared Shape',
-    docs: 'Cross-references the `new Shape(...)` literal against encodeSpec/fnToKey\n'
-      + 'literals. Skipped when the shape (or its value count) cannot be read from a\n'
-      + 'simple literal. A machine compiled for the wrong alphabet is a real bug, but\n'
+    docs: 'Cross-references the `new Shape(...)` alphabet against encodeSpec/fnToKey\n'
+      + 'literals. The alphabet is read from a bare count (`12`) or a string range\n'
+      + "(`'0-15'`). When the second argument is an expression the width is unknown but\n"
+      + 'the shape is certainly widened, so any bare literal is reported as unverifiable\n'
+      + 'rather than skipped -- that case is exactly where a narrow key silently misreads\n'
+      + 'the wider domain. A machine compiled for the wrong alphabet is a real bug, but\n'
       + 'the Shape is read by regex, so this stays heuristic.',
     check(ctx) {
       const source = ctx.view('code');
-      const shapeMatch = /new Shape\(\s*['"](\d+)x(\d+)['"]\s*(?:,\s*(\d+)\s*)?\)/.exec(source);
+      // The second argument is captured as raw text, not as digits: every widened shape
+      // in the corpus writes it as a string range or a named constant, and a digits-only
+      // capture fails to match the call at all -- which skipped the whole rule on the
+      // only scripts it exists to check.
+      const shapeMatch =
+        /new Shape\(\s*['"](\d+)x(\d+)['"]\s*(?:,\s*((?:[^(),]|\([^()]*\))+?)\s*)?\)/
+          .exec(source);
       if (!shapeMatch) return [];
-      const numValues = shapeMatch[3]
-        ? Number(shapeMatch[3])
-        : Math.max(Number(shapeMatch[1]), Number(shapeMatch[2]));
+
+      const [, rows, cols, rawAlphabet] = shapeMatch;
+      // `const N = 15; new Shape('9x11', N)` is the common way to name the alphabet, and
+      // resolving it turns an unverifiable report into an exact one.
+      const consts = new Map();
+      for (const m of source.matchAll(/\bconst\s+([A-Za-z_$][\w$]*)\s*=\s*(\d+)\s*;/g)) {
+        consts.set(m[1], Number(m[2]));
+      }
+
+      // null means "widened, width not statically known".
+      let numValues;
+      if (rawAlphabet === undefined) {
+        numValues = Math.max(Number(rows), Number(cols));
+      } else if (/^\d+$/.test(rawAlphabet)) {
+        numValues = Number(rawAlphabet);
+      } else if (consts.has(rawAlphabet)) {
+        numValues = consts.get(rawAlphabet);
+      } else {
+        const range = /^['"](\d+)\s*-\s*(\d+)['"]$/.exec(rawAlphabet);
+        numValues = range ? Number(range[2]) - Number(range[1]) + 1 : null;
+      }
 
       const items = [];
       const patterns = [
@@ -487,13 +514,17 @@ export const SOURCE_RULES = [
       for (const pattern of patterns) {
         for (const match of source.matchAll(pattern)) {
           const literal = Number(match[match.length - 1]);
-          if (literal === numValues) continue;
+          if (numValues !== null && literal === numValues) continue;
           items.push({
             line: ctx.lineAt(match.index),
             code: this.code,
-            message: `numValues literal ${literal} does not match the declared `
-              + `Shape's ${numValues} values; pass the Shape or cellGeometry() `
-              + 'instead of a literal',
+            message: numValues === null
+              ? `numValues literal ${literal} cannot be checked: the Shape's alphabet `
+                + `is set by \`${rawAlphabet}\`, so it is widened by an unknown amount. `
+                + 'Build the key from geometry.numValues, never a literal'
+              : `numValues literal ${literal} does not match the declared `
+                + `Shape's ${numValues} values; pass the Shape or cellGeometry() `
+                + 'instead of a literal',
           });
         }
       }
