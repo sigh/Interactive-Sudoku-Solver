@@ -266,6 +266,18 @@ await runTest('lint_constraints flags a Given that pins a ChaosConstruction labe
   assert.doesNotMatch(report(gridGiven), /chaos-label-given/);
 });
 
+await runTest('lint_constraints flags SearchPriority in an encoding', () => {
+  // Correctness-neutral, so nothing else can catch it: the encoding still
+  // solves, it just carries a stale branching hint.
+  const hinted = lintConstraintText(
+    '.Shape~4x4\n.Var~P~pos~4\n.SearchPriority~0~VP1~VP2\n');
+  assert.match(report(hinted), /search-priority-in-encoding.*VP1 VP2/);
+
+  // The same cells without the hint are the normal case.
+  const clean = lintConstraintText('.Shape~4x4\n.Var~P~pos~4\n');
+  assert.doesNotMatch(report(clean), /search-priority-in-encoding/);
+});
+
 await runTest('lint_constraints flags adjacency-paired clues that drop cells', () => {
   // The builder rejects a clue that binds NO pairs, but a partly-connected list
   // builds happily with the stray cells dropped -- nothing else catches that.

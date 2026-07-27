@@ -665,6 +665,23 @@ export const OUTPUT_RULES = [
     }),
   },
   {
+    code: 'search-priority-in-encoding',
+    tier: 'exact',
+    summary: 'SearchPriority maps to no rule; it is a development aid, not an encoding constraint',
+    docs: 'Every constraint in an encoding must trace back to a stated rule.\n'
+      + 'SearchPriority never can -- it only hints the solver\'s branching order -- so\n'
+      + 'its presence means the rules are not being encoded faithfully. A puzzle that\n'
+      + 'needs it is a search-heuristic finding: report the case, do not tune around it.',
+    make: () => ({
+      collect(leaf, ctx, add) {
+        if (leaf.type !== 'SearchPriority') return;
+        add(leaf.line(),
+          `SearchPriority on ${describeCells(leaf.cells)} maps to no rule; it only hints `
+          + 'the solver\'s branching order -- remove it and report the search cost instead');
+      },
+    }),
+  },
+  {
     code: 'redundant-all-different',
     tier: 'exact',
     summary: 'AllDifferent duplicates a row/column/box the engine already enforces',
