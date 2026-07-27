@@ -131,7 +131,9 @@ export const injectSolutionGivensForGroup = (input, digits, prefix) => {
 // Append a full solution digit string as `.~RrCc_v` givens (main-grid cells,
 // row-major). A '.' marks a cell that is not part of the answer -- an irregular
 // grid modelled inside a rectangular Shape (a staircase, say) leaves holes -- and
-// is left unpinned.
+// is left unpinned. A source that pads with something else (SudokuPad writes '?'
+// outside a framed canvas) is the caller's to translate; '.' is the only spelling
+// here, as it is everywhere else in ISS.
 export const injectSolutionGivens = (input, digits) => {
   // Read the dimensions off the puzzle rather than inferring them from the
   // solution length, which can only ever describe a square grid.
@@ -139,18 +141,44 @@ export const injectSolutionGivens = (input, digits) => {
   const geometry = constraint.getGeometry();
   const { numRows, numCols } = geometry;
   if (digits.length !== numRows * numCols) {
+    // Say what to do, not just what is wrong: the common cause is a solution with a
+    // native constraint's auto-generated Var cells appended (Doppelganger adds 28 on
+    // a 9x9), and the caller cannot tell from a bare count mismatch that the fix is
+    // to drop them rather than to widen the grid.
     throw new Error(
-      `solution has ${digits.length} chars but the grid is ${numRows}x${numCols} ` +
-      `(${numRows * numCols} cells)`);
+      `solution has ${digits.length} chars but the grid is ${numRows}x${numCols}, ` +
+      `so ${numRows * numCols} were expected. This pins main-grid cells only; ` +
+      `Var cells (yours or a constraint's own) are witnessed by the search, so do ` +
+      `not append them. Use --solution-group to pin an answer held in a Var group.`);
   }
   let givens = '';
   for (let i = 0; i < digits.length; i++) {
     if (digits[i] === '.') continue;
     // Cell ids use one base-17 character per coordinate (column 10 is 'a'), so
     // decimal interpolation would build invalid ids on grids wider than 9.
-    givens += `.~${geometry.makeCellId(...geometry.splitCellIndex(i))}_${digits[i]}`;
+    const cellId = geometry.makeCellId(...geometry.splitCellIndex(i));
+    givens += `.~${cellId}_${solutionValue(digits[i], geometry)}`;
   }
   return input + givens;
+};
+
+// One solution character as a value id. A grid playing past 9 has to write its
+// two-digit values as one character each, and it does so the way cell ids already
+// number their columns: '0'-'9' then 'a'/'A' for 10 and up. (ISS's own shortChar
+// spells 1 as 'A' instead, but that is not what payloads store -- BYD4TsYH9lU's
+// published 1-15 solution is hex, so reading 'a' as 1 would silently pin the wrong
+// digits.) Value ids take plain decimal, so the character is widened back out here.
+const solutionValue = (char, geometry) => {
+  const maxValue = geometry.maxValue();
+  if (maxValue < 10) return char;
+  const value = parseInt(char, 36);
+  if (!(value >= geometry.minValue() && value <= maxValue)) {
+    throw new Error(
+      `solution character '${char}' is not a value on this grid ` +
+      `(${geometry.minValue()}-${maxValue}). Past 9, write one character per cell: ` +
+      `'a' or 'A' for 10, 'b' for 11, and so on.`);
+  }
+  return String(value);
 };
 
 // ============================================================================

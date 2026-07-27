@@ -145,6 +145,40 @@ await runTest('verify_solution.js --solution-group pins the answer onto the grou
   assert.match(bad.stdout, /Result: REJECTED/);
 });
 
+// A grid playing past 9 has to write each value as one character, and it numbers them
+// the way cell ids already number columns: '0'-'9' then 'a' for 10. Parsing the
+// character as a decimal digit rejected every such solution with 'Invalid value ID',
+// so a widened main grid needed a hand-built witness just to pin its ordinary digits.
+await runTest('verify_solution.js --solution pins values past 9', async () => {
+  const HEX = '.Shape~2x2~15.AllDifferent~R1C1~R1C2~R2C1~R2C2';
+  const good = await capture(() =>
+    verifyMain(argv('verify_solution.js', '--input', HEX, '--solution', 'ab1f')));
+  assert.equal(good.thrown, null, good.thrown?.message);
+  assert.match(good.stdout, /Result: ACCEPTED/);
+
+  // Upper case is the same value: sources are not consistent about it.
+  const upper = await capture(() =>
+    verifyMain(argv('verify_solution.js', '--input', HEX, '--solution', 'AB1F')));
+  assert.match(upper.stdout, /Result: ACCEPTED/);
+
+  // A repeat still has to bind, so the pin is real and not silently dropped.
+  const bad = await capture(() =>
+    verifyMain(argv('verify_solution.js', '--input', HEX, '--solution', 'aa1f')));
+  assert.match(bad.stdout, /Result: REJECTED/);
+
+  // Out of range says so, rather than dying on 'Invalid value ID'.
+  const over = await capture(() =>
+    verifyMain(argv('verify_solution.js', '--input', HEX, '--solution', 'ab1z')));
+  assert.match(over.thrown?.message ?? '', /not a value on this grid \(1-15\)/);
+
+  // '.' is the only placeholder ISS knows; a source that pads with something else is
+  // the caller's to translate before it gets here.
+  const dotted = await capture(() =>
+    verifyMain(argv('verify_solution.js', '--input', HEX, '--solution', 'a.1f')));
+  assert.equal(dotted.thrown, null, dotted.thrown?.message);
+  assert.match(dotted.stdout, /Result: ACCEPTED/);
+});
+
 // Var cells take the grid's value range, so their printout must use the shape's
 // valueOffset like the digit grid does. Hard-coding 0 printed every value one too
 // high on an offset shape -- and a Var holding the sentinel 0 showed up as a real
