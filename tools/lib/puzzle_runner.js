@@ -95,30 +95,40 @@ export const buildSolver = (input) => {
   return { internal, geometry: internal._geometry };
 };
 
-// Append a full solution digit string as givens on a named cell group, in group
+// Append a full solution digit string as givens on named cell groups, in group
 // order (`VG` for `new Var('G', ...)`, `CC` for chaos-construction regions, ...).
-// For puzzles whose answer does not live in the main grid: the group must BE the
-// answer, so its cell count has to match the solution length. As on the main grid,
-// a '.' marks a cell that is not part of the answer and is left unpinned -- a group
-// modelling an irregular area has holes, and a filler digit would be wrong rather
-// than merely unpinned (on a 0-9 grid every filler is itself a legal value).
-export const injectSolutionGivensForGroup = (input, digits, prefix) => {
+// For puzzles whose answer does not live in the main grid: the groups must BE the
+// answer, so their combined cell count has to match the solution length. As on the
+// main grid, a '.' marks a cell that is not part of the answer and is left unpinned
+// -- a group modelling an irregular area has holes, and a filler digit would be
+// wrong rather than merely unpinned (on a 0-9 grid every filler is a legal value).
+//
+// Several prefixes ('VL,VR') consume the digits in the order given: a canvas an
+// ISS grid cannot hold may need one group per region, and stacking them keeps each
+// region's own cell order intact rather than interleaving them into one group.
+export const injectSolutionGivensForGroup = (input, digits, prefixes) => {
   // Resolve the geometry only -- building a solver here would compile every
   // handler (and any NFA) a second time just to read the group's cell ids.
   const constraint = SudokuBuilder.resolveConstraint(SudokuParser.parseText(input));
   const geometry = constraint.getGeometry();
   geometry.addVarCellsForConstraints([].concat(...constraint.toMap().values()));
 
-  const cells = geometry.varCellsForGroup(prefix);
-  if (!cells) {
-    const known = geometry.varCellGroups().map(g => g.prefix).join(', ') || 'none';
-    throw new Error(
-      `unknown cell group '${prefix}' (groups in this puzzle: ${known})`);
+  const names = Array.isArray(prefixes) ? prefixes : String(prefixes).split(',');
+  const cells = [];
+  for (const prefix of names) {
+    const groupCells = geometry.varCellsForGroup(prefix);
+    if (!groupCells) {
+      const known = geometry.varCellGroups().map(g => g.prefix).join(', ') || 'none';
+      throw new Error(
+        `unknown cell group '${prefix}' (groups in this puzzle: ${known})`);
+    }
+    cells.push(...groupCells);
   }
   if (cells.length !== digits.length) {
+    const sizes = names.length > 1 ? ` (${names.join(' + ')})` : '';
     throw new Error(
-      `group '${prefix}' has ${cells.length} cells but the solution has ` +
-      `${digits.length} digits`);
+      `group '${names.join(',')}' has ${cells.length} cells${sizes} but the ` +
+      `solution has ${digits.length} digits`);
   }
   let givens = '';
   for (let i = 0; i < digits.length; i++) {

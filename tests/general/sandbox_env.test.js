@@ -487,6 +487,28 @@ await runTest('overlay defaults to the whole grid, and honours a prefix', () => 
   assert.equal(overlay.cells()[0], 'VL1');
 });
 
+await runTest('overlay row/column/box take a grid index', () => {
+  const cc = cellGraph('4x4').makeOverlay('CC');
+  assert.deepEqual(cc.row(1), ['CC1', 'CC2', 'CC3', 'CC4']);
+  assert.deepEqual(cc.column(2), ['CC2', 'CC6', 'CC10', 'CC14']);
+  assert.deepEqual(cc.box(1), ['CC1', 'CC2', 'CC5', 'CC6']);
+  assert.equal(cc.rows().length, 4);
+  assert.equal(cc.columns().length, 4);
+  // The cell-id form still walks the overlay's own adjacency.
+  assert.deepEqual(cc.row('CC5'), ['CC5', 'CC6', 'CC7', 'CC8']);
+});
+
+await runTest('a sparse overlay answers with the cells it shadows', () => {
+  const sparse = cellGraph('4x4').makeOverlay(
+    'VC', ['R3C3', 'R3C4', 'R4C3', 'R4C4']);
+  assert.deepEqual(sparse.row(3), ['VC1', 'VC2']);
+  assert.deepEqual(sparse.row(1), []);
+  // Box regions arrive as grid indices; reading them as our own positions
+  // returned nulls, and missed the one box this overlay covers exactly.
+  assert.deepEqual(sparse.boxes(), [[], [], [], ['VC1', 'VC2', 'VC3', 'VC4']]);
+  assert.deepEqual(sparse.box(4), ['VC1', 'VC2', 'VC3', 'VC4']);
+});
+
 await runTest('a dense overlay is connected as its grid cells are', () => {
   const cc = cellGraph('4x4').makeOverlay('CC');
   assert.deepEqual(new Set(cc.neighbours('CC1')), new Set(['CC2', 'CC5']));
@@ -579,7 +601,7 @@ await runTest('grid graph locator throws for an invalid cell', () => {
 });
 
 // ============================================================================
-// index-based houses
+// index-based rows, columns and boxes
 // ============================================================================
 
 await runTest('row/column accept a 1-based index or a cell', () => {
@@ -602,12 +624,12 @@ await runTest('box(n) walks the default boxes in reading order', () => {
   assert.deepEqual(g6.box(2), ['R1C4', 'R1C5', 'R1C6', 'R2C4', 'R2C5', 'R2C6']);
 });
 
-await runTest('rows/columns/boxes/houses enumerate every house', () => {
+await runTest('rows/columns/boxes enumerate every one', () => {
   const g = cellGraph('9x9');
   assert.equal(g.rows().length, 9);
   assert.equal(g.columns().length, 9);
   assert.equal(g.boxes().length, 9);
-  assert.equal(g.houses().length, 27);
+  assert.equal(g.rowsColumnsBoxes().length, 27);
   assert.deepEqual(g.rows()[0], g.row(1));
   assert.deepEqual(g.boxes()[8], g.box(9));
 });

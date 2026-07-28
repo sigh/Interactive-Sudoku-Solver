@@ -26,12 +26,13 @@
 //                         Append serialized constraints only for this
 //                         verification run. Usually auxiliary-cell givens for
 //                         a known satisfying witness.
-//   --solution-group <prefix>
-//                         Pin the solution onto a named cell group instead of
+//   --solution-group <prefix[,prefix...]>
+//                         Pin the solution onto named cell groups instead of
 //                         the main grid, in group order -- for puzzles whose
 //                         answer does not live in the grid (e.g. a grid modelled
-//                         as a Var group because its rows are a multiset). The
-//                         prefix is the cell-id prefix: 'VG' for
+//                         as a Var group because its rows are a multiset). Several
+//                         comma-separated prefixes consume the solution in the
+//                         order given. The prefix is the cell-id prefix: 'VG' for
 //                         `new Var('G', ...)` (Var prepends the V), or a
 //                         solver-owned group such as 'CC'. The group must be the
 //                         whole answer: its cell count must equal the solution
@@ -108,12 +109,14 @@ Options:
   --witness-constraints <string>
                         Append serialized constraints for this verification
                         run only, normally auxiliary-cell witness givens.
-  --solution-group <prefix>
-                        Pin the solution onto a named cell group (in group
+  --solution-group <prefix[,prefix...]>
+                        Pin the solution onto named cell groups (in group
                         order) instead of the main grid, for puzzles whose
                         answer is not in the grid. Use the cell-id prefix:
-                        'VG' for new Var('G', ...), or e.g. 'CC'. The group's
-                        cell count must equal the solution length.
+                        'VG' for new Var('G', ...), or e.g. 'CC'. Comma-separate
+                        several groups to consume the solution across them in
+                        order. The combined cell count must equal the solution
+                        length.
   --max-backtracks <n|none>
                         Backtrack cap. Default: 1. Use "none" only for rare
                         deliberately unbounded checks.

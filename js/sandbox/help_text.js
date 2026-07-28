@@ -92,7 +92,8 @@ CELL GEOMETRY
       .row(n | cell)           the whole grid row, by 1-based index or through cell
       .column(n | cell)        the whole grid column, likewise
       .box(n[, size])          the nth box region (1-based, reading order)
-      .rows() / .columns() / .boxes([size]) / .houses([size])  all such cell lists
+      .rows() / .columns() / .boxes([size])  all such cell lists
+      .rowsColumnsBoxes([size])  the three concatenated
                                size matches a RegionSize constraint
       .block(topLeft, h, w)    cells of an h x w block, or null if off-grid
       .connected(cells)        is the set one orthogonally-connected group?
@@ -108,6 +109,7 @@ CELL GEOMETRY
                             cells; unpaired entries are null
       .toVar(label)           create a matching Var constraint; a full-grid
                             overlay keeps its grid shape
+      .row(n) / .column(n)    take an index on the paired grid
 
 STATE MACHINES (NFA)
 

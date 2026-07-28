@@ -219,9 +219,9 @@ class SandboxCellGraph {
   }
 
   // All rows / columns / boxes, each an array of cells; boxes() is empty when
-  // the geometry has no box regions. houses() concatenates them. `size` matches
-  // a RegionSize constraint; the default tiling is sized from the grid, not the
-  // value range.
+  // the geometry has no box regions. rowsColumnsBoxes() concatenates them.
+  // `size` matches a RegionSize constraint; the default tiling is sized from
+  // the grid, not the value range.
   rows() {
     return Array.from({ length: this._geometry.numRows }, (_, i) => this.row(i + 1));
   }
@@ -232,7 +232,7 @@ class SandboxCellGraph {
     return SudokuConstraintBase.boxRegions(this._geometry, size)
       .map(region => region.map(index => this._cell(index)));
   }
-  houses(size = null) {
+  rowsColumnsBoxes(size = null) {
     return [...this.rows(), ...this.columns(), ...this.boxes(size)];
   }
 
@@ -293,6 +293,7 @@ class SandboxOverlay extends SandboxCellGraph {
 
     // Everything is indexed by position: the nth grid cell and nth var cell are a
     // pair. Two arrays (pos -> cell) and two maps (cell -> pos) give O(1) both ways.
+    this._parent = parent;
     this._prefix = prefix;
     this._gridCells = gridCells;
     this._cells = gridCells.map((_, i) =>
@@ -328,6 +329,21 @@ class SandboxOverlay extends SandboxCellGraph {
     if (Array.isArray(gridCell)) return gridCell.map(cell => this.at(cell));
     const pos = this._gridPos.get(gridCell);
     return pos === undefined ? null : this._cells[pos];
+  }
+
+  // An index names a line on the paired grid; a cell id is one of our own.
+  row(rowOrCell) {
+    if (typeof rowOrCell !== 'number') return super.row(rowOrCell);
+    return this.at(this._parent.row(rowOrCell)).filter(cell => cell);
+  }
+  column(colOrCell) {
+    if (typeof colOrCell !== 'number') return super.column(colOrCell);
+    return this.at(this._parent.column(colOrCell)).filter(cell => cell);
+  }
+  // Box regions arrive as grid indices, which are our positions only when we
+  // shadow the whole grid.
+  boxes(size = null) {
+    return this._parent.boxes(size).map(box => this.at(box).filter(cell => cell));
   }
 
   // The grid cell shadowed by `varCell`, or null if `varCell` isn't in the overlay.
