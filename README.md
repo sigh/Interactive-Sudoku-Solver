@@ -8,12 +8,12 @@ It is hosted at <http://sigh.github.io/Interactive-Sudoku-Solver>
 
 ## Features
 
-- **Solution Analysis**: Verifies uniqueness, visualizes candidate densities
-  and provides solution counts, including estimates for large solution spaces.
-- **Extensive Variants**: Supports a large number of constraints found
-  in Sudoku variants, with flexible tools for defining custom constraints.
+- **Sudoku Variants**: Supports a large number of constraints natively, and
+  the ability to define custom constraints.
 - **Non-Standard Grids**: Supports any grid size up to 16x16, including
   non-square grids.
+- **Explore Solution Spaces**: Verifies uniqueness and provides solution
+  counts, including estimates for large solution counts.
 - **Scripting**: Provides a JavaScript Sandbox for programmatic puzzle
   generation and solving.
 
@@ -30,18 +30,25 @@ jekyll serve --port=8080
 
 ## Tests
 
-Execute the test suite with:
-
 ```bash
 npm test
 ```
 
-## Development Docs
+## Docs
 
-For source and test layout details, see [js/README.md](js/README.md),
+For the main app and solver docs, see [js/README.md](js/README.md),
 [js/solver/README.md](js/solver/README.md),
-[js/solver/SOLVER_ENGINE.md](js/solver/SOLVER_ENGINE.md), and
-[tests/README.md](tests/README.md).
+[js/solver/SOLVER_ENGINE.md](js/solver/SOLVER_ENGINE.md).
+
+## AI Usage
+
+The main application and solver has historically been hand-coded. More recently it uses AI-assistance with close review.
+
+The development tooling and technical documentation are mostly AI-generated,
+with oversight mainly to ensure correctness.
+
+The tests are almost entirely AI-generated with little oversight. The exception
+is the e2e test suite which is manually-curated.
 
 ## Contributions
 
