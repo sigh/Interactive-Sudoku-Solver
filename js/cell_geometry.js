@@ -133,13 +133,19 @@ export class CellGeometry {
     return this._varCellRegistry.getCellsForGroup(prefix);
   }
 
-  // The primary's dimensions: the grid's, or the primary group's when it
-  // stands in for the grid ('' while that group is missing).
-  primaryDimsStr() {
-    if (!this.mainCellGroup) return this.gridDimsStr;
+  // The primary's dimensions as [rows, columns]: the grid's, or the primary
+  // group's when it stands in for the grid (null while that group is
+  // missing).
+  primaryDims() {
+    if (!this.mainCellGroup) return [this.numRows, this.numCols];
     const primary = this.varCellGroups().find(
       g => g.prefix === this.mainCellGroup);
-    return primary ? `${primary.count / primary.columns}x${primary.columns}` : '';
+    return primary ? [primary.count / primary.columns, primary.columns] : null;
+  }
+
+  primaryDimsStr() {
+    const dims = this.primaryDims();
+    return dims ? `${dims[0]}x${dims[1]}` : '';
   }
 
   clearVarCells() {
@@ -194,6 +200,11 @@ export class CellGeometry {
   withValueRange(min, max) {
     return new CellGeometry(
       this.numRows, this.numCols, max - min + 1, min - 1, this.mainCellGroup);
+  }
+
+  // The same value range with a cell group in the main grid's place.
+  withMainCellGroup(prefix) {
+    return new CellGeometry(0, 0, this.numValues, this.valueOffset, prefix);
   }
 
   minValue() {

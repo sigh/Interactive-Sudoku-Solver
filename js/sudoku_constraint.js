@@ -171,8 +171,15 @@ export class SudokuConstraintBase {
     return this.cells || [];
   }
 
-  // Whether the constraint can exist on the geometry: all its cells exist.
+  // Whether the constraint can exist on the geometry: not defined in terms of
+  // a main grid that is absent, and all its cells exist.
   isDefinedFor(geometry) {
+    if (geometry.mainCellGroup && this.constructor.REQUIRES_MAIN_GRID) {
+      return false;
+    }
+    if (this.constructor.IS_COMPOSITE) {
+      return this.constraints.every(c => c.isDefinedFor(geometry));
+    }
     try {
       for (const cellId of this.getCells(geometry)) {
         geometry.parseCellId(cellId);

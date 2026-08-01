@@ -575,6 +575,8 @@ const createShapeInput = () => {
     varForm[field] = createMockElement('input');
   }
   globalThis.document.forms = { 'var-constraint-input': varForm };
+  const dropdownItems = createMockElement('div');
+  elementsById['shape-dropdown-items'] = dropdownItems;
 
   const collection = {
     shaped: null,
@@ -582,7 +584,10 @@ const createShapeInput = () => {
     addConstraint() { },
   };
   const shape = new ConstraintCategoryInput.Shape(collection);
-  return { shape, collection, shapeSpecInput, minSelect, maxSelect, varForm };
+  return {
+    shape, collection, shapeSpecInput, minSelect, maxSelect, varForm,
+    dropdownItems,
+  };
 };
 
 const groupGeometry = (withPrimary) => {
@@ -660,6 +665,49 @@ await runTest('Shape var size prefills from the shape dimensions', () => {
   geometry._varCellRegistry.addGroups(
     [{ prefix: 'VB', label: '', count: 4, columns: 0 }]);
   assert.equal(sizeInput.value, '4x4');
+});
+
+await runTest('Shape dropdown lists presets, current dims and groups', () => {
+  const { shape, dropdownItems } = createShapeInput();
+
+  const grid = CellGeometry.fromGridSize(9);
+  grid._varCellRegistry.addGroups(
+    [{ prefix: 'VA', label: 'over', count: 4, columns: 2 }]);
+  shape.reshape(grid);
+  assert.deepEqual(
+    dropdownItems.children.map(i => i.textContent),
+    ['9x9', '6x6', '16x16', '$A']);
+
+  // A non-preset primary adds its own dimensions.
+  const group = CellGeometry.fromShapeSpec('VA~1-6');
+  group._varCellRegistry.addGroups(
+    [{ prefix: 'VA', label: '', count: 18, columns: 9 }]);
+  shape.reshape(group);
+  assert.deepEqual(
+    dropdownItems.children.map(i => i.textContent),
+    ['9x9', '6x6', '16x16', '2x9', '$A']);
+});
+
+await runTest('_applyShape with a bare group prefix keeps the range', () => {
+  const { shape, collection, shapeSpecInput } = createShapeInput();
+
+  shape.reshape(CellGeometry.fromShapeSpec('9x9~0-8'));
+  shapeSpecInput.value = '$A';
+  shape._applyShape();
+
+  assert.equal(collection.shaped.mainCellGroup, 'VA');
+  assert.equal(collection.shaped.name, 'VA~0-8');
+});
+
+await runTest('_applyShape returns to the main grid with a dims spec', () => {
+  const { shape, collection, shapeSpecInput } = createShapeInput();
+
+  shape.reshape(groupGeometry(true));
+  shapeSpecInput.value = '6x6';
+  shape._applyShape();
+
+  assert.equal(collection.shaped.mainCellGroup, null);
+  assert.equal(collection.shaped.name, '6x6');
 });
 
 logSuiteComplete('ConstraintCategoryInput.GivenCandidates');

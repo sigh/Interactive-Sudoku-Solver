@@ -871,26 +871,42 @@ logSuiteComplete('Adjacency validation');
 // ============================================================================
 
 await runTest('isDefinedFor: cells must exist', () => {
+  const grid = CellGeometry.fromGridSize(9);
   const small = CellGeometry.fromGridSize(6);
-  const withGroup = makeShapeWithGroups(9, [
-    { prefix: 'VA', label: '', count: 4, columns: 2 },
-  ]);
+  const groupShape = CellGeometry.fromShapeSpec('VA~1-6');
+  groupShape._varCellRegistry.addGroups(
+    [{ prefix: 'VA', label: '', count: 36, columns: 6 }]);
 
   const onGrid = new SudokuConstraint.Given('R9C9', 5);
-  assert.ok(onGrid.isDefinedFor(CellGeometry.fromGridSize(9)));
+  assert.ok(onGrid.isDefinedFor(grid));
   assert.ok(!onGrid.isDefinedFor(small));
+  assert.ok(!onGrid.isDefinedFor(groupShape));
 
   const onGroup = new SudokuConstraint.Given('VA1', 5);
-  assert.ok(onGroup.isDefinedFor(withGroup));
-  assert.ok(!onGroup.isDefinedFor(small));
+  assert.ok(onGroup.isDefinedFor(groupShape));
+  assert.ok(!onGroup.isDefinedFor(grid));
+});
+
+await runTest('isDefinedFor: grid-defined constraints need the grid', () => {
+  const groupShape = CellGeometry.fromShapeSpec('VA~1-6');
+  const antiKnight = new SudokuConstraint.AntiKnight();
+  assert.ok(antiKnight.isDefinedFor(CellGeometry.fromGridSize(9)));
+  assert.ok(!antiKnight.isDefinedFor(groupShape));
 });
 
 await runTest('isDefinedFor: composites follow their children', () => {
-  const small = CellGeometry.fromGridSize(6);
-  const or = new SudokuConstraint.Or(
-    [new SudokuConstraint.Given('R9C9', 5)]);
-  assert.ok(or.isDefinedFor(CellGeometry.fromGridSize(9)));
-  assert.ok(!or.isDefinedFor(small));
+  const groupShape = CellGeometry.fromShapeSpec('VA~1-6');
+  groupShape._varCellRegistry.addGroups(
+    [{ prefix: 'VA', label: '', count: 36, columns: 6 }]);
+
+  const onGrid = new SudokuConstraint.Or(
+    [new SudokuConstraint.Given('R1C1', 5)]);
+  assert.ok(onGrid.isDefinedFor(CellGeometry.fromGridSize(9)));
+  assert.ok(!onGrid.isDefinedFor(groupShape));
+
+  const onGroup = new SudokuConstraint.Or(
+    [new SudokuConstraint.Given('VA1', 5)]);
+  assert.ok(onGroup.isDefinedFor(groupShape));
 });
 
 // ============================================================================

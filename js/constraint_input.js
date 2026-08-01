@@ -181,41 +181,23 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
     this._setUpVarInput();
   }
 
+  static _SHAPE_PRESETS = ['9x9', '6x6', '16x16'];
+
   _setUpGridInput() {
     const input = this._shapeSpecInput;
-    const dropdown = document.getElementById('shape-dropdown');
-    const items = dropdown.querySelectorAll('.shape-dropdown-item');
-    let highlightedIndex = -1;
+    this._dropdown = document.getElementById('shape-dropdown');
+    this._dropdownItemsElem = document.getElementById('shape-dropdown-items');
+    this._dropdownItems = [];
+    this._highlightedIndex = -1;
 
-    const setHighlight = (index) => {
-      items.forEach((item, i) => item.classList.toggle('highlighted', i === index));
-      highlightedIndex = index;
-    };
+    this._dropdown.onmouseleave = () => this._highlightDropdownItem(-1);
 
-    const showDropdown = () => dropdown.classList.add('dropdown-open');
-    const hideDropdown = () => {
-      dropdown.classList.remove('dropdown-open');
-      setHighlight(-1);
-    };
-
-    // Click and hover handlers for dropdown items
-    items.forEach((item, i) => {
-      item.onmousedown = (e) => {
-        e.preventDefault();
-        input.value = item.textContent;
-        hideDropdown();
-        this._applyShape();
-      };
-      item.onmouseenter = () => setHighlight(i);
-    });
-
-    dropdown.onmouseleave = () => setHighlight(-1);
-
+    const showDropdown = () => this._dropdown.classList.add('dropdown-open');
     input.addEventListener('focus', showDropdown);
     input.addEventListener('click', showDropdown);
     input.addEventListener('input', showDropdown);
     input.addEventListener('blur', () => {
-      hideDropdown();
+      this._hideDropdown();
       // Only apply if the input has changed from the current geometry,
       // to avoid resetting the value range after a full spec like "9x9~0-8"
       // has already been applied (reshape sets input to just "9x9").
@@ -228,12 +210,13 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
         showDropdown();
-        setHighlight(Math.min(highlightedIndex + 1, items.length - 1));
+        this._highlightDropdownItem(
+          Math.min(this._highlightedIndex + 1, this._dropdownItems.length - 1));
         input.select();
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
         showDropdown();
-        setHighlight(Math.max(highlightedIndex - 1, 0));
+        this._highlightDropdownItem(Math.max(this._highlightedIndex - 1, 0));
         input.select();
       } else if (e.key === 'Enter') {
         e.preventDefault();
@@ -243,15 +226,55 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
         const allSelected =
           input.selectionStart === 0 &&
           input.selectionEnd === input.value.length;
-        if (highlightedIndex >= 0 && allSelected) {
-          input.value = items[highlightedIndex].textContent;
+        if (this._highlightedIndex >= 0 && allSelected) {
+          input.value = this._dropdownItems[this._highlightedIndex].textContent;
         }
-        hideDropdown();
+        this._hideDropdown();
         this._applyShape();
       } else if (e.key === 'Escape') {
-        hideDropdown();
+        this._hideDropdown();
       }
     });
+  }
+
+  _hideDropdown() {
+    this._dropdown.classList.remove('dropdown-open');
+    this._highlightDropdownItem(-1);
+  }
+
+  _highlightDropdownItem(index) {
+    this._dropdownItems.forEach(
+      (item, i) => item.classList.toggle('highlighted', i === index));
+    this._highlightedIndex = index;
+  }
+
+  // The dimension presets, the current dimensions, and the cell groups.
+  _updateShapeDropdown() {
+    const geometry = this._geometry;
+    const specs = [...this.constructor._SHAPE_PRESETS];
+    const primaryDims = geometry.primaryDimsStr();
+    if (primaryDims && !specs.includes(primaryDims)) specs.push(primaryDims);
+    for (const group of geometry.varCellGroups()) {
+      if (group.hidden) continue;
+      specs.push(CellGeometry.displayCellId(group.prefix));
+    }
+
+    clearDOMNode(this._dropdownItemsElem);
+    this._dropdownItems = specs.map((spec, i) => {
+      const item = document.createElement('div');
+      item.className = 'shape-dropdown-item';
+      item.textContent = spec;
+      item.onmousedown = (e) => {
+        e.preventDefault();
+        this._shapeSpecInput.value = spec;
+        this._hideDropdown();
+        this._applyShape();
+      };
+      item.onmouseenter = () => this._highlightDropdownItem(i);
+      this._dropdownItemsElem.appendChild(item);
+      return item;
+    });
+    this._highlightDropdownItem(-1);
   }
 
   _setUpValueRangeDropdowns() {
@@ -272,8 +295,11 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
     const text = this._shapeSpecInput.value.trim().replace(/^\$/, 'V');
     if (!text) return;
     try {
-      // Try parsing as a full spec (handles paste of e.g. "9x9~0-8").
-      const parsed = CellGeometry.fromShapeSpec(text);
+      // A bare group prefix keeps the current value range; otherwise parse as
+      // a full spec (handles paste of e.g. "9x9~0-8").
+      const parsed = /^[A-Z]+$/.test(text) && this._geometry
+        ? this._geometry.withMainCellGroup(text)
+        : CellGeometry.fromShapeSpec(text);
       this._shapeSpecInput.setCustomValidity('');
       this.collection.setShape(parsed);
     } catch (e) {
@@ -328,9 +354,11 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
     this._varForm['var-count'].value = '';
     this._updateVarSizeDefault();
     this._updateVarPrefixDefault();
+    this._updateShapeDropdown();
     geometry.onVarCellsChanged(() => {
       this._updateVarSizeDefault();
       this._updateVarPrefixDefault();
+      this._updateShapeDropdown();
     });
   }
 
