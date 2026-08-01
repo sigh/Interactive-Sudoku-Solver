@@ -167,6 +167,18 @@ export class SudokuConstraintBase {
     return this.cells || [];
   }
 
+  // Whether the constraint can exist on the geometry: all its cells exist.
+  isDefinedFor(geometry) {
+    try {
+      for (const cellId of this.getCells(geometry)) {
+        geometry.parseCellId(cellId);
+      }
+    } catch (e) {
+      return false;
+    }
+    return true;
+  }
+
   getVarCellGroups(geometry) {
     return [];
   }

@@ -435,9 +435,8 @@ class RootConstraintCollection extends ConstraintCollectionBase {
     geometry.onVarCellsChanged(({ removedCellIds }) => {
       // Remove constraints whose cells no longer exist.
       if (removedCellIds.length) {
-        const removed = new Set(removedCellIds);
         for (const c of [...this._constraintMap.keys()]) {
-          if (c.getCells(geometry).some(id => removed.has(id))) {
+          if (!c.isDefinedFor(geometry)) {
             this.removeConstraint(c);
           }
         }
@@ -546,7 +545,42 @@ class RootConstraintCollection extends ConstraintCollectionBase {
   }
 
   setShape(geometry) {
+    // Split out var cells so we can keep them across shape changes.
+    const [varConstraints, otherConstraints] =
+      this._splitVarCellConstraints(this._constraintMap.keys());
+    const domainKept =
+      geometry.numValues === this._geometry.numValues &&
+      geometry.valueOffset === this._geometry.valueOffset;
+    // If the value range changes then clear all other constraints.
+    const carried = domainKept
+      ? [...varConstraints, ...otherConstraints] : varConstraints;
+
     this._reshapeListener(geometry);
+
+    // Keep only the constraints which still reference valid cells.
+    for (const c of carried) {
+      if (c.isDefinedFor(geometry)) this.addConstraint(c);
+    }
+  }
+
+  // Add constraints with var-cell-defining ones first, so their cell IDs are
+  // available to the constraints that use them.
+  addConstraints(constraints) {
+    const [varConstraints, otherConstraints] =
+      this._splitVarCellConstraints(constraints);
+    for (const c of varConstraints) this.addConstraint(c);
+    for (const c of otherConstraints) this.addConstraint(c);
+  }
+
+  // The var-cell-defining constraints, then the rest.
+  _splitVarCellConstraints(constraints) {
+    const varConstraints = [];
+    const otherConstraints = [];
+    for (const c of constraints) {
+      (c.getVarCellGroups(this._geometry).length
+        ? varConstraints : otherConstraints).push(c);
+    }
+    return [varConstraints, otherConstraints];
   }
 
   getCollectionForComposite(c) {
@@ -931,16 +965,9 @@ class ConstraintManager {
     const geometry = constraint.getGeometry();
     this._rootCollection.setShape(geometry);
 
-    // Add var-cell-defining constraints first so their cell IDs are
-    // available when subsequent constraints reference them.
-    const varConstraints = [];
-    const otherConstraints = [];
-    constraint.forEachTopLevel(c => {
-      (c.getVarCellGroups(geometry).length
-        ? varConstraints : otherConstraints).push(c);
-    });
-    for (const c of varConstraints) this._rootCollection.addConstraint(c);
-    for (const c of otherConstraints) this._rootCollection.addConstraint(c);
+    const constraints = [];
+    constraint.forEachTopLevel(c => constraints.push(c));
+    this._rootCollection.addConstraints(constraints);
 
     this.runUpdateCallback();
 

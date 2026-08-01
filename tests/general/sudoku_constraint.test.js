@@ -861,6 +861,33 @@ await runTest('Pair.makeFromArgs treats non-underscore items as cells', () => {
 logSuiteComplete('Adjacency validation');
 
 // ============================================================================
+// isDefinedFor
+// ============================================================================
+
+await runTest('isDefinedFor: cells must exist', () => {
+  const small = CellGeometry.fromGridSize(6);
+  const withGroup = makeShapeWithGroups(9, [
+    { prefix: 'VA', label: '', count: 4, columns: 2 },
+  ]);
+
+  const onGrid = new SudokuConstraint.Given('R9C9', 5);
+  assert.ok(onGrid.isDefinedFor(CellGeometry.fromGridSize(9)));
+  assert.ok(!onGrid.isDefinedFor(small));
+
+  const onGroup = new SudokuConstraint.Given('VA1', 5);
+  assert.ok(onGroup.isDefinedFor(withGroup));
+  assert.ok(!onGroup.isDefinedFor(small));
+});
+
+await runTest('isDefinedFor: composites follow their children', () => {
+  const small = CellGeometry.fromGridSize(6);
+  const or = new SudokuConstraint.Or(
+    [new SudokuConstraint.Given('R9C9', 5)]);
+  assert.ok(or.isDefinedFor(CellGeometry.fromGridSize(9)));
+  assert.ok(!or.isDefinedFor(small));
+});
+
+// ============================================================================
 // Sum constraint with coefficients
 
 await runTest('Sum: constructor parses sum without coefficients', () => {
