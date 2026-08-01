@@ -219,7 +219,7 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
       // Only apply if the input has changed from the current geometry,
       // to avoid resetting the value range after a full spec like "9x9~0-8"
       // has already been applied (reshape sets input to just "9x9").
-      if (!this._geometry || input.value.trim() !== this._geometry.gridDimsStr) {
+      if (!this._geometry || input.value.trim() !== this._displayedDimsSpec()) {
         this._applyShape();
       }
     });
@@ -262,8 +262,14 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
     this._maxSelect.onchange = onchange;
   }
 
+  // The dims spec in the display form: cell groups render as '$A'.
+  _displayedDimsSpec() {
+    return CellGeometry.displayCellId(this._geometry.dimsSpec);
+  }
+
   _applyShape() {
-    const text = this._shapeSpecInput.value.trim();
+    // A leading '$' is the display form of the cell group prefix.
+    const text = this._shapeSpecInput.value.trim().replace(/^\$/, 'V');
     if (!text) return;
     try {
       // Try parsing as a full spec (handles paste of e.g. "9x9~0-8").
@@ -277,14 +283,8 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
 
   _applyValueRange(min, max) {
     if (!this._geometry) return;
-    const numValues = max - min + 1;
-    const valueOffset = min - 1;
     try {
-      const geometry = CellGeometry.fromGridSize(
-        this._geometry.numRows, this._geometry.numCols, numValues, valueOffset);
-      if (geometry) {
-        this.collection.setShape(geometry);
-      }
+      this.collection.setShape(this._geometry.withValueRange(min, max));
     } catch (e) {
       // Revert dropdowns to current geometry.
       this._updateValueRangeDropdowns(this._geometry);
@@ -306,8 +306,8 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
     }
     this._minSelect.value = minValue;
 
-    // Populate max dropdown: min+defaultNV-1 .. min+MAX_SIZE-1.
-    const maxLow = minValue + defaultNV - 1;
+    // Populate max dropdown: the constructor's numValues floor up to MAX_SIZE.
+    const maxLow = minValue + Math.max(1, defaultNV) - 1;
     const maxHigh = minValue + CellGeometry.MAX_SIZE - 1;
     clearDOMNode(this._maxSelect);
     for (let v = maxLow; v <= maxHigh; v++) {
@@ -321,12 +321,26 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
 
   reshape(geometry) {
     this._geometry = geometry;
-    this._shapeSpecInput.value = geometry.gridDimsStr;
+    this._shapeSpecInput.value = this._displayedDimsSpec();
     this._shapeSpecInput.setCustomValidity('');
     this._updateValueRangeDropdowns(geometry);
-    this._varForm['var-count'].value = geometry.gridDimsStr;
+    // The size field resets to the new shape's dimensions.
+    this._varForm['var-count'].value = '';
+    this._updateVarSizeDefault();
     this._updateVarPrefixDefault();
-    geometry.onVarCellsChanged(() => this._updateVarPrefixDefault());
+    geometry.onVarCellsChanged(() => {
+      this._updateVarSizeDefault();
+      this._updateVarPrefixDefault();
+    });
+  }
+
+  // Prefill the size field with the shape's dimensions — the primary group's
+  // when it stands in for the grid. A user-typed value is left alone.
+  _updateVarSizeDefault() {
+    const input = this._varForm['var-count'];
+    if (input.value && input.value !== this._autoSize) return;
+    this._autoSize = this._geometry.primaryDimsStr();
+    input.value = this._autoSize;
   }
 
   // Prefill the prefix field with the first unused letter. A user-typed value

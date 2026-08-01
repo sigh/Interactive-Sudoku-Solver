@@ -7,7 +7,7 @@ ensureGlobalEnvironment();
 const { SudokuBuilder } = await import('../../js/solver/sudoku_builder.js' + self.VERSION_PARAM);
 const { SudokuParser } = await import('../../js/sudoku_parser.js' + self.VERSION_PARAM);
 
-// Solution counts with a var group as the shape subject, verified against
+// Solution counts with the shape dimensions taken from a var group, verified
 // brute-force enumeration of the TRUE constraint semantics (not the handler
 // implementations). Cells are VA{n}, row-major: R{r}C{c} -> VA{(r-1)*cols+c},
 // 0-indexed below as n-1.

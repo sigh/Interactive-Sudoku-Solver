@@ -23,9 +23,9 @@ export class CellGeometry {
     return new CellGeometry(numRows, numCols, numValues, valueOffset);
   }
 
-  // The subject is the main grid's dimensions ("9x9"), or a cell group
-  // prefix ("VA" — the group's own constraint carries its size, and the
-  // main grid does not exist).
+  // The dimensions are given literally ("9x9"), or taken from a cell group
+  // ("VA" — the group's own constraint declares them, and the main grid does
+  // not exist).
   static fromShapeSpec(shapeSpec) {
     const match = shapeSpec.match(
       /^(?:(\d+)x(\d+)|([A-Z]+))(?:~(\d+)(?:-(\d+))?)?$/);
@@ -109,6 +109,7 @@ export class CellGeometry {
     this.name = this.constructor.makeName(
       numRows, numCols, this.numValues, valueOffset, mainCellGroup);
     this.gridDimsStr = `${numRows}x${numCols}`;
+    this.dimsSpec = mainCellGroup ?? this.gridDimsStr;
 
     this._varCellRegistry = new VarCellRegistry(
       this.numGridCells, numCols, mainCellGroup);
@@ -130,6 +131,15 @@ export class CellGeometry {
 
   varCellsForGroup(prefix) {
     return this._varCellRegistry.getCellsForGroup(prefix);
+  }
+
+  // The primary's dimensions: the grid's, or the primary group's when it
+  // stands in for the grid ('' while that group is missing).
+  primaryDimsStr() {
+    if (!this.mainCellGroup) return this.gridDimsStr;
+    const primary = this.varCellGroups().find(
+      g => g.prefix === this.mainCellGroup);
+    return primary ? `${primary.count / primary.columns}x${primary.columns}` : '';
   }
 
   clearVarCells() {
@@ -178,6 +188,12 @@ export class CellGeometry {
     }
 
     this._varCellRegistry.addGroups(specs);
+  }
+
+  // The same shape with a different value range.
+  withValueRange(min, max) {
+    return new CellGeometry(
+      this.numRows, this.numCols, max - min + 1, min - 1, this.mainCellGroup);
   }
 
   minValue() {

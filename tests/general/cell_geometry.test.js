@@ -421,6 +421,18 @@ await runTest('fromShapeSpec round-trips through name', () => {
   }
 });
 
+await runTest('withValueRange keeps the shape', () => {
+  const grid = CellGeometry.fromShapeSpec('9x9').withValueRange(0, 8);
+  assert.equal(grid.name, '9x9~0-8');
+
+  const group = CellGeometry.fromShapeSpec('VA~1-6').withValueRange(1, 8);
+  assert.equal(group.mainCellGroup, 'VA');
+  assert.equal(group.name, 'VA~8');
+
+  // The grid still floors numValues.
+  assert.throws(() => CellGeometry.fromShapeSpec('9x9').withValueRange(1, 6));
+});
+
 // ============================================================================
 // Var cell group columns
 // ============================================================================
@@ -446,6 +458,16 @@ await runTest('count-only groups resolve columns to the primary group', () => {
     { prefix: 'VB', count: 10, columns: 0 },
   ]);
   assert.equal(columns.get('VB'), 6);
+});
+
+await runTest('primaryDimsStr follows the primary', () => {
+  assert.equal(CellGeometry.fromGridSize(9).primaryDimsStr(), '9x9');
+
+  const geometry = CellGeometry.fromShapeSpec('VA~1-6');
+  assert.equal(geometry.primaryDimsStr(), '');
+  geometry._varCellRegistry.addGroups(
+    [{ prefix: 'VA', label: '', count: 18, columns: 9 }]);
+  assert.equal(geometry.primaryDimsStr(), '2x9');
 });
 
 await runTest('count-only columns stay unresolved while the named group is missing', () => {

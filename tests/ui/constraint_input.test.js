@@ -555,4 +555,111 @@ await runTest('_handleSelection: valid selection adds constraint and clears stal
   assert.equal(errorElem.textContent, '');
 });
 
+// ============================================================================
+// ConstraintCategoryInput.Shape
+// ============================================================================
+
+// The Shape panel reads its elements at construction; give it real mocks for
+// the ones the tests inspect.
+const createShapeInput = () => {
+  const shapeSpecInput = createMockElement('input');
+  shapeSpecInput.setCustomValidity = () => { };
+  elementsById['shape-input'] = shapeSpecInput;
+  const minSelect = createMockElement('select');
+  const maxSelect = createMockElement('select');
+  elementsById['value-range-min'] = minSelect;
+  elementsById['value-range-max'] = maxSelect;
+
+  const varForm = createMockElement('form', { id: 'var-constraint-input' });
+  for (const field of ['var-prefix', 'var-count', 'var-label']) {
+    varForm[field] = createMockElement('input');
+  }
+  globalThis.document.forms = { 'var-constraint-input': varForm };
+
+  const collection = {
+    shaped: null,
+    setShape(geometry) { this.shaped = geometry; },
+    addConstraint() { },
+  };
+  const shape = new ConstraintCategoryInput.Shape(collection);
+  return { shape, collection, shapeSpecInput, minSelect, maxSelect, varForm };
+};
+
+const groupGeometry = (withPrimary) => {
+  const geometry = CellGeometry.fromShapeSpec('VA~1-6');
+  if (withPrimary) {
+    geometry._varCellRegistry.addGroups(
+      [{ prefix: 'VA', label: '', count: 36, columns: 6 }]);
+  }
+  return geometry;
+};
+
+await runTest('Shape.reshape shows the dimension spec', () => {
+  const { shape, shapeSpecInput } = createShapeInput();
+
+  shape.reshape(CellGeometry.fromShapeSpec('9x9~0-8'));
+  assert.equal(shapeSpecInput.value, '9x9');
+
+  // Cell groups render in the display form.
+  shape.reshape(groupGeometry(true));
+  assert.equal(shapeSpecInput.value, '$A');
+});
+
+await runTest('Shape._applyShape accepts the display form', () => {
+  const { shape, collection, shapeSpecInput } = createShapeInput();
+
+  shapeSpecInput.value = '$A~1-6';
+  shape._applyShape();
+  assert.equal(collection.shaped.mainCellGroup, 'VA');
+});
+
+await runTest('Shape value range dropdowns floor at one value', () => {
+  const { shape, maxSelect } = createShapeInput();
+
+  // 9x9: max options start at the grid's numValues (9).
+  shape.reshape(CellGeometry.fromShapeSpec('9x9'));
+  assert.equal(maxSelect.children[0].value, 9);
+
+  // A cell group shape has no grid to floor from; one value is the minimum.
+  shape.reshape(groupGeometry(true));
+  assert.equal(maxSelect.children[0].value, 1);
+});
+
+await runTest('Shape._applyValueRange keeps the dimensions', () => {
+  const { shape, collection } = createShapeInput();
+
+  shape.reshape(CellGeometry.fromShapeSpec('9x9'));
+  shape._applyValueRange(0, 8);
+  assert.equal(collection.shaped.name, '9x9~0-8');
+
+  shape.reshape(groupGeometry(true));
+  shape._applyValueRange(1, 8);
+  assert.equal(collection.shaped.mainCellGroup, 'VA');
+  assert.equal(collection.shaped.numValues, 8);
+});
+
+await runTest('Shape var size prefills from the shape dimensions', () => {
+  const { shape, varForm } = createShapeInput();
+  const sizeInput = varForm['var-count'];
+
+  shape.reshape(CellGeometry.fromShapeSpec('9x9'));
+  assert.equal(sizeInput.value, '9x9');
+
+  // No primary group registered yet: nothing to prefill from.
+  const geometry = groupGeometry(false);
+  shape.reshape(geometry);
+  assert.equal(sizeInput.value, '');
+
+  // The primary registering (as when a puzzle loads) fills the prefill in.
+  geometry._varCellRegistry.addGroups(
+    [{ prefix: 'VA', label: '', count: 18, columns: 9 }]);
+  assert.equal(sizeInput.value, '2x9');
+
+  // A user-typed value survives later group changes.
+  sizeInput.value = '4x4';
+  geometry._varCellRegistry.addGroups(
+    [{ prefix: 'VB', label: '', count: 4, columns: 0 }]);
+  assert.equal(sizeInput.value, '4x4');
+});
+
 logSuiteComplete('ConstraintCategoryInput.GivenCandidates');
