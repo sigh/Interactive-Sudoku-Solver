@@ -17,6 +17,13 @@ const shortCharToValue = (char, maxValue) => {
   return null;
 }
 
+// Square-grid guessers for raw text formats; null means the length doesn't
+// fit, so the caller tries the next format.
+const gridFromNumCells = (numCells) =>
+  CellGeometry.fromGridSize(Math.sqrt(numCells));
+const gridFromNumPencilmarks = (numPencilmarks) =>
+  CellGeometry.fromGridSize(Math.cbrt(numPencilmarks));
+
 class AstNode {
   constructor(cls, args = null) {
     this.cls = cls;
@@ -246,7 +253,7 @@ export class SudokuParser {
   }
 
   static _parsePlainSudokuToAst(text) {
-    const geometry = CellGeometry.fromNumCells(text.length);
+    const geometry = gridFromNumCells(text.length);
     if (!geometry) return null;
 
     const numCells = geometry.numGridCells;
@@ -274,7 +281,7 @@ export class SudokuParser {
   }
 
   static _parseJigsawLayoutToAst(text) {
-    const geometry = CellGeometry.fromNumCells(text.length);
+    const geometry = gridFromNumCells(text.length);
     if (!geometry) return null;
 
     const numCells = geometry.numGridCells;
@@ -301,7 +308,7 @@ export class SudokuParser {
   static _parseJigsawToAst(text) {
     if (text.length % 2 !== 0) return null;
 
-    const geometry = CellGeometry.fromNumCells(text.length / 2);
+    const geometry = gridFromNumCells(text.length / 2);
     if (!geometry) return null;
 
     const numCells = geometry.numGridCells;
@@ -322,7 +329,7 @@ export class SudokuParser {
     const parts = [...rawText.matchAll(/[.]|\d+/g)];
     const numParts = parts.length;
 
-    const geometry = CellGeometry.fromNumCells(numParts);
+    const geometry = gridFromNumCells(numParts);
     if (!geometry) return null;
 
     let fixedValues = [];
@@ -339,7 +346,7 @@ export class SudokuParser {
   }
 
   static _parsePencilmarksToAst(text) {
-    const geometry = CellGeometry.fromNumPencilmarks(text.length);
+    const geometry = gridFromNumPencilmarks(text.length);
     if (!geometry) return null;
 
     // Only allow digits, and dots.

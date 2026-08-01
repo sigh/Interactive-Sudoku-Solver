@@ -600,12 +600,12 @@ await runTest('shiftCells throws when shifted cell is out of bounds', () => {
   );
 });
 
-await runTest('shiftCells throws when base cell is an extra cell without graph', () => {
-  // $0 is not in the graph on a plain 9x9 geometry (no var cells registered).
+await runTest('shiftCells throws for an unknown cell id', () => {
+  // The legacy '$N' anonymous form no longer parses.
   const given = new SudokuConstraint.Given('$0', 5);
   assert.throws(
     () => given.shiftCells('R1C1', geometry9x9),
-    /Cannot shift cell/
+    /Invalid cell ID/
   );
 });
 
@@ -828,34 +828,34 @@ await runTest('_cellsAre2x2Square: non-square state cells', () => {
 
 await runTest('NFA.makeFromArgs treats non-underscore items as cells', () => {
   const constraints = [...SudokuConstraint.NFA.makeFromArgs(
-    ['encoded', '_named', 'R1C1', '$0', '', '$1'],
+    ['encoded', '_named', 'R1C1', 'VA1', '', 'VA2'],
     CellGeometry.fromGridSize(9))];
 
   assert.equal(constraints.length, 2);
 
   assert.equal(constraints[0].encodedNFA, 'encoded');
   assert.equal(constraints[0].name, 'named');
-  assert.deepEqual(constraints[0].cells, ['R1C1', '$0']);
+  assert.deepEqual(constraints[0].cells, ['R1C1', 'VA1']);
 
   assert.equal(constraints[1].encodedNFA, 'encoded');
   assert.equal(constraints[1].name, 'named');
-  assert.deepEqual(constraints[1].cells, ['$1']);
+  assert.deepEqual(constraints[1].cells, ['VA2']);
 });
 
 await runTest('Pair.makeFromArgs treats non-underscore items as cells', () => {
   const constraints = [...SudokuConstraint.Pair.makeFromArgs(
-    ['key', '_group', '$0', 'R1C2', '', '$1'],
+    ['key', '_group', 'VA1', 'R1C2', '', 'VA2'],
     CellGeometry.fromGridSize(9))];
 
   assert.equal(constraints.length, 2);
 
   assert.equal(constraints[0].key, 'key');
   assert.equal(constraints[0].name, 'group');
-  assert.deepEqual(constraints[0].cells, ['$0', 'R1C2']);
+  assert.deepEqual(constraints[0].cells, ['VA1', 'R1C2']);
 
   assert.equal(constraints[1].key, 'key');
   assert.equal(constraints[1].name, 'group');
-  assert.deepEqual(constraints[1].cells, ['$1']);
+  assert.deepEqual(constraints[1].cells, ['VA2']);
 });
 
 logSuiteComplete('Adjacency validation');

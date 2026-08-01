@@ -17,7 +17,6 @@ await runTest('fromGridSize creates valid geometry for size 9', () => {
   assert.equal(geometry.numCols, 9);
   assert.equal(geometry.numValues, 9);
   assert.equal(geometry.numGridCells, 81);
-  assert.equal(geometry.numPencilmarks, 729);
 });
 
 await runTest('fromGridSize creates valid geometry for size 4', () => {
@@ -658,7 +657,7 @@ await runTest('VarCellRegistry.addGroups throws on duplicate prefix', () => {
   geometry._varCellRegistry.addGroups([{ prefix: 'X', label: 'x', count: 2 }]);
   assert.throws(
     () => geometry._varCellRegistry.addGroups([{ prefix: 'X', label: 'x2', count: 3 }]),
-    /Var cell group prefix 'X' already exists/);
+    /Cell group prefix 'X' already exists/);
 });
 
 await runTest('VarCellRegistry.clear removes all groups', () => {

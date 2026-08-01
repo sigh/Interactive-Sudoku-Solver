@@ -46,26 +46,15 @@ export class CellGeometry {
 
     const geometry = this.fromGridSize(numRows, numCols, numValues, valueOffset);
     if (!geometry) {
-      throw new Error('Invalid shape spec: ' + shapeSpec);
+      throw new Error('Invalid shape dimensions: ' + shapeSpec);
     }
     return geometry;
-  };
+  }
 
-  // The default grid geometry (9x9), as a fresh mutable instance.
+  // The default grid geometry (9x9), as a fresh instance that is safe to add
+  // var cells to — unlike the shared GEOMETRY_* singletons.
   static newDefault() {
     return this.fromGridSize(GEOMETRY_9x9.numRows, GEOMETRY_9x9.numCols);
-  }
-
-  static fromNumCells(numCells) {
-    // Only works for square grids
-    const gridSize = Math.sqrt(numCells);
-    return this.fromGridSize(gridSize);
-  }
-
-  static fromNumPencilmarks(numPencilmarks) {
-    // Only works for square grids
-    const gridSize = Math.cbrt(numPencilmarks);
-    return this.fromGridSize(gridSize);
   }
 
   static makeName(numRows, numCols, numValues, valueOffset) {
@@ -97,7 +86,6 @@ export class CellGeometry {
     }
 
     this.numGridCells = numRows * numCols;
-    this.numPencilmarks = this.numGridCells * this.numValues;
 
     this.name = this.constructor.makeName(
       numRows, numCols, this.numValues, valueOffset);
@@ -217,7 +205,6 @@ export class CellGeometry {
   makeCellIdFromIndex(cellIndex) {
     const namedId = this._varCellRegistry.getCellId(cellIndex);
     if (namedId) return namedId;
-    if (cellIndex >= this.numGridCells) return `$${cellIndex - this.numGridCells}`;
     return this.makeCellId(...this.splitCellIndex(cellIndex));
   }
 
@@ -255,9 +242,6 @@ export class CellGeometry {
       }
       throw new Error('Invalid cell ID: ' + cellId);
     }
-    if (cellId[0] === '$') {
-      return { cellIndex: this.numGridCells + parseInt(cellId.substring(1)) };
-    }
     const registryCell = this._varCellRegistry.getCellIndex(cellId);
     if (registryCell !== null) return { cellIndex: registryCell };
     throw new Error('Invalid cell ID: ' + cellId);
@@ -287,7 +271,7 @@ class VarCellRegistry {
     let anyAdded = false;
     for (const { prefix, count, label, hidden, columns } of specs) {
       if (this._groups.has(prefix)) {
-        throw Error(`Var cell group prefix '${prefix}' already exists`);
+        throw Error(`Cell group prefix '${prefix}' already exists`);
       }
       this._groups.set(prefix, {
         prefix, count, label,
@@ -401,7 +385,7 @@ export class CellGraph {
     const defaultColumns = geometry.numCols;
     for (const group of groups) {
       const cells = group.cells;
-      if (!cells || !cells.length) continue;
+      if (!cells.length) continue;
       this._addEdges(graph, cells, group.columns || defaultColumns);
     }
 
