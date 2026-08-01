@@ -1687,7 +1687,7 @@ export class SudokuConstraintOptimizer {
           }
         } else if (newCells.length !== h.cells.length) {
           const newHandler = new HandlerModule.RequiredValues(
-            newCells, newValues);
+            newCells, newValues, h.isStrict());
           handlerSet.replace(h, newHandler);
           if (this._debugLogger) {
             this._debugLogger.log({

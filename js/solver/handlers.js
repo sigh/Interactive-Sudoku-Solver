@@ -2328,6 +2328,10 @@ export class RequiredValues extends SudokuConstraintHandler {
     return this._values;
   }
 
+  isStrict() {
+    return this._strict;
+  }
+
   exclusionCells() {
     // If there are as many values as cells, then each cell must be different.
     if (this._valueCounts.size === this.cells.length) {
