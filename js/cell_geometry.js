@@ -63,7 +63,8 @@ export class CellGeometry {
     return new CellGeometry(0, 0, numValues, valueOffset, mainCellGroup);
   }
 
-  // The default grid geometry (9x9), as a fresh mutable instance.
+  // The default grid geometry (9x9), as a fresh instance that is safe to add
+  // var cells to — unlike the shared GEOMETRY_* singletons.
   static newDefault() {
     return this.fromGridSize(GEOMETRY_9x9.numRows, GEOMETRY_9x9.numCols);
   }
@@ -109,7 +110,8 @@ export class CellGeometry {
       numRows, numCols, this.numValues, valueOffset, mainCellGroup);
     this.gridDimsStr = `${numRows}x${numCols}`;
 
-    this._varCellRegistry = new VarCellRegistry(this.numGridCells);
+    this._varCellRegistry = new VarCellRegistry(
+      this.numGridCells, numCols, mainCellGroup);
     this._cellGraph = null;
     this._varCellRegistry.addChangeListener(() => { this._cellGraph = null; });
   }
@@ -165,6 +167,16 @@ export class CellGeometry {
         `(${this.totalCells()} cells already in use).`);
     }
 
+    // The primary group takes the grid's place (other groups default their
+    // columns to it), so it must declare dimensions.
+    const primary = specs.find(
+      g => g.prefix === this.mainCellGroup && !g.columns);
+    if (primary) {
+      throw new Error(
+        `Cell group '${primary.prefix}' needs explicit dimensions ` +
+        'to be the primary.');
+    }
+
     this._varCellRegistry.addGroups(specs);
   }
 
@@ -182,7 +194,7 @@ export class CellGeometry {
   }
 
   isSquare() {
-    return this.numRows === this.numCols;
+    return this.numGridCells > 0 && this.numRows === this.numCols;
   }
 
   static displayCellId(cellId) {
@@ -275,8 +287,10 @@ export class CellGeometry {
 }
 
 class VarCellRegistry {
-  constructor(cellIndexOffset = 0) {
+  constructor(cellIndexOffset = 0, gridColumns = 0, mainCellGroup = null) {
     this._cellIndexOffset = cellIndexOffset;
+    this._gridColumns = gridColumns;
+    this._mainCellGroup = mainCellGroup;
     this._groups = new Map();
     this._sortedGroups = [];
     this._totalCells = 0;
@@ -333,7 +347,14 @@ class VarCellRegistry {
     const sorted = [...this._groups.values()].sort(
       (a, b) => a.prefix < b.prefix ? -1 : a.prefix > b.prefix ? 1 : 0);
 
+    // Count-only groups take their columns from the grid, or the primary
+    // group when it stands in for the grid. The stored specs keep the
+    // declared columns.
+    const defaultColumns = this._gridColumns ||
+      this._groups.get(this._mainCellGroup)?.columns || 0;
+
     let next = this._cellIndexOffset;
+    const resolved = [];
     for (const group of sorted) {
       group.cells = Array.from({ length: group.count }, (_, i) => next + i);
       next += group.count;
@@ -343,9 +364,12 @@ class VarCellRegistry {
         this._cellToId.set(group.cells[i], id);
         this._idToCell.set(id, group.cells[i]);
       }
+
+      resolved.push(
+        group.columns ? group : { ...group, columns: defaultColumns });
     }
 
-    this._sortedGroups = sorted;
+    this._sortedGroups = resolved;
     this._totalCells = next - this._cellIndexOffset;
   }
 
@@ -400,11 +424,10 @@ export class CellGraph {
     if (!groups.length) return base;
 
     const graph = base._graph.slice();
-    const defaultColumns = geometry.numCols;
     for (const group of groups) {
       const cells = group.cells;
-      if (!cells.length) continue;
-      this._addEdges(graph, cells, group.columns || defaultColumns);
+      if (!cells.length || !group.columns) continue;
+      this._addEdges(graph, cells, group.columns);
     }
 
     return new CellGraph(graph);

@@ -109,9 +109,14 @@ export class SudokuBuilder {
   static buildGeometry(constraint) {
     const geometry = constraint.getGeometry();
     const constraintMap = constraint.toMap();
+    const constraints = [].concat(...constraintMap.values());
+
+    // Check before var cell registration so a flagged group creator gets this
+    // error, not one about its group.
+    for (const c of constraints) this._rejectIfMainGridRequired(c, geometry);
 
     // The geometry enforces the cell-count limit here (throws if too many cells).
-    geometry.addVarCellsForConstraints([].concat(...constraintMap.values()));
+    geometry.addVarCellsForConstraints(constraints);
 
     const mainCellGroup = geometry.mainCellGroup;
     if (mainCellGroup && !geometry.varCellsForGroup(mainCellGroup)) {
@@ -120,6 +125,14 @@ export class SudokuBuilder {
     }
 
     return { geometry, constraintMap };
+  }
+
+  static _rejectIfMainGridRequired(constraint, geometry) {
+    if (geometry.mainCellGroup && constraint.constructor.REQUIRES_MAIN_GRID) {
+      throw new InvalidConstraintError(
+        `${constraint.constructor.displayName()} is defined in terms of ` +
+        'the main grid, which is not in use.');
+    }
   }
 
   static resolveConstraint(constraint) {
@@ -293,11 +306,9 @@ export class SudokuBuilder {
     for (const constraint of constraints) {
       context.recordConstraint(constraint);
 
-      if (geometry.mainCellGroup && constraint.constructor.REQUIRES_MAIN_GRID) {
-        throw new InvalidConstraintError(
-          `${constraint.constructor.displayName()} is defined in terms of ` +
-          'the main grid, which is not in use.');
-      }
+      // Also checked in buildGeometry; repeated here to cover constraints
+      // nested in composites.
+      this._rejectIfMainGridRequired(constraint, geometry);
       // Validate constraint is compatible with the geometry.
       const validateShape = constraint.constructor.VALIDATE_SHAPE_FN;
       if (validateShape && !validateShape(geometry)) {

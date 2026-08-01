@@ -163,6 +163,20 @@ await runTest('a cell group shape requires a value range', () => {
   assert.throws(() => CellGeometry.fromShapeSpec('VA'), /value range/);
 });
 
+await runTest('the primary group needs explicit dimensions', () => {
+  const countOnly = SudokuParser.parseString('.Shape~VA~4.Var~A~~4');
+  assert.throws(
+    () => SudokuBuilder.buildGeometry(countOnly),
+    /needs explicit dimensions to be the primary/);
+
+  // Count-only is fine for other groups; they default to the primary's
+  // columns.
+  const withOverlay = SudokuParser.parseString(
+    '.Shape~VA~4.Var~A~~2x2.Var~B~~4');
+  const { geometry } = SudokuBuilder.buildGeometry(withOverlay);
+  assert.equal(geometry.totalCells(), 8);
+});
+
 await runTest('a cell group shape keeps constraint-provided handlers on var cells', () => {
   const constraint = SudokuParser.parseString(
     '.Shape~VA~4.Var~A~~2x2'
@@ -173,7 +187,7 @@ await runTest('a cell group shape keeps constraint-provided handlers on var cell
 });
 
 await runTest('a cell group shape requires the named group to exist', () => {
-  const constraint = SudokuParser.parseString('.Shape~VQ~4.Var~A~~4');
+  const constraint = SudokuParser.parseString('.Shape~VQ~4.Var~A~~2x2');
   assert.throws(
     () => SudokuBuilder.buildGeometry(constraint),
     { name: 'InvalidConstraintError', message: /no cell group 'VQ'/ });
@@ -181,7 +195,7 @@ await runTest('a cell group shape requires the named group to exist', () => {
 
 await runTest('a cell group shape makes grid cell references fail', () => {
   const constraint = SudokuParser.parseString(
-    '.Shape~VA~4.Var~A~~4.Thermo~R1C1~R1C2');
+    '.Shape~VA~4.Var~A~~2x2.Thermo~R1C1~R1C2');
   assert.throws(() => buildHandlers(constraint), /Invalid cell ID/);
 });
 

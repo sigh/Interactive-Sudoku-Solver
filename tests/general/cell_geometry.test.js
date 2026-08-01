@@ -421,6 +421,40 @@ await runTest('fromShapeSpec round-trips through name', () => {
   }
 });
 
+// ============================================================================
+// Var cell group columns
+// ============================================================================
+
+const groupColumns = (geometry, specs) => {
+  geometry._varCellRegistry.addGroups(
+    specs.map(s => ({ label: '', ...s })));
+  return new Map(geometry.varCellGroups().map(g => [g.prefix, g.columns]));
+};
+
+await runTest('count-only groups resolve columns to the grid', () => {
+  const columns = groupColumns(CellGeometry.fromGridSize(9), [
+    { prefix: 'VA', count: 10, columns: 0 },
+    { prefix: 'VB', count: 4, columns: 2 },
+  ]);
+  assert.equal(columns.get('VA'), 9);
+  assert.equal(columns.get('VB'), 2);
+});
+
+await runTest('count-only groups resolve columns to the primary group', () => {
+  const columns = groupColumns(CellGeometry.fromShapeSpec('VA~1-6'), [
+    { prefix: 'VA', count: 36, columns: 6 },
+    { prefix: 'VB', count: 10, columns: 0 },
+  ]);
+  assert.equal(columns.get('VB'), 6);
+});
+
+await runTest('count-only columns stay unresolved while the named group is missing', () => {
+  const columns = groupColumns(CellGeometry.fromShapeSpec('VA~1-6'), [
+    { prefix: 'VB', count: 10, columns: 0 },
+  ]);
+  assert.equal(columns.get('VB'), 0);
+});
+
 logSuiteComplete('CellGeometry');
 
 // ============================================================================

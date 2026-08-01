@@ -228,7 +228,8 @@ export const printSolution = (geometry, grid, solutionNum) => {
   for (const group of geometry.varCellGroups()) {
     if (group.hidden) continue;
     console.log(`\n[${group.prefix}] ${group.label}:`);
-    if (group.columns) {
+    // Groups that wrap render as a grid; single-row groups as labeled values.
+    if (group.cells.length > group.columns) {
       printVarGrid(geometry, grid, group.cells, group.columns);
     } else {
       for (const cell of group.cells) {

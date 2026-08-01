@@ -115,8 +115,7 @@ export class ConnectedValues extends SudokuConstraintHandler {
       throw new InvalidConstraintError(
         'Connected Values must cover the grid or a whole var-cell group.');
     }
-    this._neighbors = layerNeighborTable(
-      numCells, layer.columns || geometry.numCols);
+    this._neighbors = layerNeighborTable(numCells, layer.columns);
     this._traversalBuffer = new Uint16Array(numCells);
     this._states = new Uint8Array(numCells + 1);
 

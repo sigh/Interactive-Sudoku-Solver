@@ -1201,7 +1201,7 @@ export class VarCellDisplay extends DisplayItem {
   }
 }
 
-class CellPositioner {
+export class CellPositioner {
   static VAR_CELL_GAP = 20;
   static VAR_CELL_LABEL_HEIGHT = 14;
 
@@ -1287,16 +1287,17 @@ class CellPositioner {
     const labelHeight = CellPositioner.VAR_CELL_LABEL_HEIGHT;
     const gridHeight = cellSize * this._geometry.numRows;
     const gridWidth = cellSize * this._geometry.numCols;
-    const defaultColumns = this._geometry.numCols;
 
     let yNext = gridHeight + gap;
     let maxWidth = gridWidth;
     const layout = [];
 
     for (const group of groups) {
-      if (group.hidden || !group.cells.length) continue;
+      // Columns resolve in the registry; a count-only group has none while
+      // the group named by the shape is missing.
+      if (group.hidden || !group.cells.length || !group.columns) continue;
 
-      const columns = group.columns || defaultColumns;
+      const columns = group.columns;
       const rows = Math.ceil(group.cells.length / columns);
       const yLabel = yNext;
       const y = yLabel + labelHeight;
