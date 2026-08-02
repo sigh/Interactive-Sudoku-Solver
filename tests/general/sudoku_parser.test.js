@@ -381,6 +381,13 @@ await runTest('parseString should parse Diagonal', () => {
   assert.equal(diagonal.direction, 1);
 });
 
+await runTest('parseString should reject a Diagonal with no direction', () => {
+  // '.Diagonal~' used to parse into a main-diagonal constraint, so an encoding that
+  // lost its direction was indistinguishable from one that meant the main diagonal.
+  assert.throws(
+    () => SudokuParser.parseString('.Diagonal~.'), /Invalid Diagonal direction/);
+});
+
 await runTest('parseString should parse Sandwich', () => {
   const result = SudokuParser.parseString('.Sandwich~15~R1.');
   assert.ok(result);

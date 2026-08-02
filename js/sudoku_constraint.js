@@ -1876,6 +1876,11 @@ export class SudokuConstraint {
     constructor(direction) {
       super(direction);
       this.direction = +direction;
+
+      if (!this.constructor.ARGUMENT_CONFIG.options.map(o => o.value).includes(
+        this.direction)) {
+        throw new Error('Invalid Diagonal direction: ' + direction);
+      }
     }
   }
 

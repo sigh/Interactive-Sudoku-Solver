@@ -1241,6 +1241,43 @@ await runTest('Modular accepts mod >= 1', () => {
 logSuiteComplete('Modular argument validation');
 
 // ============================================================================
+// Diagonal argument validation
+// ============================================================================
+
+await runTest('Diagonal rejects a direction outside its options', () => {
+  // The constructor coerces with +, so anything non-numeric became NaN, and
+  // sudoku_builder's `direction > 0` test read that as false and silently emitted
+  // the main diagonal. It serialized back to a plausible '.Diagonal~', so two
+  // puzzles shipped with a marked diagonal entirely unconstrained.
+  assert.throws(() => new SudokuConstraint.Diagonal(), /Invalid Diagonal direction/);
+  assert.throws(() => new SudokuConstraint.Diagonal('main'), /Invalid Diagonal direction/);
+  assert.throws(() => new SudokuConstraint.Diagonal('anti'), /Invalid Diagonal direction/);
+  assert.throws(() => new SudokuConstraint.Diagonal(0), /Invalid Diagonal direction/);
+  assert.throws(() => new SudokuConstraint.Diagonal(2), /Invalid Diagonal direction/);
+  assert.throws(() => new SudokuConstraint.Diagonal(null), /Invalid Diagonal direction/);
+});
+
+await runTest('Diagonal accepts either option, as a number or as a string', () => {
+  // Deserialization passes the argument as a string, so validating the raw value
+  // instead of the coerced one would reject every already-serialized puzzle.
+  assert.equal(new SudokuConstraint.Diagonal(1).direction, 1);
+  assert.equal(new SudokuConstraint.Diagonal(-1).direction, -1);
+  assert.equal(new SudokuConstraint.Diagonal('1').direction, 1);
+  assert.equal(new SudokuConstraint.Diagonal('-1').direction, -1);
+});
+
+await runTest('Diagonal round-trips through its serialized form', () => {
+  for (const direction of [1, -1]) {
+    const text = new SudokuConstraint.Diagonal(direction).toString();
+    assert.equal(text, `.Diagonal~${direction}`);
+    const [reparsed] = [...SudokuConstraint.Diagonal.makeFromArgs([`${direction}`])];
+    assert.equal(reparsed.direction, direction);
+  }
+});
+
+logSuiteComplete('Diagonal argument validation');
+
+// ============================================================================
 // Structured Sum / geometry-based value ranges / Var member ids
 // ============================================================================
 
