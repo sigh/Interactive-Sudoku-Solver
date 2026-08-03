@@ -564,6 +564,7 @@ await runTest('_handleSelection: valid selection adds constraint and clears stal
 const createShapeInput = () => {
   const shapeSpecInput = createMockElement('input');
   shapeSpecInput.setCustomValidity = () => { };
+  shapeSpecInput.reportValidity = () => { };
   elementsById['shape-input'] = shapeSpecInput;
   const minSelect = createMockElement('select');
   const maxSelect = createMockElement('select');
@@ -613,6 +614,7 @@ await runTest('Shape.reshape shows the dimension spec', () => {
 await runTest('Shape._applyShape accepts the display form', () => {
   const { shape, collection, shapeSpecInput } = createShapeInput();
 
+  shape.reshape(groupGeometry(true));
   shapeSpecInput.value = '$A~1-6';
   shape._applyShape();
   assert.equal(collection.shaped.mainCellGroup, 'VA');
@@ -671,12 +673,15 @@ await runTest('Shape dropdown lists presets, current dims and groups', () => {
   const { shape, dropdownItems } = createShapeInput();
 
   const grid = CellGeometry.fromGridSize(9);
-  grid._varCellRegistry.addGroups(
-    [{ prefix: 'VA', label: 'over', count: 4, columns: 2 }]);
+  grid._varCellRegistry.addGroups([
+    { prefix: 'VA', label: 'over', count: 4, columns: 2 },
+    // Count-only: not a valid primary, so not suggested.
+    { prefix: 'VB', label: '', count: 4, columns: 0 },
+  ]);
   shape.reshape(grid);
   assert.deepEqual(
     dropdownItems.children.map(i => i.textContent),
-    ['9x9', '6x6', '16x16', '$A']);
+    ['9x9', '6x6', '16x16', '$A: over', 'raw 9x9 ($C)']);
 
   // A non-preset primary adds its own dimensions.
   const group = CellGeometry.fromShapeSpec('VA~1-6');
@@ -688,15 +693,45 @@ await runTest('Shape dropdown lists presets, current dims and groups', () => {
     ['9x9', '6x6', '16x16', '2x9', '$A']);
 });
 
+await runTest('the new-group entry creates and applies a grid-sized group', () => {
+  const { shape, collection, dropdownItems } = createShapeInput();
+
+  const grid = CellGeometry.fromShapeSpec('9x9~0-8');
+  // Register added constraints, as the root collection does.
+  collection.addConstraint = (c) =>
+    grid._varCellRegistry.addGroups(c.getVarCellGroups(grid));
+  shape.reshape(grid);
+
+  const newGroup = dropdownItems.children.length - 1;
+  assert.equal(
+    dropdownItems.children[newGroup].textContent, 'raw 9x9 ($A)');
+  shape._dropdownActions[newGroup]();
+
+  assert.equal(collection.shaped.mainCellGroup, 'VA');
+  assert.equal(collection.shaped.numValues, 9);
+});
+
 await runTest('_applyShape with a bare group prefix keeps the range', () => {
   const { shape, collection, shapeSpecInput } = createShapeInput();
 
-  shape.reshape(CellGeometry.fromShapeSpec('9x9~0-8'));
+  const grid = CellGeometry.fromShapeSpec('9x9~0-8');
+  grid._varCellRegistry.addGroups(
+    [{ prefix: 'VA', label: '', count: 81, columns: 9 }]);
+  shape.reshape(grid);
   shapeSpecInput.value = '$A';
   shape._applyShape();
 
   assert.equal(collection.shaped.mainCellGroup, 'VA');
   assert.equal(collection.shaped.name, 'VA~0-8');
+});
+
+await runTest('_applyShape rejects a group that cannot be the grid', () => {
+  const { shape, collection, shapeSpecInput } = createShapeInput();
+
+  shape.reshape(groupGeometry(true));
+  shapeSpecInput.value = '\$Z';
+  shape._applyShape();
+  assert.equal(collection.shaped, null);
 });
 
 await runTest('_applyShape returns to the main grid with a dims spec', () => {

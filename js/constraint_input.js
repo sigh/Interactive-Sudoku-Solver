@@ -207,18 +207,21 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
       }
     });
 
+    // Arrow keys move within the items, and always land on one.
+    const moveHighlight = (delta) => {
+      showDropdown();
+      this._highlightDropdownItem(Math.max(0, Math.min(
+        this._highlightedIndex + delta, this._dropdownItems.length - 1)));
+      input.select();
+    };
+
     input.addEventListener('keydown', (e) => {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
-        showDropdown();
-        this._highlightDropdownItem(
-          Math.min(this._highlightedIndex + 1, this._dropdownItems.length - 1));
-        input.select();
+        moveHighlight(1);
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
-        showDropdown();
-        this._highlightDropdownItem(Math.max(this._highlightedIndex - 1, 0));
-        input.select();
+        moveHighlight(-1);
       } else if (e.key === 'Enter') {
         e.preventDefault();
         // If an item is highlighted and the entire input is selected.
@@ -228,10 +231,13 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
           input.selectionStart === 0 &&
           input.selectionEnd === input.value.length;
         if (this._highlightedIndex >= 0 && allSelected) {
-          input.value = this._dropdownItems[this._highlightedIndex].textContent;
+          const action = this._dropdownActions[this._highlightedIndex];
+          this._hideDropdown();
+          action();
+        } else {
+          this._hideDropdown();
+          this._applyShape();
         }
-        this._hideDropdown();
-        this._applyShape();
       } else if (e.key === 'Escape') {
         this._hideDropdown();
       }
@@ -252,24 +258,50 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
   // The dimension presets, the current dimensions, and the cell groups.
   _updateShapeDropdown() {
     const geometry = this._geometry;
-    const specs = [...this.constructor._SHAPE_PRESETS];
+    const applySpec = (spec) => {
+      this._shapeSpecInput.value = spec;
+      this._applyShape();
+    };
+    const entries = [];
+    const addSpecEntry = (spec, text = spec) => entries.push(
+      { text, action: () => applySpec(spec) });
+
+    this.constructor._SHAPE_PRESETS.forEach(spec => addSpecEntry(spec));
     const primaryDims = geometry.primaryDimsStr();
-    if (primaryDims && !specs.includes(primaryDims)) specs.push(primaryDims);
-    for (const group of geometry.varCellGroups()) {
-      if (group.hidden) continue;
-      specs.push(CellGeometry.displayCellId(group.prefix));
+    if (primaryDims && !this.constructor._SHAPE_PRESETS.includes(primaryDims)) {
+      addSpecEntry(primaryDims);
+    }
+    for (const group of this._primaryCellGroupChoices()) {
+      const spec = CellGeometry.displayCellId(group.prefix);
+      addSpecEntry(spec, group.label ? `${spec}: ${group.label}` : spec);
+    }
+    // One step to a grid-sized cell group as the grid. 'raw' because the
+    // result has no rows, columns or boxes: just the cells.
+    if (!geometry.mainCellGroup && this._autoPrefix) {
+      entries.push({
+        text: `raw ${geometry.gridDimsStr} ($${this._autoPrefix})`,
+        divided: true,
+        action: () => {
+          // Adding the group advances the prefix prefill; capture it first.
+          const prefix = this._autoPrefix;
+          this.collection.addConstraint(
+            new SudokuConstraint.Var(prefix, '', geometry.gridDimsStr));
+          applySpec('$' + prefix);
+        },
+      });
     }
 
     clearDOMNode(this._dropdownItemsElem);
-    this._dropdownItems = specs.map((spec, i) => {
+    this._dropdownActions = entries.map(entry => entry.action);
+    this._dropdownItems = entries.map((entry, i) => {
       const item = document.createElement('div');
       item.className = 'shape-dropdown-item';
-      item.textContent = spec;
+      if (entry.divided) item.classList.add('divided');
+      item.textContent = entry.text;
       item.onmousedown = (e) => {
         e.preventDefault();
-        this._shapeSpecInput.value = spec;
         this._hideDropdown();
-        this._applyShape();
+        this._dropdownActions[i]();
       };
       item.onmouseenter = () => this._highlightDropdownItem(i);
       this._dropdownItemsElem.appendChild(item);
@@ -284,6 +316,11 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
     };
     this._minSelect.onchange = onchange;
     this._maxSelect.onchange = onchange;
+  }
+
+  _primaryCellGroupChoices() {
+    return this._geometry.varCellGroups().filter(
+      g => !g.hidden && !g.countOnly);
   }
 
   // The dims spec in the display form: cell groups render as '$A'.
@@ -301,10 +338,16 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
       const parsed = /^[A-Z]+$/.test(text) && this._geometry
         ? this._geometry.withMainCellGroup(text)
         : CellGeometry.fromShapeSpec(text);
+      if (parsed.mainCellGroup && !this._primaryCellGroupChoices().some(
+        g => g.prefix === parsed.mainCellGroup)) {
+        throw new Error(`No cell group '${CellGeometry.displayCellId(
+          parsed.mainCellGroup)}' with its own dimensions`);
+      }
       this._shapeSpecInput.setCustomValidity('');
       this.collection.setShape(parsed);
     } catch (e) {
       this._shapeSpecInput.setCustomValidity(e.toString());
+      this._shapeSpecInput.reportValidity();
     }
   }
 
@@ -318,32 +361,31 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
     }
   }
 
+  _setSelectOptions(select, values, selected) {
+    clearDOMNode(select);
+    for (const v of values) {
+      const opt = document.createElement('option');
+      opt.value = v;
+      opt.textContent = v;
+      select.appendChild(opt);
+    }
+    select.value = selected;
+  }
+
   _updateValueRangeDropdowns(geometry) {
     const defaultNV = CellGeometry.defaultNumValues(geometry.numRows, geometry.numCols);
     const minValue = geometry.minValue();
-    const maxValue = geometry.maxValue();
 
-    // Populate min dropdown: options 0 and 1.
-    clearDOMNode(this._minSelect);
-    for (const v of [0, 1]) {
-      const opt = document.createElement('option');
-      opt.value = v;
-      opt.textContent = v;
-      this._minSelect.appendChild(opt);
-    }
-    this._minSelect.value = minValue;
+    this._setSelectOptions(this._minSelect, [0, 1], minValue);
 
-    // Populate max dropdown: the constructor's numValues floor up to MAX_SIZE.
+    // The max options run from the constructor's numValues floor up to
+    // MAX_SIZE.
     const maxLow = minValue + Math.max(1, defaultNV) - 1;
     const maxHigh = minValue + CellGeometry.MAX_SIZE - 1;
-    clearDOMNode(this._maxSelect);
-    for (let v = maxLow; v <= maxHigh; v++) {
-      const opt = document.createElement('option');
-      opt.value = v;
-      opt.textContent = v;
-      this._maxSelect.appendChild(opt);
-    }
-    this._maxSelect.value = maxValue;
+    this._setSelectOptions(
+      this._maxSelect,
+      Array.from({ length: maxHigh - maxLow + 1 }, (_, i) => maxLow + i),
+      geometry.maxValue());
   }
 
   reshape(geometry) {

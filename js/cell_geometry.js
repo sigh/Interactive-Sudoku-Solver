@@ -399,8 +399,8 @@ class VarCellRegistry {
         this._idToCell.set(id, group.cells[i]);
       }
 
-      resolved.push(
-        group.columns ? group : { ...group, columns: defaultColumns });
+      resolved.push(group.columns
+        ? group : { ...group, columns: defaultColumns, countOnly: true });
     }
 
     this._sortedGroups = resolved;
