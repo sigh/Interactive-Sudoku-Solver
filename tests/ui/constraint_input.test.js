@@ -710,4 +710,19 @@ await runTest('_applyShape returns to the main grid with a dims spec', () => {
   assert.equal(collection.shaped.name, '6x6');
 });
 
+await runTest('checkbox categories disable for a cell group shape', () => {
+  const layout = new ConstraintCategoryInput.LayoutCheckbox(
+    createMockCollection());
+  const grid = CellGeometry.fromGridSize(9);
+  const groupShape = CellGeometry.fromShapeSpec('VA~1-6');
+
+  layout.reshape(grid);
+  assert.ok([...layout._checkboxes.values()].some(
+    item => !item.element.disabled));
+
+  layout.reshape(groupShape);
+  assert.ok([...layout._checkboxes.values()].every(
+    item => item.element.disabled));
+});
+
 logSuiteComplete('ConstraintCategoryInput.GivenCandidates');

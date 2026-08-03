@@ -155,6 +155,7 @@ export class ConstraintCategoryInput {
     classes.sort((a, b) => a.displayName().localeCompare(b.displayName()));
     return classes;
   }
+
 }
 
 ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
@@ -576,8 +577,8 @@ class CheckboxCategoryInput extends ConstraintCategoryInput {
 
   reshape(geometry) {
     for (const item of this._checkboxes.values()) {
-      const constr = item.constraint.constructor;
-      const disabled = !!(constr.VALIDATE_SHAPE_FN && !constr.VALIDATE_SHAPE_FN(geometry));
+      const disabled =
+        !item.constraint.constructor.isValidForShape(geometry);
       item.element.disabled = disabled;
       item.element.parentElement.classList.toggle('disabled', disabled);
     }
@@ -1475,8 +1476,7 @@ ConstraintCategoryInput.OutsideClueOption = class OutsideClueOption extends Cons
 
   reshape(geometry) {
     for (const item of this._selects.values()) {
-      const constr = item.constraintClass;
-      const disabled = !!(constr.VALIDATE_SHAPE_FN && !constr.VALIDATE_SHAPE_FN(geometry));
+      const disabled = !item.constraintClass.isValidForShape(geometry);
       item.element.disabled = disabled;
       item.element.parentElement.classList.toggle('disabled', disabled);
     }

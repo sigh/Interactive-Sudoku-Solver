@@ -894,6 +894,23 @@ await runTest('isDefinedFor: grid-defined constraints need the grid', () => {
   assert.ok(!antiKnight.isDefinedFor(groupShape));
 });
 
+await runTest('isValidForShape: flagged or shape-invalid types', () => {
+  const groupShape = CellGeometry.fromShapeSpec('VA~1-6');
+  assert.ok(SudokuConstraint.AntiKnight.isValidForShape(
+    CellGeometry.fromGridSize(9)));
+  assert.ok(!SudokuConstraint.AntiKnight.isValidForShape(groupShape));
+
+  // VALIDATE_SHAPE_FN failures too: Windoku needs a square grid.
+  assert.ok(!SudokuConstraint.Windoku.isValidForShape(
+    CellGeometry.fromGridSize(4, 6)));
+});
+
+await runTest('isDefinedFor: shape-invalid types are not defined', () => {
+  const windoku = new SudokuConstraint.Windoku();
+  assert.ok(windoku.isDefinedFor(CellGeometry.fromGridSize(9)));
+  assert.ok(!windoku.isDefinedFor(CellGeometry.fromGridSize(4, 6)));
+});
+
 await runTest('isDefinedFor: composites follow their children', () => {
   const groupShape = CellGeometry.fromShapeSpec('VA~1-6');
   groupShape._varCellRegistry.addGroups(

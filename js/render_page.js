@@ -736,6 +736,10 @@ class ConstraintManager {
       listener.reshape(geometry);
     }
 
+    for (const panel of this._panelsRequiringMainGrid) {
+      panel.style.display = geometry.mainCellGroup ? 'none' : '';
+    }
+
     this.runUpdateCallback();
   }
 
@@ -856,6 +860,10 @@ class ConstraintManager {
       this.addReshapeListener(categoryInput);
       categoryInput.setUpdateCallback(this.runUpdateCallback.bind(this));
     }
+
+    this._panelsRequiringMainGrid = ['layout-constraint-container',
+      'global-constraints-container', 'outside-clue-container']
+      .map(id => document.getElementById(id));
 
     this._setUpCustomConstraintTabs();
     this._setUpFreeFormInput();
