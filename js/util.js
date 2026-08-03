@@ -33,6 +33,12 @@ export const createSvgElement = (tag) => {
   return document.createElementNS('http://www.w3.org/2000/svg', tag);
 };
 
+export const setSvgAttrs = (element, attrs) => {
+  for (const [key, value] of Object.entries(attrs)) {
+    element.setAttribute(key, value);
+  }
+};
+
 const SOURCE_ICON_DOMAINS = [
   'logic-masters.de',
   'youtube.com',

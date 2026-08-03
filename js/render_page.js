@@ -19,7 +19,6 @@ const {
 } = await import('./sudoku_constraint.js' + self.VERSION_PARAM);
 const {
   DisplayContainer,
-  BorderDisplay,
   DisplayItem
 } = await import('./display.js' + self.VERSION_PARAM);
 const { SudokuParser } = await import('./sudoku_parser.js' + self.VERSION_PARAM);
@@ -1251,21 +1250,18 @@ class ConstraintChipView {
     const svg = createSvgElement('svg');
     svg.classList.add('chip-icon');
 
-    const borders = createSvgElement('g');
-    const borderDisplay = new BorderDisplay(
-      borders, 'rgb(255, 255, 255)');
-    borderDisplay.reshape(geometry);
-    svg.append(borders);
-
-    // Determine the correct scale to fit our icon size.
-    const gridWidthPixels = borderDisplay.gridWidthPixels();
-    const gridHeightPixels = borderDisplay.gridHeightPixels();
-    const maxGridPixels = Math.max(gridWidthPixels, gridHeightPixels);
-    const scale = this._CHIP_ICON_SIZE_PX / maxGridPixels;
+    const [numRows, numCols] = geometry.primaryDims() ?? [1, 1];
+    const widthPixels = DisplayItem.CELL_SIZE * numCols;
+    const heightPixels = DisplayItem.CELL_SIZE * numRows;
+    const scale = this._CHIP_ICON_SIZE_PX / Math.max(widthPixels, heightPixels);
     const transform = `scale(${scale})`;
 
-    borders.setAttribute('transform', transform);
-    borders.setAttribute('stroke-width', 0);
+    const background = createSvgElement('rect');
+    background.setAttribute('width', widthPixels);
+    background.setAttribute('height', heightPixels);
+    background.setAttribute('fill', 'rgb(255, 255, 255)');
+    background.setAttribute('transform', transform);
+    svg.append(background);
 
     elem.setAttribute('transform', transform);
     elem.setAttribute('stroke-width', 15);
@@ -1276,8 +1272,8 @@ class ConstraintChipView {
     // Set the size (as well as minSize so it doesn't get squished).
     // Keep the longest dimension at _CHIP_ICON_SIZE_PX and scale the other
     // dimension proportionally, so rectangular grids don't look squashed.
-    svg.style.width = (gridWidthPixels * scale) + 'px';
-    svg.style.height = (gridHeightPixels * scale) + 'px';
+    svg.style.width = (widthPixels * scale) + 'px';
+    svg.style.height = (heightPixels * scale) + 'px';
     // Undo the opacity.
     svg.style.filter = 'saturate(100)';
 

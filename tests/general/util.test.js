@@ -7,6 +7,7 @@ ensureGlobalEnvironment();
 
 const {
   clamp,
+  setSvgAttrs,
   formatTimeMs,
   formatFixedTruncated,
   formatNumberMetric,
@@ -835,6 +836,13 @@ await runTest('IteratorWithCount with empty iterator', () => {
   const result = iter.next();
   assert.equal(result.done, true);
   assert.equal(iter.count, 1);
+});
+
+await runTest('setSvgAttrs sets each attribute', () => {
+  const attrs = {};
+  setSvgAttrs({ setAttribute: (k, v) => attrs[k] = v },
+    { 'stroke': 'red', 'stroke-width': 2 });
+  assert.deepEqual(attrs, { 'stroke': 'red', 'stroke-width': 2 });
 });
 
 logSuiteComplete('util');

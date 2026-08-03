@@ -40,6 +40,36 @@ await runTest('count-only group uses the primary group width', () => {
   assert.ok(Number.isFinite(result.extraWidth));
 });
 
+await runTest('the primary group lays out as the grid', () => {
+  const { result } = layoutFor(
+    CellGeometry.fromShapeSpec('VA~1-6'),
+    [{ prefix: 'VA', count: 36, columns: 6 },
+    { prefix: 'VB', count: 10, columns: 0 }]);
+
+  const labelHeight = CellPositioner.VAR_CELL_LABEL_HEIGHT;
+  assert.ok(result.layout[0].primary);
+  assert.equal(result.layout[0].group.prefix, 'VA');
+  // The primary sits at the top, below its label row.
+  assert.equal(result.layout[0].yLabel, 0);
+  assert.equal(result.layout[0].y, labelHeight);
+  // Other groups follow below the primary, after their label row.
+  const belowPrimary = labelHeight + 6 * CELL_SIZE +
+    CellPositioner.VAR_CELL_GAP + labelHeight;
+  assert.equal(result.layout[1].y, belowPrimary);
+  assert.equal(result.extraHeight, belowPrimary + 2 * CELL_SIZE);
+});
+
+await runTest('the primary group lays out first regardless of sort order', () => {
+  const { result } = layoutFor(
+    CellGeometry.fromShapeSpec('VB~1-6'),
+    [{ prefix: 'VA', count: 4, columns: 2 },
+    { prefix: 'VB', count: 36, columns: 6 }]);
+
+  assert.equal(result.layout[0].group.prefix, 'VB');
+  assert.equal(result.layout[0].yLabel, 0);
+  assert.ok(!result.layout[1].primary);
+});
+
 await runTest('a group with unresolved columns is not laid out', () => {
   // A count-only group has no width while the group named by the shape is
   // missing.
