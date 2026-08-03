@@ -470,6 +470,18 @@ await runTest('primaryDimsStr follows the primary', () => {
   assert.equal(geometry.primaryDimsStr(), '2x9');
 });
 
+await runTest('primaryCells follows the primary', () => {
+  assert.deepEqual(
+    CellGeometry.fromGridSize(2).primaryCells(), [0, 1, 2, 3]);
+
+  const geometry = CellGeometry.fromShapeSpec('VA~1-6');
+  geometry._varCellRegistry.addGroups([
+    { prefix: 'VA', label: '', count: 4, columns: 2 },
+    { prefix: 'VB', label: '', count: 2, columns: 2 },
+  ]);
+  assert.deepEqual(geometry.primaryCells(), [0, 1, 2, 3]);
+});
+
 await runTest('count-only columns stay unresolved while the named group is missing', () => {
   const columns = groupColumns(CellGeometry.fromShapeSpec('VA~1-6'), [
     { prefix: 'VB', count: 10, columns: 0 },

@@ -505,10 +505,7 @@ export class SudokuParser {
 export const toShortSolution = (solution, geometry) => {
   const DEFAULT_VALUE = '.';
 
-  const cells = geometry.mainCellGroup
-    ? geometry.varCellsForGroup(geometry.mainCellGroup)
-    : Array.from(
-      { length: Math.min(solution.length, geometry.numGridCells) }, (_, i) => i);
+  const cells = geometry.primaryCells();
   const result = new Array(cells.length).fill(DEFAULT_VALUE);
   const minValue = geometry.minValue();
   let maxValue = minValue;

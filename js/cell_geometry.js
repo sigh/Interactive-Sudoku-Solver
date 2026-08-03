@@ -148,6 +148,13 @@ export class CellGeometry {
     return dims ? `${dims[0]}x${dims[1]}` : '';
   }
 
+  // The primary's cell indices: the cells a solution reports.
+  primaryCells() {
+    return this.mainCellGroup
+      ? this.varCellsForGroup(this.mainCellGroup)
+      : Array.from({ length: this.numGridCells }, (_, i) => i);
+  }
+
   clearVarCells() {
     this._varCellRegistry.clear();
   }
