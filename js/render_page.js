@@ -597,13 +597,18 @@ class RootConstraintCollection extends ConstraintCollectionBase {
     return [...this._constraintMap.keys()].filter(c => c.type === type);
   }
 
-  removeConstraintForVarPrefix(prefix) {
+  constraintForVarPrefix(prefix) {
     for (const c of this._constraintMap.keys()) {
       if (c.getVarCellGroups(this._geometry).some(g => g.prefix === prefix)) {
-        this.removeConstraint(c);
-        return;
+        return c;
       }
     }
+    return null;
+  }
+
+  removeConstraintForVarPrefix(prefix) {
+    const constraint = this.constraintForVarPrefix(prefix);
+    if (constraint) this.removeConstraint(constraint);
   }
 
   _chipViewForConstraint(constraint) {
@@ -729,7 +734,7 @@ class ConstraintManager {
   _reshape(geometry) {
     if (this._geometry === geometry) return;
 
-    this.clear();
+    this._clear();
     this._geometry = geometry;
 
     for (const listener of this._reshapeListeners) {
@@ -869,7 +874,14 @@ class ConstraintManager {
     this._setUpFreeFormInput();
 
     // Clear button.
-    document.getElementById('clear-constraints-button').onclick = () => this.clear();
+    // Clear the puzzle onto the same shape: when a cell group is the
+    // primary, its defining constraint survives.
+    document.getElementById('clear-constraints-button').onclick = () => {
+      const primary = this._geometry.mainCellGroup &&
+        this._rootCollection.constraintForVarPrefix(this._geometry.mainCellGroup);
+      this._clear();
+      if (primary) this._rootCollection.addConstraint(primary);
+    };
 
     // Copy to clipboard.
     const copyButton = document.getElementById('copy-constraints-button');
@@ -970,7 +982,7 @@ class ConstraintManager {
   _loadFromText(input) {
     const constraint = SudokuParser.parseText(input);
 
-    this.clear();
+    this._clear();
 
     const geometry = constraint.getGeometry();
     this._rootCollection.setShape(geometry);
@@ -1003,7 +1015,7 @@ class ConstraintManager {
     return this._getConstraints(_ => true);
   }
 
-  clear() {
+  _clear() {
     this._display.clear();
     for (const chipView of this._chipViews.values()) {
       chipView.clear();
