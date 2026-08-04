@@ -115,6 +115,52 @@ await runTest('lint_sandbox_script flags numValues/Shape mismatch and id templat
   assert.match(report(items), /manual-cell-id-template/);
 });
 
+await runTest('lint_sandbox_script flags numValues mismatch in an inline-spec call', () => {
+  // The spec object spans commas and lines; the call scanner must still find
+  // the second argument.
+  const items = lintSource(SCRIPT_HEADER
+    + 'const enc = NFA.encodeSpec({\n'
+    + '  startState: 0,\n'
+    + '  transition: (s, v) => (v > s ? v : []),\n'
+    + '  accept: (s) => true,\n'
+    + '}, 9);\n'
+    + "return [new Shape('6x6')];\n");
+  assert.match(report(items), /num-values-mismatch/);
+});
+
+await runTest('lint_sandbox_script flags a bare count on an offset-alphabet Shape', () => {
+  // The count matches the width, so only the offset is wrong: a literal and a
+  // `.numValues` read both drop it.
+  for (const arg of ['9', 'geometry.numValues']) {
+    const items = lintSource(SCRIPT_HEADER
+      + `const enc = NFA.encodeSpec(spec, ${arg}, { multiSegment: true });\n`
+      + "return [new Shape('9x9', '0-8')];\n");
+    assert.match(report(items), /value-offset-dropped/, `arg: ${arg}`);
+    assert.doesNotMatch(report(items), /num-values-mismatch/, `arg: ${arg}`);
+  }
+  // The `'9x9~0-8'` spec form declares the same alphabet.
+  const items = lintSource(SCRIPT_HEADER
+    + 'const enc = NFA.encodeSpec(spec, 9);\n'
+    + "return [new Shape('9x9~0-8')];\n");
+  assert.match(report(items), /value-offset-dropped/);
+});
+
+await runTest('lint_sandbox_script passes offset-aware value range forms', () => {
+  const clean = [
+    // The geometry itself carries the offset.
+    "const enc = NFA.encodeSpec(spec, geometry);\nreturn [new Shape('9x9', '0-8')];\n",
+    // An explicit valueOffset is the author's assertion.
+    "const enc = NFA.encodeSpec(spec, 9, { valueOffset: -1 });\nreturn [new Shape('9x9', '0-8')];\n",
+    "const key = Pair.fnToKey((a, b) => a < b, 9, -1);\nreturn [new Shape('9x9', '0-8')];\n",
+    // A bare count is fine when the alphabet starts at 1.
+    "const enc = NFA.encodeSpec(spec, geometry.numValues);\nreturn [new Shape('9x9')];\n",
+  ];
+  for (const body of clean) {
+    const items = lintSource(SCRIPT_HEADER + body);
+    assert.doesNotMatch(report(items), /value-offset-dropped|num-values-mismatch/, body);
+  }
+});
+
 await runTest('lint_sandbox_script flags idioms superseded by houses/Var APIs', () => {
   const items = lintSource(SCRIPT_HEADER
     + 'const wolf = b => `VW${b}`;\n'

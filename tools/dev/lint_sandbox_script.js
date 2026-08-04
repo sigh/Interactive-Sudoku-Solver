@@ -120,6 +120,95 @@ const declarationBody = (source, start) => {
   return source.slice(start, semi === -1 ? end : Math.min(semi + 1, end));
 };
 
+// Split a call's argument list at `openParen` into top-level args, tracking
+// bracket depth and skipping string bodies so inline spec objects and lambdas
+// stay within their own argument. Returns null on an unbalanced call.
+const callArgsAt = (source, openParen) => {
+  const args = [];
+  let depth = 1;
+  let argStart = openParen + 1;
+  let i = argStart;
+  while (i < source.length && depth > 0) {
+    const c = source[i];
+    if (c === '"' || c === "'" || c === '`') {
+      i++;
+      while (i < source.length && source[i] !== c) {
+        if (source[i] === '\\') i++;
+        i++;
+      }
+    } else if (c === '(' || c === '[' || c === '{') depth++;
+    else if (c === ')' || c === ']' || c === '}') depth--;
+    else if (c === ',' && depth === 1) {
+      args.push(source.slice(argStart, i).trim());
+      argStart = i + 1;
+    }
+    i++;
+  }
+  if (depth !== 0) return null;
+  args.push(source.slice(argStart, i - 1).trim());
+  return args;
+};
+
+// Every call matching `nameRe` (which must end with an escaped open paren),
+// with its top-level argument texts.
+const findCalls = (source, nameRe) => {
+  const calls = [];
+  for (const match of source.matchAll(nameRe)) {
+    const args = callArgsAt(source, match.index + match[0].length - 1);
+    if (args) calls.push({ index: match.index, name: match[1], args });
+  }
+  return calls;
+};
+
+// The value range declared by the script's `new Shape(...)`: numValues and
+// valueOffset, either of which is null when the alphabet is set by an
+// expression that cannot be resolved statically. `const N = 15` declarations
+// are resolved, since naming the alphabet is the common way to widen it.
+const parseDeclaredShape = (source) => {
+  const call = findCalls(source, /\bnew Shape\(/g)[0];
+  const dims = /^['"](\d+)x(\d+)(?:~(\d+)(?:-(\d+))?)?['"]$/
+    .exec(call?.args[0] ?? '');
+  if (!dims) return null;
+
+  const consts = new Map();
+  for (const m of source.matchAll(/\bconst\s+([A-Za-z_$][\w$]*)\s*=\s*(\d+)\s*;/g)) {
+    consts.set(m[1], Number(m[2]));
+  }
+
+  // The alphabet is the second argument, or the `~` suffix of the shape spec.
+  const raw = call.args[1] ?? (dims[3] !== undefined
+    ? dims[3] + (dims[4] !== undefined ? `-${dims[4]}` : '')
+    : undefined);
+  const range = raw === undefined
+    ? null
+    : /^['"]?(\d+)\s*-\s*(\d+)['"]?$/.exec(raw);
+
+  if (raw === undefined) {
+    return { numValues: Math.max(Number(dims[1]), Number(dims[2])), valueOffset: 0, raw };
+  }
+  if (range) {
+    return {
+      numValues: Number(range[2]) - Number(range[1]) + 1,
+      valueOffset: Number(range[1]) - 1,
+      raw,
+    };
+  }
+  if (/^\d+$/.test(raw)) return { numValues: Number(raw), valueOffset: 0, raw };
+  if (consts.has(raw)) return { numValues: consts.get(raw), valueOffset: 0, raw };
+  return { numValues: null, valueOffset: null, raw };
+};
+
+// The NFA.encodeSpec / Pair.fnToKey calls that take a value range, with the
+// call's explicit value offset when one is passed (opts.valueOffset for
+// encodeSpec, the positional third argument for fnToKey).
+const findValueRangeCalls = (source) =>
+  findCalls(source, /\b(encodeSpec|fnToKey)\(/g).map((call) => ({
+    ...call,
+    hasExplicitOffset: call.name === 'encodeSpec'
+      ? /\bvalueOffset\b/.test(call.args[2] ?? '')
+      : call.args.length >= 3 && call.args[2] !== '',
+  }));
+
 // What a cell-neighbour helper actually *does*: steps a row/column by a small
 // offset, or builds the id of the cell it stepped to. A predicate over two
 // digits does none of this, whatever it is called.
@@ -468,65 +557,75 @@ export const SOURCE_RULES = [
     tier: 'heuristic',
     summary: 'NFA.encodeSpec / Pair.fnToKey numValues literal disagrees with the declared Shape',
     docs: 'Cross-references the `new Shape(...)` alphabet against encodeSpec/fnToKey\n'
-      + 'literals. The alphabet is read from a bare count (`12`) or a string range\n'
-      + "(`'0-15'`). When the second argument is an expression the width is unknown but\n"
-      + 'the shape is certainly widened, so any bare literal is reported as unverifiable\n'
-      + 'rather than skipped -- that case is exactly where a narrow key silently misreads\n'
-      + 'the wider domain. A machine compiled for the wrong alphabet is a real bug, but\n'
+      + 'literals. The alphabet is read from a bare count (`12`), a string range\n'
+      + "(`'0-15'`, also in the `'9x9~0-15'` spec form), or a named constant. When it\n"
+      + 'is set by an expression the width is unknown but the shape is certainly\n'
+      + 'widened, so any bare literal is reported as unverifiable rather than\n'
+      + 'skipped -- that case is exactly where a narrow key silently misreads the\n'
+      + 'wider domain. A machine compiled for the wrong alphabet is a real bug, but\n'
       + 'the Shape is read by regex, so this stays heuristic.',
     check(ctx) {
       const source = ctx.view('code');
-      // The second argument is captured as raw text, not as digits: every widened shape
-      // in the corpus writes it as a string range or a named constant, and a digits-only
-      // capture fails to match the call at all -- which skipped the whole rule on the
-      // only scripts it exists to check.
-      const shapeMatch =
-        /new Shape\(\s*['"](\d+)x(\d+)['"]\s*(?:,\s*((?:[^(),]|\([^()]*\))+?)\s*)?\)/
-          .exec(source);
-      if (!shapeMatch) return [];
-
-      const [, rows, cols, rawAlphabet] = shapeMatch;
-      // `const N = 15; new Shape('9x11', N)` is the common way to name the alphabet, and
-      // resolving it turns an unverifiable report into an exact one.
-      const consts = new Map();
-      for (const m of source.matchAll(/\bconst\s+([A-Za-z_$][\w$]*)\s*=\s*(\d+)\s*;/g)) {
-        consts.set(m[1], Number(m[2]));
-      }
-
-      // null means "widened, width not statically known".
-      let numValues;
-      if (rawAlphabet === undefined) {
-        numValues = Math.max(Number(rows), Number(cols));
-      } else if (/^\d+$/.test(rawAlphabet)) {
-        numValues = Number(rawAlphabet);
-      } else if (consts.has(rawAlphabet)) {
-        numValues = consts.get(rawAlphabet);
-      } else {
-        const range = /^['"](\d+)\s*-\s*(\d+)['"]$/.exec(rawAlphabet);
-        numValues = range ? Number(range[2]) - Number(range[1]) + 1 : null;
-      }
+      const shape = parseDeclaredShape(source);
+      if (!shape) return [];
 
       const items = [];
-      const patterns = [
-        /encodeSpec\(\s*[^,()]+,\s*(\d+)/g,
-        /fnToKey\(([^()]|\([^()]*\))*,\s*(\d+)\s*\)/g,
-      ];
-      for (const pattern of patterns) {
-        for (const match of source.matchAll(pattern)) {
-          const literal = Number(match[match.length - 1]);
-          if (numValues !== null && literal === numValues) continue;
-          items.push({
-            line: ctx.lineAt(match.index),
-            code: this.code,
-            message: numValues === null
-              ? `numValues literal ${literal} cannot be checked: the Shape's alphabet `
-                + `is set by \`${rawAlphabet}\`, so it is widened by an unknown amount. `
-                + 'Build the key from geometry.numValues, never a literal'
-              : `numValues literal ${literal} does not match the declared `
-                + `Shape's ${numValues} values; pass the Shape or cellGeometry() `
-                + 'instead of a literal',
-          });
-        }
+      for (const call of findValueRangeCalls(source)) {
+        const literal = /^\d+$/.test(call.args[1] ?? '') ? Number(call.args[1]) : null;
+        if (literal === null) continue;
+        if (shape.numValues !== null && literal === shape.numValues) continue;
+        items.push({
+          line: ctx.lineAt(call.index),
+          code: this.code,
+          message: shape.numValues === null
+            ? `numValues literal ${literal} cannot be checked: the Shape's alphabet `
+              + `is set by \`${shape.raw}\`, so it is widened by an unknown amount. `
+              + 'Pass the Shape or the geometry itself, never a literal'
+            : `numValues literal ${literal} does not match the declared `
+              + `Shape's ${shape.numValues} values; pass the Shape or cellGeometry() `
+              + 'instead of a literal',
+        });
+      }
+      return items;
+    },
+  },
+  {
+    code: 'value-offset-dropped',
+    tier: 'heuristic',
+    summary: 'NFA.encodeSpec / Pair.fnToKey gets a bare count on an offset-alphabet Shape',
+    docs: 'A bare count (a literal or `geometry.numValues`) leaves valueOffset at 0,\n'
+      + 'so on a Shape whose alphabet does not start at 1 every value fed to the\n'
+      + 'spec is mislabelled -- the machine compiles clean and then rejects grids it\n'
+      + 'should accept. The compiled NFA carries no offset metadata, so nothing\n'
+      + 'downstream can catch this; only the call site can. Fires when the declared\n'
+      + 'alphabet has (or may have) a non-zero offset and the call neither passes\n'
+      + 'the Shape/geometry object nor an explicit valueOffset.',
+    check(ctx) {
+      const source = ctx.view('code');
+      const shape = parseDeclaredShape(source);
+      if (!shape || shape.valueOffset === 0) return [];
+
+      const items = [];
+      for (const call of findValueRangeCalls(source)) {
+        if (call.hasExplicitOffset) continue;
+        const arg = call.args[1] ?? '';
+        const isBareCount = /^\d+$/.test(arg) || /\.numValues$/.test(arg);
+        if (!isBareCount) continue;
+        // A wrong count is num-values-mismatch's finding; report one problem.
+        if (/^\d+$/.test(arg) && shape.numValues !== null
+          && Number(arg) !== shape.numValues) continue;
+        items.push({
+          line: ctx.lineAt(call.index),
+          code: this.code,
+          message: shape.valueOffset === null
+            ? `the Shape's alphabet is set by \`${shape.raw}\`, so its value offset `
+              + `cannot be verified; \`${arg}\` carries only a count. Pass the Shape `
+              + 'or the geometry itself (or an explicit valueOffset)'
+            : `the declared Shape's values start at ${shape.valueOffset + 1} `
+              + `(valueOffset ${shape.valueOffset}) but \`${arg}\` carries only a `
+              + 'count, leaving valueOffset at 0. Pass the Shape or the geometry '
+              + 'itself (or an explicit valueOffset)',
+        });
       }
       return items;
     },
