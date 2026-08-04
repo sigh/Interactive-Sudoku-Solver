@@ -20,6 +20,18 @@ await runTest('all handlers fail returns false', () => {
   assert.equal(result, false);
 });
 
+await runTest('all handlers fail leaves enforceConsistency safe', () => {
+  const context = new GridTestContext({ gridSize: [1, 4], numValues: 4 });
+  const handler = new Or(new False([0]), new False([0]));
+  assert.equal(initOrHandler(context, handler), false);
+
+  // The engine keeps a failed handler (it only invalidates the grid) and
+  // still runs postInitialize and the initial propagation pass on it.
+  handler.postInitialize(context._grid);
+  assert.equal(
+    handler.enforceConsistency(context._grid, createAccumulator()), false);
+});
+
 await runTest('single valid handler delegates', () => {
   const context = new GridTestContext({ gridSize: [1, 4], numValues: 4 });
   const handler = new Or(new True(), new False([0]));

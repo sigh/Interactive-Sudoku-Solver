@@ -4165,9 +4165,9 @@ export class Or extends SudokuConstraintHandler {
       this._initializations.push(initialization);
     }
 
+    this._handlers = validHandlers;
     if (validHandlers.length === 0) return false;
 
-    this._handlers = validHandlers;
     this._numSearchCells = numSearchCells;
 
     // state = [finalHandlerIndex|numRemainingHandlers, ...handlerStates]
@@ -4212,6 +4212,10 @@ export class Or extends SudokuConstraintHandler {
   }
 
   enforceConsistency(grid, pQueue) {
+    // No live branches (all were eliminated during initialize). The state
+    // word was never allocated, so bail before reading it.
+    if (this._handlers.length === 0) return false;
+
     // Check if we only have one handler left, and if so, enforce it directly.
     if ((grid[this._stateOffset] & this.constructor._FLAG_FINAL)) {
       const handlerIndex = grid[this._stateOffset] & ~this.constructor._FLAG_FINAL;

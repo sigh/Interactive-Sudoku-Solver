@@ -222,6 +222,11 @@ const puzzles9x9 = [
     input: CLASSIC_9X9.input + '.Or.And.Or.~R6C1_2.~R6C1_4.End.End.And.Or.~R6C1_3.~R6C1_9.End.End.End',
     solution: false,
   },
+  {  // Every Or branch fails during initialize: must report unsolvable, not crash.
+    name: 'Or with all branches failing initialize [no solution]',
+    input: CLASSIC_9X9.input + '.Var~L~~3.Or.AllDifferent~VL1~VL2.AllDifferent~VL2~VL3.AllDifferent~VL1~VL3.End.~VL1_1.~VL2_1.~VL3_1',
+    solution: false,
+  },
   {  // And and Or constraint which are both simplified out
     name: 'Elided And and Or',
     input: '.Or.And.AllDifferent~R3C8~R4C7.End.End.~R1C1_5~R1C2_3~R2C1_6~R2C6_5~R3C2_9~R3C3_8~R7C2_6~R8C6_9~R8C9_5~R9C8_7~R9C5_8~R8C4_4~R7C7_2~R7C8_8~R5C9_1~R4C9_3~R4C5_6~R6C5_2~R5C4_8~R5C1_4~R4C1_8~R6C1_7~R1C5_9~R5C8_9~R7C4_5~R3C1_1~R1C4_2',
