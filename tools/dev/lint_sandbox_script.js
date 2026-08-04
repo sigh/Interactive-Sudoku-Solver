@@ -3,9 +3,12 @@
 // These suggestions surface places where sandbox idioms may have been missed:
 // hand-built/parsing cell ids, local neighbour helpers that duplicate cellGraph(),
 // numValues literals that disagree with the declared Shape, hand-assembled Sum
-// coefficient strings, and missing rules prose. Every rule here is `heuristic`
-// tier: it reads source text, so a human decides. They are advisory by default;
-// pass --fail-on-guidance to use them as a CI gate.
+// coefficient strings, and missing rules prose. The rules walk a parsed AST
+// (comments come from the parser too), so code-shaped text inside strings and
+// comments cannot masquerade as code. Every rule here is `heuristic` tier:
+// structure narrows the candidates, but a human decides. They are advisory by
+// default; pass --fail-on-guidance to use them as a CI gate. A script that
+// does not parse is reported as a file error and is not linted.
 //
 // A rule that is deliberately not applicable to a line is silenced in the file
 // itself: `// lint-ok: <code>[, <code>]` on the line, or on the line above it.
@@ -17,258 +20,407 @@
 // Usage:
 //   node tools/dev/lint_sandbox_script.js [--fail-on-guidance] <script.js> [...]
 
+import { parse } from 'acorn';
+
 import { runAsCli } from '../lib/cli_entry.js';
 import { dedupeGuidance, runLintCli } from '../lib/lint_cli.js';
+import { ensureGlobalEnvironment } from '../../tests/helpers/test_env.js';
 
-// Blank out comment bodies, preserving every offset and newline so line numbers
-// and match indices still refer to the real source. Rules that look for code
-// idioms run over this view, so prose describing a rule ("cells [1, 4, 7]",
-// "the _=_ wire format") is not mistaken for the idiom itself.
-//
-// String and template-literal contents are deliberately KEPT: the idioms these
-// rules hunt for -- `R${r}C${c}` ids, '_=_' coefficient strings -- live inside
-// string literals. The scan tracks strings only so that a `//` inside one (a
-// URL, say) does not start a comment.
-const commentsBlanked = (source) => {
-  const out = source.split('');
-  const blank = (from, to) => {
-    for (let i = from; i < to && i < out.length; i++) {
-      if (out[i] !== '\n') out[i] = ' ';
-    }
-  };
-  let i = 0;
-  while (i < source.length) {
-    const c = source[i];
-    if (c === '"' || c === "'" || c === '`') {
-      // Skip the string body; only the quote state matters here.
-      i++;
-      while (i < source.length && source[i] !== c) {
-        if (source[i] === '\\') i++;
-        i++;
+ensureGlobalEnvironment();
+const { SudokuConstraint, OutsideConstraintBase } =
+  await import('../../js/sudoku_constraint.js' + self.VERSION_PARAM);
+const { CellGeometry } = await import('../../js/cell_geometry.js' + self.VERSION_PARAM);
+
+// Recursive walk over every AST node. ESTree nodes are plain objects with a
+// string `type`; child nodes hang off properties directly or in arrays.
+const walkAst = (node, visit, parent = null) => {
+  visit(node, parent);
+  for (const key in node) {
+    const value = node[key];
+    if (Array.isArray(value)) {
+      for (const child of value) {
+        if (child && typeof child.type === 'string') walkAst(child, visit, node);
       }
-      i++;
-    } else if (c === '/' && source[i + 1] === '/') {
-      const end = source.indexOf('\n', i);
-      blank(i, end === -1 ? source.length : end);
-      i = end === -1 ? source.length : end;
-    } else if (c === '/' && source[i + 1] === '*') {
-      const end = source.indexOf('*/', i + 2);
-      const stop = end === -1 ? source.length : end + 2;
-      blank(i, stop);
-      i = stop;
-    } else {
-      i++;
+    } else if (value && typeof value.type === 'string') {
+      walkAst(value, visit, node);
     }
   }
-  return out.join('');
 };
 
-// The source in both views, its lines, and a line number for any index into it.
-// The line lookup is a binary search over precomputed line starts: every pattern
-// match needs one, and re-slicing the whole source per match is quadratic.
+const subtreeHas = (node, predicate) => {
+  let found = false;
+  walkAst(node, (n) => { found ||= predicate(n); });
+  return found;
+};
+
+const lazily = (fn) => {
+  let value;
+  let computed = false;
+  return () => {
+    if (!computed) {
+      value = fn();
+      computed = true;
+    }
+    return value;
+  };
+};
+
+// The parsed source: its AST indexed by node type, comments, raw text access,
+// and lazily-memoized facts that more than one rule needs. A script that does
+// not parse is simply broken -- the syntax error is thrown and becomes the
+// file's lint error; no guidance runs.
 const makeSourceContext = (source) => {
-  const lines = source.split('\n');
-  const starts = [0];
-  for (let i = 0; i < source.length; i++) {
-    if (source[i] === '\n') starts.push(i + 1);
+  const comments = [];
+  let ast;
+  try {
+    // Sandbox scripts are function bodies: top-level return/await are legal.
+    ast = parse(source, {
+      ecmaVersion: 'latest',
+      allowReturnOutsideFunction: true,
+      allowAwaitOutsideFunction: true,
+      locations: true,
+      onComment: comments,
+    });
+  } catch (e) {
+    throw new Error(`syntax error: ${e.message}`);
   }
-  const lineAt = (index) => {
-    let lo = 0;
-    let hi = starts.length - 1;
-    while (lo < hi) {
-      const mid = (lo + hi + 1) >> 1;
-      if (starts[mid] <= index) lo = mid; else hi = mid - 1;
-    }
-    return lo + 1;
+
+  const byType = new Map();
+  walkAst(ast, (node) => {
+    let list = byType.get(node.type);
+    if (!list) byType.set(node.type, list = []);
+    list.push(node);
+  });
+
+  const ctx = {
+    lines: source.split('\n'),
+    comments,
+    ast,
+    nodesOfType: (type) => byType.get(type) ?? [],
+    text: (node) => source.slice(node.start, node.end),
   };
-  // 'code' hides comments; 'all' sees the file as written.
-  const views = { code: commentsBlanked(source), all: source };
-  return { lines, lineAt, view: (scope) => views[scope] };
+  // Derived facts shared between rules, computed at most once per file.
+  ctx.declaredShape = lazily(() => parseDeclaredShape(ctx));
+  ctx.valueRangeCalls = lazily(() => findValueRangeCalls(ctx));
+  ctx.overlayBindings = lazily(() => constBindings(ctx, (init) =>
+    subtreeHas(init, (n) => isCallTo(n, 'makeOverlay'))));
+  return ctx;
 };
 
-// The common rule shape: regexes over one view of the source, one item per
-// match. `excludeLine` drops a match whose (raw) line disqualifies it.
-const patternRule = ({ patterns, excludeLine, scope = 'code' }) =>
-  function check(ctx) {
-    const source = ctx.view(scope);
-    const items = [];
-    for (const pattern of patterns) {
-      for (const match of source.matchAll(pattern)) {
-        const line = ctx.lineAt(match.index);
-        if (excludeLine?.test(ctx.lines[line - 1])) continue;
-        items.push({ line, code: this.code, message: this.summary });
-      }
-    }
-    return items;
-  };
+// A rule's check(ctx) reports findings as AST nodes (the rule summary is the
+// message), or as { node | line, message? } when it has more to say; the code
+// and defaults are stamped here so no rule spells the item shape.
+const findingToItem = (rule, finding) => ({
+  line: typeof finding.type === 'string'
+    ? finding.loc.start.line
+    : finding.node?.loc.start.line ?? finding.line,
+  code: rule.code,
+  message: finding.message ?? rule.summary,
+});
 
-// The text of the declaration starting at `start`: brace-matched when it has a
-// block body, otherwise up to the end of the statement. Bounded, so an unclosed
-// brace cannot drag the scan through the rest of the file.
-const declarationBody = (source, start) => {
-  const end = Math.min(source.length, start + 2000);
-  const brace = source.indexOf('{', start);
-  const semi = source.indexOf(';', start);
-  if (brace !== -1 && brace < end && (semi === -1 || brace < semi)) {
-    let depth = 0;
-    for (let i = brace; i < end; i++) {
-      if (source[i] === '{') depth++;
-      else if (source[i] === '}' && --depth === 0) return source.slice(start, i + 1);
-    }
-    return source.slice(start, end);
-  }
-  return source.slice(start, semi === -1 ? end : Math.min(semi + 1, end));
+// --- Node predicates shared across rules. ---
+
+// The .property name of a non-computed member expression, else null.
+const memberName = (node) =>
+  node?.type === 'MemberExpression' && !node.computed
+    && node.property.type === 'Identifier' ? node.property.name : null;
+
+// The name a call/new expression is invoked as: `foo(...)` and `obj.foo(...)`
+// both give 'foo'.
+const calleeName = (node) =>
+  node.callee.type === 'Identifier' ? node.callee.name : memberName(node.callee);
+
+const isCallTo = (node, name) =>
+  node?.type === 'CallExpression' && calleeName(node) === name;
+
+// The object name when `call` is `<name>.<method>(...)` with name in `names`,
+// else null.
+const methodCallOn = (call, method, names) =>
+  memberName(call.callee) === method
+    && call.callee.object.type === 'Identifier'
+    && names.has(call.callee.object.name)
+    ? call.callee.object.name : null;
+
+const stringValue = (node) =>
+  node?.type === 'Literal' && typeof node.value === 'string' ? node.value : null;
+
+const numberValue = (node) =>
+  node?.type === 'Literal' && typeof node.value === 'number' ? node.value : null;
+
+// The template as a shape string: cooked quasi text with '\x00' marking each
+// interpolation slot, e.g. `R${r}C${c}` -> 'R\x00C\x00'.
+const templateShape = (node) => {
+  let shape = '';
+  node.quasis.forEach((quasi, i) => {
+    shape += quasi.value.cooked ?? '';
+    if (i < node.expressions.length) shape += '\x00';
+  });
+  return shape;
 };
 
-// Split a call's argument list at `openParen` into top-level args, tracking
-// bracket depth and skipping string bodies so inline spec objects and lambdas
-// stay within their own argument. Returns null on an unbalanced call.
-const callArgsAt = (source, openParen) => {
-  const args = [];
-  let depth = 1;
-  let argStart = openParen + 1;
-  let i = argStart;
-  while (i < source.length && depth > 0) {
-    const c = source[i];
-    if (c === '"' || c === "'" || c === '`') {
-      i++;
-      while (i < source.length && source[i] !== c) {
-        if (source[i] === '\\') i++;
-        i++;
-      }
-    } else if (c === '(' || c === '[' || c === '{') depth++;
-    else if (c === ')' || c === ']' || c === '}') depth--;
-    else if (c === ',' && depth === 1) {
-      args.push(source.slice(argStart, i).trim());
-      argStart = i + 1;
+// Names bound by `const <name> = <init>` where the init satisfies `predicate`.
+const constBindings = (ctx, predicate) => {
+  const names = new Set();
+  for (const decl of ctx.nodesOfType('VariableDeclarator')) {
+    if (decl.id.type === 'Identifier' && decl.init && predicate(decl.init)) {
+      names.add(decl.id.name);
     }
-    i++;
   }
-  if (depth !== 0) return null;
-  args.push(source.slice(argStart, i - 1).trim());
-  return args;
+  return names;
 };
 
-// Every call matching `nameRe` (which must end with an escaped open paren),
-// with its top-level argument texts.
-const findCalls = (source, nameRe) => {
-  const calls = [];
-  for (const match of source.matchAll(nameRe)) {
-    const args = callArgsAt(source, match.index + match[0].length - 1);
-    if (args) calls.push({ index: match.index, name: match[1], args });
+// --- num-values-mismatch / value-offset-dropped: the declared Shape and the
+// --- calls that must agree with it.
+
+// Numeric `const N = 15` bindings, for resolving named alphabets.
+const numericConstants = (ctx) => {
+  const consts = new Map();
+  for (const decl of ctx.nodesOfType('VariableDeclarator')) {
+    if (decl.id.type === 'Identifier' && numberValue(decl.init) !== null) {
+      consts.set(decl.id.name, decl.init.value);
+    }
   }
-  return calls;
+  return consts;
 };
 
 // The value range declared by the script's `new Shape(...)`: numValues and
-// valueOffset, either of which is null when the alphabet is set by an
-// expression that cannot be resolved statically. `const N = 15` declarations
-// are resolved, since naming the alphabet is the common way to widen it.
-const parseDeclaredShape = (source) => {
-  const call = findCalls(source, /\bnew Shape\(/g)[0];
-  const dims = /^['"](\d+)x(\d+)(?:~(\d+)(?:-(\d+))?)?['"]$/
-    .exec(call?.args[0] ?? '');
-  if (!dims) return null;
-
-  const consts = new Map();
-  for (const m of source.matchAll(/\bconst\s+([A-Za-z_$][\w$]*)\s*=\s*(\d+)\s*;/g)) {
-    consts.set(m[1], Number(m[2]));
-  }
+// valueOffset, both null when the alphabet is set by an expression that cannot
+// be resolved statically, and the whole result null when there is no valid
+// Shape to check against. The spec string is rebuilt exactly as the Shape
+// constructor does and handed to CellGeometry.fromShapeSpec, so the linter
+// shares the app's alphabet grammar instead of reimplementing it. `const N =
+// 15` alphabets are resolved, since naming the alphabet is the common way to
+// widen it.
+const parseDeclaredShape = (ctx) => {
+  const call = ctx.nodesOfType('NewExpression')
+    .find((n) => n.callee.type === 'Identifier' && n.callee.name === 'Shape');
+  const spec = stringValue(call?.arguments[0]);
+  if (spec === null) return null;
 
   // The alphabet is the second argument, or the `~` suffix of the shape spec.
-  const raw = call.args[1] ?? (dims[3] !== undefined
-    ? dims[3] + (dims[4] !== undefined ? `-${dims[4]}` : '')
-    : undefined);
-  const range = raw === undefined
-    ? null
-    : /^['"]?(\d+)\s*-\s*(\d+)['"]?$/.exec(raw);
+  const alphabet = call.arguments[1];
+  let raw;         // how the script spells it, for messages
+  let text = null; // statically resolved form: '12' or '0-8'
+  if (alphabet) {
+    raw = ctx.text(alphabet);
+    if (alphabet.type === 'Literal') {
+      text = String(alphabet.value);
+    } else if (alphabet.type === 'Identifier') {
+      const value = numericConstants(ctx).get(alphabet.name);
+      if (value !== undefined) text = String(value);
+    }
+  } else {
+    raw = /~(.+)$/.exec(spec)?.[1];
+  }
 
-  if (raw === undefined) {
-    return { numValues: Math.max(Number(dims[1]), Number(dims[2])), valueOffset: 0, raw };
+  let geometry;
+  try {
+    geometry = CellGeometry.fromShapeSpec(
+      alphabet && text !== null ? `${spec}~${text}` : spec);
+  } catch {
+    return null;  // Not a valid Shape declaration; nothing to check against.
   }
-  if (range) {
-    return {
-      numValues: Number(range[2]) - Number(range[1]) + 1,
-      valueOffset: Number(range[1]) - 1,
-      raw,
-    };
+  if (alphabet && text === null) {
+    return { numValues: null, valueOffset: null, raw };  // Widened by an unknown amount.
   }
-  if (/^\d+$/.test(raw)) return { numValues: Number(raw), valueOffset: 0, raw };
-  if (consts.has(raw)) return { numValues: consts.get(raw), valueOffset: 0, raw };
-  return { numValues: null, valueOffset: null, raw };
+  return { numValues: geometry.numValues, valueOffset: geometry.valueOffset, raw };
 };
 
-// The NFA.encodeSpec / Pair.fnToKey calls that take a value range, with the
-// call's explicit value offset when one is passed (opts.valueOffset for
-// encodeSpec, the positional third argument for fnToKey).
-const findValueRangeCalls = (source) =>
-  findCalls(source, /\b(encodeSpec|fnToKey)\(/g).map((call) => ({
-    ...call,
-    hasExplicitOffset: call.name === 'encodeSpec'
-      ? /\bvalueOffset\b/.test(call.args[2] ?? '')
-      : call.args.length >= 3 && call.args[2] !== '',
-  }));
+// Whether encodeSpec's opts argument passes valueOffset. Anything the walk
+// cannot see into (a named opts object, a spread, a computed key) counts as
+// passing it: unverifiable means silent, not flagged.
+const hasValueOffsetOption = (opts) => {
+  if (!opts) return false;
+  if (opts.type !== 'ObjectExpression') return true;
+  return opts.properties.some((p) =>
+    p.type !== 'Property'
+    || p.computed
+    || (p.key.type === 'Identifier' ? p.key.name : p.key.value) === 'valueOffset');
+};
+
+// The NFA.encodeSpec / Pair.fnToKey calls that take a value range: the line,
+// the second argument as a literal count and/or the bare-count text it was
+// spelled as (a number literal or a `.numValues` read), and whether the call
+// passes an explicit value offset (opts.valueOffset for encodeSpec, the
+// positional third argument for fnToKey).
+const findValueRangeCalls = (ctx) =>
+  ctx.nodesOfType('CallExpression')
+    .filter((n) => ['encodeSpec', 'fnToKey'].includes(calleeName(n)))
+    .map((node) => {
+      const args = node.arguments;
+      const countArg = args[1];
+
+      const literal = numberValue(countArg);
+      let bareCountText = literal !== null ? String(literal) : null;
+      if (countArg?.type === 'MemberExpression'
+        && memberName(countArg) === 'numValues') {
+        bareCountText = ctx.text(countArg);
+      }
+
+      return {
+        node,
+        literal,
+        bareCountText,
+        hasExplicitOffset: calleeName(node) === 'fnToKey'
+          ? args.length >= 3
+          : hasValueOffsetOption(args[2]),
+      };
+    });
+
+// --- custom-neighbour-helper: what a candidate declaration must do. ---
 
 // What a cell-neighbour helper actually *does*: steps a row/column by a small
 // offset, or builds the id of the cell it stepped to. A predicate over two
 // digits does none of this, whatever it is called.
-const ADJACENCY_BEHAVIOUR = new RegExp([
-  /\[\s*-?[01]\s*,\s*-?[01]\s*\]/,        // offset pairs: [-1, 0], [0, 1]
-  /\b(?:d[rc]|dRow|dCol|dx|dy)\b/,        // named deltas
-  /\b(?:row|col|r|c)\s*[+-]\s*\d/,        // row + 1, c - 1
-  /makeCellId\s*\(/,                      // building the stepped-to cell id
-  /`R\$\{/,                               // ... or its template form
-].map((r) => r.source).join('|'));
+const computesAdjacency = (decl) => subtreeHas(decl, (n) =>
+  // Offset pairs: [-1, 0], [0, 1].
+  (n.type === 'ArrayExpression' && n.elements.length === 2
+    && n.elements.every((el) => {
+      const v = el?.type === 'UnaryExpression' && el.operator === '-'
+        ? numberValue(el.argument) : numberValue(el);
+      return v !== null && Math.abs(v) <= 1;
+    }))
+  // Named deltas.
+  || (n.type === 'Identifier' && /^(?:d[rc]|dRow|dCol|dx|dy)$/.test(n.name))
+  // row + 1, c - 1.
+  || (n.type === 'BinaryExpression' && (n.operator === '+' || n.operator === '-')
+    && n.left.type === 'Identifier' && /^(?:row|col|r|c)$/.test(n.left.name)
+    && numberValue(n.right) !== null)
+  // Building the stepped-to cell id, by helper or template.
+  || isCallTo(n, 'makeCellId')
+  || (n.type === 'TemplateLiteral' && /^R\x00/.test(templateShape(n))));
 
-export const SOURCE_RULES = [
+// A declaration that leans on the cell graph (or is a plain data table) is not
+// a hand-rolled neighbour helper.
+const usesCellGraph = (node) => subtreeHas(node, (n) =>
+  isCallTo(n, 'cellGraph')
+  || (n.type === 'MemberExpression'
+    && n.object.type === 'Identifier' && n.object.name === 'graph')
+  || ['step', 'neighbours', 'kingNeighbours'].includes(memberName(n)));
+
+const NEIGHBOUR_NAME = /^(?:[\w$]*(?:[Nn]eighbou?r|[Oo]rthogonal|King)[\w$]*|king[\w$]*)$/;
+
+// --- outside-clue-by-arrow-id: the classes with raw arrowId constructors,
+// --- from the class hierarchy so a new subclass is covered automatically.
+
+const OUTSIDE_CLUE_CLASSES = new Set(
+  Object.entries(SudokuConstraint)
+    .filter(([, cls]) =>
+      typeof cls === 'function' && cls.prototype instanceof OutsideConstraintBase)
+    .map(([name]) => name));
+
+// --- overlay-map-use-array / overlay-at-make-cell-id: pass-through shapes. ---
+
+// A one-parameter function whose entire body is `<overlay>.at(<param>)` /
+// `.gridAt(<param>)` for a known overlay: the pass-through shape that
+// overlay-map-use-array hunts, as a lambda or a single-return function.
+const overlayPassThrough = (fn, overlays) => {
+  if (fn.params.length !== 1 || fn.params[0].type !== 'Identifier') return null;
+  let body = fn.body;
+  if (body.type === 'BlockStatement') {
+    if (body.body.length !== 1 || body.body[0].type !== 'ReturnStatement') return null;
+    body = body.body[0].argument;
+  }
+  if (body?.type !== 'CallExpression') return null;
+  const overlay = methodCallOn(body, 'at', overlays)
+    ?? methodCallOn(body, 'gridAt', overlays);
+  const arg = body.arguments[0];
+  if (!overlay || body.arguments.length !== 1
+    || arg.type !== 'Identifier' || arg.name !== fn.params[0].name) return null;
+  return { overlay, method: memberName(body.callee) };
+};
+
+// --- local-file-reference: names that must not appear in a shared script. ---
+
+// Over comments and string content.
+const LOCAL_FILE_PATTERNS = [
+  /\b(?:raw|decoded?|result)\.json\b/g,
+  /\b(?:notes|description)\.md\b/g,
+  /\bsummarize_(?:geometry|decode)\.js\b/g,
+  /\b(?:verify_solution|benchmark_puzzles|run_sandbox|lint_sandbox_script)\b/g,
+];
+// Only the dev-tool names can survive identifier syntax (no dots).
+const DEV_TOOL_IDENTIFIER =
+  /^(?:verify_solution|benchmark_puzzles|run_sandbox|lint_sandbox_script)$/;
+
+// --- zero-indexed-cell-math: the wrapped `<identifier> + 1` argument form. ---
+
+const isPlusOne = (node) =>
+  node?.type === 'BinaryExpression' && node.operator === '+'
+  && node.left.type === 'Identifier' && numberValue(node.right) === 1;
+
+// --- missing-rules-comment: what counts as a header rather than prose. ---
+
+const HEADER_FIELD = /^\s*[A-Z][a-zA-Z ]*:/;
+
+const RULES = [
   {
     code: 'manual-cell-id-regex',
-    tier: 'heuristic',
     summary: 'manual R/C cell-id parsing found; prefer cellGraph()/cellGeometry helpers',
     docs: 'Cell ids are an encoding, not data: parsing them back out means the\n'
       + 'geometry was thrown away. Take the row/col from the graph helper that\n'
       + 'produced the cells instead.',
-    check: patternRule({
-      patterns: [
-        /\/\^R\([^/]*\\d[^/]*\)C\([^/]*\\d[^/]*\)/g,
-        /\.match\(\s*\/\^R/g,
-        /\.exec\(\s*cell/g,
-      ],
-    }),
+    check(ctx) {
+      const findings = ctx.nodesOfType('Literal').filter((lit) =>
+        lit.regex && /^\^R\(.*\\d.*\)C\(.*\\d.*\)/.test(lit.regex.pattern));
+      for (const call of ctx.nodesOfType('CallExpression')) {
+        const name = memberName(call.callee);
+        const arg = call.arguments[0];
+        if (name === 'match' && arg?.regex?.pattern.startsWith('^R')) findings.push(call);
+        if (name === 'exec' && arg?.type === 'Identifier'
+          && arg.name.startsWith('cell')) findings.push(call);
+      }
+      return findings;
+    },
   },
   {
     code: 'manual-row-col-cast',
-    tier: 'heuristic',
     summary: 'manual row/column numeric conversion found; prefer graph helpers over parsing cell ids',
     docs: 'The other half of manual-cell-id-regex: casting the captured groups\n'
       + 'back to numbers. Ignore only where the ids come from outside the script.',
-    check: patternRule({
-      patterns: [
-        /Number\(\s*match\[[12]\]\s*\)/g,
-        /parseInt\(\s*match\[[12]\]/g,
-      ],
-    }),
+    check(ctx) {
+      return ctx.nodesOfType('CallExpression').filter((call) => {
+        if (call.callee.type !== 'Identifier'
+          || !['Number', 'parseInt'].includes(call.callee.name)) return false;
+        const arg = call.arguments[0];
+        return arg?.type === 'MemberExpression' && arg.computed
+          && arg.object.type === 'Identifier' && arg.object.name === 'match'
+          && [1, 2].includes(numberValue(arg.property));
+      });
+    },
   },
   {
     code: 'local-file-reference',
-    tier: 'heuristic',
     summary: 'reference to a local working file or dev tool found; sandbox scripts are shared '
       + 'standalone (?code= links), so keep decode/provenance/validation notes in local files instead',
-    docs: 'Scans comments as well as code (scope: all): a shared script must make\n'
-      + 'sense to a reader who has none of the author\'s local files.',
-    check: patternRule({
-      scope: 'all',
-      patterns: [
-        /\b(?:raw|decoded?|result)\.json\b/g,
-        /\b(?:notes|description)\.md\b/g,
-        /\bsummarize_(?:geometry|decode)\.js\b/g,
-        /\b(?:verify_solution|benchmark_puzzles|run_sandbox|lint_sandbox_script)\b/g,
-      ],
-    }),
+    docs: 'Scans comments, string literals, and identifiers: a shared script must\n'
+      + 'make sense to a reader who has none of the author\'s local files.',
+    check(ctx) {
+      const findings = [];
+      const scan = (text, baseLine) => {
+        for (const pattern of LOCAL_FILE_PATTERNS) {
+          for (const match of text.matchAll(pattern)) {
+            const offset = (text.slice(0, match.index).match(/\n/g) ?? []).length;
+            findings.push({ line: baseLine + offset });
+          }
+        }
+      };
+      for (const comment of ctx.comments) scan(comment.value, comment.loc.start.line);
+      for (const lit of ctx.nodesOfType('Literal')) {
+        const value = stringValue(lit);
+        if (value !== null) scan(value, lit.loc.start.line);
+      }
+      for (const tmpl of ctx.nodesOfType('TemplateLiteral')) {
+        for (const quasi of tmpl.quasis) {
+          scan(quasi.value.cooked ?? '', quasi.loc.start.line);
+        }
+      }
+      return findings.concat(ctx.nodesOfType('Identifier')
+        .filter((id) => DEV_TOOL_IDENTIFIER.test(id.name)));
+    },
   },
   {
     code: 'custom-neighbour-helper',
-    tier: 'heuristic',
     summary: 'custom neighbour helper found; prefer cellGraph().neighbours/kingNeighbours when applicable',
     docs: 'The name only nominates a candidate; the body decides. A declaration is\n'
       + 'reported only when it also *computes* adjacency -- steps a row/column by a\n'
@@ -276,56 +428,43 @@ export const SOURCE_RULES = [
       + 'rule off predicates that merely borrow the vocabulary: a Pair key function\n'
       + 'named `pickyNeighbors` compares two digits and never touches the grid.\n'
       + 'King must still start the name or a camelCase word ("kingMoves",\n'
-      + '"antiKing"), since a bare [Kk]ing also matches "Marking". Helpers built ON\n'
-      + 'the cell graph, and data tables, are excluded by line as before.',
-    check: function check(ctx) {
-      const source = ctx.view('code');
-      const exclude = /\bcellGraph\(|\bgraph\.|\.step\(|\.neighbours\(|\.kingNeighbours\(|=\s*\[/;
-      const patterns = [
-        /\bfunction\s+(?:\w*(?:[Nn]eighbou?r|[Oo]rthogonal|King)\w*|king\w*)\s*\(/g,
-        /\bconst\s+(?:\w*(?:[Nn]eighbou?r|[Oo]rthogonal|King)\w*|king\w*)\s*=/g,
-      ];
-      const items = [];
-      for (const pattern of patterns) {
-        for (const match of source.matchAll(pattern)) {
-          const line = ctx.lineAt(match.index);
-          if (exclude.test(ctx.lines[line - 1])) continue;
-          if (!ADJACENCY_BEHAVIOUR.test(declarationBody(source, match.index))) continue;
-          items.push({ line, code: this.code, message: this.summary });
-        }
-      }
-      return items;
+      + '"antiKing"), since a bare [Kk]ing also matches "Marking". Declarations\n'
+      + 'that lean on the cell graph, and plain data tables, are excluded.',
+    check(ctx) {
+      return [
+        ...ctx.nodesOfType('FunctionDeclaration')
+          .filter((fn) => fn.id && NEIGHBOUR_NAME.test(fn.id.name)),
+        ...ctx.nodesOfType('VariableDeclarator')
+          .filter((decl) => decl.id.type === 'Identifier'
+            && NEIGHBOUR_NAME.test(decl.id.name) && decl.init
+            && decl.init.type !== 'ArrayExpression'),
+      ].filter((decl) => !usesCellGraph(decl) && computesAdjacency(decl));
     },
   },
   {
     code: 'manual-cell-id-template',
-    tier: 'heuristic',
     summary: 'hand-built cell id template found; prefer makeCellId(row, col)',
-    docs: 'One rule, three spellings of the same template: both parts interpolated,\n'
-      + 'the row interpolated, the column interpolated. They overlap, which is why\n'
-      + 'they must share a code -- two codes on one line are two findings that\n'
+    docs: 'Flags templates shaped like a cell id with an interpolated row or\n'
+      + 'column (`R${r}C${c}`, `R${r}C1`, `R3C${c}`). The spellings overlap, which\n'
+      + 'is why they share a code -- two codes on one line are two findings that\n'
       + 'dedupe cannot merge.',
-    check: patternRule({
-      patterns: [
-        /`R\$\{[^`]+C\$\{[^`]+`/g,
-        /`R\$\{[^`]*\}C/g,
-        /`R\d+C\$\{/g,
-      ],
-    }),
+    check(ctx) {
+      return ctx.nodesOfType('TemplateLiteral')
+        .filter((tmpl) => /^R(?:\x00C|\d+C\x00)/.test(templateShape(tmpl)));
+    },
   },
   {
     code: 'manual-var-id-template',
-    tier: 'heuristic',
     summary: 'hand-built Var member id found; prefer Var .cells() / .cell(n)',
     docs: 'The `V<prefix><n>` id format is internal; the Var instance hands out its\n'
       + 'own member ids, and knows when a single-cell Var drops the index.',
-    check: patternRule({
-      patterns: [/`V[A-Z]*\$\{/g],
-    }),
+    check(ctx) {
+      return ctx.nodesOfType('TemplateLiteral')
+        .filter((tmpl) => /^V[A-Z]*\x00/.test(templateShape(tmpl)));
+    },
   },
   {
     code: 'outside-clue-by-arrow-id',
-    tier: 'heuristic',
     summary: 'outside clue built from a raw corner/arrow id; prefer '
       + 'Class.fromCells(value, cells, geometry) so the canonical corner and '
       + 'direction come from the cells',
@@ -333,51 +472,48 @@ export const SOURCE_RULES = [
       + 'that is easy to get wrong: a bare corner id silently defaults the direction,\n'
       + 'picking one of the two lines through that corner. There is no good reason to\n'
       + 'write one by hand, so every direct construction is flagged.',
-    check: patternRule({
-      patterns: [
-        /\bnew\s+(?:LittleKiller|Sandwich|XSum|Skyscraper|HiddenSkyscraper|NumberedRoom|FullRank)\s*\(/g,
-      ],
-    }),
+    check(ctx) {
+      return ctx.nodesOfType('NewExpression')
+        .filter((n) => OUTSIDE_CLUE_CLASSES.has(calleeName(n)));
+    },
   },
   {
     code: 'outside-clue-literal-cells',
-    tier: 'heuristic',
     summary: 'outside-clue fromCells given a literal cell-list array; derive the '
       + 'line with graph.ray() (diagonals) or graph.row()/graph.column() instead '
       + 'of hand-listing cell ids',
-    docs: 'Matches `.fromCells(<value>, [` -- a bare array literal as the second arg.\n'
+    docs: 'Matches fromCells(...) with an array literal as the second argument.\n'
       + 'A variable, or a graph.ray()/row()/column() call, does not match.',
-    check: patternRule({
-      patterns: [/\.fromCells\(\s*(?:[^,()[\]]|\([^()]*\))+,\s*\[/g],
-    }),
+    check(ctx) {
+      return ctx.nodesOfType('CallExpression')
+        .filter((call) => memberName(call.callee) === 'fromCells'
+          && call.arguments[1]?.type === 'ArrayExpression');
+    },
   },
   {
     code: 'manual-house-lookup',
-    tier: 'heuristic',
     summary: 'row/column built from a corner cell; prefer index-based graph.row(n) / graph.column(n)',
     docs: 'graph.row()/column() take an index. Passing makeCellId(n, 1) is a\n'
       + 'round trip through the id encoding to say "row n".',
-    check: patternRule({
-      patterns: [
-        /\.row\(\s*makeCellId\(/g,
-        /\.column\(\s*makeCellId\(/g,
-      ],
-    }),
+    check(ctx) {
+      return ctx.nodesOfType('CallExpression')
+        .filter((call) => ['row', 'column'].includes(memberName(call.callee))
+          && isCallTo(call.arguments[0], 'makeCellId'));
+    },
   },
   {
     code: 'bare-replicate-constructor',
-    tier: 'heuristic',
     summary: 'bare new Replicate found; prefer graph.makeReplicate() or overlay.makeReplicate()',
     docs: 'The graph or overlay already owns the cell ordering and locator needed\n'
       + 'to encode Replicate targets. Its makeReplicate() helper keeps that wire-format\n'
       + 'plumbing out of sandbox scripts.',
-    check: patternRule({
-      patterns: [/\bnew\s+Replicate\s*\(/g],
-    }),
+    check(ctx) {
+      return ctx.nodesOfType('NewExpression')
+        .filter((n) => calleeName(n) === 'Replicate');
+    },
   },
   {
     code: 'overlay-map-use-array',
-    tier: 'heuristic',
     summary: 'overlay at()/gridAt() mapped element-by-element; pass the array '
       + 'directly instead',
     docs: 'The overlay methods accept either one cell or an array. This catches\n'
@@ -387,113 +523,150 @@ export const SOURCE_RULES = [
       + 'makeOverlay() are considered, so unrelated APIs with an at() method are\n'
       + 'left alone.',
     check(ctx) {
-      const source = ctx.view('code');
-      const overlays = new Set([...source.matchAll(
-        /\bconst\s+([A-Za-z_$][\w$]*)\s*=\s*[^;]*?\.makeOverlay\s*\(/g,
-      )].map(match => match[1]));
+      const overlays = ctx.overlayBindings();
       if (!overlays.size) return [];
 
-      const items = [];
-      const direct = /\.(?:map|flatMap)\(\s*\(?\s*([A-Za-z_$][\w$]*)\s*\)?\s*=>\s*([A-Za-z_$][\w$]*)\.(at|gridAt)\(\s*\1\s*\)\s*\)/g;
-      for (const match of source.matchAll(direct)) {
-        const [, , overlay, method] = match;
-        if (!overlays.has(overlay)) continue;
-        items.push({
-          line: ctx.lineAt(match.index),
-          code: this.code,
-          message: `${overlay}.${method}() accepts the array directly; use `
-            + `${overlay}.${method}(cells) instead of mapping each element`,
+      const helpers = new Map();
+      const candidates = [
+        ...ctx.nodesOfType('VariableDeclarator')
+          .filter((decl) => decl.id.type === 'Identifier'
+            && decl.init?.type === 'ArrowFunctionExpression')
+          .map((decl) => [decl.id.name, decl.init]),
+        ...ctx.nodesOfType('FunctionDeclaration')
+          .filter((fn) => fn.id)
+          .map((fn) => [fn.id.name, fn]),
+      ];
+      for (const [name, fn] of candidates) {
+        const helper = overlayPassThrough(fn, overlays);
+        if (helper) helpers.set(name, helper);
+      }
+
+      const findings = [];
+      for (const call of ctx.nodesOfType('CallExpression')) {
+        if (!['map', 'flatMap'].includes(memberName(call.callee))) continue;
+        const arg = call.arguments[0];
+        if (!arg) continue;
+        const isInline = arg.type === 'ArrowFunctionExpression'
+          || arg.type === 'FunctionExpression';
+        const helper = isInline
+          ? overlayPassThrough(arg, overlays)
+          : arg.type === 'Identifier' && helpers.get(arg.name);
+        if (!helper) continue;
+        const { overlay, method } = helper;
+        findings.push({
+          node: call,
+          message: isInline
+            ? `${overlay}.${method}() accepts the array directly; use `
+              + `${overlay}.${method}(cells) instead of mapping each element`
+            : `${arg.name} is only ${overlay}.${method}(); pass the array `
+              + `to ${overlay}.${method}() directly`,
         });
       }
-
-      const helpers = new Map();
-      const arrowHelper = /\bconst\s+([A-Za-z_$][\w$]*)\s*=\s*\(?\s*([A-Za-z_$][\w$]*)\s*\)?\s*=>\s*([A-Za-z_$][\w$]*)\.(at|gridAt)\(\s*\2\s*\)/g;
-      for (const match of source.matchAll(arrowHelper)) {
-        const [, helper, , overlay, method] = match;
-        if (overlays.has(overlay)) helpers.set(helper, { overlay, method });
-      }
-      const functionHelper = /\bfunction\s+([A-Za-z_$][\w$]*)\s*\(\s*([A-Za-z_$][\w$]*)\s*\)\s*\{\s*return\s+([A-Za-z_$][\w$]*)\.(at|gridAt)\(\s*\2\s*\)\s*;?\s*\}/g;
-      for (const match of source.matchAll(functionHelper)) {
-        const [, helper, , overlay, method] = match;
-        if (overlays.has(overlay)) helpers.set(helper, { overlay, method });
-      }
-
-      for (const [helper, { overlay, method }] of helpers) {
-        const escaped = helper.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const mappedHelper = new RegExp(
-          `\\.(?:map|flatMap)\\(\\s*${escaped}\\s*\\)`, 'g');
-        for (const match of source.matchAll(mappedHelper)) {
-          items.push({
-            line: ctx.lineAt(match.index),
-            code: this.code,
-            message: `${helper} is only ${overlay}.${method}(); pass the array to `
-              + `${overlay}.${method}() directly`,
-          });
-        }
-      }
-      return items;
+      return findings;
     },
   },
   {
     code: 'manual-box-arithmetic',
-    tier: 'heuristic',
     summary: 'manual box construction found; prefer graph.box(n) / graph.boxes()',
     docs: 'Box-CELL construction only. Cell->box-index derivations\n'
       + '(Math.floor((row - 1) / 3) style) are not flagged: no box-index helper\n'
       + 'exists, so that math is currently the only idiom.',
-    check: patternRule({
-      patterns: [
-        /\bb[rc]\s*\*\s*\d/g,
-        /'R1C1',\s*'R1C4',\s*'R1C7'/g,
-        /\[1,\s*4,\s*7\]/g,
-      ],
-    }),
+    check(ctx) {
+      const findings = ctx.nodesOfType('BinaryExpression').filter((bin) =>
+        bin.operator === '*' && bin.left.type === 'Identifier'
+        && /^b[rc]$/.test(bin.left.name) && numberValue(bin.right) !== null);
+      const cornerTriple = (elements) => elements.find((el, i) =>
+        stringValue(el) === 'R1C1'
+        && stringValue(elements[i + 1]) === 'R1C4'
+        && stringValue(elements[i + 2]) === 'R1C7');
+      for (const arr of ctx.nodesOfType('ArrayExpression')) {
+        const el = cornerTriple(arr.elements);
+        if (el) findings.push(el);
+        if (arr.elements.length === 3
+          && [1, 4, 7].every((v, i) => numberValue(arr.elements[i]) === v)) {
+          findings.push(arr);
+        }
+      }
+      for (const call of ctx.nodesOfType('CallExpression')) {
+        const el = cornerTriple(call.arguments);
+        if (el) findings.push(el);
+      }
+      return findings;
+    },
   },
   {
     code: 'sum-wire-format',
-    tier: 'heuristic',
     summary: 'hand-assembled Sum coefficient string found; prefer [cell, coeff] pairs (new Sum(0, cellA, [cellB, -1])) and run lint_constraints.js for canonical alternatives (EqualSum, plain Sum)',
     docs: 'The `<target>_=_<coeffs>` string is the wire format, not an API. The\n'
       + 'structured form is checked; the string is not.',
-    check: patternRule({
-      patterns: [
-        /`[^`\n]*_=_/g,
-        /['"]-?\d+_=_/g,
-      ],
-    }),
+    check(ctx) {
+      return [
+        ...ctx.nodesOfType('Literal')
+          .filter((lit) => /^-?\d+_=_/.test(stringValue(lit) ?? '')),
+        ...ctx.nodesOfType('TemplateLiteral')
+          .filter((tmpl) =>
+            tmpl.quasis.some((q) => (q.value.cooked ?? '').includes('_=_'))),
+      ];
+    },
   },
   {
     code: 'mutable-constraint-accumulator',
-    tier: 'heuristic',
     summary: 'constraint list built by mutation; return it declaratively instead — '
       + 'one `return [...]` of new Shape(...), the givens, and a named group per '
       + 'rule spread in (`...whispers`), building each group with .map()/.flatMap()',
     docs: 'The general tell is a top-level `return <variable>;` rather than an array\n'
-      + 'literal or an expression -- anchored to column 0, so a helper\'s own indented\n'
-      + '`return out;` is out of scope. Local accumulation that is not the constraint\n'
-      + 'list (collecting the branches of one Or, say) is not the pattern.',
-    check: patternRule({
-      patterns: [
-        // The `add()` helper, whatever the array is named.
-        /\bconst\s+add\s*=\s*\([^)]*\)\s*=>\s*\w+\.push\(/g,
-        /\bconstraints\.push\(/g,
-        /^return\s+[A-Za-z_$][\w$]*\s*;/gm,
-      ],
-    }),
+      + 'literal or an expression -- read from the Program body directly, so a\n'
+      + 'helper\'s own `return out;` is out of scope. Local accumulation that is not\n'
+      + 'the constraint list (collecting the branches of one Or, say) is not the\n'
+      + 'pattern.',
+    check(ctx) {
+      const findings = [];
+      // The `add()` helper, whatever the array is named.
+      for (const decl of ctx.nodesOfType('VariableDeclarator')) {
+        if (decl.id.type === 'Identifier' && decl.id.name === 'add'
+          && decl.init?.type === 'ArrowFunctionExpression'
+          && decl.init.body.type === 'CallExpression'
+          && memberName(decl.init.body.callee) === 'push') {
+          findings.push(decl);
+        }
+      }
+      for (const call of ctx.nodesOfType('CallExpression')) {
+        if (memberName(call.callee) === 'push'
+          && call.callee.object.type === 'Identifier'
+          && call.callee.object.name === 'constraints') {
+          findings.push(call);
+        }
+      }
+      for (const statement of ctx.ast.body) {
+        if (statement.type === 'ReturnStatement'
+          && statement.argument?.type === 'Identifier') {
+          findings.push(statement);
+        }
+      }
+      return findings;
+    },
   },
   {
     code: 'zero-indexed-cell-math',
-    tier: 'heuristic',
     summary: 'a makeCellId wrapper adding 1 to both row and column suggests 0-indexed data; prefer 1-indexed R/C data tables',
-    docs: 'Only the both-arguments wrapper form: a single "+ 1" is usually legitimate\n'
+    docs: 'Only the both-arguments wrapper form (a lambda or return of\n'
+      + 'makeCellId(r + 1, c + 1)): a single "+ 1" is usually legitimate\n'
       + 'neighbour/offset stepping, not a 0-indexed data table.',
-    check: patternRule({
-      patterns: [/=>\s*makeCellId\(\s*\w+\s*\+\s*1\s*,\s*\w+\s*\+\s*1\s*\)/g],
-    }),
+    check(ctx) {
+      const findings = [];
+      walkAst(ctx.ast, (node, parent) => {
+        if (node.type === 'CallExpression' && calleeName(node) === 'makeCellId'
+          && node.arguments.length === 2 && node.arguments.every(isPlusOne)
+          && (parent?.type === 'ArrowFunctionExpression'
+            || parent?.type === 'ReturnStatement')) {
+          findings.push(node);
+        }
+      });
+      return findings;
+    },
   },
   {
     code: 'overlay-at-make-cell-id',
-    tier: 'heuristic',
     summary: 'at(makeCellId(...)) builds an id just to translate it; declare '
       + 'RxC dimensions on the Var and use cell(row, col)',
     docs: 'Matches <overlay>.at(makeCellId(...)) for variables assigned from\n'
@@ -502,28 +675,23 @@ export const SOURCE_RULES = [
       + 'round-trip. Overlays remain the tool for graph structure (rows,\n'
       + 'neighbours, makeReplicate) keyed by real grid cells.',
     check(ctx) {
-      const source = ctx.view('code');
-      const overlays = new Set([...source.matchAll(
-        /\bconst\s+([A-Za-z_$][\w$]*)\s*=\s*[^;]*?\.makeOverlay\s*\(/g,
-      )].map(match => match[1]));
+      const overlays = ctx.overlayBindings();
       if (!overlays.size) return [];
-      const items = [];
-      const call = /\b([A-Za-z_$][\w$]*)\.at\(\s*makeCellId\s*\(/g;
-      for (const match of source.matchAll(call)) {
-        if (!overlays.has(match[1])) continue;
-        items.push({
-          line: ctx.lineAt(match.index),
-          code: this.code,
-          message: `${match[1]}.at(makeCellId(...)) round-trips through a cell `
-            + `id; use the Var's cell(row, col) with declared dimensions`,
+      const findings = [];
+      for (const call of ctx.nodesOfType('CallExpression')) {
+        const overlay = methodCallOn(call, 'at', overlays);
+        if (!overlay || !isCallTo(call.arguments[0], 'makeCellId')) continue;
+        findings.push({
+          node: call,
+          message: `${overlay}.at(makeCellId(...)) round-trips through a cell `
+            + 'id; use the Var\'s cell(row, col) with declared dimensions',
         });
       }
-      return items;
+      return findings;
     },
   },
   {
     code: 'manual-var-cell-arithmetic',
-    tier: 'heuristic',
     summary: 'row-major arithmetic into a Var\'s .cell(); pair the group with '
       + 'makeOverlay()/at() instead',
     docs: 'Matches <var>.cell(<expr containing *>) where <var> was assigned from\n'
@@ -533,28 +701,26 @@ export const SOURCE_RULES = [
       + 'math. Literal and additive indices (cell(9), cell(i + 1)) are left\n'
       + 'alone: only multiplicative row/column folding is flagged.',
     check(ctx) {
-      const source = ctx.view('code');
-      const vars = new Set([...source.matchAll(
-        /\bconst\s+([A-Za-z_$][\w$]*)\s*=\s*new\s+(?:SudokuConstraint\.)?Var\s*\(/g,
-      )].map(match => match[1]));
+      const vars = constBindings(ctx, (init) =>
+        init.type === 'NewExpression' && calleeName(init) === 'Var');
       if (!vars.size) return [];
-      const items = [];
-      const call = /\b([A-Za-z_$][\w$]*)\.cell\(\s*([^()]*\*[^()]*)\)/g;
-      for (const match of source.matchAll(call)) {
-        if (!vars.has(match[1])) continue;
-        items.push({
-          line: ctx.lineAt(match.index),
-          code: this.code,
-          message: `${match[1]}.cell(${match[2].trim()}) hand-rolls row-major `
-            + `indexing; read the group through makeOverlay()/at() instead`,
+      const findings = [];
+      for (const call of ctx.nodesOfType('CallExpression')) {
+        const varName = methodCallOn(call, 'cell', vars);
+        const index = call.arguments[0];
+        if (!varName || !index || !subtreeHas(index, (n) =>
+          n.type === 'BinaryExpression' && n.operator === '*')) continue;
+        findings.push({
+          node: call,
+          message: `${varName}.cell(${ctx.text(index)}) hand-rolls `
+            + 'row-major indexing; read the group through makeOverlay()/at() instead',
         });
       }
-      return items;
+      return findings;
     },
   },
   {
     code: 'num-values-mismatch',
-    tier: 'heuristic',
     summary: 'NFA.encodeSpec / Pair.fnToKey numValues literal disagrees with the declared Shape',
     docs: 'Cross-references the `new Shape(...)` alphabet against encodeSpec/fnToKey\n'
       + 'literals. The alphabet is read from a bare count (`12`), a string range\n'
@@ -563,35 +729,31 @@ export const SOURCE_RULES = [
       + 'widened, so any bare literal is reported as unverifiable rather than\n'
       + 'skipped -- that case is exactly where a narrow key silently misreads the\n'
       + 'wider domain. A machine compiled for the wrong alphabet is a real bug, but\n'
-      + 'the Shape is read by regex, so this stays heuristic.',
+      + 'values that flow through helpers stay unresolvable, so this stays heuristic.',
     check(ctx) {
-      const source = ctx.view('code');
-      const shape = parseDeclaredShape(source);
+      const shape = ctx.declaredShape();
       if (!shape) return [];
 
-      const items = [];
-      for (const call of findValueRangeCalls(source)) {
-        const literal = /^\d+$/.test(call.args[1] ?? '') ? Number(call.args[1]) : null;
-        if (literal === null) continue;
-        if (shape.numValues !== null && literal === shape.numValues) continue;
-        items.push({
-          line: ctx.lineAt(call.index),
-          code: this.code,
+      const findings = [];
+      for (const call of ctx.valueRangeCalls()) {
+        if (call.literal === null) continue;
+        if (shape.numValues !== null && call.literal === shape.numValues) continue;
+        findings.push({
+          node: call.node,
           message: shape.numValues === null
-            ? `numValues literal ${literal} cannot be checked: the Shape's alphabet `
-              + `is set by \`${shape.raw}\`, so it is widened by an unknown amount. `
-              + 'Pass the Shape or the geometry itself, never a literal'
-            : `numValues literal ${literal} does not match the declared `
+            ? `numValues literal ${call.literal} cannot be checked: the Shape's `
+              + `alphabet is set by \`${shape.raw}\`, so it is widened by an unknown `
+              + 'amount. Pass the Shape or the geometry itself, never a literal'
+            : `numValues literal ${call.literal} does not match the declared `
               + `Shape's ${shape.numValues} values; pass the Shape or cellGeometry() `
               + 'instead of a literal',
         });
       }
-      return items;
+      return findings;
     },
   },
   {
     code: 'value-offset-dropped',
-    tier: 'heuristic',
     summary: 'NFA.encodeSpec / Pair.fnToKey gets a bare count on an offset-alphabet Shape',
     docs: 'A bare count (a literal or `geometry.numValues`) leaves valueOffset at 0,\n'
       + 'so on a Shape whose alphabet does not start at 1 every value fed to the\n'
@@ -599,78 +761,83 @@ export const SOURCE_RULES = [
       + 'should accept. The compiled NFA carries no offset metadata, so nothing\n'
       + 'downstream can catch this; only the call site can. Fires when the declared\n'
       + 'alphabet has (or may have) a non-zero offset and the call neither passes\n'
-      + 'the Shape/geometry object nor an explicit valueOffset.',
+      + 'the Shape/geometry object nor an explicit valueOffset. Opts the walk cannot\n'
+      + 'see into (a named object, a spread) are assumed to carry the offset.',
     check(ctx) {
-      const source = ctx.view('code');
-      const shape = parseDeclaredShape(source);
+      const shape = ctx.declaredShape();
       if (!shape || shape.valueOffset === 0) return [];
 
-      const items = [];
-      for (const call of findValueRangeCalls(source)) {
+      const findings = [];
+      for (const call of ctx.valueRangeCalls()) {
         if (call.hasExplicitOffset) continue;
-        const arg = call.args[1] ?? '';
-        const isBareCount = /^\d+$/.test(arg) || /\.numValues$/.test(arg);
-        if (!isBareCount) continue;
+        if (call.bareCountText === null) continue;
         // A wrong count is num-values-mismatch's finding; report one problem.
-        if (/^\d+$/.test(arg) && shape.numValues !== null
-          && Number(arg) !== shape.numValues) continue;
-        items.push({
-          line: ctx.lineAt(call.index),
-          code: this.code,
+        if (call.literal !== null && shape.numValues !== null
+          && call.literal !== shape.numValues) continue;
+        findings.push({
+          node: call.node,
           message: shape.valueOffset === null
             ? `the Shape's alphabet is set by \`${shape.raw}\`, so its value offset `
-              + `cannot be verified; \`${arg}\` carries only a count. Pass the Shape `
-              + 'or the geometry itself (or an explicit valueOffset)'
+              + `cannot be verified; \`${call.bareCountText}\` carries only a count. `
+              + 'Pass the Shape or the geometry itself (or an explicit valueOffset)'
             : `the declared Shape's values start at ${shape.valueOffset + 1} `
-              + `(valueOffset ${shape.valueOffset}) but \`${arg}\` carries only a `
-              + 'count, leaving valueOffset at 0. Pass the Shape or the geometry '
-              + 'itself (or an explicit valueOffset)',
+              + `(valueOffset ${shape.valueOffset}) but \`${call.bareCountText}\` `
+              + 'carries only a count, leaving valueOffset at 0. Pass the Shape or '
+              + 'the geometry itself (or an explicit valueOffset)',
         });
       }
-      return items;
+      return findings;
     },
   },
   {
     code: 'missing-rules-comment',
-    tier: 'heuristic',
     summary: 'no rules prose found; state the rules being encoded '
       + '(and any omissions) after the header',
-    docs: 'Reads comments, not code: it wants a comment line that is not a\n'
+    docs: 'Reads comments, not code: it wants a comment that is not a\n'
       + '"Field: value" header (Title/Author/Video/Source and similar). A script\n'
       + 'without its rules written down cannot be reviewed against them.',
     check(ctx) {
-      const HEADER_FIELD = /^\/\/\s*[A-Z][a-zA-Z ]*:/;
-      for (const rawLine of ctx.lines) {
-        const line = rawLine.trim();
-        if (line.startsWith('//') && !HEADER_FIELD.test(line)) return [];
-      }
-      return [{ line: 1, code: this.code, message: this.summary }];
+      const hasProse = ctx.comments.some((comment) =>
+        comment.type === 'Block' || !HEADER_FIELD.test(comment.value));
+      return hasProse ? [] : [{ line: 1 }];
     },
   },
 ];
+
+// Every source rule is advisory pattern guidance; stamping the tier here keeps
+// the USAGE promise ("--fail-on=exact never gates on this tool") structural.
+export const SOURCE_RULES = RULES.map((rule) => ({ ...rule, tier: 'heuristic' }));
 
 // `// lint-ok: <code>[, <code>]` silences those codes on the line it excuses:
 // its own line when it trails code, or the line below when it stands alone (so
 // a suppression can sit above a long line). A standalone comment silences only
 // the next line, never a whole block -- and codes must be named, because a
-// blanket "lint-ok" would hide rules nobody considered.
-const suppressionsByLine = (lines) => {
+// blanket "lint-ok" would hide rules nobody considered. Only real comments
+// count: the parser supplies them, so a string containing "lint-ok" is inert.
+const suppressionsByLine = (ctx) => {
   const suppressed = new Map();
-  lines.forEach((text, index) => {
-    const match = /\/\/\s*lint-ok:\s*([\w-]+(?:\s*,\s*[\w-]+)*)/.exec(text);
-    if (!match) return;
-    const standalone = text.trim().startsWith('//');
-    const line = standalone ? index + 2 : index + 1;
-    if (!suppressed.has(line)) suppressed.set(line, new Set());
-    for (const code of match[1].split(',')) suppressed.get(line).add(code.trim());
-  });
+  for (const comment of ctx.comments) {
+    if (comment.type !== 'Line') continue;
+    const match = /^\s*lint-ok:\s*([\w-]+(?:\s*,\s*[\w-]+)*)/.exec(comment.value);
+    if (!match) continue;
+    const { line, column } = comment.loc.start;
+    const standalone = ctx.lines[line - 1].slice(0, column).trim() === '';
+    const target = standalone ? line + 1 : line;
+    if (!suppressed.has(target)) suppressed.set(target, new Set());
+    for (const code of match[1].split(',')) suppressed.get(target).add(code.trim());
+  }
   return suppressed;
 };
 
-export const lintSource = (source) => {
+// `only`/`ignore` take Sets of rule codes (as the CLI parses them) so
+// deselected rules are skipped entirely, not run and filtered.
+export const lintSource = (source, { only = null, ignore = null } = {}) => {
   const ctx = makeSourceContext(source);
-  const items = SOURCE_RULES.flatMap(rule => rule.check(ctx));
-  const suppressed = suppressionsByLine(ctx.lines);
+  const rules = SOURCE_RULES.filter((rule) =>
+    (!only || only.has(rule.code)) && !ignore?.has(rule.code));
+  const items = rules.flatMap((rule) =>
+    rule.check(ctx).map((finding) => findingToItem(rule, finding)));
+  const suppressed = suppressionsByLine(ctx);
   return dedupeGuidance(
     items.filter(item => !suppressed.get(item.line)?.has(item.code)));
 };
@@ -702,7 +869,8 @@ export const main = async (argv) => runLintCli({
   usage: USAGE,
   rules: SOURCE_RULES,
   noFilesError: 'No scripts specified. Pass one or more .js files.',
-  lintFile: (file, raw) => lintSource(raw),
+  lintFile: (file, raw, args) =>
+    lintSource(raw, { only: args.only, ignore: args.ignore }),
 });
 
 runAsCli(import.meta.url, main);

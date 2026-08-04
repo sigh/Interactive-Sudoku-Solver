@@ -10,12 +10,24 @@
   },
   "c8": {
     "all": true,
-    "src": ["js"],
-    "exclude": ["_site/**", "lib/**", "tests/**", "tools/**", "node_modules/**"],
-    "reporter": ["text", "html"],
+    "src": [
+      "js"
+    ],
+    "exclude": [
+      "_site/**",
+      "lib/**",
+      "tests/**",
+      "tools/**",
+      "node_modules/**"
+    ],
+    "reporter": [
+      "text",
+      "html"
+    ],
     "report-dir": "coverage"
   },
   "devDependencies": {
+    "acorn": "^8.18.0",
     "c8": "^11.0.0"
   }
 }

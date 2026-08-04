@@ -115,6 +115,39 @@ await runTest('lint_sandbox_script flags numValues/Shape mismatch and id templat
   assert.match(report(items), /manual-cell-id-template/);
 });
 
+await runTest('lint_sandbox_script ignores code-shaped text inside strings', () => {
+  // The rules walk the AST, so idioms quoted in strings are not findings.
+  const items = lintSource(SCRIPT_HEADER
+    + 'const msg = "constraints.push(x) or new Replicate(a) or [1, 4, 7]";\n'
+    + "return [new Shape('9x9')];\n");
+  assert.equal(report(items), '');
+});
+
+await runTest('lint_sandbox_script lint-ok suppresses only from a real comment', () => {
+  const flagged = lintSource(SCRIPT_HEADER
+    + 'const s = "// lint-ok: bare-replicate-constructor";\n'
+    + "return [new Shape('9x9'), new Replicate('x')];\n");
+  assert.match(report(flagged), /bare-replicate-constructor/);
+
+  const suppressed = lintSource(SCRIPT_HEADER
+    + "return [new Shape('9x9'), new Replicate('x')]; // lint-ok: bare-replicate-constructor\n");
+  assert.equal(report(suppressed), '');
+});
+
+await runTest('lint_sandbox_script reports a syntax error instead of linting', () => {
+  assert.throws(() => lintSource(SCRIPT_HEADER + 'const = ;\n'), /syntax error/);
+});
+
+await runTest('lint_sandbox_script value-range rules survive regex literals in arguments', () => {
+  // An unbalanced-looking regex literal inside an argument must not derail the
+  // structural rules (the classic division-vs-regex lexing hazard).
+  const items = lintSource(SCRIPT_HEADER
+    + 'const spec = makeSpec(/\\(/, ",");\n'
+    + 'const enc = NFA.encodeSpec(spec, 9);\n'
+    + "return [new Shape('6x6')];\n");
+  assert.match(report(items), /num-values-mismatch/);
+});
+
 await runTest('lint_sandbox_script flags numValues mismatch in an inline-spec call', () => {
   // The spec object spans commas and lines; the call scanner must still find
   // the second argument.
