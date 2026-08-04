@@ -5,7 +5,7 @@ import { GridTestContext, createAccumulator, valueMask, initTypedHandler } from 
 
 ensureGlobalEnvironment();
 
-const { Or, True, False, GivenCandidates } = await import('../../js/solver/handlers.js');
+const { Or, And, True, False, GivenCandidates } = await import('../../js/solver/handlers.js');
 const { LookupTables } = await import('../../js/solver/lookup_tables.js');
 
 // Or requires a typed, state-extended grid and postInitialize; initTypedHandler
@@ -127,6 +127,63 @@ await runTest('var cells: var cell not left unconstrained', () => {
   assert.notEqual(grid[varCell], allValues,
     'var cell should not have all values after Or enforcement');
   assert.equal(grid[varCell], valueMask(1, 2));
+});
+
+// -- nested composite watched-cell discovery --
+//
+// GivenCandidates registers no constructor-time cells (it acts via
+// initialize), so an Or over GivenCandidates starts with cells=[] and only
+// discovers its dependencies during initialize. A *nested* Or's dependencies
+// must propagate up through the enclosing composites, or the outer handler is
+// attached to no cell and the engine never schedules it (it is then silently
+// unenforced -- the bug behind pipeline blockers #1107/#1109).
+
+const makeInnerOrOn = (cell) => new Or(
+  new GivenCandidates(new Map([[cell, [1, 2]]])),
+  new GivenCandidates(new Map([[cell, [3]]])));
+
+await runTest('nested Or discovers watched cells during initialize', () => {
+  const context = new GridTestContext({ gridSize: [1, 4], numValues: 4 });
+  const outer = new Or(makeInnerOrOn(0), makeInnerOrOn(1));
+
+  // Constructor-time: no branch exposes any cells.
+  assert.equal(outer.cells.length, 0);
+
+  const result = initOrHandler(context, outer);
+  assert.equal(result, true);
+
+  const watched = new Set(outer.cells);
+  assert.ok(watched.has(0) && watched.has(1),
+    'outer Or must watch the cells its nested branches depend on, got: '
+    + JSON.stringify([...outer.cells]));
+});
+
+await runTest('And mirrors child cells extended during initialize', () => {
+  const context = new GridTestContext({ gridSize: [1, 4], numValues: 4 });
+  const outer = new Or(new And(makeInnerOrOn(0)), new And(makeInnerOrOn(1)));
+
+  assert.equal(outer.cells.length, 0);
+
+  const result = initOrHandler(context, outer);
+  assert.equal(result, true);
+
+  const watched = new Set(outer.cells);
+  assert.ok(watched.has(0) && watched.has(1),
+    'cells discovered by a nested Or must propagate up through And, got: '
+    + JSON.stringify([...outer.cells]));
+});
+
+await runTest('nested Or rejects when every branch is dead', () => {
+  const context = new GridTestContext({ gridSize: [1, 4], numValues: 4 });
+  const outer = new Or(new And(makeInnerOrOn(0)), new And(makeInnerOrOn(1)));
+  const result = initOrHandler(context, outer);
+  assert.equal(result, true);
+
+  const grid = context._grid;
+  // Pin both cells to 4: excluded by every Given in every nested branch.
+  grid[0] = valueMask(4);
+  grid[1] = valueMask(4);
+  assert.equal(outer.enforceConsistency(grid, createAccumulator()), false);
 });
 
 logSuiteComplete('or.test.js');

@@ -163,6 +163,17 @@ export class And extends SudokuConstraintHandler {
     for (const h of this._handlers) {
       if (!h.initialize(initialGridCells, cellExclusions, geometry, stateAllocator)) return false;
     }
+
+    // Mirror any cells the children added during their initialize() (e.g. a
+    // nested Or over Givens) so enclosing composites and the engine see them.
+    const watchedCells = new Set(this.cells);
+    for (const h of this._handlers) {
+      for (const cell of h.cells) watchedCells.add(cell);
+    }
+    if (watchedCells.size !== this.cells.length) {
+      this.cells = this.cells.constructor.from(watchedCells);
+    }
+
     return true;
   }
 
@@ -4175,14 +4186,17 @@ export class Or extends SudokuConstraintHandler {
     }
     this._stateOffset = stateAllocator.allocate(state);
 
-    // If initialization changed any cells we may need to updated the watched
-    // cells.
-    if (initializationCells.size) {
-      const watchedCells = initializationCells;
-      for (const cell of this.cells) {
-        watchedCells.add(cell);
-      }
-
+    // Watch the branches' initialization cells plus any cells the branch
+    // handlers added during their own initialize() (e.g. a nested Or over
+    // Givens has none at construction time; an unwatched Or is never enforced).
+    const watchedCells = initializationCells;
+    for (const cell of this.cells) {
+      watchedCells.add(cell);
+    }
+    for (const h of this._handlers) {
+      for (const cell of h.cells) watchedCells.add(cell);
+    }
+    if (watchedCells.size !== this.cells.length) {
       this.cells = this.cells.constructor.from(watchedCells);
     }
 

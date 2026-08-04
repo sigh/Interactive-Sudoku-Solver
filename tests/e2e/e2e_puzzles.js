@@ -212,6 +212,16 @@ const puzzles9x9 = [
     input: '.Or.~R1C1_1.AllDifferent~R3C8~R4C7.End.~R1C1_5~R1C2_3~R2C1_6~R2C6_5~R3C2_9~R3C3_8~R7C2_6~R8C6_9~R8C9_5~R9C8_7~R9C5_8~R8C4_4~R7C7_2~R7C8_8~R5C9_1~R4C9_3~R4C5_6~R6C5_2~R5C4_8~R5C1_4~R4C1_8~R6C1_7~R1C5_9~R5C8_9~R7C4_5~R3C1_1~R1C4_2',
     solution: '534298617672315948198746532859167423426853791713924856967531284281479365345682179',
   },
+  {  // Nested Or (branch watched cells only discovered during initialize)
+    name: 'Nested Or with Givens',
+    input: CLASSIC_9X9.input + '.Or.And.Or.~R6C1_7.~R6C1_1.End.End.And.Or.~R6C1_1.~R6C1_7.End.End.End',
+    solution: CLASSIC_9X9.solution,
+  },
+  {  // Nested Or with no feasible branch: must have no solution.
+    name: 'Nested Or with Givens [no solution]',
+    input: CLASSIC_9X9.input + '.Or.And.Or.~R6C1_2.~R6C1_4.End.End.And.Or.~R6C1_3.~R6C1_9.End.End.End',
+    solution: false,
+  },
   {  // And and Or constraint which are both simplified out
     name: 'Elided And and Or',
     input: '.Or.And.AllDifferent~R3C8~R4C7.End.End.~R1C1_5~R1C2_3~R2C1_6~R2C6_5~R3C2_9~R3C3_8~R7C2_6~R8C6_9~R8C9_5~R9C8_7~R9C5_8~R8C4_4~R7C7_2~R7C8_8~R5C9_1~R4C9_3~R4C5_6~R6C5_2~R5C4_8~R5C1_4~R4C1_8~R6C1_7~R1C5_9~R5C8_9~R7C4_5~R3C1_1~R1C4_2',
