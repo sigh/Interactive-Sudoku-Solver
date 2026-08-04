@@ -180,6 +180,10 @@ const puzzles9x9 = [
     ...PUZZLE_INDEX.get('Hit, Reveal, Solve'),  // NFA (with segments)
     input: '/data/scripts/hit_reveal_solve.iss',
   },
+  {
+    ...PUZZLE_INDEX.get('Between The Skyscrapers'),  // NFA (with empty leading segments)
+    input: '/data/scripts/between_the_skyscrapers.iss',
+  },
   'Full rank - 6 clue snipe',
   'Septa',  // region sum line on irregular 7x7 jigsaw
   'Embedded Squishdoku',

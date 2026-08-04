@@ -172,7 +172,7 @@ class BaseConstraintDisplayItem extends DisplayItem {
 
   _makeConstraintLineFromPoints(points, options) {
     const len = points.length;
-    if (len < 1) throw new Error('Line has no points');
+    if (len < 1) return createSvgElement('g');
 
     if (options.constructor !== LineOptions) {
       options = new LineOptions(options);
@@ -542,7 +542,7 @@ export class Chaos extends BaseConstraintDisplayItem {
   }
 }
 
-class CustomLine extends GenericLine {
+export class CustomLine extends GenericLine {
   constructor(svg, cellPositioner) {
     super(svg, cellPositioner);
     this._colorPicker = new ColorPicker();

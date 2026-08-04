@@ -3260,18 +3260,17 @@ function* parseNamedCellGroups(items, decodeName) {
 // Token separating segments in a flat cell list.
 const SEGMENT_SEPARATOR = '-';
 
+// The exact inverse of joinSegments: empty segments are preserved.
 const splitSegments = (items) => {
-  const segments = [];
-  let segment = [];
+  if (!items.length) return [];
+  const segments = [[]];
   for (const item of items) {
     if (item === SEGMENT_SEPARATOR) {
-      if (segment.length) segments.push(segment);
-      segment = [];
+      segments.push([]);
     } else {
-      segment.push(item);
+      segments[segments.length - 1].push(item);
     }
   }
-  if (segment.length) segments.push(segment);
   return segments;
 };
 

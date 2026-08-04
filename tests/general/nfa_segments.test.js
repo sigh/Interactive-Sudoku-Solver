@@ -60,6 +60,23 @@ await runTest('NFA round-trips segments through the parser', () => {
   assert.deepEqual(found.segments, [['R1C1', 'R1C2'], ['R1C3']]);
 });
 
+await runTest('NFA round-trips empty segments through the parser', () => {
+  // Empty segments are meaningful: each separator is a SEGMENT_BREAK consumed
+  // by the automaton, wherever it falls.
+  for (const segments of [
+    [[], ['R1C1', 'R1C2']],           // leading (e.g. target cell starts the line)
+    [['R1C1'], [], ['R1C2']],         // middle (consecutive breaks)
+    [['R1C1', 'R1C2'], []],           // trailing
+  ]) {
+    const original = new SudokuConstraint.NFA('ENC', 'n', ...segments);
+    const parsed = SudokuParser.parseText(original.toString());
+    let found = null;
+    parsed.forEachTopLevel(c => { if (c.type === 'NFA') found = c; });
+    assert.deepEqual(found.segments, segments,
+      `segments survive round-trip: ${JSON.stringify(segments)}`);
+  }
+});
+
 // ---------------------------------------------------------------------------
 // Builder: the segment break becomes the symbol just past the real values.
 // ---------------------------------------------------------------------------
@@ -112,6 +129,26 @@ await runTest('single-segment NFA (no boundary) forces one increasing run', () =
     const row = ['R1C1', 'R1C2', 'R1C3', 'R1C4'].map(id => sol.valueAt(id));
     assert.deepEqual(row, [1, 2, 3, 4]);
   }
+});
+
+await runTest('an empty first segment feeds the automaton a leading break', () => {
+  // The automaton must see a SEGMENT_BREAK before the first value; after that
+  // anything is accepted. Only satisfiable if the empty first segment survives.
+  const leadingBreakSpec = {
+    startState: 0,
+    transition: (s, v) => {
+      if (s === 0) return v === SEGMENT_BREAK ? 1 : [];
+      return 1;
+    },
+    accept: (s) => s === 1,
+  };
+  const enc = SudokuConstraint.NFA.encodeSpec(
+    leadingBreakSpec, 4, { multiSegment: true });
+  const nfaStr = new SudokuConstraint.NFA(
+    enc, 'lead', [], ['R1C1', 'R1C2']).toString();
+  const solver = new SimpleSolver();
+  const sols = [...solver.solutions('.Shape~4x4' + nfaStr, 1)];
+  assert.equal(sols.length, 1, 'the leading segment break must be consumed');
 });
 
 await runTest('segment-break NFA on a 16-value grid is rejected at encode time', () => {

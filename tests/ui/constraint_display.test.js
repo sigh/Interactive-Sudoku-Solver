@@ -23,7 +23,7 @@ ensureGlobalEnvironment({
   documentValue: { createElementNS: (_ns, tag) => mockEl(tag) },
 });
 
-const { Chaos } = await import('../../js/constraint_display.js');
+const { Chaos, CustomLine } = await import('../../js/constraint_display.js');
 const { CellGeometry } = await import('../../js/cell_geometry.js');
 const { SudokuConstraint } = await import('../../js/sudoku_constraint.js');
 
@@ -90,4 +90,23 @@ await runTest('Chaos.makeIcon: an inner arm renders as a dashed full line', () =
   assert.equal(pointCount(paths[0]), 3);
 });
 
-logSuiteComplete('Chaos');
+const linePaths = (el, out = []) => {
+  if (el.tagName === 'path' && el.getAttribute('d') != null) out.push(el);
+  for (const c of el.children || []) linePaths(c, out);
+  return out;
+};
+
+// An NFA segment may be empty (its separator is still a symbol consumed by the
+// automaton); a zero-point group draws nothing rather than throwing.
+await runTest('CustomLine.makeIcon: an empty NFA segment draws nothing', () => {
+  const display = new CustomLine(mockEl('g'), cellPositioner);
+  display.reshape(CellGeometry.fromGridSize(9));
+  const constraint = new SudokuConstraint.NFA('ENC', 'n', [], ['R1C1', 'R1C2']);
+
+  const icon = display.makeIcon(constraint, SudokuConstraint.NFA.DISPLAY_CONFIG);
+
+  // Only the non-empty segment produces a line.
+  assert.equal(linePaths(icon).length, 1);
+});
+
+logSuiteComplete('Constraint display');

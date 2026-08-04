@@ -525,6 +525,14 @@ const EXAMPLE_OTHER_VARIANTS = [
     solution: '168573924924618357753294168596481273837952641241736895685149732419327586372865419',
   },
   {
+    name: 'Between The Skyscrapers',
+    comment: 'Circled cells self-count row/column skyscraper visibility; the segment breaks locate the circled cell, with an empty leading segment when it is first in its line.',
+    src: ['https://www.youtube.com/watch?v=bi0sC74nPuU', 'https://app.crackingthecryptic.com/sudoku/2tfL7TJhPd'],
+    input: '/data/scripts/between_the_skyscrapers.js',
+    solution: '438917265567842391192356487213468579659271834874593126926135748345789612781624953',
+    constraintTypes: ['Between', 'GreaterThan', 'NFA: sky'],
+  },
+  {
     name: 'Ambiguous Arrows',
     src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?chlang=en&id=000A06',
     // See http://sigh.github.io/Interactive-Sudoku-Solver/help#ambiguous-arrow for NFA explanation
