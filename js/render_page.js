@@ -304,26 +304,28 @@ class ExampleHandler {
   }
 
   async _populateExampleSelect(exampleSelect) {
-    const { DISPLAYED_EXAMPLES, PUZZLE_INDEX } = await import('../data/example_puzzles.js' + self.VERSION_PARAM);
+    const { DISPLAYED_EXAMPLE_GROUPS, PUZZLE_INDEX } = await import('../data/example_puzzles.js' + self.VERSION_PARAM);
 
-    for (const example of DISPLAYED_EXAMPLES) {
-      const option = document.createElement('option');
-      option.textContent = example.name;
-      exampleSelect.appendChild(option);
+    for (const group of DISPLAYED_EXAMPLE_GROUPS) {
+      const optGroup = document.createElement('optgroup');
+      optGroup.label = group.name;
+      for (const example of group.puzzles) {
+        const option = document.createElement('option');
+        option.value = example.name;
+        option.textContent = example.displayName ?? example.name;
+        optGroup.appendChild(option);
+      }
+      exampleSelect.appendChild(optGroup);
     }
 
-    const sourceLinks = exampleSelect.nextElementSibling;
+    const sourceLinks = document.querySelector(
+      '#example-select-container .example-source-links');
     exampleSelect.onchange = () => {
-      if (exampleSelect.selectedIndex) {
-        const exampleName = exampleSelect.options[exampleSelect.selectedIndex].text;
-        const example = PUZZLE_INDEX.get(exampleName);
-        this._renderSourceLinks(sourceLinks, example.src);
-
-        this._ignoreConstraintChanges = true;
+      const example = PUZZLE_INDEX.get(exampleSelect.value);
+      this._renderSourceLinks(sourceLinks, example?.src);
+      this._ignoreConstraintChanges = true;
+      if (example) {
         this._constraintManager.loadUnsafeFromText(example.input);
-      } else {
-        this._renderSourceLinks(sourceLinks, null);
-        this._ignoreConstraintChanges = true;
       }
     };
     exampleSelect.disabled = false;

@@ -58,64 +58,64 @@ export const classicWithVarCells = (numVars) =>
   `.Var~X~~${numVars}${CLASSIC_9X9.input}.Replicate~${consecutiveBitset(numVars)}~VX1.~VX1_1.End`;
 
 const puzzles9x9 = [
-  'Thermosudoku',
+  'Thermo',
   'Classic sudoku',
   'Classic sudoku, hard',
   'Anti-knights move',
-  'Killer sudoku',
+  'Killer',
   withExtraConstraints(
-    'Killer sudoku',
+    'Killer',
     '.Cage~9~R1C5~R2C5.',
     { name: 'Killer sudoku [overlap]' }),
   {
-    ...PUZZLE_INDEX.get('Killer sudoku'),
+    ...PUZZLE_INDEX.get('Killer'),
     name: 'Killer sudoku [gaps]',
-    comment: "Same as 'Killer sudoku' but with gaps for the optimizer to fill.",
+    comment: "Same as 'Killer' but with gaps for the optimizer to fill.",
     input: '.Cage~17~R2C3~R2C4.Cage~9~R3C3~R3C4~R4C4.Cage~22~R1C6~R2C5~R2C6~R3C5.Cage~4~R1C7~R2C7.Cage~16~R1C8~R2C8.Cage~15~R1C9~R2C9~R3C9~R4C9.Cage~20~R3C7~R3C8~R4C7.Cage~17~R4C5~R5C5~R6C5.Cage~20~R5C4~R6C4~R7C4.Cage~14~R4C2~R4C3.Cage~6~R4C1~R5C1.Cage~13~R5C2~R5C3~R6C2.Cage~6~R6C3~R7C2~R7C3.Cage~17~R4C8~R5C7~R5C8.Cage~27~R6C1~R7C1~R8C1~R9C1.Cage~8~R8C2~R9C2.Cage~16~R8C3~R9C3.Cage~10~R7C5~R8C4~R8C5~R9C4.Cage~12~R5C9~R6C9.Cage~6~R6C7~R6C8.Cage~20~R6C6~R7C6~R7C7.Cage~15~R8C6~R8C7.Cage~14~R7C8~R7C9~R8C8~R8C9.Cage~13~R9C5~R9C6~R9C7.Cage~17~R9C8~R9C9.',
   },
   {
-    ...PUZZLE_INDEX.get('Killer sudoku'),
+    ...PUZZLE_INDEX.get('Killer'),
     name: 'Killer sudoku [0 cage]',
     input: '.Cage~3~R1C1~R1C2.Cage~15~R1C3~R1C4~R1C5.Cage~17~R2C3~R2C4.Cage~22~R1C6~R2C5~R2C6~R3C5.Cage~4~R1C7~R2C7.Cage~16~R1C8~R2C8.Cage~15~R1C9~R2C9~R3C9~R4C9.Cage~8~R3C6~R4C6~R5C6.Cage~6~R4C1~R5C1.Cage~6~R6C3~R7C2~R7C3.Cage~27~R6C1~R7C1~R8C1~R9C1.Cage~8~R8C2~R9C2.Cage~16~R8C3~R9C3.Cage~10~R7C5~R8C4~R8C5~R9C4.Cage~12~R5C9~R6C9.Cage~6~R6C7~R6C8.Cage~20~R6C6~R7C6~R7C7.Cage~15~R8C6~R8C7.Cage~14~R7C8~R7C9~R8C8~R8C9.Cage~13~R9C5~R9C6~R9C7.Cage~17~R9C8~R9C9.Cage~0~R5C4~R5C3~R5C2~R6C2.Cage~0~R3C7~R3C8~R4C8.',
   },
   {
-    ...PUZZLE_INDEX.get('Killer sudoku'),
+    ...PUZZLE_INDEX.get('Killer'),
     name: 'Killer sudoku [alldiff]',
     input: '.Cage~3~R1C1~R1C2.Cage~15~R1C3~R1C4~R1C5.Cage~17~R2C3~R2C4.Cage~22~R1C6~R2C5~R2C6~R3C5.Cage~4~R1C7~R2C7.Cage~16~R1C8~R2C8.Cage~15~R1C9~R2C9~R3C9~R4C9.Cage~8~R3C6~R4C6~R5C6.Cage~6~R4C1~R5C1.Cage~6~R6C3~R7C2~R7C3.Cage~27~R6C1~R7C1~R8C1~R9C1.Cage~8~R8C2~R9C2.Cage~16~R8C3~R9C3.Cage~10~R7C5~R8C4~R8C5~R9C4.Cage~12~R5C9~R6C9.Cage~6~R6C7~R6C8.Cage~20~R6C6~R7C6~R7C7.Cage~15~R8C6~R8C7.Cage~14~R7C8~R7C9~R8C8~R8C9.Cage~13~R9C5~R9C6~R9C7.Cage~17~R9C8~R9C9.AllDifferent~R5C4~R5C3~R5C2~R6C2.Cage~0~R3C7~R3C8~R4C8.',
   },
   'Sudoku X',
   'Anti-knight Anti-king',
   'Anti-knight Anti-consecutive',
-  'Arrow sudoku',
+  'Arrow',
   'Double arrow',
-  'Pill arrow',
+  'Pill Arrow Sudoku',
   'I Bet Someone Did This Already',  // 3-digit pill arrow, strict XV
   'CTC Tribute',  // arrow + killer cages
   'Kropki sudoku',
-  'Little killer',
+  'Little Killer Sudoku',
   {
-    ...PUZZLE_INDEX.get('Little killer'),
+    ...PUZZLE_INDEX.get('Little Killer Sudoku'),
     name: 'Little killer [sum clue]',
-    comment: "Same as 'Little killer' but the 23 little-killer clue is replaced with a Sum constraint.",
+    comment: "Same as 'Little Killer Sudoku' but the 23 little-killer clue is replaced with a Sum constraint.",
     input: '.LittleKiller~22~R1C1.LittleKiller~28~R2C1.LittleKiller~26~R3C1.LittleKiller~34~R1C7.LittleKiller~40~R1C8.LittleKiller~42~R1C9.~R3C2_5~R3C7_2~R5C4_3~R5C5_7.Sum~23~R1C5~R2C4~R3C3~R4C2~R5C1',
   },
   'Little killer 2',
-  'Sandwich sudoku',
-  'German whispers',
-  'International whispers',
-  'Renban',
-  'Between lines',
-  'Lockout lines',
-  'Palindromes',
-  'Modular lines',
+  'Between 1 and 9 Sudoku',
+  'German Whispers',
+  'Elementary',
+  "'Leven",
+  'Sudoku Variants Series (173) - Between Lines Sudoku',
+  'Lockout Lines (DSM 23 Quali Training)',
+  'Sudoku Variants Series (013) - Palindrome Sudoku',
+  'Modular Lines 1',
   'Entropic connections',  // Entropic Line, Pair
   'Jigsaw',
   'Jigsaw boxes, disconnected',
   'Windoku',
   'X-Windoku',
-  'Region sum lines',
+  'Raw Spaghetti',
   'XV-sudoku',
-  'XV-kropki',
+  'XV Kropki Sudoku',
   'Strict kropki',
   {
     // 'Strict kropki' with its dots wrapped in an And: composite-nested
@@ -131,24 +131,24 @@ const puzzles9x9 = [
   'X-Sum little killer',
   'Skyscraper',
   'Skyscraper - all 6',
-  'Global entropy',  // Global entropy
+  '[New Constraint] Entropy Sudoku',  // Global entropy
   'Global mod 3',  // Global mod
-  'Odd even',
+  'Odd & even',
   'Quadruple X',
   'Quadruple - repeated values',
-  'Odd-even thermo',  // Pair
+  'Odd/Even Thermo Sudoku',  // Pair
   withExtraConstraints(
-    'Nabner thermo',
+    'Cold Sauerkraut',
     '~R6C8_4~R6C2_6'),  // PairX
   'Knight-arrows',  // Binary (backward compatibility)
   'Zipper lines - tutorial',  // Zipper both odd and even length.
   'Ten Lines 01: Adding to Ten',  // sum lines
-  'Sum lines, with loop',
+  '10 Lines',
   'Sum lines - long loop',
   'Long sums 3',
-  'Indexing',
+  '159 Sudoku',
   '2D 1-5-9',
-  'Full rank',
+  'DSM 2023 Leftover: Full Rank Sudoku',
   'Event horizon', // Full duplicate-cell sum regression, with renban constraints.
   {
     // Focused duplicate-cell sum regression, without the renban machinery
@@ -157,7 +157,7 @@ const puzzles9x9 = [
     name: 'Event Horizon [simplified]',
     input: '.Cage~20~R1C2~R2C2~R2C1.Cage~20~R4C2~R4C3~R4C4~R4C4.Cage~20~R8C2~R8C1~R9C1.Cage~10~R1C8~R2C8~R2C9.Cage~0~R6C6~R6C7~R6C8.Cage~70~R8C5~R7C5~R6C5~R5C5~R5C4~R4C5~R3C5~R2C5~R4C5~R5C5~R5C4~R6C5~R5C6~R5C6.Sum~30~R1C9~R2C8~R3C7~R7C3~R8C2~R9C1~R4C6~R5C5~R6C4~R4C6~R5C5~R6C4.Sum~30~R1C2~R2C3~R3C4~R4C5~R5C6~R6C7~R7C8~R8C9~R4C5~R5C6.LittleKiller~30~R1C6.~R4C5_6~R7C4_5~R2C5_3~R3C6_9',
   },
-  'Lunchbox',  // Lunchbox
+  'Normal Lunchbox',  // Lunchbox
   {
     ...PUZZLE_INDEX.get('Killer lunchboxes'),
     name: 'Killer lunchboxes [resolved]',
@@ -166,7 +166,7 @@ const puzzles9x9 = [
   }, // Lunchbox with 0
   'Hidden skyscrapers',
   'Unbidden First Hidden', // And constraint
-  'Look-and-say',  // LookAndSay
+  'Look-and-Say Killer',  // LookAndSay
   {
     ...PUZZLE_INDEX.get('Look-and-Say 2'),
     name: 'Look-and-Say 2 [ContainExact]',  // ContainExact
@@ -174,23 +174,23 @@ const puzzles9x9 = [
     input: '.ContainExact~2~R1C2~R2C2~R3C2~R3C3.ContainExact~6_7~R2C7~R3C7~R3C8.ContainExact~5_5~R6C9~R7C9~R7C8.ContainExact~7_7~R8C2~R8C3~R9C3~R9C4~R9C2.ContainExact~1_1_2_2~R6C2~R7C2~R7C3~R7C4~R8C4.ContainExact~4_4_2~R5C5~R6C5~R7C5~R8C5~R7C6.ContainExact~3_3_3~R4C6~R4C7~R5C7~R6C7~R7C7~R6C8~R5C8.ContainExact~1~R1C7~R2C8~R3C9.ContainExact~8_8~R4C9~R3C8~R2C7~R1C6.ContainExact~4_4~R6C9~R5C8~R4C7~R3C6~R2C5~R1C4.ContainExact~3_3_3~R1C9~R2C8~R3C7~R4C6~R5C5~R6C4~R7C3~R8C2~R9C1.ContainExact~2~R1C1~R2C2~R3C3~R4C4~R5C5~R6C6~R7C7~R8C8~R9C9.ContainExact~1_1_1~R3C1~R4C2~R5C3~R6C4~R7C5~R8C6~R9C7.ContainExact~9~R4C1~R5C2~R6C3~R7C4~R8C5~R9C6.ContainExact~3~R1C4~R2C3~R3C2~R4C1.ContainExact~9_9~R1C6~R2C5~R3C4~R4C3~R5C2~R6C1.ContainExact~8_8_8~R1C7~R2C6~R3C5~R4C4~R5C3~R6C2~R7C1.',
   },
   {
-    ...PUZZLE_INDEX.get('Look-and-say'),
+    ...PUZZLE_INDEX.get('Look-and-Say Killer'),
     name: 'Look-and-say [zero counts]',  // LookAndSay (0-count pairs)
-    comment: "Same as 'Look-and-say' with redundant zero-count pairs appended to two clues.",
+    comment: "Same as 'Look-and-Say Killer' with redundant zero-count pairs appended to two clues.",
     input: '.LookAndSay~1617~R3C1~R2C1~R1C1.LookAndSay~1324~R1C3~R2C3~R2C4~R1C4.LookAndSay~1109~R1C7~R1C8.LookAndSay~1913~R2C9~R2C8~R3C8~R3C7~R3C6.LookAndSay~3518~R3C9~R4C9~R5C9~R5C8~R5C7~R6C7~R6C6.LookAndSay~1112~R7C9~R7C8~R8C8~R8C7~R9C7.LookAndSay~2311~R7C4~R8C4~R8C3~R8C2~R7C2.LookAndSay~26~R7C5~R6C5~R6C4~R5C4.LookAndSay~2113~R6C2~R6C1~R7C1.LookAndSay~28~R7C7~R7C6~R8C6~R9C6.LookAndSay~1422~R5C5~R4C5~R4C4~R4C3.LookAndSay~39~R5C1~R6C2~R7C3~R8C4~R9C5.LookAndSay~2601~R6C9~R7C8~R8C7~R9C6.',
   },
   {  // A zero-count pair contradicting the solution: fails only if the zero
     // count is enforced (the R7C8 cage cell must be a 5).
-    ...PUZZLE_INDEX.get('Look-and-say'),
+    ...PUZZLE_INDEX.get('Look-and-Say Killer'),
     name: 'Look-and-say [zero-count contradiction, no solution]',
     input: '.LookAndSay~1617~R3C1~R2C1~R1C1.LookAndSay~1324~R1C3~R2C3~R2C4~R1C4.LookAndSay~11~R1C7~R1C8.LookAndSay~1913~R2C9~R2C8~R3C8~R3C7~R3C6.LookAndSay~3518~R3C9~R4C9~R5C9~R5C8~R5C7~R6C7~R6C6.LookAndSay~1112~R7C9~R7C8~R8C8~R8C7~R9C7.LookAndSay~2311~R7C4~R8C4~R8C3~R8C2~R7C2.LookAndSay~26~R7C5~R6C5~R6C4~R5C4.LookAndSay~2113~R6C2~R6C1~R7C1.LookAndSay~28~R7C7~R7C6~R8C6~R9C6.LookAndSay~1422~R5C5~R4C5~R4C4~R4C3.LookAndSay~39~R5C1~R6C2~R7C3~R8C4~R9C5.LookAndSay~2605~R6C9~R7C8~R8C7~R9C6.',
     solution: false,
   },
-  'Counting circles',
+  'Clockwork',
   'Bubble Tornado',
-  'Anti-taxicab',
-  'Dutch Flatmates',  // Dutch Flatmates
-  'Fortress sudoku',  // GreaterThan
+  'Anti-Taxi Sudoku X',
+  'Dutch Flat Mates (Kropki)',  // Dutch Flatmates
+  'Fortress',  // GreaterThan
   'Equality cages',  // EqualityCage
   'Regex line',  // Regex
   'Sequence sudoku', // NFA (simple transitions only)
@@ -210,7 +210,7 @@ const puzzles9x9 = [
   withExtraConstraints(
     'Copycat',
     '~R2C2_9'),  // Same value - 2 sets, repeated values
-  'Clone sudoku', // Same value - single cell sets
+  'Clone', // Same value - single cell sets
   'Slingshot sudoku', // ValueIndexing
   'Numbered Rooms vs X-Sums', // Or constraint
   'Count Different (Circles)',  // CountDistinct
@@ -308,7 +308,7 @@ const puzzlesSmallSizes = [
 const puzzlesNonSquareGrids = [
   '6x8: Plain',
   '5x10: Killer Sudoku',  // Killer cages (tests sum optimizer on non-square grids)
-  '6x9: Postcard',  // Indexing, Anti-knight, Whisper
+  'Answers on a Postcard',  // Indexing, Anti-knight, Whisper
   '4x7: Jigsaw',  // Jigsaw
   '4x6: Skyscraper',  // Skyscraper
   '9x8: Plain boxless',  // Boxless rectangular grid
@@ -380,12 +380,12 @@ const puzzles0Indexed = [
     input: '.Shape~9x9~0-10.NoBoxes.Jigsaw~AAAAAAABCDEFFAFABCDEFFFFBBCDEFFBBBBCDEEEGGCBCDDEGGGCCCDDEEGGGGHDIIIIHHHHIIIIIHHHH.Replicate~_____________H.~R1C1_1_2_3_4_5_6_7_8_9.End.~R1C1_3~R2C1_1~R1C9_7~R2C9_5~R3C5_6~R3C6_8~R4C5_1~R4C6_9~R4C3_5~R5C4_9~R8C4_2~R8C5_3~R7C6_3~R8C6_5~R7C1_8~R9C8_9~R8C9_1~R6C9_2',
   },
   {
-    ...PUZZLE_INDEX.get('Killer sudoku'),
+    ...PUZZLE_INDEX.get('Killer'),
     name: 'Killer sudoku [extended range]',  // extended value range (0-10) but restricted grid.
     input: '.Shape~9x9~0-10.Cage~3~R1C1~R1C2.Cage~15~R1C3~R1C4~R1C5.Cage~25~R2C1~R2C2~R3C1~R3C2.Cage~17~R2C3~R2C4.Cage~9~R3C3~R3C4~R4C4.Cage~22~R1C6~R2C5~R2C6~R3C5.Cage~4~R1C7~R2C7.Cage~16~R1C8~R2C8.Cage~15~R1C9~R2C9~R3C9~R4C9.Cage~20~R3C7~R3C8~R4C7.Cage~8~R3C6~R4C6~R5C6.Cage~17~R4C5~R5C5~R6C5.Cage~20~R5C4~R6C4~R7C4.Cage~14~R4C2~R4C3.Cage~6~R4C1~R5C1.Cage~13~R5C2~R5C3~R6C2.Cage~6~R6C3~R7C2~R7C3.Cage~17~R4C8~R5C7~R5C8.Cage~27~R6C1~R7C1~R8C1~R9C1.Cage~8~R8C2~R9C2.Cage~16~R8C3~R9C3.Cage~10~R7C5~R8C4~R8C5~R9C4.Cage~12~R5C9~R6C9.Cage~6~R6C7~R6C8.Cage~20~R6C6~R7C6~R7C7.Cage~15~R8C6~R8C7.Cage~14~R7C8~R7C9~R8C8~R8C9.Cage~13~R9C5~R9C6~R9C7.Cage~17~R9C8~R9C9.Replicate~_____________H.~R1C1_1_2_3_4_5_6_7_8_9.End',
   },
   {
-    ...PUZZLE_INDEX.get('Killer sudoku, hard'),
+    ...PUZZLE_INDEX.get('Killing with flowers'),
     name: 'Killer sudoku [extended range, hard]',  // extended value range (0-10) but restricted grid.
     input: '.Shape~9x9~0-10.Cage~28~R1C1~R1C2~R2C2~R2C3~R2C4.Cage~19~R1C3~R1C4~R1C5~R2C5~R2C6.Cage~24~R1C6~R1C7~R1C8~R2C7.Cage~20~R1C9~R2C8~R2C9~R3C8~R4C8.Cage~19~R2C1~R3C1~R3C2~R4C1.Cage~23~R3C3~R3C4~R3C5~R3C6~R4C3.Cage~19~R3C7~R4C5~R4C6~R4C7~R5C7.Cage~26~R3C9~R4C9~R5C8~R5C9~R6C8.Cage~28~R4C2~R5C1~R5C2~R6C1~R7C1.Cage~24~R4C4~R5C4~R5C5~R5C6~R6C6.Cage~32~R5C3~R6C3~R6C4~R6C5~R7C3.Cage~24~R6C2~R7C2~R8C1~R8C2~R9C1.Cage~29~R6C7~R7C4~R7C5~R7C6~R7C7.Cage~19~R6C9~R7C8~R7C9~R8C9.Cage~22~R8C3~R9C2~R9C3~R9C4.Cage~21~R8C4~R8C5~R9C5~R9C6~R9C7.Cage~28~R8C6~R8C7~R8C8~R9C8~R9C9.Replicate~_____________H.~R1C1_1_2_3_4_5_6_7_8_9.End',
   },

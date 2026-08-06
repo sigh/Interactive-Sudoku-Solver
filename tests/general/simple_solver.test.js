@@ -14,8 +14,8 @@ const { SudokuConstraint } = await import('../../js/sudoku_constraint.js' + self
 const getPuzzle = (name) => DISPLAYED_EXAMPLES.find(p => p.name === name);
 
 const CLASSIC_SUDOKU = getPuzzle('Classic sudoku');
-const THERMOSUDOKU = getPuzzle('Thermosudoku');
-const KILLER_SUDOKU = getPuzzle('Killer sudoku');
+const THERMOSUDOKU = getPuzzle('Thermo');
+const KILLER_SUDOKU = getPuzzle('Killer');
 const JIGSAW = getPuzzle('Jigsaw');
 
 // A 4x4 puzzle with multiple solutions (small enough to count quickly)

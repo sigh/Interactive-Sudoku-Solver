@@ -6,7 +6,7 @@ Static data files used by the UI and tests: example puzzles, puzzle collections 
 
 | File | Purpose |
 | --- | --- |
-| [example_puzzles.js](example_puzzles.js) | Puzzle definitions for the UI example selector. Exports `PUZZLE_INDEX` (lookup by ID) and `DISPLAYED_EXAMPLES` (showcase list). Each entry has `name`, `input` (constraint string), `solution`, and optional `src` (attribution link). Covers 40+ variants (classic, thermo, killer, arrow, jigsaw, whisper, etc.). |
+| [example_puzzles.js](example_puzzles.js) | Puzzle definitions for the UI example selector. Exports `DISPLAYED_EXAMPLE_GROUPS` (the showcase list as `{ name, puzzles }` groups, one per dropdown optgroup), `DISPLAYED_EXAMPLES` (the same puzzles, flattened), and `PUZZLE_INDEX` (lookup by name). Each entry has `name`, `input` (constraint string), `solution`, and optionally `displayName`/`src`. Covers 60+ variants (classic, thermo, killer, arrow, jigsaw, whisper, chaos construction, etc.). |
 | [collections.js](collections.js) | Puzzle collections for benchmarking and testing. Used by the debug panel's benchmark runner and by end-to-end tests. Path-input entries (`.iss`/`.js`) carry an explicit `constraintTypes` tag list; [`tools/dev/sync_derived_puzzle_data.js`](../tools/dev/README.md) keeps it in sync. |
 | [jigsaw_layouts.js](jigsaw_layouts.js) | Valid and easily-invalid jigsaw region layouts for 9×9 grids. Each layout is an 81-character string where each character is a region ID. |
 | [jigsaw_box_layouts.js](jigsaw_box_layouts.js) | Additional valid jigsaw layouts using box-based region assignments. |
@@ -25,6 +25,7 @@ Static data files used by the UI and tests: example puzzles, puzzle collections 
 | `src` | optional | Attribution link(s) — a single URL or an **array**. Ideally provide two: a machine-decodable puzzle link (SudokuPad / f-puzzles / Penpa, extractable by the decode tooling) and a step-by-step solution (usually a YouTube solve). Put the **YouTube link first** — the UI surfaces only the first source, and the walkthrough is the more useful one to open. |
 | `constraintTypes` | only for path inputs | Constraint-type tags for the selector. Derived automatically via `SudokuParser.extractConstraintTypes(input)` for inline constraint strings, but a `.iss`/`.js` path can't be parsed that way, so those entries must list them explicitly — kept equal to the extractor's output by [`tools/dev/sync_derived_puzzle_data.js`](../tools/dev/README.md) (`--dry-run` to check). |
 | `comment` | optional | Free-text note about the entry — why it is a variant/re-encoding, what solver feature it exercises, or any caveat. Not parsed; for humans. |
+| `displayName` | optional (displayed examples only) | Dropdown label when it should differ from `name` — typically the constraint headline (e.g. `Renban` for a puzzle named `'Leven`). The dropdown shows `displayName ?? name`. |
 
 **Variant naming**: when an entry is a modified or re-encoded version of a puzzle
 (so its `name` would otherwise collide with, or misrepresent itself as, the
