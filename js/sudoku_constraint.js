@@ -1564,6 +1564,10 @@ export class SudokuConstraint {
 
     constructor(size) {
       super(size);
+      if (arguments.length > 1) {
+        throw new Error(
+          `RegionSize accepts one argument: the region cell count; got ${arguments.length}`);
+      }
       this.size = +size;
     }
   }

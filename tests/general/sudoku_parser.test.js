@@ -327,6 +327,12 @@ await runTest('parseString should parse AntiKnight', () => {
   assertConstraintCount(result, 'AntiKnight', 1);
 });
 
+await runTest('parseString rejects excess RegionSize arguments', () => {
+  assert.throws(
+    () => SudokuParser.parseString('.Shape~6x6.RegionSize~2~3.'),
+    /RegionSize accepts one argument: the region cell count; got 2/);
+});
+
 await runTest('parseString should parse Cage', () => {
   const result = SudokuParser.parseString('.Cage~15~R1C1~R1C2~R1C3.');
 

@@ -115,6 +115,26 @@ await runTest('lint_sandbox_script flags numValues/Shape mismatch and id templat
   assert.match(report(items), /manual-cell-id-template/);
 });
 
+await runTest('value-range lint uses the returned host Shape, not an earlier local Shape', () => {
+  const items = lintSource(SCRIPT_HEADER
+    + "const binaryShape = new Shape('1x1', 2);\n"
+    + 'const binary = NFA.encodeSpec(binarySpec, binaryShape);\n'
+    + 'const digits = NFA.encodeSpec(digitSpec, 9);\n'
+    + "const shape = new Shape('9x9');\n"
+    + 'return [shape, new NFA(binary), new NFA(digits)];\n');
+  assert.doesNotMatch(report(items), /value-offset-dropped|num-values-mismatch/);
+});
+
+await runTest('value-range lint resolves a host Shape through a named return array', () => {
+  const items = lintSource(SCRIPT_HEADER
+    + "const binaryShape = new Shape('1x1', 2);\n"
+    + 'const digits = NFA.encodeSpec(digitSpec, 9);\n'
+    + "const shape = new Shape('9x9');\n"
+    + 'const constraints = [shape, new NFA(digits)];\n'
+    + 'return constraints;\n');
+  assert.doesNotMatch(report(items), /value-offset-dropped|num-values-mismatch/);
+});
+
 await runTest('lint_sandbox_script ignores code-shaped text inside strings', () => {
   // The rules walk the AST, so idioms quoted in strings are not findings.
   const items = lintSource(SCRIPT_HEADER
@@ -132,6 +152,32 @@ await runTest('lint_sandbox_script lint-ok suppresses only from a real comment',
   const suppressed = lintSource(SCRIPT_HEADER
     + "return [new Shape('9x9'), new Replicate('x')]; // lint-ok: bare-replicate-constructor\n");
   assert.equal(report(suppressed), '');
+});
+
+await runTest('bare-replicate-constructor accepts only canonical custom origins', () => {
+  const clean = lintSource(SCRIPT_HEADER
+    + "const graph = cellGraph('9x9');\n"
+    + "const origin = 'R2C2';\n"
+    + "const targets = ['R2C2', 'R3C2'];\n"
+    + 'return [new Replicate([template],\n'
+    + '  Replicate.encodeTargetCells(targets, origin, graph), origin)];\n',
+  { only: new Set(['bare-replicate-constructor']) });
+  assert.equal(clean.length, 0, report(clean));
+
+  const flaggedBodies = [
+    "return [new Replicate([template], 'raw-bitset', origin)];\n",
+    'return [new Replicate([template],\n'
+      + '  Replicate.encodeTargetCells(targets, encodedOrigin, graph), origin)];\n',
+    'return [new Replicate([template],\n'
+      + "  Replicate.encodeTargetCells(targets, 'R1C1', graph), 'R1C1')];\n",
+    'return [new Replicate([template],\n'
+      + '  other.encodeTargetCells(targets, origin, graph), origin)];\n',
+  ];
+  for (const body of flaggedBodies) {
+    const items = lintSource(SCRIPT_HEADER + body,
+      { only: new Set(['bare-replicate-constructor']) });
+    assert.equal(items.length, 1, `${body}\n${report(items)}`);
+  }
 });
 
 await runTest('lint_sandbox_script reports a syntax error instead of linting', () => {
@@ -307,6 +353,39 @@ await runTest('lint_sandbox_script flags row-major arithmetic into Var cell()', 
     + 'const unrelated = table.cell(r * 9 + c);\n'
     + "return [new Shape('1x1'), GRID];\n");
   assert.doesNotMatch(report(clean), /manual-var-cell-arithmetic/);
+});
+
+await runTest('constraint-constructor-arity explains RegionSize dimensions', () => {
+  const items = lintSource(SCRIPT_HEADER
+    + "return [new Shape('6x6'), new RegionSize(2, 3)];\n",
+  { only: new Set(['constraint-constructor-arity']) });
+  assert.equal(items.length, 1, report(items));
+  assert.match(report(items), /RegionSize accepts 1 argument: the region cell count/);
+  assert.match(report(items), /RegionSize\(rows \* columns\)/);
+});
+
+await runTest('constraint-constructor-arity covers finite constructor families', () => {
+  const items = lintSource(SCRIPT_HEADER
+    + "return [new Shape('6x6', 6, 'ignored'),\n"
+    + "  new Var('A', 'Aux', 6, 'ignored'),\n"
+    + "  new AntiKnight('ignored'),\n"
+    + "  new LittleKiller('R1C1,1', 10, 'ignored')];\n",
+  { only: new Set(['constraint-constructor-arity']) });
+  assert.deepEqual(items.map((item) => item.line), [6, 7, 8, 9]);
+  assert.match(report(items), /Shape accepts at most 2 arguments/);
+  assert.match(report(items), /Var accepts at most 3 arguments/);
+  assert.match(report(items), /AntiKnight accepts no arguments/);
+  assert.match(report(items), /LittleKiller accepts at most 2 arguments/);
+});
+
+await runTest('constraint-constructor-arity leaves valid and variadic calls alone', () => {
+  const items = lintSource(SCRIPT_HEADER
+    + 'const args = [2, 3];\n'
+    + "return [new Shape('6x6'), new RegionSize(6), new AntiKnight(),\n"
+    + "  new Arrow('R1C1', 'R1C2', 'R1C3'),\n"
+    + "  new Sum(10, 'R1C1', 'R1C2'), new RegionSize(...args)];\n",
+  { only: new Set(['constraint-constructor-arity']) });
+  assert.equal(items.length, 0, report(items));
 });
 
 await runTest('lint_constraints suggests native constraints per key group', () => {

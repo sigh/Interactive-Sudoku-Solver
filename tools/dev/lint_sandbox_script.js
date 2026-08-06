@@ -3,7 +3,8 @@
 // These suggestions surface places where sandbox idioms may have been missed:
 // hand-built/parsing cell ids, local neighbour helpers that duplicate cellGraph(),
 // numValues literals that disagree with the declared Shape, hand-assembled Sum
-// coefficient strings, and missing rules prose. The rules walk a parsed AST
+// coefficient strings, excess constraint-constructor arguments, and missing
+// rules prose. The rules walk a parsed AST
 // (comments come from the parser too), so code-shaped text inside strings and
 // comments cannot masquerade as code. Every rule here is `heuristic` tier:
 // structure narrows the candidates, but a human decides. They are advisory by
@@ -130,6 +131,24 @@ const memberName = (node) =>
 const calleeName = (node) =>
   node.callee.type === 'Identifier' ? node.callee.name : memberName(node.callee);
 
+// AST equality without source positions or literal spelling. Used when two
+// arguments must be the same expression, even if their whitespace or quote
+// style differs.
+const sameExpression = (a, b) => {
+  if (a === b) return true;
+  if (!a || !b || typeof a !== 'object' || typeof b !== 'object') return false;
+  if (Array.isArray(a) || Array.isArray(b)) {
+    return Array.isArray(a) && Array.isArray(b) && a.length === b.length
+      && a.every((value, i) => sameExpression(value, b[i]));
+  }
+  const ignored = new Set(['start', 'end', 'loc', 'raw']);
+  const aKeys = Object.keys(a).filter(key => !ignored.has(key));
+  const bKeys = Object.keys(b).filter(key => !ignored.has(key));
+  return aKeys.length === bKeys.length
+    && aKeys.every((key, i) => key === bKeys[i]
+      && sameExpression(a[key], b[key]));
+};
+
 const isCallTo = (node, name) =>
   node?.type === 'CallExpression' && calleeName(node) === name;
 
@@ -183,7 +202,31 @@ const numericConstants = (ctx) => {
   return consts;
 };
 
-// The value range declared by the script's `new Shape(...)`: numValues and
+const isShapeCall = (node) => node?.type === 'NewExpression'
+  && node.callee.type === 'Identifier' && node.callee.name === 'Shape';
+
+// Resolve the host Shape from the returned constraint array. Scripts may also
+// construct smaller Shape objects solely as value-range descriptors for an NFA;
+// lexical order cannot distinguish those from the Shape that defines the puzzle.
+const returnedShapeCall = (ctx) => {
+  const bindings = new Map(ctx.nodesOfType('VariableDeclarator')
+    .filter((decl) => decl.id.type === 'Identifier' && decl.init)
+    .map((decl) => [decl.id.name, decl.init]));
+  const resolve = (node) => node?.type === 'Identifier' ? bindings.get(node.name) : node;
+
+  for (const statement of ctx.ast.body) {
+    if (statement.type !== 'ReturnStatement') continue;
+    const returned = resolve(statement.argument);
+    if (returned?.type !== 'ArrayExpression') continue;
+    for (const element of returned.elements) {
+      const constraint = resolve(element);
+      if (isShapeCall(constraint)) return constraint;
+    }
+  }
+  return null;
+};
+
+// The value range declared by the script's returned `new Shape(...)`: numValues and
 // valueOffset, both null when the alphabet is set by an expression that cannot
 // be resolved statically, and the whole result null when there is no valid
 // Shape to check against. The spec string is rebuilt exactly as the Shape
@@ -192,8 +235,8 @@ const numericConstants = (ctx) => {
 // 15` alphabets are resolved, since naming the alphabet is the common way to
 // widen it.
 const parseDeclaredShape = (ctx) => {
-  const call = ctx.nodesOfType('NewExpression')
-    .find((n) => n.callee.type === 'Identifier' && n.callee.name === 'Shape');
+  const call = returnedShapeCall(ctx)
+    ?? ctx.nodesOfType('NewExpression').find(isShapeCall);
   const spec = stringValue(call?.arguments[0]);
   if (spec === null) return null;
 
@@ -308,6 +351,44 @@ const OUTSIDE_CLUE_CLASSES = new Set(
     .filter(([, cls]) =>
       typeof cls === 'function' && cls.prototype instanceof OutsideConstraintBase)
     .map(([name]) => name));
+
+// --- constraint-constructor-arity: finite public constructor signatures. ---
+
+// Most cell constraints deliberately end in `...cells` and have no maximum.
+// Keep only constructors whose public API has a finite upper bound. The
+// zero-argument entries inherit the permissive base constructor, but are
+// configuration switches whose handlers do not consume arguments.
+const CONSTRAINT_MAX_ARITY = new Map([
+  ['Container', 1],
+  ['Or', 1],
+  ['And', 1],
+  ['Replicate', 3],
+  ['RegionSize', 1],
+  ['Shape', 2],
+  ['FullRankTies', 1],
+  ['Diagonal', 1],
+  ['ConnectedValues', 2],
+  ['Var', 3],
+  ...[...OUTSIDE_CLUE_CLASSES].map((name) => [name, 2]),
+  ...[
+    'End',
+    'NoBoxes',
+    'ChaosConstruction',
+    'RegionSameValues',
+    'StrictKropki',
+    'StrictXV',
+    'Windoku',
+    'DisjointSets',
+    'AntiKnight',
+    'Doppelganger',
+    'AntiKing',
+    'AntiTaxicab',
+    'AntiConsecutive',
+    'GlobalEntropy',
+    'GlobalMod',
+    'DutchFlatmates',
+  ].map((name) => [name, 0]),
+]);
 
 // --- overlay-map-use-array / overlay-at-make-cell-id: pass-through shapes. ---
 
@@ -506,10 +587,28 @@ const RULES = [
     summary: 'bare new Replicate found; prefer graph.makeReplicate() or overlay.makeReplicate()',
     docs: 'The graph or overlay already owns the cell ordering and locator needed\n'
       + 'to encode Replicate targets. Its makeReplicate() helper keeps that wire-format\n'
-      + 'plumbing out of sandbox scripts.',
+      + 'plumbing out of sandbox scripts. A direct constructor is accepted only for\n'
+      + 'the custom-origin form the helpers cannot express: exactly three arguments,\n'
+      + 'with Replicate.encodeTargetCells(targets, origin, locator) feeding the\n'
+      + 'bitset and the same origin expression passed to the constructor. R1C1 is\n'
+      + 'still the graph helper\'s ordinary origin and does not need this exception.',
     check(ctx) {
       return ctx.nodesOfType('NewExpression')
-        .filter((n) => calleeName(n) === 'Replicate');
+        .filter((n) => {
+          if (calleeName(n) !== 'Replicate') return false;
+          if (n.arguments.length !== 3 || stringValue(n.arguments[2]) === 'R1C1') {
+            return true;
+          }
+          const encoded = n.arguments[1];
+          return !(encoded.type === 'CallExpression'
+            && encoded.callee.type === 'MemberExpression'
+            && !encoded.callee.computed
+            && encoded.callee.object.type === 'Identifier'
+            && encoded.callee.object.name === 'Replicate'
+            && memberName(encoded.callee) === 'encodeTargetCells'
+            && encoded.arguments.length === 3
+            && sameExpression(encoded.arguments[1], n.arguments[2]));
+        });
     },
   },
   {
@@ -715,6 +814,43 @@ const RULES = [
           message: `${varName}.cell(${ctx.text(index)}) hand-rolls `
             + 'row-major indexing; read the group through makeOverlay()/at() instead',
         });
+      }
+      return findings;
+    },
+  },
+  {
+    code: 'constraint-constructor-arity',
+    summary: 'constraint constructor has excess arguments that its public API does not consume',
+    docs: 'Checks every constraint constructor with a finite maximum: fixed-arity\n'
+      + 'constructors, Shape (dimensions plus one optional value range), all\n'
+      + 'outside-clue constructors, and argument-free configuration switches.\n'
+      + 'Genuinely variadic cell constraints are excluded. Calls containing a\n'
+      + 'spread are left alone because their final arity is not statically known.\n'
+      + 'Only excess arguments are reported: several constructors intentionally\n'
+      + 'default omitted arguments. In particular, RegionSize takes one cell-count\n'
+      + 'argument, not separate row and column dimensions.',
+    check(ctx) {
+      const findings = [];
+      for (const expr of ctx.nodesOfType('NewExpression')) {
+        const name = calleeName(expr);
+        const maxArity = CONSTRAINT_MAX_ARITY.get(name);
+        if (maxArity === undefined
+          || expr.arguments.some((arg) => arg.type === 'SpreadElement')
+          || expr.arguments.length <= maxArity) continue;
+
+        const supplied = expr.arguments.length;
+        const message = name === 'RegionSize'
+          ? `RegionSize accepts 1 argument: the region cell count. ${supplied} `
+            + 'arguments were supplied; use RegionSize(rows * columns), or omit '
+            + 'it to use the Shape\'s default boxes'
+          : maxArity === 0
+            ? `${name} accepts no arguments; ${supplied} `
+              + `${supplied === 1 ? 'was' : 'were'} supplied, so they cannot `
+              + 'affect the intended constraint'
+            : `${name} accepts at most ${maxArity} argument${maxArity === 1 ? '' : 's'}; `
+            + `${supplied} were supplied, so the trailing `
+            + `${supplied - maxArity} cannot affect the intended constraint`;
+        findings.push({ node: expr, message });
       }
       return findings;
     },

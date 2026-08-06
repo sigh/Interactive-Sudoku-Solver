@@ -8,6 +8,12 @@ ensureGlobalEnvironment();
 const { CellGeometry } = await import('../../js/cell_geometry.js');
 const { SudokuConstraintBase, SudokuConstraint } = await import('../../js/sudoku_constraint.js');
 
+await runTest('RegionSize rejects excess constructor arguments', () => {
+  assert.throws(
+    () => new SudokuConstraint.RegionSize(2, 3),
+    /RegionSize accepts one argument: the region cell count; got 2/);
+});
+
 // ============================================================================
 // Region generation
 // ============================================================================
