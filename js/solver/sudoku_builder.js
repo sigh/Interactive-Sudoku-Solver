@@ -874,6 +874,36 @@ export class SudokuBuilder {
             /* strict = */ true);
           break;
 
+        case 'LookAndSay': {
+          const clue = constraint.clue;
+          const values = [];
+          const excluded = [];
+          for (let i = 0; i < clue.length; i += 2) {
+            const count = +clue[i];
+            const value = +clue[i + 1];
+            if (count && values.includes(value)) {
+              throw new InvalidConstraintError(
+                `Look-and-say clue has multiple pairs for value ${value}: ${clue}`);
+            }
+            if (count === 0) excluded.push(value);
+            else values.push(...Array(count).fill(value));
+          }
+          cells = constraint.cells.map(c => geometry.parseCellId(c).cellIndex);
+          if (excluded.length) {
+            const allowed = [];
+            for (let v = geometry.minValue(); v <= geometry.maxValue(); v++) {
+              if (!excluded.includes(v)) allowed.push(v);
+            }
+            yield new HandlerModule.GivenCandidates(
+              new Map(cells.map(c => [c, allowed])));
+          }
+          if (values.length) {
+            yield new HandlerModule.RequiredValues(
+              cells, values, /* strict = */ true);
+          }
+          break;
+        }
+
         case 'ConnectedValues':
           {
             let cellOffset = 0;

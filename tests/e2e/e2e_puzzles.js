@@ -166,7 +166,26 @@ const puzzles9x9 = [
   }, // Lunchbox with 0
   'Hidden skyscrapers',
   'Unbidden First Hidden', // And constraint
-  'Look-and-say',
+  'Look-and-say',  // LookAndSay
+  {
+    ...PUZZLE_INDEX.get('Look-and-Say 2'),
+    name: 'Look-and-Say 2 [ContainExact]',  // ContainExact
+    comment: "Same as 'Look-and-Say 2' with the clues encoded as ContainExact value lists.",
+    input: '.ContainExact~2~R1C2~R2C2~R3C2~R3C3.ContainExact~6_7~R2C7~R3C7~R3C8.ContainExact~5_5~R6C9~R7C9~R7C8.ContainExact~7_7~R8C2~R8C3~R9C3~R9C4~R9C2.ContainExact~1_1_2_2~R6C2~R7C2~R7C3~R7C4~R8C4.ContainExact~4_4_2~R5C5~R6C5~R7C5~R8C5~R7C6.ContainExact~3_3_3~R4C6~R4C7~R5C7~R6C7~R7C7~R6C8~R5C8.ContainExact~1~R1C7~R2C8~R3C9.ContainExact~8_8~R4C9~R3C8~R2C7~R1C6.ContainExact~4_4~R6C9~R5C8~R4C7~R3C6~R2C5~R1C4.ContainExact~3_3_3~R1C9~R2C8~R3C7~R4C6~R5C5~R6C4~R7C3~R8C2~R9C1.ContainExact~2~R1C1~R2C2~R3C3~R4C4~R5C5~R6C6~R7C7~R8C8~R9C9.ContainExact~1_1_1~R3C1~R4C2~R5C3~R6C4~R7C5~R8C6~R9C7.ContainExact~9~R4C1~R5C2~R6C3~R7C4~R8C5~R9C6.ContainExact~3~R1C4~R2C3~R3C2~R4C1.ContainExact~9_9~R1C6~R2C5~R3C4~R4C3~R5C2~R6C1.ContainExact~8_8_8~R1C7~R2C6~R3C5~R4C4~R5C3~R6C2~R7C1.',
+  },
+  {
+    ...PUZZLE_INDEX.get('Look-and-say'),
+    name: 'Look-and-say [zero counts]',  // LookAndSay (0-count pairs)
+    comment: "Same as 'Look-and-say' with redundant zero-count pairs appended to two clues.",
+    input: '.LookAndSay~1617~R3C1~R2C1~R1C1.LookAndSay~1324~R1C3~R2C3~R2C4~R1C4.LookAndSay~1109~R1C7~R1C8.LookAndSay~1913~R2C9~R2C8~R3C8~R3C7~R3C6.LookAndSay~3518~R3C9~R4C9~R5C9~R5C8~R5C7~R6C7~R6C6.LookAndSay~1112~R7C9~R7C8~R8C8~R8C7~R9C7.LookAndSay~2311~R7C4~R8C4~R8C3~R8C2~R7C2.LookAndSay~26~R7C5~R6C5~R6C4~R5C4.LookAndSay~2113~R6C2~R6C1~R7C1.LookAndSay~28~R7C7~R7C6~R8C6~R9C6.LookAndSay~1422~R5C5~R4C5~R4C4~R4C3.LookAndSay~39~R5C1~R6C2~R7C3~R8C4~R9C5.LookAndSay~2601~R6C9~R7C8~R8C7~R9C6.',
+  },
+  {  // A zero-count pair contradicting the solution: fails only if the zero
+    // count is enforced (the R7C8 cage cell must be a 5).
+    ...PUZZLE_INDEX.get('Look-and-say'),
+    name: 'Look-and-say [zero-count contradiction, no solution]',
+    input: '.LookAndSay~1617~R3C1~R2C1~R1C1.LookAndSay~1324~R1C3~R2C3~R2C4~R1C4.LookAndSay~11~R1C7~R1C8.LookAndSay~1913~R2C9~R2C8~R3C8~R3C7~R3C6.LookAndSay~3518~R3C9~R4C9~R5C9~R5C8~R5C7~R6C7~R6C6.LookAndSay~1112~R7C9~R7C8~R8C8~R8C7~R9C7.LookAndSay~2311~R7C4~R8C4~R8C3~R8C2~R7C2.LookAndSay~26~R7C5~R6C5~R6C4~R5C4.LookAndSay~2113~R6C2~R6C1~R7C1.LookAndSay~28~R7C7~R7C6~R8C6~R9C6.LookAndSay~1422~R5C5~R4C5~R4C4~R4C3.LookAndSay~39~R5C1~R6C2~R7C3~R8C4~R9C5.LookAndSay~2605~R6C9~R7C8~R8C7~R9C6.',
+    solution: false,
+  },
   'Counting circles',
   'Bubble Tornado',
   'Anti-taxicab',
@@ -342,7 +361,7 @@ const puzzles0Indexed = [
   '± Information',  // V, StrictXV, Diagonal
   '0-indexed: Hidden skyscrapers',  // HiddenSkyscraper
   '0-indexed: Quadruple X',  // Quad, Diagonal
-  '0-indexed: Look-and-say',  // ContainExact
+  '0-indexed: Look-and-say',  // LookAndSay (0 as a value)
   '0-indexed: Equality cages',  // EqualityCage
   '0-indexed: Skyscraper',  // Skyscraper
   'Hippo Birdie',  // CountingCircles

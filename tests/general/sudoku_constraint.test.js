@@ -1469,3 +1469,23 @@ await runTest('ConnectedValues accepts an empty group prefix (the main grid)', (
 });
 
 logSuiteComplete('ConnectedValues');
+
+// ============================================================================
+// LookAndSay
+// ============================================================================
+
+await runTest('LookAndSay serializes its clue', () => {
+  const constraint = new SudokuConstraint.LookAndSay(1223, 'R1C1', 'R1C2', 'R1C3');
+  assert.equal(constraint.clue, '1223');
+  assert.equal(constraint.toString(), '.LookAndSay~1223~R1C1~R1C2~R1C3');
+  assert.equal(constraint.chipLabel(), 'Look and Say (1223)');
+});
+
+await runTest('LookAndSay rejects malformed clues at construction', () => {
+  // Odd number of digits.
+  assert.throws(() => new SudokuConstraint.LookAndSay('234', 'R1C1', 'R1C2'));
+  // Non-digit characters.
+  assert.throws(() => new SudokuConstraint.LookAndSay('2x', 'R1C1', 'R1C2'));
+});
+
+logSuiteComplete('LookAndSay');

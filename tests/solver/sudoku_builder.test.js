@@ -382,6 +382,74 @@ await runTest('Quad supports var-cell 2x2 squares', () => {
   assert.deepEqual([...requiredHandlers[0].cells], [93, 94, 102, 103]);
 });
 
+await runTest('LookAndSay produces strict RequiredValues handler', () => {
+  const constraint = SudokuParser.parseString('.LookAndSay~23~R1C1~R1C2~R1C3');
+  const handlers = buildHandlers(constraint);
+  const requiredHandlers = handlers.filter(h =>
+    h instanceof HandlerModule.RequiredValues);
+
+  assert.equal(requiredHandlers.length, 1);
+  assert.deepEqual(requiredHandlers[0].values(), [3, 3]);
+  assert.ok(requiredHandlers[0].isStrict());
+  assert.deepEqual([...requiredHandlers[0].cells], [0, 1, 2]);
+});
+
+await runTest('LookAndSay expands multi-pair clues', () => {
+  const constraint = new SudokuConstraint.Container([
+    new SudokuConstraint.LookAndSay('1223', 'R1C1', 'R1C2', 'R1C3'),
+  ]);
+  const handlers = buildHandlers(constraint);
+  const requiredHandlers = handlers.filter(h =>
+    h instanceof HandlerModule.RequiredValues);
+
+  assert.equal(requiredHandlers.length, 1);
+  assert.deepEqual(requiredHandlers[0].values(), [2, 3, 3]);
+});
+
+await runTest('LookAndSay zero count excludes the value', () => {
+  const constraint = new SudokuConstraint.Container([
+    new SudokuConstraint.LookAndSay('2103', 'R1C1', 'R1C2', 'R1C3'),
+  ]);
+  const handlers = buildHandlers(constraint);
+  const requiredHandlers = handlers.filter(h =>
+    h instanceof HandlerModule.RequiredValues);
+  assert.equal(requiredHandlers.length, 1);
+  assert.deepEqual(requiredHandlers[0].values(), [1, 1]);
+  assert.ok(hasHandler(handlers, 'GivenCandidates'));
+
+  // A zero count over a full row is unsatisfiable.
+  const rowConstraint = new SudokuConstraint.Container([
+    new SudokuConstraint.LookAndSay(
+      '03', ...Array.from({ length: 9 }, (_, i) => `R1C${i + 1}`)),
+  ]);
+  const solver = SudokuBuilder.build(rowConstraint);
+  assert.equal(solver.nthSolution(0), null);
+});
+
+await runTestCases('LookAndSay invalid clue throws', [
+  ['multiple counted pairs for one value', '1313'],
+], (clue) => {
+  const constraint = new SudokuConstraint.Container([
+    new SudokuConstraint.LookAndSay(clue, 'R1C1', 'R1C2'),
+  ]);
+  assert.throws(
+    () => buildHandlers(constraint),
+    { name: 'InvalidConstraintError' },
+  );
+});
+
+await runTestCases('LookAndSay unsatisfiable clue has no solution', [
+  ['more values than cells', '33'],
+  ['required value outside grid range', '10'],
+  ['contradictory zero and non-zero pairs', '0313'],
+], (clue) => {
+  const constraint = new SudokuConstraint.Container([
+    new SudokuConstraint.LookAndSay(clue, 'R1C1', 'R1C2'),
+  ]);
+  const solver = SudokuBuilder.build(constraint);
+  assert.equal(solver.nthSolution(0), null);
+});
+
 await runTest('Between produces Between handler', () => {
   const constraint = new SudokuConstraint.Container([
     new SudokuConstraint.Between('R1C1', 'R2C1', 'R3C1'),

@@ -2499,6 +2499,37 @@ export class SudokuConstraint {
     }
   };
 
+  static LookAndSay = class LookAndSay extends SudokuConstraintBase {
+    static DESCRIPTION = (`
+      The clue is read as (count, value) pairs: a clue of 23 means the
+      cells contain exactly two 3s, and 1223 means exactly one 2 and
+      exactly two 3s. A count of zero means the value must not appear.
+      Values not named by the clue are unrestricted.`);
+    static CATEGORY = 'LinesAndSets';
+    static DISPLAY_CONFIG = {
+      displayClass: 'ShadedRegion',
+      pattern: ShadedRegionOptions.DIAGONAL_PATTERN,
+      labelField: 'clue',
+    };
+    static ARGUMENT_CONFIG = {
+      label: 'clue',
+    };
+
+    constructor(clue, ...cells) {
+      super(clue, ...cells);
+      this.cells = cells;
+      this.clue = String(clue);
+      if (!/^(\d\d)+$/.test(this.clue)) {
+        throw Error(
+          'Look-and-say clue must be (count, value) digit pairs: ' + clue);
+      }
+    }
+
+    chipLabel() {
+      return `Look and Say (${this.clue})`;
+    }
+  };
+
   static ConnectedValues = class ConnectedValues extends SudokuConstraintBase {
     static DESCRIPTION = (`
       The cells of the given cell group which contain any of the
