@@ -160,4 +160,26 @@ await runTest('offset=0: unchanged behavior', () => {
   assert.equal(grid[1], valueMask(1, 2));
 });
 
+await runTest('total exactly at the minimum is reachable, not a rejection', () => {
+  // 3 cells, sum=10, loop. Domains {2,5},{3,4,9},{5,9}. The mins 2+3+5 = 10
+  // are a valid single segment, but the minimum is also the only multiple of
+  // 10 at or below the maximum total (5+9+9 = 23), so an exclusive bound on
+  // that multiple rejects a line that has a solution.
+  const context = new GridTestContext({ gridSize: [1, 9], numValues: 9 });
+  const handler = new SumLine([0, 1, 2], true, 10);
+  context.initializeHandler(handler);
+
+  const grid = context.grid;
+  grid[0] = valueMask(2, 5);
+  grid[1] = valueMask(3, 4, 9);
+  grid[2] = valueMask(5, 9);
+
+  const acc = createAccumulator();
+  assert.equal(handler.enforceConsistency(grid, acc), true);
+  // 2, 3 and 5 are the assignment that works, so none may be pruned.
+  assert.equal(grid[0] & valueMask(2), valueMask(2));
+  assert.equal(grid[1] & valueMask(3), valueMask(3));
+  assert.equal(grid[2] & valueMask(5), valueMask(5));
+});
+
 logSuiteComplete('sum_line.test.js');

@@ -2599,9 +2599,10 @@ export class SumLine extends SudokuConstraintHandler {
     const maxRemainder = maxTotal % sum;
     if (maxRemainder === 0) return true;
 
-    // Otherwise for the total to be a multiple of sum, the min and max must be
-    // different integers when divided by sum.
-    return minTotal < maxTotal - maxRemainder;
+    // Otherwise the total must reach the largest multiple of sum at or below
+    // maxTotal. Inclusive: when minTotal is exactly that multiple, taking every
+    // cell's minimum is a valid total, not a rejection.
+    return minTotal <= maxTotal - maxRemainder;
   }
 
   enforceConsistency(grid, pQueue) {
