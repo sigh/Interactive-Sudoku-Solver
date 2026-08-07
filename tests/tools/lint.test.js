@@ -606,6 +606,29 @@ await runTest('lint_constraints does not stamp alternatives inside an Or', async
   assert.doesNotMatch(report(conditional), /stamped-copies-without-replicate/);
 });
 
+await runTest('lint_constraints does not read Or-scoped Pairs as a flat all-different',
+  async () => {
+    const setup = "const shape = new Shape('9x9');\n"
+      + 'const ne = Pair.fnToKey((a, b) => a !== b, shape);\n';
+    // "these two cell sets differ": each not-equal Pair is one branch's
+    // hypothesis, so rewriting them as AllDifferent would assert them always.
+    const conditional = await lintScript(setup
+      + "const A = ['R1C1', 'R1C2', 'R1C3'];\n"
+      + "const B = ['R2C1', 'R2C2', 'R2C3'];\n"
+      + 'const branches = A.map(a => new And(B.map(b => new Pair(ne, a, b))));\n'
+      + 'return [shape, new Or(branches)];\n');
+    assert.doesNotMatch(report(conditional), /pair-all-different/);
+
+    // Asserted pairs still fire, and a mix counts only the asserted ones.
+    const mixed = await lintScript(setup
+      + "const cells = ['R1C1', 'R1C2', 'R1C3'];\n"
+      + 'const pairs = cells.flatMap((a, i) =>\n'
+      + '  cells.slice(i + 1).map(b => new Pair(ne, a, b)));\n'
+      + "const branches = [new Pair(ne, 'R5C1', 'R6C1'), new Pair(ne, 'R5C2', 'R6C2')];\n"
+      + 'return [shape, ...pairs, new Or(branches)];\n');
+    assert.match(report(mixed), /pair-all-different: 3 Pair constraints/);
+  });
+
 await runTest('lint_constraints suggests Quad for a 2x2 ContainAtLeast', async () => {
   const quad = await lintScript(
     "return [new Shape('9x9'),\n"

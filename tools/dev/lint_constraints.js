@@ -313,9 +313,20 @@ const makeContext = (text) => {
 
   // Pair/PairX leaves grouped by key: three rules judge these groups, and the
   // grouping itself is a fact about the input, not one of their judgements.
+  //
+  // Only UNCONDITIONAL leaves are grouped. All three rules say "this re-encodes
+  // a native constraint, use that instead", which holds only for a pair the
+  // input actually asserts. Inside an Or the pair is one branch's hypothesis, so
+  // the suggested rewrite would assert it always and change the meaning: an
+  // Or-of-And-of-not-equal-Pair expressing "these two cell sets differ" read as
+  // 256 re-encoded all-differents (Iu9sDHZwjj8), and the encoding was rebuilt
+  // around the linter rather than because it was wrong. Replicate stays in --
+  // it applies its constraint to every listed cell set unconditionally -- and a
+  // top-level And does too, since its children are all asserted.
   const pairGroups = new Map();
   for (const leaf of leaves) {
     if (leaf.type !== 'Pair' && leaf.type !== 'PairX') continue;
+    if (leaf.inOr) continue;
     const gridCells = leaf.cells.map(parseGridCell);
     const replaceable = leaf.cells.length === 2 && gridCells[0] && gridCells[1]
       && isOrthAdjacent(gridCells[0], gridCells[1]);
