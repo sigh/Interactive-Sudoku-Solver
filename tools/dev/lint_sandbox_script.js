@@ -669,27 +669,52 @@ const RULES = [
     summary: 'manual box construction found; prefer graph.box(n) / graph.boxes()',
     docs: 'Box-CELL construction only. Cell->box-index derivations\n'
       + '(Math.floor((row - 1) / 3) style) are not flagged: no box-index helper\n'
-      + 'exists, so that math is currently the only idiom.',
+      + 'exists, so that math is currently the only idiom. One base triple is\n'
+      + 'never flagged -- a row whose cells happen to sit at 1, 4, 7 is not box\n'
+      + 'construction. Numeric [1, 4, 7] needs two base uses (a row base and a\n'
+      + 'column base); corner strings need consecutive R{r}C1,R{r}C4,R{r}C7\n'
+      + 'runs for two or more base rows r.',
     check(ctx) {
       const findings = ctx.nodesOfType('BinaryExpression').filter((bin) =>
         bin.operator === '*' && bin.left.type === 'Identifier'
         && /^b[rc]$/.test(bin.left.name) && numberValue(bin.right) !== null);
-      const cornerTriple = (elements) => elements.find((el, i) =>
-        stringValue(el) === 'R1C1'
-        && stringValue(elements[i + 1]) === 'R1C4'
-        && stringValue(elements[i + 2]) === 'R1C7');
-      for (const arr of ctx.nodesOfType('ArrayExpression')) {
-        const el = cornerTriple(arr.elements);
-        if (el) findings.push(el);
-        if (arr.elements.length === 3
-          && [1, 4, 7].every((v, i) => numberValue(arr.elements[i]) === v)) {
-          findings.push(arr);
+      const cornerRuns = (elements) => {
+        const runs = new Map();
+        for (const r of [1, 4, 7]) {
+          const el = elements.find((e, i) =>
+            stringValue(e) === `R${r}C1`
+            && stringValue(elements[i + 1]) === `R${r}C4`
+            && stringValue(elements[i + 2]) === `R${r}C7`);
+          if (el) runs.set(r, el);
         }
+        return runs.size >= 2 ? runs.values().next().value : null;
+      };
+      for (const arr of ctx.nodesOfType('ArrayExpression')) {
+        const el = cornerRuns(arr.elements);
+        if (el) findings.push(el);
       }
       for (const call of ctx.nodesOfType('CallExpression')) {
-        const el = cornerTriple(call.arguments);
+        const el = cornerRuns(call.arguments);
         if (el) findings.push(el);
       }
+      // Box cells need a row base AND a column base, so a numeric [1, 4, 7]
+      // is the pattern only where base triples are reached for at least twice:
+      // each literal counts once, and so does each later reference to a name
+      // bound to one. A lone `const cols = [1, 4, 7]` is one reach, not boxes.
+      const triples = ctx.nodesOfType('ArrayExpression').filter((arr) =>
+        arr.elements.length === 3
+        && [1, 4, 7].every((v, i) => numberValue(arr.elements[i]) === v));
+      const bound = new Set();
+      for (const decl of ctx.nodesOfType('VariableDeclarator')) {
+        if (decl.id.type === 'Identifier' && triples.includes(decl.init)) {
+          bound.add(decl.id.name);
+        }
+      }
+      // Identifier nodes include the binding occurrence itself, which is the
+      // literal already counted, so drop one per bound name.
+      const references = ctx.nodesOfType('Identifier')
+        .filter((id) => bound.has(id.name)).length - bound.size;
+      if (triples.length + references >= 2) findings.push(...triples);
       return findings;
     },
   },

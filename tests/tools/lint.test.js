@@ -245,6 +245,7 @@ await runTest('lint_sandbox_script flags idioms superseded by houses/Var APIs', 
     + 'const wolf = b => `VW${b}`;\n'
     + 'const cells = graph.row(makeCellId(4, 1));\n'
     + 'const origins = [1, 4, 7];\n'
+    + 'const boxes = origins.flatMap(r => origins.map(c => makeCellId(r, c)));\n'
     + "return [new Shape('9x9')];\n");
   assert.match(report(items), /manual-var-id-template/);
   assert.match(report(items), /manual-house-lookup/);
@@ -861,6 +862,7 @@ await runTest('source rules see code, not comments', () => {
   // The same idioms in code still fire.
   const code = lintSource(SCRIPT_HEADER
     + 'const origins = [1, 4, 7];\n'
+    + 'const boxes = origins.flatMap(r => origins.map(c => makeCellId(r, c)));\n'
     + "const sum = new Sum('0_=_1_1', 'R1C1', 'R1C2');\n"
     + "return [new Shape('9x9'), sum];\n");
   assert.match(report(code), /manual-box-arithmetic/);
@@ -886,6 +888,7 @@ await runTest('// lint-ok silences one code on one line', () => {
   // It silences the named code, not the line.
   const otherCode = lintSource(SCRIPT_HEADER
     + 'const origins = [1, 4, 7]; // lint-ok: manual-house-lookup\n'
+    + 'const boxes = origins.flatMap(r => origins.map(c => makeCellId(r, c)));\n'
     + "return [new Shape('9x9')];\n");
   assert.match(report(otherCode), /manual-box-arithmetic/);
 });
