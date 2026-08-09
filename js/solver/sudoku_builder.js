@@ -907,6 +907,7 @@ export class SudokuBuilder {
         case 'ConnectedValues':
           {
             let cellOffset = 0;
+            let numCells = geometry.numGridCells;
             if (constraint.groupPrefix) {
               const groupCells = geometry.varCellsForGroup(constraint.groupPrefix);
               if (!groupCells) {
@@ -914,9 +915,10 @@ export class SudokuBuilder {
                   `Connected Values: unknown cell group '${constraint.groupPrefix}'.`);
               }
               cellOffset = groupCells[0];
+              numCells = groupCells.length;
             }
             yield new ConnectedHandlerModule.ConnectedValues(
-              geometry.numGridCells,
+              numCells,
               cellOffset,
               constraint.values.split('_').map(v => +v));
           }

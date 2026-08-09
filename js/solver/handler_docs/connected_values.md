@@ -27,8 +27,8 @@ orthogonally-connected region within the constraint's cells.
 A handler may hold several value sets over the same cells, each independently
 forming its own region (§5); everything below describes one set's pass.
 
-The cells must be a whole layer in order: the grid itself, or a var-cell
-group with one cell per grid cell. The layer's column count defines adjacency,
+The cells must be a whole layer in order: the grid itself, or a whole
+var-cell group of any size. The layer's column count defines adjacency,
 and position `i`'s search cell is simply `cellOffset + i`, so the handler stores
 one offset instead of a cell mapping.
 

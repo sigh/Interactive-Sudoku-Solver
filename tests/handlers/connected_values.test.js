@@ -227,7 +227,7 @@ await runTest('ConnectedValues: full-grid var cell group uses grid adjacency', (
   assert.equal(handler.enforceConsistency(grid, createAccumulator()), false);
 });
 
-await runTest('ConnectedValues: partial var cell group is rejected', () => {
+await runTest('ConnectedValues: handler size must match the var cell group', () => {
   const context = makeContext();
   const geometry = context.geometry;
   geometry.addVarCellsForConstraints([
@@ -242,6 +242,36 @@ await runTest('ConnectedValues: partial var cell group is rejected', () => {
       createCellExclusions({ allUnique: false, numCells: geometry.totalCells() }),
       geometry, createStateAllocator(grid)),
     InvalidConstraintError);
+});
+
+await runTest('ConnectedValues: var cell group smaller than the grid works', () => {
+  const context = makeContext();  // 4x4 grid
+  const geometry = context.geometry;
+  // 6 cells laid out 2 rows x 3 cols.
+  geometry.addVarCellsForConstraints([
+    { getVarCellGroups: () => [{ prefix: 'VS', count: 6, columns: 3 }] },
+  ]);
+  const offset = geometry.varCellsForGroup('VS')[0];
+  const handler = new ConnectedValues(6, offset, [1]);
+  const grid = new Array(geometry.totalCells()).fill(context.lookupTables.allValues);
+  assert.equal(
+    handler.initialize(
+      grid,
+      createCellExclusions({ allUnique: false, numCells: geometry.totalCells() }),
+      geometry, createStateAllocator(grid)),
+    true);
+
+  const setValue1 = (...positions) => {
+    for (let i = 0; i < 6; i++) grid[offset + i] = valueMask(2);
+    for (const p of positions) grid[offset + p] = valueMask(1);
+  };
+  // Positions 0 and 3 are vertically adjacent in the 2x3 layout.
+  setValue1(0, 3);
+  assert.equal(handler.enforceConsistency(grid, createAccumulator()), true);
+
+  // Positions 0 and 4 are diagonal — disconnected.
+  setValue1(0, 4);
+  assert.equal(handler.enforceConsistency(grid, createAccumulator()), false);
 });
 
 await runTest('ConnectedValues: an offset inside a var cell group is rejected', () => {

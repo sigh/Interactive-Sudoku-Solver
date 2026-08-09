@@ -60,9 +60,9 @@ const MULTI_DOOR = 0xfffe;
 export class ConnectedValues extends SudokuConstraintHandler {
   // `values` is one set, or a list of pairwise-disjoint single-value sets (a
   // multi-value set is only supported alone).
-  constructor(numGridCells, cellOffset, values) {
-    const cells = new Uint16Array(numGridCells);
-    for (let i = 0; i < numGridCells; i++) cells[i] = cellOffset + i;
+  constructor(numCells, cellOffset, values) {
+    const cells = new Uint16Array(numCells);
+    for (let i = 0; i < numCells; i++) cells[i] = cellOffset + i;
     super(cells);
 
     this._cellOffset = cellOffset;
@@ -106,14 +106,14 @@ export class ConnectedValues extends SudokuConstraintHandler {
     }
 
     const numCells = this.cells.length;
-    // The grid, or a var-cell group with one cell per grid cell. A group may set
-    // its own width, so the layer need not have the grid's shape.
+    // The grid, or a whole var-cell group. A group sets its own size and
+    // width, so the layer need not have the grid's shape.
     const layer = this._cellOffset === 0 ?
       { count: geometry.numGridCells, columns: geometry.numCols } :
       geometry.varCellGroups().find((g) => g.cells[0] === this._cellOffset);
-    if (numCells !== geometry.numGridCells || layer?.count !== numCells) {
+    if (layer?.count !== numCells) {
       throw new InvalidConstraintError(
-        'Connected Values must cover the grid, or a var-cell group with one cell per grid cell.');
+        'Connected Values must cover the grid or a whole var-cell group.');
     }
     this._neighbors = layerNeighborTable(
       numCells, layer.columns || geometry.numCols);
