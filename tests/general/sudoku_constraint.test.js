@@ -1474,6 +1474,17 @@ await runTest('ConnectedValues accepts an empty group prefix (the main grid)', (
   assert.deepEqual(constraint.getCells(geometry9x9), []);
 });
 
+await runTest('ConnectedValues rejects nested value arrays', () => {
+  // These used to stringify to '1_2_3', silently merging the sets into a single
+  // connectivity constraint over their union.
+  assert.throws(
+    () => new SudokuConstraint.ConnectedValues('VS', [[1], [2], [3]]),
+    { message: /must be a flat value set/ });
+  assert.throws(
+    () => new SudokuConstraint.ConnectedValues('VS', [1, [2, 3]]),
+    { message: /must be a flat value set/ });
+});
+
 logSuiteComplete('ConnectedValues');
 
 // ============================================================================

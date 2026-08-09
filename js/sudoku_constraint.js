@@ -2540,10 +2540,13 @@ export class SudokuConstraint {
       values must form a single orthogonally-connected region.`);
     static CATEGORY = 'Experimental';
 
-    // Values may be a number, an array, or the serialized '1_2' string.
+    // Values may be a number, a flat array, or the serialized '1_2' string.
     constructor(groupPrefix, values) {
       super(groupPrefix, values);
       this.groupPrefix = groupPrefix || '';
+      if (Array.isArray(values) && values.some(v => Array.isArray(v))) {
+        throw Error('ConnectedValues values must be a flat value set');
+      }
       this.values = String(values).replace(/,/g, '_');
     }
 
