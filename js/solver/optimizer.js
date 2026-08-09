@@ -187,19 +187,20 @@ export class SudokuConstraintOptimizer {
       // Merged handlers require pairwise-disjoint single-value sets (a
       // cell is decided into at most one set, and multi-value sets are
       // only supported alone); leave other instances separate.
-      const valueSets = group.flatMap(h => h.valueSets());
+      const sets = new Map(group.flatMap(h => [...h.sets()]));
+      const valueSets = [...sets.keys()];
       if (valueSets.some(values => values.length !== 1)) continue;
       const allValues = valueSets.flat();
       if (new Set(allValues).size !== allValues.length) continue;
 
       const cellOffset = group[0].cells[0];
       const newHandler = new ConnectedHandlerModule.ConnectedValues(
-        group[0].cells.length, cellOffset, valueSets);
+        group[0].cells.length, cellOffset, sets);
       handlerSet.replace(group[0], newHandler);
       newHandler.essential = group.some(h => h.essential);
       for (let i = 1; i < group.length; i++) handlerSet.delete(group[i]);
       this._logAddHandler('_mergeConnectedValues', newHandler, {
-        args: { valueSets: newHandler.valueSets() },
+        args: { valueSets },
       });
 
       this._addConnectedCrossingRules(

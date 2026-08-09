@@ -38,7 +38,7 @@ const initHandler = (context, handler) => {
 
 await runTest('ConnectedValues: full-candidate grid passes with no pruning', () => {
   const context = makeContext();
-  const handler = new ConnectedValues(context.geometry.numGridCells, 0, [1]);
+  const handler = new ConnectedValues(context.geometry.numGridCells, 0, new Map([[[1], 0]]));
   initHandler(context, handler);
 
   const acc = createAccumulator();
@@ -48,7 +48,7 @@ await runTest('ConnectedValues: full-candidate grid passes with no pruning', () 
 
 await runTest('ConnectedValues: decided cells split by a barrier fail', () => {
   const context = makeContext();
-  const handler = new ConnectedValues(context.geometry.numGridCells, 0, [1]);
+  const handler = new ConnectedValues(context.geometry.numGridCells, 0, new Map([[[1], 0]]));
   initHandler(context, handler);
 
   // Row 1 excludes value 1, splitting row 0 from rows 2-3.
@@ -61,7 +61,7 @@ await runTest('ConnectedValues: decided cells split by a barrier fail', () => {
 
 await runTest('ConnectedValues: components without a decided cell are pruned', () => {
   const context = makeContext();
-  const handler = new ConnectedValues(context.geometry.numGridCells, 0, [1]);
+  const handler = new ConnectedValues(context.geometry.numGridCells, 0, new Map([[[1], 0]]));
   initHandler(context, handler);
 
   // Decided cell in row 0; row 1 is a barrier; rows 2-3 are undecided.
@@ -81,7 +81,7 @@ await runTest('ConnectedValues: components without a decided cell are pruned', (
 
 await runTest('ConnectedValues: fully decided connected region passes', () => {
   const context = makeContext();
-  const handler = new ConnectedValues(context.geometry.numGridCells, 0, [1]);
+  const handler = new ConnectedValues(context.geometry.numGridCells, 0, new Map([[[1], 0]]));
   initHandler(context, handler);
 
   const assignments = {};
@@ -94,7 +94,7 @@ await runTest('ConnectedValues: fully decided connected region passes', () => {
 
 await runTest('ConnectedValues: fully decided diagonal region fails', () => {
   const context = makeContext();
-  const handler = new ConnectedValues(context.geometry.numGridCells, 0, [1]);
+  const handler = new ConnectedValues(context.geometry.numGridCells, 0, new Map([[[1], 0]]));
   initHandler(context, handler);
 
   const assignments = {};
@@ -107,7 +107,7 @@ await runTest('ConnectedValues: fully decided diagonal region fails', () => {
 
 await runTest('ConnectedValues: empty region fails', () => {
   const context = makeContext();
-  const handler = new ConnectedValues(context.geometry.numGridCells, 0, [1]);
+  const handler = new ConnectedValues(context.geometry.numGridCells, 0, new Map([[[1], 0]]));
   initHandler(context, handler);
 
   const assignments = {};
@@ -118,7 +118,7 @@ await runTest('ConnectedValues: empty region fails', () => {
 
 await runTest('ConnectedValues: sole possible cell is forced for non-emptiness', () => {
   const context = makeContext();
-  const handler = new ConnectedValues(context.geometry.numGridCells, 0, [1]);
+  const handler = new ConnectedValues(context.geometry.numGridCells, 0, new Map([[[1], 0]]));
   initHandler(context, handler);
 
   const assignments = {};
@@ -134,7 +134,7 @@ await runTest('ConnectedValues: sole possible cell is forced for non-emptiness',
 
 await runTest('ConnectedValues: sole support narrows to a multi-value set', () => {
   const context = makeContext();
-  const handler = new ConnectedValues(context.geometry.numGridCells, 0, [1, 2]);
+  const handler = new ConnectedValues(context.geometry.numGridCells, 0, new Map([[[1, 2], 0]]));
   initHandler(context, handler);
 
   const assignments = {};
@@ -151,7 +151,7 @@ await runTest('ConnectedValues: sole support narrows to a multi-value set', () =
 await runTest('ConnectedValues: singleton supports feed merged sets in one pass', () => {
   const context = makeContext();
   const handler = new ConnectedValues(
-    context.geometry.numGridCells, 0, [[1], [2]]);
+    context.geometry.numGridCells, 0, new Map([[[1], 0], [[2], 0]]));
   initHandler(context, handler);
 
   const assignments = {};
@@ -168,7 +168,7 @@ await runTest('ConnectedValues: singleton supports feed merged sets in one pass'
 
 await runTest('ConnectedValues: multi-value region counts mixed in-set candidates as decided', () => {
   const context = makeContext();
-  const handler = new ConnectedValues(context.geometry.numGridCells, 0, [1, 2]);
+  const handler = new ConnectedValues(context.geometry.numGridCells, 0, new Map([[[1, 2], 0]]));
   initHandler(context, handler);
 
   // Cells 0 and 15 must hold 1 or 2, so both are decided into the region.
@@ -188,7 +188,7 @@ await runTest('ConnectedValues: cells must cover a whole layer', () => {
     [12, 0],   // wrong cell count
   ]) {
     const context = makeContext();
-    const handler = new ConnectedValues(numGridCells, cellOffset, [1]);
+    const handler = new ConnectedValues(numGridCells, cellOffset, new Map([[[1], 0]]));
     assert.throws(() => initHandler(context, handler), InvalidConstraintError,
       `(${numGridCells}, ${cellOffset}) should be rejected`);
   }
@@ -196,7 +196,7 @@ await runTest('ConnectedValues: cells must cover a whole layer', () => {
 
 await runTest('ConnectedValues: invalid values are rejected', () => {
   const context = makeContext();
-  const handler = new ConnectedValues(context.geometry.numGridCells, 0, [5]);
+  const handler = new ConnectedValues(context.geometry.numGridCells, 0, new Map([[[5], 0]]));
   assert.throws(() => initHandler(context, handler), InvalidConstraintError);
 });
 
@@ -207,7 +207,7 @@ await runTest('ConnectedValues: full-grid var cell group uses grid adjacency', (
     { getVarCellGroups: () => [{ prefix: 'VL', count: geometry.numGridCells }] },
   ]);
   const varCells = geometry.varCellsForGroup('VL');
-  const handler = new ConnectedValues(geometry.numGridCells, varCells[0], [1]);
+  const handler = new ConnectedValues(geometry.numGridCells, varCells[0], new Map([[[1], 0]]));
 
   const grid = new Array(geometry.totalCells()).fill(context.lookupTables.allValues);
   const cellExclusions = createCellExclusions({
@@ -234,7 +234,7 @@ await runTest('ConnectedValues: handler size must match the var cell group', () 
     { getVarCellGroups: () => [{ prefix: 'VP', count: 4 }] },
   ]);
   const handler = new ConnectedValues(
-    geometry.numGridCells, geometry.varCellsForGroup('VP')[0], [1]);
+    geometry.numGridCells, geometry.varCellsForGroup('VP')[0], new Map([[[1], 0]]));
   const grid = new Array(geometry.totalCells()).fill(context.lookupTables.allValues);
   assert.throws(
     () => handler.initialize(
@@ -252,7 +252,7 @@ await runTest('ConnectedValues: var cell group smaller than the grid works', () 
     { getVarCellGroups: () => [{ prefix: 'VS', count: 6, columns: 3 }] },
   ]);
   const offset = geometry.varCellsForGroup('VS')[0];
-  const handler = new ConnectedValues(6, offset, [1]);
+  const handler = new ConnectedValues(6, offset, new Map([[[1], 0]]));
   const grid = new Array(geometry.totalCells()).fill(context.lookupTables.allValues);
   assert.equal(
     handler.initialize(
@@ -281,7 +281,7 @@ await runTest('ConnectedValues: an offset inside a var cell group is rejected', 
     { getVarCellGroups: () => [{ prefix: 'VM', count: geometry.numGridCells }] },
   ]);
   const handler = new ConnectedValues(
-    geometry.numGridCells, geometry.varCellsForGroup('VM')[1], [1]);
+    geometry.numGridCells, geometry.varCellsForGroup('VM')[1], new Map([[[1], 0]]));
   const grid = new Array(geometry.totalCells()).fill(context.lookupTables.allValues);
   assert.throws(
     () => handler.initialize(
@@ -299,7 +299,7 @@ await runTest('ConnectedValues: var group uses its own column count, not the gri
     { getVarCellGroups: () => [{ prefix: 'VW', count: 16, columns: 8 }] },
   ]);
   const offset = geometry.varCellsForGroup('VW')[0];
-  const handler = new ConnectedValues(16, offset, [1]);
+  const handler = new ConnectedValues(16, offset, new Map([[[1], 0]]));
   const grid = new Array(geometry.totalCells()).fill(context.lookupTables.allValues);
   assert.equal(
     handler.initialize(
@@ -330,7 +330,7 @@ await runTest('ConnectedValues: var group uses its own column count, not the gri
 {
   const scenario = {
     makeContext,
-    makeHandler: () => new ConnectedValues(16, 0, [1]),
+    makeHandler: () => new ConnectedValues(16, 0, new Map([[[1], 0]])),
     cellExclusions: () => createCellExclusions({ allUnique: false, numCells: 16 }),
     // Decided cell 0, row-1 barrier, prunable components below.
     candidates: {
@@ -517,7 +517,7 @@ await runTest('ConnectedValues: solver matches brute-force oracle (main grid, me
 
 await runTest('ConnectedValues door forcing: single-door corridor cascades', () => {
     const context = makeContext();
-  const handler = new ConnectedValues(context.geometry.numGridCells, 0, [1]);
+  const handler = new ConnectedValues(context.geometry.numGridCells, 0, new Map([[[1], 0]]));
   initHandler(context, handler);
 
   // Row 0 is a corridor (rows 1-3 exclude the value): decided at both ends,
@@ -534,7 +534,7 @@ await runTest('ConnectedValues door forcing: single-door corridor cascades', () 
 
 await runTest('ConnectedValues door forcing: multiple doors force nothing', () => {
     const context = makeContext();
-  const handler = new ConnectedValues(context.geometry.numGridCells, 0, [1]);
+  const handler = new ConnectedValues(context.geometry.numGridCells, 0, new Map([[[1], 0]]));
   initHandler(context, handler);
 
   // Two decided corners; every blob has two doors.
@@ -548,7 +548,7 @@ await runTest('ConnectedValues door forcing: single blob is never extended', () 
     const context = makeContext();
   // Decided cell 0 with a single door (cell 1); no other blob, so the
   // region may already be complete and nothing is forced.
-  const handler = new ConnectedValues(context.geometry.numGridCells, 0, [1]);
+  const handler = new ConnectedValues(context.geometry.numGridCells, 0, new Map([[[1], 0]]));
   initHandler(context, handler);
 
   const assignments = { 0: [1], 1: [1, 2], 2: [2, 3], 3: [2, 3] };
@@ -566,7 +566,210 @@ await runTest('ConnectedValues door forcing: Or-wrap stays sound', () => {
   for (let cell = 4; cell < 16; cell++) candidates[cell] = [2, 3];
   const scenario = {
     makeContext,
-    makeHandler: () => new ConnectedValues(16, 0, [1]),
+    makeHandler: () => new ConnectedValues(16, 0, new Map([[[1], 0]])),
+    cellExclusions: () => createCellExclusions({ allUnique: false, numCells: 16 }),
+    candidates,
+  };
+  for (const mode of [OR_WRAP_MODES.FAST_PATH, OR_WRAP_MODES.FAILING_DECOY]) {
+    assertOrWrapEquivalent({ ...scenario, mode });
+  }
+  assertOrWrapNoStateLeak(scenario);
+});
+
+// ===========================================================================
+// Given size (§7 of the handler doc).
+// ===========================================================================
+
+await runTest('ConnectedValues size: cardinality window fails both ways', () => {
+  const context = makeContext();
+
+  // More decided cells than the size.
+  const tooMany = new ConnectedValues(context.geometry.numGridCells, 0, new Map([[[1], 1]]));
+  initHandler(context, tooMany);
+  let grid = applyCandidates(context.grid.slice(), { 0: [1], 1: [1] });
+  assert.equal(tooMany.enforceConsistency(grid, createAccumulator()), false);
+
+  // Fewer possible cells than the size, even with nothing decided.
+  const tooFew = new ConnectedValues(context.geometry.numGridCells, 0, new Map([[[1], 4]]));
+  initHandler(context, tooFew);
+  const assignments = {};
+  for (let cell = 0; cell < 16; cell++) assignments[cell] = [2, 3];
+  assignments[0] = [1, 2];
+  assignments[1] = [1, 2];
+  grid = applyCandidates(context.grid.slice(), assignments);
+  assert.equal(tooFew.enforceConsistency(grid, createAccumulator()), false);
+});
+
+await runTest('ConnectedValues size: a complete region strips all other cells', () => {
+  const context = makeContext();
+  const handler = new ConnectedValues(context.geometry.numGridCells, 0, new Map([[[1], 2]]));
+  initHandler(context, handler);
+
+  // Cells 0-1 are a decided blob of exactly the size; everything else is
+  // undecided and must leave the set.
+  const assignments = { 0: [1], 1: [1] };
+  for (let cell = 2; cell < 16; cell++) assignments[cell] = [1, 2];
+  const grid = applyCandidates(context.grid, assignments);
+  const acc = createAccumulator();
+  assert.equal(handler.enforceConsistency(grid, acc), true);
+  const expectations = {};
+  for (let cell = 2; cell < 16; cell++) expectations[cell] = [2];
+  assertCandidates(grid, expectations);
+  assertTouched(acc, Array.from({ length: 14 }, (_, i) => i + 2));
+});
+
+await runTest('ConnectedValues size: a complete but split region fails', () => {
+  const context = makeContext();
+  const handler = new ConnectedValues(context.geometry.numGridCells, 0, new Map([[[1], 2]]));
+  initHandler(context, handler);
+
+  // Two decided corners reach the size but form two blobs; undecided cells
+  // between them can no longer join the region to connect it.
+  const assignments = { 0: [1], 15: [1] };
+  for (let cell = 1; cell < 15; cell++) assignments[cell] = [1, 2];
+  const grid = applyCandidates(context.grid, assignments);
+  assert.equal(handler.enforceConsistency(grid, createAccumulator()), false);
+});
+
+await runTest('ConnectedValues size: exhausted support forces the region', () => {
+  const context = makeContext();
+  const handler = new ConnectedValues(context.geometry.numGridCells, 0, new Map([[[1], 3]]));
+  initHandler(context, handler);
+
+  // Exactly three possible cells (one decided): all of them are the region.
+  const assignments = { 0: [1], 1: [1, 2], 2: [1, 2] };
+  for (let cell = 3; cell < 16; cell++) assignments[cell] = [2, 3];
+  const grid = applyCandidates(context.grid, assignments);
+  const acc = createAccumulator();
+  assert.equal(handler.enforceConsistency(grid, acc), true);
+  assertCandidates(grid, { 1: [1], 2: [1] });
+  assertTouched(acc, [1, 2]);
+});
+
+await runTest('ConnectedValues size: zero-decided exhaustion forces and verifies', () => {
+  const context = makeContext();
+  const handler = new ConnectedValues(context.geometry.numGridCells, 0, new Map([[[1], 2]]));
+  initHandler(context, handler);
+
+  // Connected pair: forced into the region.
+  const assignments = {};
+  for (let cell = 0; cell < 16; cell++) assignments[cell] = [2, 3];
+  assignments[0] = [1, 2];
+  assignments[1] = [1, 2];
+  const grid = applyCandidates(context.grid.slice(), assignments);
+  const acc = createAccumulator();
+  assert.equal(handler.enforceConsistency(grid, acc), true);
+  assertCandidates(grid, { 0: [1], 1: [1] });
+  assertTouched(acc, [0, 1]);
+
+  // Diagonal pair: forced cells cannot connect, so the pass fails.
+  assignments[1] = [2, 3];
+  assignments[5] = [1, 2];
+  const splitGrid = applyCandidates(context.grid.slice(), assignments);
+  assert.equal(handler.enforceConsistency(splitGrid, createAccumulator()), false);
+});
+
+await runTest('ConnectedValues size: lone blob forces its door and completes', () => {
+  const context = makeContext();
+  // Same shape as the no-size 'single blob is never extended' test, but with
+  // a size the blob is provably incomplete: the row-0 corridor cascades two
+  // doors to reach size 3, then the leftover corridor cell is stripped.
+  const handler = new ConnectedValues(context.geometry.numGridCells, 0, new Map([[[1], 3]]));
+  initHandler(context, handler);
+
+  const assignments = { 0: [1], 1: [1, 2], 2: [1, 2], 3: [1, 2] };
+  for (let cell = 4; cell < 16; cell++) assignments[cell] = [2, 3];
+  const grid = applyCandidates(context.grid, assignments);
+  const acc = createAccumulator();
+  assert.equal(handler.enforceConsistency(grid, acc), true);
+  assertCandidates(grid, { 1: [1], 2: [1], 3: [2] });
+  assertTouched(acc, [1, 2, 3]);
+});
+
+await runTest('ConnectedValues size: cells beyond the reach budget are pruned', () => {
+  const context = makeContext();
+  const handler = new ConnectedValues(context.geometry.numGridCells, 0, new Map([[[1], 2]]));
+  initHandler(context, handler);
+
+  // One decided cell and a budget of one more: only its orthogonal
+  // neighbours (cells 1 and 4) stay possible; the rest lose the value.
+  const assignments = { 0: [1] };
+  for (let cell = 1; cell < 16; cell++) assignments[cell] = [1, 2];
+  const grid = applyCandidates(context.grid, assignments);
+  const acc = createAccumulator();
+  assert.equal(handler.enforceConsistency(grid, acc), true);
+  const expectations = { 1: [1, 2], 4: [1, 2] };
+  for (let cell = 2; cell < 16; cell++) {
+    if (cell !== 4) expectations[cell] = [2];
+  }
+  assertCandidates(grid, expectations);
+});
+
+await runTest('ConnectedValues size: singleton-level cascade completes the region', () => {
+  const context = makeContext();
+  const handler = new ConnectedValues(context.geometry.numGridCells, 0, new Map([[[1], 3]]));
+  initHandler(context, handler);
+
+  // A row-0 corridor from the decided corner, plus a second possible area
+  // behind a barrier so the corridor is not the only support (numPossible
+  // stays above the size). The area is unreachable and is stripped; the
+  // corridor's two singleton levels are forced, completing the region, and
+  // the leftover corridor cell is stripped by the re-run.
+  const assignments = { 0: [1], 1: [1, 2], 2: [1, 2], 3: [1, 2] };
+  for (let cell = 4; cell < 8; cell++) assignments[cell] = [2, 3];
+  for (let cell = 8; cell < 16; cell++) assignments[cell] = [1, 2];
+  const grid = applyCandidates(context.grid, assignments);
+  const acc = createAccumulator();
+  assert.equal(handler.enforceConsistency(grid, acc), true);
+  const expectations = { 1: [1], 2: [1], 3: [2] };
+  for (let cell = 8; cell < 16; cell++) expectations[cell] = [2];
+  assertCandidates(grid, expectations);
+});
+
+await runTest('ConnectedValues size: mutually unreachable blobs fail', () => {
+  const context = makeContext();
+  const handler = new ConnectedValues(context.geometry.numGridCells, 0, new Map([[[1], 3]]));
+  initHandler(context, handler);
+
+  // Decided cells in opposite corners with one cell of budget: every path
+  // between the blobs needs at least six more cells, so no region of size 3
+  // contains both, even though the possible graph is fully connected.
+  const assignments = { 0: [1], 15: [1] };
+  for (let cell = 1; cell < 15; cell++) assignments[cell] = [1, 2];
+  const grid = applyCandidates(context.grid, assignments);
+  assert.equal(handler.enforceConsistency(grid, createAccumulator()), false);
+});
+
+await runTest('ConnectedValues size: sizes past the layer are unsatisfiable', () => {
+  const context = makeContext();
+  for (const sets of [
+    new Map([[[1], 17]]),            // single size larger than the layer
+    new Map([[[1], 10], [[2], 7]]),  // disjoint sizes jointly overfull
+  ]) {
+    const handler = new ConnectedValues(context.geometry.numGridCells, 0, sets);
+    const result = context.initializeHandler(handler, {
+      cellExclusions: createCellExclusions({
+        allUnique: false, numCells: context.geometry.numGridCells,
+      }),
+    });
+    assert.equal(result, false, 'oversized sizes are unsatisfiable, not an error');
+  }
+  // The whole puzzle is unsatisfiable, not broken.
+  assert.equal(new SimpleSolver().countSolutions(
+    '.Shape~4x4.Var~S~~16.ConnectedValues~VS~1~17'), 0);
+  // Exactly filling the layer is fine.
+  const full = new ConnectedValues(
+    context.geometry.numGridCells, 0, new Map([[[1], 8], [[2], 8]]));
+  initHandler(context, full);
+});
+
+await runTest('ConnectedValues size: Or-wrap stays sound', () => {
+  // The lone-blob cascade scenario, wrapped in Or.
+  const candidates = { 0: [1], 1: [1, 2], 2: [1, 2], 3: [1, 2] };
+  for (let cell = 4; cell < 16; cell++) candidates[cell] = [2, 3];
+  const scenario = {
+    makeContext,
+    makeHandler: () => new ConnectedValues(16, 0, new Map([[[1], 3]])),
     cellExclusions: () => createCellExclusions({ allUnique: false, numCells: 16 }),
     candidates,
   };
@@ -585,7 +788,7 @@ const CONN_L = 1, CONN_R = 2, CONN_U = 4, CONN_D = 8;
 
 await runTest('ConnectedValues control: plain adjacency accepts the same grid', () => {
   const context = makeContext();
-  const handler = new ConnectedValues(context.geometry.numGridCells, 0, [1]);
+  const handler = new ConnectedValues(context.geometry.numGridCells, 0, new Map([[[1], 0]]));
   initHandler(context, handler);
   const grid = applyCandidates(context.grid, (() => {
     const assignments = {};
@@ -643,7 +846,7 @@ const ADJACENCY_SCENARIOS = [
 const makeContext3 = () => new GridTestContext({ gridSize: [3, 3] });
 
 const makeScenarioHandler = (scenario, context) => {
-  const handler = new ConnectedValues(context.geometry.numGridCells, 0, scenario.values);
+  const handler = new ConnectedValues(context.geometry.numGridCells, 0, new Map([[scenario.values, 0]]));
   const result = context.initializeHandler(handler, {
     cellExclusions: createCellExclusions({
       allUnique: false, numCells: context.geometry.numGridCells,
@@ -767,13 +970,61 @@ await runTest('ConnectedValues: serialization round trip (main grid)', async () 
   assert.equal(constraint.values, '1_2');
 });
 
+await runTest('ConnectedValues: serialization round trip (with size)', async () => {
+  const { SudokuParser } = await import('../../js/sudoku_parser.js');
+  const str = '.ConnectedValues~VS~1_2~10';
+  const parsed = SudokuParser.parseText(str);
+  assert.equal(parsed.toString(), str);
+  const constraint = parsed.toMap().get('ConnectedValues')[0];
+  assert.equal(constraint.groupPrefix, 'VS');
+  assert.equal(constraint.values, '1_2');
+  assert.equal(constraint.size, 10);
+});
+
+await runTest('ConnectedValues: solver matches brute-force oracle (with size)', () => {
+  // As the single-value 4x4 oracle above, with the region size pinned to 5.
+  const overlayDomains = Array.from({ length: 16 }, (_, i) =>
+    `.~VS${i + 1}_1_2`).join('');
+  const input = '.Shape~4x4' + gridGivens('1342243141233214', 4)
+    + '.Var~S~~16' + overlayDomains + '.ConnectedValues~VS~1~5';
+
+  let expected = 0;
+  for (const values of allAssignments([1, 2], 16)) {
+    if (values.filter(v => v === 1).length === 5 &&
+      referenceIsConnected(values, [1], 4, 4)) expected++;
+  }
+  assert.ok(expected > 0 && expected < 2 ** 16);
+
+  const solver = new SimpleSolver();
+  assert.equal(solver.countSolutions(input), expected);
+});
+
+await runTest('ConnectedValues: solver matches brute-force oracle (merged sizes)', () => {
+  // Two same-layer single-value sets with sizes: the optimizer merges them,
+  // and the sizes must survive the merge.
+  const input = '.Shape~3x3' + gridGivens('123231312', 3)
+    + '.Var~S~~9' + '.ConnectedValues~VS~1~3.ConnectedValues~VS~2~4';
+
+  let expected = 0;
+  for (const values of allAssignments([1, 2, 3], 9)) {
+    if (values.filter(v => v === 1).length === 3 &&
+      values.filter(v => v === 2).length === 4 &&
+      referenceIsConnected(values, [1], 3, 3) &&
+      referenceIsConnected(values, [2], 3, 3)) expected++;
+  }
+  assert.ok(expected > 0 && expected < 3 ** 9);
+
+  const solver = new SimpleSolver();
+  assert.equal(solver.countSolutions(input), expected);
+});
+
 // ===========================================================================
 // Multi-set handlers (the optimizer merges same-cell instances into one).
 // ===========================================================================
 
 await runTest('ConnectedValues multi-set: sets propagate to each other in one pass', () => {
   const context = makeContext();
-  const handler = new ConnectedValues(context.geometry.numGridCells, 0, [[1], [2]]);
+  const handler = new ConnectedValues(context.geometry.numGridCells, 0, new Map([[[1], 0], [[2], 0]]));
   initHandler(context, handler);
 
   // Complementary {1,2} shading. Set 1 is decided at cells 0 and 8 with cell
@@ -796,7 +1047,7 @@ await runTest('ConnectedValues multi-set: sets propagate to each other in one pa
 
 await runTest('ConnectedValues multi-set leaf oracle (3^9 grids)', () => {
   const context = makeContext3();
-  const handler = new ConnectedValues(context.geometry.numGridCells, 0, [[1], [2]]);
+  const handler = new ConnectedValues(context.geometry.numGridCells, 0, new Map([[[1], 0], [[2], 0]]));
   const result = context.initializeHandler(handler, {
     cellExclusions: createCellExclusions({ allUnique: false, numCells: 9 }),
   });
@@ -829,7 +1080,7 @@ await runTest('ConnectedValues multi-set leaf oracle (3^9 grids)', () => {
 
 await runTest('ConnectedValues multi-set soundness fuzz', () => {
   const context = makeContext3();
-  const handler = new ConnectedValues(context.geometry.numGridCells, 0, [[1], [2]]);
+  const handler = new ConnectedValues(context.geometry.numGridCells, 0, new Map([[[1], 0], [[2], 0]]));
   const initResult = context.initializeHandler(handler, {
     cellExclusions: createCellExclusions({ allUnique: false, numCells: 9 }),
   });
@@ -998,16 +1249,22 @@ await runTest('ConnectedValues: optimizer merges same-cell instances', async () 
   const merged = build(
     '.Shape~4x4.Var~S~~16.ConnectedValues~VS~1.ConnectedValues~VS~2');
   assert.equal(merged.connected.length, 1);
-  assert.deepEqual(merged.connected[0].valueSets(), [[1], [2]]);
+  assert.deepEqual([...merged.connected[0].sets()], [[[1], 0], [[2], 0]]);
   assert.equal(merged.crossing, 9);
   assert.equal(merged.border, 1);
+
+  // Sizes survive the merge, aligned with their sets.
+  const mergedSized = build(
+    '.Shape~4x4.Var~S~~16.ConnectedValues~VS~1~3.ConnectedValues~VS~2~5');
+  assert.equal(mergedSized.connected.length, 1);
+  assert.deepEqual([...mergedSized.connected[0].sets()], [[[1], 3], [[2], 5]]);
 
   // The main grid (empty prefix) is a layer like any other.
   const mergedGrid = build(
     '.Shape~4x4.ConnectedValues~~1.ConnectedValues~~2');
   assert.equal(mergedGrid.connected.length, 1);
   assert.equal(mergedGrid.connected[0].cells[0], 0);
-  assert.deepEqual(mergedGrid.connected[0].valueSets(), [[1], [2]]);
+  assert.deepEqual([...mergedGrid.connected[0].sets()], [[[1], 0], [[2], 0]]);
   assert.equal(mergedGrid.crossing, 9);
   assert.equal(mergedGrid.border, 1);
 
@@ -1040,7 +1297,7 @@ await runTest('ConnectedValues: optimizer merges same-cell instances', async () 
 
 await runTest('ConnectedValues multi-set: overlapping sets are rejected', () => {
   const context = makeContext();
-  const handler = new ConnectedValues(context.geometry.numGridCells, 0, [[1, 2], [2, 3]]);
+  const handler = new ConnectedValues(context.geometry.numGridCells, 0, new Map([[[1, 2], 0], [[2, 3], 0]]));
   assert.throws(
     () => initHandler(context, handler),
     InvalidConstraintError);
@@ -1048,7 +1305,7 @@ await runTest('ConnectedValues multi-set: overlapping sets are rejected', () => 
 
 await runTest('ConnectedValues multi-set: multi-value sets are rejected', () => {
   const context = makeContext();
-  const handler = new ConnectedValues(context.geometry.numGridCells, 0, [[1, 2], [3]]);
+  const handler = new ConnectedValues(context.geometry.numGridCells, 0, new Map([[[1, 2], 0], [[3], 0]]));
   assert.throws(
     () => initHandler(context, handler),
     InvalidConstraintError);

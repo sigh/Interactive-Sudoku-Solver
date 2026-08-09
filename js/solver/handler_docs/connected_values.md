@@ -25,7 +25,8 @@ orthogonally-connected region within the constraint's cells.
 ```
 
 A handler may hold several value sets over the same cells, each independently
-forming its own region (§5); everything below describes one set's pass.
+forming its own region (§5); everything below describes one set's pass. A set
+may also carry an exact region size, which adds the rules of §7 to its pass.
 
 The cells must be a whole layer in order: the grid itself, or a whole
 var-cell group of any size. The layer's column count defines adjacency,
@@ -193,9 +194,11 @@ are decided (same blob, by maximality of components), excluded (never in the
 region), or doors — so every path out passes through a door. With a single
 door, that cell is in the region in every completion. ∎
 
-The two-blob requirement is essential: the handler has no size or completion
+The two-blob requirement is essential: the handler has no completion
 information, so a lone blob might already *be* the finished region, and its
 door need not be taken. A second blob is what proves the region is incomplete.
+(A given size is the other proof of incompleteness, and lifts the requirement
+— §7.4.)
 
 A blob with *no* door is impossible at this point: §3 established that all
 decided cells share one possible component (and §4.3 shows forcing preserves
@@ -465,15 +468,14 @@ untouched.
   they never hold more than one entry per possible cell, and `numUndecided + numDecided ≤
   numCells`. So the blob decomposition costs no memory at all — the handler
   allocates exactly the two arrays it always did.
-- **Mark polarity in forcing rounds.** After §3 every surviving cell has
-  VISITED set, and every blob traversal visits every decided cell, so forcing
-  rounds reuse the byte by alternating which polarity of the decided cells'
-  VISITED bit means "unvisited" — round 1 marks by clearing it, round 2 by
-  setting it, and so on. Undecided cells stay at `UNDECIDED | VISITED`
-  throughout; freshly forced doors are stamped with the finished round's
-  visited polarity so the whole decided set flips together. This is what
-  extends the one-load fusion into the forcing rounds: no per-round mark
-  resets and no second marks structure.
+- **Forcing rounds clear the marks.** Each round starts by clearing the
+  VISITED bit across the states array, then marks as it scans, so every walk
+  in the handler reads and writes the same two mark values. (An earlier form
+  avoided the per-round clear by alternating which VISITED polarity meant
+  "unvisited"; the clear is one byte-and per cell in rounds that are rare —
+  gated on the size-free path, once-per-pass typically on the sized path —
+  and removing the polarity parameters measured node-identical and
+  wall-neutral.)
 - **Two ends of one array, again** (forcing rounds). A round uses the same
   split as §3, for the same reason: the banked doors take one slot per blob at
   the front of `_traversalBuffer`, and the blob being traversed is a LIFO from its
@@ -500,3 +502,95 @@ untouched.
   connectivity was considered and rejected: per-branch state would be O(cells)
   and is copied per search node, which costs the same order as the single
   traversal it would save.
+
+## 7. Given Size
+
+A set may carry an exact region size `N` (design:
+\_notes/roadmap/deep-dives/constraints/connected-values-size.md). A set with
+a size skips §3's traversal: after classification it runs the reach BFS
+(§7.2) — whose fail covers the split check and whose strip covers the
+dead-component prune, leaving the same marks (§6) — then door forcing
+(§7.4). Without a size the pass is unchanged.
+
+### 7.1 The size bounds
+
+The region has exactly `N` cells, all decided cells are in it, and it lies
+within the possible cells; so `numDecided ≤ N ≤ numPossible` must hold at all
+times. It is checked after classification and again after the reach strip
+shrinks `numPossible`. By monotonicity (§2.1) a violation is permanent — a
+fail, not a wait.
+
+### 7.2 Reach rules
+
+Every region cell connects to the seed blob through region cells, of which
+only `budget = N − numDecided` are still unplaced. So run one bucketed 0-1
+BFS from the seed blob — decided steps free, undecided steps costing one —
+capped at the budget, and read off two rules:
+
+- **Fail.** A decided cell the BFS never reaches needs more than the budget
+  of fresh cells to connect (its distance is minimal, chaining free through
+  any decided cells en route), so the branch is dead. This is what catches
+  scattered same-value placements early: cells decided far apart are each
+  locally fine, in one possible component, and under the size — only their
+  *mutual* connection cost exceeds the budget.
+- **Strip.** An undecided cell the BFS never reaches cannot join the region
+  — its path to the seed blob alone would overspend the budget — so it
+  loses `valueMask` (never emptying it: an undecided cell holds an
+  out-of-set candidate by definition). Distance from the seed blob (not the
+  nearest decided cell) is the sound and strictly stronger bound: joining
+  means connecting to the whole region, seed blob included.
+
+A complete region (`numDecided = N`) needs no rule of its own: the budget is
+zero, so a second blob is unreachable (the fail) and every undecided cell is
+beyond reach (the strip). What remains is exactly the decided set,
+connected, of size `N`.
+
+The pass runs on freshly classified states, reusing the traversal buffer —
+current bucket from the front, next bucket collecting at the back — and
+marks by setting the VISITED bit, so reached cells end up exactly as §3's
+traversal would leave them and the forcing rounds' mark bookkeeping (§4.3,
+§6) follows with no restore step. The bucket at distance `budget` expands
+only 0-cost decided chains, keeping cutoff distances exact.
+
+### 7.3 Exactly N possible cells
+
+When `numPossible = N` every possible cell is in the region, so every
+undecided cell is narrowed *to* `valueMask` (never emptying — a possible
+cell holds an in-set candidate). This fires in two places:
+
+- Straight after classification: the cells are forced and marked decided,
+  and the sized pass's reach — its budget now zero — fails if they span
+  several components.
+- After the reach strip shrinks `numPossible` to `N`: the survivors are
+  forced with no further check — every survivor kept its whole shortest
+  path to the seed blob (prefix distances along a shortest path never
+  exceed the endpoint's, so the strip removes no path cell), so the result
+  is connected through the seed blob.
+
+### 7.4 Lone-blob door forcing
+
+§4.1's rule needed a second blob only as proof that the region is incomplete.
+With a size, `numDecided < N` is that proof (and it holds whenever the forcing
+loop is entered — the reach pass returned otherwise), so the round's blob
+threshold drops from 2 to 1: a lone blob with a single door forces it.
+Everything else about forcing — the snapshot argument (§4.2), fixed-point
+iteration without re-traversal (§4.3) — is size-independent and unchanged.
+The rounds run without §4.4's gate: its door tally comes from the traversal,
+which a set with a size does not run.
+
+One addition to the loop: each round forces every single-door blob of its
+snapshot at once, so `numDecided` can *pass* `N`. Every forced cell is
+provably in the region, so overshoot is a contradiction. Landing exactly on
+`N` completes the region, which still needs checking: the rounds' own blob
+bookkeeping is a pre-forcing snapshot, so it cannot certify the merged
+region is one blob. The rounds' marks differ from classification's only in
+the VISITED bit, so clearing it across the states array lets a budget-0
+reach make that check, and the cells left out of the region are stripped.
+
+### 7.5 Multiple sets
+
+Sizes are per set; a merged handler (§5) carries one per set, and disjoint
+sets have disjoint regions, so sizes summing past the layer's cell count are
+unsatisfiable — `initialize` returns false, invalidating the grid rather
+than erroring: the constraint is well-formed, the puzzle just has no
+solutions. The crossing and border rules (§5.2–5.3) read no size.

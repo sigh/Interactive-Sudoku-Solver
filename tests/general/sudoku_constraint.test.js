@@ -1506,6 +1506,28 @@ await runTest('ConnectedValues accepts an empty group prefix (the main grid)', (
   assert.deepEqual(constraint.getCells(geometry9x9), []);
 });
 
+await runTest('ConnectedValues accepts an optional size', () => {
+  // A number or the serialized string form; without one, size is null and
+  // the serialization is unchanged.
+  const sized = new SudokuConstraint.ConnectedValues('VS', [1, 2], 10);
+  assert.equal(sized.size, 10);
+  assert.equal(sized.toString(), '.ConnectedValues~VS~1_2~10');
+  const parsed = new SudokuConstraint.ConnectedValues('VS', '1_2', '10');
+  assert.equal(parsed.size, 10);
+  assert.equal(parsed.toString(), '.ConnectedValues~VS~1_2~10');
+  const unsized = new SudokuConstraint.ConnectedValues('VS', [1, 2]);
+  assert.equal(unsized.size, null);
+  assert.equal(unsized.toString(), '.ConnectedValues~VS~1_2');
+});
+
+await runTest('ConnectedValues rejects invalid sizes', () => {
+  for (const size of [0, -1, 1.5, 'x']) {
+    assert.throws(
+      () => new SudokuConstraint.ConnectedValues('VS', [1], size),
+      /size must be a positive integer/);
+  }
+});
+
 await runTest('ConnectedValues rejects nested value arrays', () => {
   // These used to stringify to '1_2_3', silently merging the sets into a single
   // connectivity constraint over their union.

@@ -946,7 +946,8 @@ export class SudokuBuilder {
             yield new ConnectedHandlerModule.ConnectedValues(
               numCells,
               cellOffset,
-              constraint.values.split('_').map(v => +v));
+              new Map([
+                [constraint.values.split('_').map(v => +v), constraint.size || 0]]));
           }
           break;
 

@@ -2581,22 +2581,31 @@ export class SudokuConstraint {
   static ConnectedValues = class ConnectedValues extends SudokuConstraintBase {
     static DESCRIPTION = (`
       The cells of the given cell group which contain any of the
-      values must form a single orthogonally-connected region.`);
+      values must form a single orthogonally-connected region.
+      An optional size requires the region to contain exactly that
+      many cells.`);
     static CATEGORY = 'Experimental';
 
     // Values may be a number, a flat array, or the serialized '1_2' string.
-    constructor(groupPrefix, values) {
-      super(groupPrefix, values);
+    constructor(groupPrefix, values, size) {
+      super(groupPrefix, values, size);
       this.groupPrefix = groupPrefix || '';
       if (Array.isArray(values) && values.some(v => Array.isArray(v))) {
         throw Error('ConnectedValues values must be a flat value set');
       }
       this.values = String(values).replace(/,/g, '_');
+      this.size = size == null || size === '' ? null : +size;
+      if (this.size !== null &&
+        !(Number.isInteger(this.size) && this.size > 0)) {
+        throw Error('ConnectedValues size must be a positive integer: ' + size);
+      }
     }
 
     static serialize(constraints) {
       return constraints.map(
-        c => this._argsToString(c.groupPrefix, c.values)).join('');
+        c => c.size === null ?
+          this._argsToString(c.groupPrefix, c.values) :
+          this._argsToString(c.groupPrefix, c.values, c.size)).join('');
     }
 
     getCells(geometry) {
@@ -2607,7 +2616,8 @@ export class SudokuConstraint {
 
     chipLabel() {
       const group = this.groupPrefix || 'grid';
-      return `ConnectedValues (${group}: ${this.values.replace(/_/g, ',')})`;
+      const size = this.size === null ? '' : `, size ${this.size}`;
+      return `ConnectedValues (${group}: ${this.values.replace(/_/g, ',')}${size})`;
     }
   };
 
