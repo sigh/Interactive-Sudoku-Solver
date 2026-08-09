@@ -82,6 +82,28 @@ await runTest('extractConstraintTypes surfaces dimensions and range as leading e
   assert.deepEqual(types, ['6x6', '0-5', 'Var']);
 });
 
+await runTest('extractConstraintTypes tags a cell-group shape from its group', () => {
+  // No main grid: the shape's own dims are 0x0, and the board's are on the
+  // named group. 'Raw' because the group has no rows, columns or boxes.
+  const types = extractConstraintTypes('.Shape~VG~9.Var~G~Grid~9x9.Arrow~VG1~VG2.');
+  assert.ok(types.includes('Raw 9x9'));
+  assert.ok(!types.includes('0x0'));
+  // 1-9 over 9x9 is the default range, so it is not surfaced -- as for a grid.
+  assert.ok(!types.includes('1-9'));
+  assert.ok(types.includes('Arrow'));
+});
+
+await runTest('extractConstraintTypes surfaces a cell-group shape non-default range', () => {
+  const types = extractConstraintTypes('.Shape~VP~0-6.Var~P~Canvas~13x13.');
+  assert.deepEqual(types, ['Raw 13x13', '0-6', 'Var']);
+});
+
+await runTest('extractConstraintTypes tags a non-square cell-group shape', () => {
+  const types = extractConstraintTypes('.Shape~VG~0-9.Var~G~Board~10x8.');
+  assert.ok(types.includes('Raw 10x8'));
+  assert.ok(types.includes('0-9'));
+});
+
 //////////////////////////////////////////////////////////////////////////////
 // Named custom constraints (NFA / Pair / ...)
 //////////////////////////////////////////////////////////////////////////////
