@@ -29,8 +29,8 @@
 //   --solution-group <prefix[,prefix...]>
 //                         Pin the solution onto named cell groups instead of
 //                         the main grid, in group order -- for puzzles whose
-//                         answer does not live in the grid (e.g. a grid modelled
-//                         as a Var group because its rows are a multiset). Several
+//                         answer does not live in the grid (e.g. an answer read
+//                         from a Var overlay or region-label layer). Several
 //                         comma-separated prefixes consume the solution in the
 //                         order given. The prefix is the cell-id prefix: 'VG' for
 //                         `new Var('G', ...)` (Var prepends the V), or a
