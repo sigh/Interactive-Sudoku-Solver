@@ -364,10 +364,10 @@ const CONSTRAINT_MAX_ARITY = new Map([
   ['And', 1],
   ['Replicate', 3],
   ['RegionSize', 1],
-  ['Shape', 2],
+  ['Shape', 3],
   ['FullRankTies', 1],
   ['Diagonal', 1],
-  ['ConnectedValues', 2],
+  ['ConnectedValues', 3],
   ['Var', 3],
   ...[...OUTSIDE_CLUE_CLASSES].map((name) => [name, 2]),
   ...[

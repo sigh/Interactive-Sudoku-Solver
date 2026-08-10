@@ -1369,6 +1369,14 @@ const EXAMPLE_EXTRA_VARIABLES = [
     constraintTypes: ['Var', 'Replicate', 'ConnectedValues', 'WhiteDot', 'AllDifferent', 'PillArrow', 'Or', 'And', 'NFA: no-mono-2x2'],
   },
   {
+    name: 'Homogenous',
+    comment: 'Divide the grid into 10 regions of 10 orthogonally connected cells, every cell in a region the same digit: ten sized ConnectedValues on a raw 0-9 grid.',
+    src: ['https://www.youtube.com/watch?v=kM6Kwwkv3aM', 'https://sudokupad.app/0htle6wxey'],
+    input: '/data/scripts/homogenous.js',
+    solution: '3399999900633339990766330009071633660007166667777718888888771155444888125554444412225555541112222224',
+    constraintTypes: ['10x10 Raw', 'ConnectedValues', 'Arrow', 'Pair'],
+  },
+  {
     name: '250!',
     comment: 'No latin square: digits repeat, so the puzzle is built on a Raw grid, with ContainExact for the rows, columns and regions.',
     src: ['https://www.youtube.com/watch?v=STXQn26IVHs', 'https://sudokupad.app/q5iopoxvbm'],

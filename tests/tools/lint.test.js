@@ -367,13 +367,13 @@ await runTest('constraint-constructor-arity explains RegionSize dimensions', () 
 
 await runTest('constraint-constructor-arity covers finite constructor families', () => {
   const items = lintSource(SCRIPT_HEADER
-    + "return [new Shape('6x6', 6, 'ignored'),\n"
+    + "return [new Shape('6x6', 6, 'Raw', 'ignored'),\n"
     + "  new Var('A', 'Aux', 6, 'ignored'),\n"
     + "  new AntiKnight('ignored'),\n"
     + "  new LittleKiller('R1C1,1', 10, 'ignored')];\n",
   { only: new Set(['constraint-constructor-arity']) });
   assert.deepEqual(items.map((item) => item.line), [6, 7, 8, 9]);
-  assert.match(report(items), /Shape accepts at most 2 arguments/);
+  assert.match(report(items), /Shape accepts at most 3 arguments/);
   assert.match(report(items), /Var accepts at most 3 arguments/);
   assert.match(report(items), /AntiKnight accepts no arguments/);
   assert.match(report(items), /LittleKiller accepts at most 2 arguments/);

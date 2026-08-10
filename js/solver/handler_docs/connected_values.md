@@ -505,9 +505,7 @@ untouched.
 
 ## 7. Given Size
 
-A set may carry an exact region size `N` (design:
-\_notes/roadmap/deep-dives/constraints/connected-values-size.md). A set with
-a size skips §3's traversal: after classification it runs the reach BFS
+A set may carry an exact region size `N`. A set with a size skips §3's traversal: after classification it runs the reach BFS
 (§7.2) — whose fail covers the split check and whose strip covers the
 dead-component prune, leaving the same marks (§6) — then door forcing
 (§7.4). Without a size the pass is unchanged.

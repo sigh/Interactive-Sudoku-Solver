@@ -206,9 +206,8 @@ its category off that list.
 | Cell-lane only, or private self-read state lane | yes (the common case) |
 | Reads a state lane written by another handler / outside its branch | no — keep its category out of `_ALLOWED_CATEGORIES` |
 
-The full soundness model (invariants I1–I12, the `Sol(n, b)` conditioning
-argument, and the per-handler census) lives in
-[or-safety-invariants.md](../../_notes/roadmap/deep-dives/engine/or-safety-invariants.md).
+The full soundness model covers invariants I1–I12, the `Sol(n, b)`
+conditioning argument, and the per-handler census.
 The Or-wrap test harness (`wrapInOr` / `assertOrWrapEquivalent` /
 `assertOrWrapNoStateLeak` in
 [tests/helpers/grid_test_utils.js](../../tests/helpers/grid_test_utils.js),

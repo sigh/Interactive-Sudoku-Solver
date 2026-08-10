@@ -15,7 +15,9 @@ const { solveCollections, layoutCases } = await import('./e2e_puzzles.js' + self
 const loadInput = async (puzzle) => {
   if (puzzle.input.startsWith('/')) {
     const filePath = resolvePath(process.cwd(), '.' + puzzle.input);
-    return readFile(filePath, 'utf8');
+    // Inline inputs get extraConstraints appended by resolvePuzzleConfig;
+    // file inputs get them here.
+    return await readFile(filePath, 'utf8') + (puzzle.extraConstraints ?? '');
   }
   return puzzle.input;
 };

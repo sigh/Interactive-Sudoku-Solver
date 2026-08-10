@@ -405,6 +405,14 @@ const puzzlesExtraCells = [
     ...PUZZLE_INDEX.get('Xin Yang v2'),  // ConnectedValues, Var, PillArrow, Or, And, Replicate
     input: '/data/scripts/xin_yang_v2.iss',
   },
+  {
+    // Sized ConnectedValues on a raw 0-9 grid. The givens anchor each
+    // digit's first and last cell for speed; the solution is unique only
+    // with the region sizes.
+    ...PUZZLE_INDEX.get('Homogenous'),
+    input: '/data/scripts/homogenous.iss',
+    extraConstraints: '.~R1C1_3~R1C3_9~R1C9_0~R2C1_6~R2Ca_7~R3C8_9~R4C1_1~R4C4_3~R4C9_0~R5C5_6~R6C2_8~R6Ca_7~R7C3_5~R7C5_4~R7Ca_8~R8C2_2~R9C9_5~RaC3_1~RaC9_2~RaCa_4',
+  },
   {  // Var cells inside Or composite
     name: 'Or with extra cells',
     input: '.Var~X~X.Or.And.~R1C1_1~VX_1~R4C4_1.End.And.~R1C1_2~VX_2~R4C4_2.End.End.~R2C5_1~R5C3_3~R7C7_4~R8C2_5~R3C2_6~R1C8_7~R9C9_8~R6C6_9~R5C9_1~R9C3_2~R7C1_3~R6C4_4~R3C6_5~R2C7_6~R7C9_7~R8C5_8~R1C3_9~R5C1_5~R6C8_6~R3C4_8~R9C1_7~R3C7_9',

@@ -205,7 +205,7 @@ export const assertCandidates = (grid, expectations) => {
 };
 
 // ===========================================================================
-// Or-wrap harness (see _notes/.../engine/or-safety-invariants.md, L3).
+// Or-wrap harness.
 //
 // The engine only exercises a handler's Or-nested paths (delta replay, scratch
 // isolation, state writeback) during a full solve, where regressions surface
