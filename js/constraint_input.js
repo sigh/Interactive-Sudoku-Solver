@@ -271,32 +271,12 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
     if (primaryDims && !this.constructor._SHAPE_PRESETS.includes(primaryDims)) {
       addSpecEntry(primaryDims);
     }
-    for (const group of this._primaryCellGroupChoices()) {
-      const spec = CellGeometry.displayCellId(group.prefix);
-      addSpecEntry(spec, group.label ? `${spec}: ${group.label}` : spec);
-    }
-    // One step to a grid-sized cell group as the grid. 'raw' because the
-    // result has no rows, columns or boxes: just the cells.
-    if (!geometry.mainCellGroup && this._autoPrefix) {
-      entries.push({
-        text: `raw ${geometry.gridDimsStr} ($${this._autoPrefix})`,
-        divided: true,
-        action: () => {
-          // Adding the group advances the prefix prefill; capture it first.
-          const prefix = this._autoPrefix;
-          this.collection.addConstraint(
-            new SudokuConstraint.Var(prefix, '', geometry.gridDimsStr));
-          applySpec('$' + prefix);
-        },
-      });
-    }
 
     clearDOMNode(this._dropdownItemsElem);
     this._dropdownActions = entries.map(entry => entry.action);
     this._dropdownItems = entries.map((entry, i) => {
       const item = document.createElement('div');
       item.className = 'shape-dropdown-item';
-      if (entry.divided) item.classList.add('divided');
       item.textContent = entry.text;
       item.onmousedown = (e) => {
         e.preventDefault();
@@ -318,11 +298,6 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
     this._maxSelect.onchange = onchange;
   }
 
-  _primaryCellGroupChoices() {
-    return this._geometry.varCellGroups().filter(
-      g => !g.hidden && !g.countOnly);
-  }
-
   // The dims spec in the display form: cell groups render as '$A'.
   _displayedDimsSpec() {
     return CellGeometry.displayCellId(this._geometry.dimsSpec);
@@ -332,16 +307,15 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
     // A leading '$' is the display form of the cell group prefix.
     const text = this._shapeSpecInput.value.trim().replace(/^\$/, 'V');
     if (!text) return;
+    // Re-entering the current spec is a no-op: it must not reset the value
+    // range, and a loaded cell group shape is valid but can't be re-entered.
+    if (this._geometry && text === this._geometry.dimsSpec) return;
     try {
-      // A bare group prefix keeps the current value range; otherwise parse as
-      // a full spec (handles paste of e.g. "9x9~0-8").
-      const parsed = /^[A-Z]+$/.test(text) && this._geometry
-        ? this._geometry.withMainCellGroup(text)
-        : CellGeometry.fromShapeSpec(text);
-      if (parsed.mainCellGroup && !this._primaryCellGroupChoices().some(
-        g => g.prefix === parsed.mainCellGroup)) {
-        throw new Error(`No cell group '${CellGeometry.displayCellId(
-          parsed.mainCellGroup)}' with its own dimensions`);
+      const parsed = CellGeometry.fromShapeSpec(text);
+      // Cell group shapes can only be loaded from a full puzzle spec, not
+      // entered here.
+      if (parsed.mainCellGroup) {
+        throw new Error('A cell group cannot be used as the grid shape');
       }
       this._shapeSpecInput.setCustomValidity('');
       this.collection.setShape(parsed);

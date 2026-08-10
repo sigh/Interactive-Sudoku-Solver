@@ -209,11 +209,6 @@ export class CellGeometry {
       this.numRows, this.numCols, max - min + 1, min - 1, this.mainCellGroup);
   }
 
-  // The same value range with a cell group in the main grid's place.
-  withMainCellGroup(prefix) {
-    return new CellGeometry(0, 0, this.numValues, this.valueOffset, prefix);
-  }
-
   minValue() {
     return 1 + this.valueOffset;
   }

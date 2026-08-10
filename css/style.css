@@ -970,10 +970,6 @@ select.thin-select {
   background: var(--color-background-special);
 }
 
-.shape-dropdown-item.divided {
-  border-top: 1px solid var(--color-border-light);
-}
-
 .shape-dropdown-help {
   padding: 2px;
   border-top: 1px solid var(--color-border-light);
