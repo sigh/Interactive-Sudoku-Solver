@@ -173,11 +173,13 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
       panel, /* defaultOpen= */ true);
 
     this._shapeSpecInput = document.getElementById('shape-input');
+    this._gridTypeSelect = document.getElementById('grid-type-input');
     this._minSelect = document.getElementById('value-range-min');
     this._maxSelect = document.getElementById('value-range-max');
     this._varForm = document.forms['var-constraint-input'];
 
     this._setUpGridInput();
+    this._setUpGridTypeInput();
     this._setUpValueRangeDropdowns();
     this._setUpVarInput();
   }
@@ -267,9 +269,9 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
       { text, action: () => applySpec(spec) });
 
     this.constructor._SHAPE_PRESETS.forEach(spec => addSpecEntry(spec));
-    const primaryDims = geometry.primaryDimsStr();
-    if (primaryDims && !this.constructor._SHAPE_PRESETS.includes(primaryDims)) {
-      addSpecEntry(primaryDims);
+    const dims = geometry.gridDimsStr;
+    if (!this.constructor._SHAPE_PRESETS.includes(dims)) {
+      addSpecEntry(dims);
     }
 
     clearDOMNode(this._dropdownItemsElem);
@@ -290,6 +292,31 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
     this._highlightDropdownItem(-1);
   }
 
+  _setUpGridTypeInput() {
+    const select = this._gridTypeSelect;
+    for (const gridType of CellGeometry.GRID_TYPES) {
+      const opt = document.createElement('option');
+      opt.value = gridType;
+      opt.textContent = gridType;
+      select.appendChild(opt);
+    }
+    select.onchange = () => this._applyGridType(select.value);
+  }
+
+  _applyGridType(gridType) {
+    if (!this._geometry) return;
+    try {
+      const parsed = this._geometry.withGridType(gridType);
+      this._gridTypeSelect.setCustomValidity('');
+      this.collection.setShape(parsed);
+    } catch (e) {
+      // e.g. too few values for a Sudoku grid.
+      this._gridTypeSelect.value = this._geometry.gridType;
+      this._gridTypeSelect.setCustomValidity(e.toString());
+      this._gridTypeSelect.reportValidity();
+    }
+  }
+
   _setUpValueRangeDropdowns() {
     const onchange = () => {
       this._applyValueRange(+this._minSelect.value, +this._maxSelect.value);
@@ -298,25 +325,21 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
     this._maxSelect.onchange = onchange;
   }
 
-  // The dims spec in the display form: cell groups render as '$A'.
   _displayedDimsSpec() {
-    return CellGeometry.displayCellId(this._geometry.dimsSpec);
+    return this._geometry.gridDimsStr;
   }
 
   _applyShape() {
-    // A leading '$' is the display form of the cell group prefix.
-    const text = this._shapeSpecInput.value.trim().replace(/^\$/, 'V');
+    const text = this._shapeSpecInput.value.trim();
     if (!text) return;
-    // Re-entering the current spec is a no-op: it must not reset the value
-    // range, and a loaded cell group shape is valid but can't be re-entered.
-    if (this._geometry && text === this._geometry.dimsSpec) return;
+    // Re-entering the current dims is a no-op, so it does not reset the
+    // value range.
+    if (this._geometry && text === this._geometry.gridDimsStr) return;
     try {
-      const parsed = CellGeometry.fromShapeSpec(text);
-      // Cell group shapes can only be loaded from a full puzzle spec, not
-      // entered here.
-      if (parsed.mainCellGroup) {
-        throw new Error('A cell group cannot be used as the grid shape');
-      }
+      // The grid type has its own input, so typing dimensions preserves it
+      // unless the spec sets one explicitly.
+      const parsed = CellGeometry.fromShapeSpec(
+        text, this._geometry?.gridType);
       this._shapeSpecInput.setCustomValidity('');
       this.collection.setShape(parsed);
     } catch (e) {
@@ -347,14 +370,14 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
   }
 
   _updateValueRangeDropdowns(geometry) {
-    const defaultNV = CellGeometry.defaultNumValues(geometry.numRows, geometry.numCols);
     const minValue = geometry.minValue();
 
     this._setSelectOptions(this._minSelect, [0, 1], minValue);
 
     // The max options run from the constructor's numValues floor up to
     // MAX_SIZE.
-    const maxLow = minValue + Math.max(1, defaultNV) - 1;
+    const maxLow = minValue + CellGeometry.numValuesFloor(
+      geometry.numRows, geometry.numCols, geometry.gridType) - 1;
     const maxHigh = minValue + CellGeometry.MAX_SIZE - 1;
     this._setSelectOptions(
       this._maxSelect,
@@ -366,6 +389,8 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
     this._geometry = geometry;
     this._shapeSpecInput.value = this._displayedDimsSpec();
     this._shapeSpecInput.setCustomValidity('');
+    this._gridTypeSelect.value = geometry.gridType;
+    this._gridTypeSelect.setCustomValidity('');
     this._updateValueRangeDropdowns(geometry);
     // The size field resets to the new shape's dimensions.
     this._varForm['var-count'].value = '';
@@ -379,12 +404,12 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
     });
   }
 
-  // Prefill the size field with the shape's dimensions — the primary group's
-  // when it stands in for the grid. A user-typed value is left alone.
+  // Prefill the size field with the grid's dimensions. A user-typed value is
+  // left alone.
   _updateVarSizeDefault() {
     const input = this._varForm['var-count'];
     if (input.value && input.value !== this._autoSize) return;
-    this._autoSize = this._geometry.primaryDimsStr();
+    this._autoSize = this._geometry.gridDimsStr;
     input.value = this._autoSize;
   }
 

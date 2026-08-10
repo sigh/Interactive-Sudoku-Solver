@@ -31,7 +31,6 @@ const { GridDisplay, BorderDisplay, VarCellDisplay } =
 const { CellGeometry } = await import('../../js/cell_geometry.js');
 
 const GRID_4x4 = CellGeometry.fromGridSize(4);
-const GROUP_SHAPE = CellGeometry.fromShapeSpec('VA~1-4');
 
 await runTest('GridDisplay draws the cell lines in its style', () => {
   const svg = mockEl('g');
@@ -56,33 +55,12 @@ await runTest('BorderDisplay draws the border, with an optional fill', () => {
   assert.equal(filled.children[0].getAttribute('fill'), 'red');
 });
 
-await runTest('grid displays draw nothing without a grid', () => {
-  const svg = mockEl('g');
-  new GridDisplay(svg).reshape(GROUP_SHAPE);
-  new BorderDisplay(svg).reshape(GROUP_SHAPE);
-  assert.equal(svg.children.length, 0);
-});
-
 const layoutEntry = (over = {}) => ({
   group: { prefix: 'VA', label: '', cells: [0, 1, 2, 3] },
-  columns: 2, rows: 2, yLabel: 0, y: 14, primary: false, ...over,
+  columns: 2, rows: 2, yLabel: 0, y: 14, ...over,
 });
 
-await runTest('VarCellDisplay renders the primary as the main grid', () => {
-  const svg = mockEl('g');
-  new VarCellDisplay(svg, () => { }).render([layoutEntry({ primary: true })]);
-
-  // A block and a label; no close button for the primary.
-  const [block, label] = svg.children;
-  assert.equal(svg.children.length, 2);
-  const [lines, border] = block.children;
-  assert.equal(block.getAttribute('transform'), 'translate(0,14)');
-  assert.equal(lines.getAttribute('stroke'), GridDisplay.STYLE['stroke']);
-  assert.equal(border.getAttribute('stroke'), BorderDisplay.STYLE['stroke']);
-  assert.equal(label.textContent, '$A [2x2]');
-});
-
-await runTest('VarCellDisplay renders overlay groups lightly', () => {
+await runTest('VarCellDisplay renders groups lightly with a close button', () => {
   const removed = [];
   const svg = mockEl('g');
   new VarCellDisplay(svg, (prefix) => removed.push(prefix)).render(

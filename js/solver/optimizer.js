@@ -66,7 +66,8 @@ export class SudokuConstraintOptimizer {
     this._addPerfectAllDifferentHandlers(handlerSet, geometry, effectiveValues);
 
 
-    if (!geometry.isSquare()) {
+    if (geometry.gridType === CellGeometry.SUDOKU_GRID_TYPE &&
+      !geometry.isSquare()) {
       this._optimizeNonSquareGrids(handlerSet, boxRegions, geometry);
     }
 
@@ -806,6 +807,8 @@ export class SudokuConstraintOptimizer {
   }
 
   _fillInSumGap(sumHandlers, sumCells, geometry) {
+    // The grid total is only known when the rows are Sudoku houses.
+    if (geometry.gridType !== CellGeometry.SUDOKU_GRID_TYPE) return [];
     // Fill in a gap if one remains.
     // Exclude handlers with cells outside the grid.
     const gridHandlers = sumHandlers.filter(
@@ -1231,14 +1234,17 @@ export class SudokuConstraintOptimizer {
   _overlapRegions(geometry, boxRegions, valueCount) {
     const regions = [];
 
+    // Rows and columns are only houses on a Sudoku grid.
+    const isSudoku = geometry.gridType === CellGeometry.SUDOKU_GRID_TYPE;
+
     // Rows are houses if they have valueCount cells (numCols === valueCount).
-    if (geometry.numCols === valueCount) {
+    if (isSudoku && geometry.numCols === valueCount) {
       const rowRegions = SudokuConstraintBase.rowRegions(geometry);
       regions.push(rowRegions, rowRegions.slice().reverse());
     }
 
     // Columns are houses if they have valueCount cells (numRows === valueCount).
-    if (geometry.numRows === valueCount) {
+    if (isSudoku && geometry.numRows === valueCount) {
       const colRegions = SudokuConstraintBase.colRegions(geometry);
       regions.push(colRegions, colRegions.slice().reverse());
     }

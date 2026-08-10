@@ -873,32 +873,31 @@ logSuiteComplete('Adjacency validation');
 await runTest('isDefinedFor: cells must exist', () => {
   const grid = CellGeometry.fromGridSize(9);
   const small = CellGeometry.fromGridSize(6);
-  const groupShape = CellGeometry.fromShapeSpec('VA~1-6');
-  groupShape._varCellRegistry.addGroups(
+  const withGroup = CellGeometry.fromGridSize(6);
+  withGroup._varCellRegistry.addGroups(
     [{ prefix: 'VA', label: '', count: 36, columns: 6 }]);
 
   const onGrid = new SudokuConstraint.Given('R9C9', 5);
   assert.ok(onGrid.isDefinedFor(grid));
   assert.ok(!onGrid.isDefinedFor(small));
-  assert.ok(!onGrid.isDefinedFor(groupShape));
 
   const onGroup = new SudokuConstraint.Given('VA1', 5);
-  assert.ok(onGroup.isDefinedFor(groupShape));
+  assert.ok(onGroup.isDefinedFor(withGroup));
   assert.ok(!onGroup.isDefinedFor(grid));
 });
 
-await runTest('isDefinedFor: grid-defined constraints need the grid', () => {
-  const groupShape = CellGeometry.fromShapeSpec('VA~1-6');
+await runTest('isDefinedFor: grid-defined constraints need a Sudoku grid', () => {
+  const raw = CellGeometry.fromShapeSpec('9x9~~Raw');
   const antiKnight = new SudokuConstraint.AntiKnight();
   assert.ok(antiKnight.isDefinedFor(CellGeometry.fromGridSize(9)));
-  assert.ok(!antiKnight.isDefinedFor(groupShape));
+  assert.ok(!antiKnight.isDefinedFor(raw));
 });
 
 await runTest('isValidForShape: flagged or shape-invalid types', () => {
-  const groupShape = CellGeometry.fromShapeSpec('VA~1-6');
+  const raw = CellGeometry.fromShapeSpec('9x9~~Raw');
   assert.ok(SudokuConstraint.AntiKnight.isValidForShape(
     CellGeometry.fromGridSize(9)));
-  assert.ok(!SudokuConstraint.AntiKnight.isValidForShape(groupShape));
+  assert.ok(!SudokuConstraint.AntiKnight.isValidForShape(raw));
 
   // VALIDATE_SHAPE_FN failures too: Windoku needs a square grid.
   assert.ok(!SudokuConstraint.Windoku.isValidForShape(
@@ -912,18 +911,18 @@ await runTest('isDefinedFor: shape-invalid types are not defined', () => {
 });
 
 await runTest('isDefinedFor: composites follow their children', () => {
-  const groupShape = CellGeometry.fromShapeSpec('VA~1-6');
-  groupShape._varCellRegistry.addGroups(
+  const withGroup = CellGeometry.fromGridSize(6);
+  withGroup._varCellRegistry.addGroups(
     [{ prefix: 'VA', label: '', count: 36, columns: 6 }]);
 
   const onGrid = new SudokuConstraint.Or(
-    [new SudokuConstraint.Given('R1C1', 5)]);
+    [new SudokuConstraint.Given('R9C9', 5)]);
   assert.ok(onGrid.isDefinedFor(CellGeometry.fromGridSize(9)));
-  assert.ok(!onGrid.isDefinedFor(groupShape));
+  assert.ok(!onGrid.isDefinedFor(withGroup));
 
   const onGroup = new SudokuConstraint.Or(
     [new SudokuConstraint.Given('VA1', 5)]);
-  assert.ok(onGroup.isDefinedFor(groupShape));
+  assert.ok(onGroup.isDefinedFor(withGroup));
 });
 
 // ============================================================================

@@ -943,6 +943,10 @@ select.thin-select {
   padding: 2px 20px 2px 5px;
 }
 
+#grid-type-input {
+  justify-self: start;
+}
+
 .shape-panel-body .hstack {
   column-gap: 5px;
 }

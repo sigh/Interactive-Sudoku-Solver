@@ -7,10 +7,10 @@ ensureGlobalEnvironment();
 const { SudokuBuilder } = await import('../../js/solver/sudoku_builder.js' + self.VERSION_PARAM);
 const { SudokuParser } = await import('../../js/sudoku_parser.js' + self.VERSION_PARAM);
 
-// Solution counts with the shape dimensions taken from a var group, verified
+// Solution counts on a Raw grid (no implicit constraints), verified against
 // brute-force enumeration of the TRUE constraint semantics (not the handler
-// implementations). Cells are VA{n}, row-major: R{r}C{c} -> VA{(r-1)*cols+c},
-// 0-indexed below as n-1.
+// implementations). Brute-force cells are 0-indexed row-major:
+// R{r}C{c} -> (r-1)*cols + c-1.
 
 const countSolutions = (input) => {
   const constraint = SudokuParser.parseString(input);
@@ -48,66 +48,66 @@ const allDistinct = (vs) => new Set(vs).size === vs.length;
 
 await runTest('empty 2x3 group has numValues^numCells solutions', () => {
   assert.equal(
-    countSolutions('.Shape~VA~3.Var~A~~2x3.'), 3 ** 6);
+    countSolutions('.Shape~2x3~3~Raw.'), 3 ** 6);
 });
 
 await runTest('4x4 group with only givens counts numValues^free', () => {
-  const input = '.Shape~VA~4.Var~A~~4x4.' +
-    '~VA1_1~VA3_2~VA6_3~VA8_4~VA9_2~VA11_3~VA14_4~VA16_1~VA13_2~VA5_4';
+  const input = '.Shape~4x4~4~Raw.' +
+    '~R1C1_1~R1C3_2~R2C2_3~R2C4_4~R3C1_2~R3C3_3~R4C2_4~R4C4_1~R4C1_2~R2C1_4';
   assert.equal(countSolutions(input), 4 ** 6);
 });
 
 await runTest('4x4 cage+thermo count matches brute force', () => {
   const givens = new Map([
-    [0, 1],   // VA1
-    [4, 3],   // VA5
-    [5, 2],   // VA6
-    [7, 1],   // VA8
-    [11, 2],  // VA12
-    [12, 3],  // VA13
-    [15, 1],  // VA16
-    [8, 2],   // VA9
+    [0, 1],   // R1C1
+    [4, 3],   // R2C1
+    [5, 2],   // R2C2
+    [7, 1],   // R2C4
+    [11, 2],  // R3C4
+    [12, 3],  // R4C1
+    [15, 1],  // R4C4
+    [8, 2],   // R3C1
   ]);
   const cage = (vs) => {
-    const cells = [vs[1], vs[2], vs[3]];  // VA2, VA3, VA4
+    const cells = [vs[1], vs[2], vs[3]];  // R1C2, R1C3, R1C4
     return allDistinct(cells) && cells[0] + cells[1] + cells[2] === 7;
   };
   const thermo = (vs) =>
-    vs[13] < vs[14] && vs[14] < vs[10];  // VA14 < VA15 < VA11
+    vs[13] < vs[14] && vs[14] < vs[10];  // R4C2 < R4C3 < R3C3
 
   const expected = bruteForceCount(16, 4, givens, [cage, thermo]);
   assert.ok(expected > 0, 'test case must be satisfiable');
 
-  const input = '.Shape~VA~4.Var~A~~4x4' +
-    '.Cage~7~VA2~VA3~VA4' +
-    '.Thermo~VA14~VA15~VA11' +
-    '.~VA1_1~VA5_3~VA6_2~VA8_1~VA12_2~VA13_3~VA16_1~VA9_2';
+  const input = '.Shape~4x4~4~Raw' +
+    '.Cage~7~R1C2~R1C3~R1C4' +
+    '.Thermo~R4C2~R4C3~R3C3' +
+    '.~R1C1_1~R2C1_3~R2C2_2~R2C4_1~R3C4_2~R4C1_3~R4C4_1~R3C1_2';
   assert.equal(countSolutions(input), expected);
 });
 
 await runTest('4x4 constraint-provided full house matches brute force', () => {
   // The AllDifferent covers numValues cells, so it can be promoted to a
-  // full PerfectAllDifferent house even without the main grid.
+  // full PerfectAllDifferent house even without the Sudoku defaults.
   const givens = new Map([
-    [0, 4],   // VA1
-    [2, 2],   // VA3
-    [6, 1],   // VA7
-    [9, 3],   // VA10
-    [14, 4],  // VA15
-    [15, 2],  // VA16
-    [3, 3],   // VA4
-    [12, 1],  // VA13
+    [0, 4],   // R1C1
+    [2, 2],   // R1C3
+    [6, 1],   // R2C3
+    [9, 3],   // R3C2
+    [14, 4],  // R4C3
+    [15, 2],  // R4C4
+    [3, 3],   // R1C4
+    [12, 1],  // R4C1
   ]);
   const house = (vs) => allDistinct([vs[1], vs[5], vs[9], vs[13]]);
-  const whiteDot = (vs) => Math.abs(vs[10] - vs[11]) === 1;  // VA11-VA12
+  const whiteDot = (vs) => Math.abs(vs[10] - vs[11]) === 1;  // R3C3-R3C4
 
   const expected = bruteForceCount(16, 4, givens, [house, whiteDot]);
   assert.ok(expected > 0, 'test case must be satisfiable');
 
-  const input = '.Shape~VA~4.Var~A~~4x4' +
-    '.AllDifferent~VA2~VA6~VA10~VA14' +
-    '.WhiteDot~VA11~VA12' +
-    '.~VA1_4~VA3_2~VA7_1~VA10_3~VA15_4~VA16_2~VA4_3~VA13_1';
+  const input = '.Shape~4x4~4~Raw' +
+    '.AllDifferent~R1C2~R2C2~R3C2~R4C2' +
+    '.WhiteDot~R3C3~R3C4' +
+    '.~R1C1_4~R1C3_2~R2C3_1~R3C2_3~R4C3_4~R4C4_2~R1C4_3~R4C1_1';
   assert.equal(countSolutions(input), expected);
 });
 
@@ -117,14 +117,14 @@ await runTest('restricted value domain (givens on a 0-3 grid) matches brute forc
   // 1-based values, shifted by the -1 offset (faces {0,2} are internal
   // values {1,3}).
   const singleGivens = new Map([
-    [2, 1], [3, 3],             // VA3=0, VA4=2
-    [5, 3], [6, 1], [7, 3],     // VA6=2, VA7=0, VA8=2
-    [8, 1], [10, 3], [13, 1],   // VA9=0, VA11=2, VA14=0
-    [14, 3], [15, 1],           // VA15=2, VA16=0
+    [2, 1], [3, 3],             // R1C3=0, R1C4=2
+    [5, 3], [6, 1], [7, 3],     // R2C2=2, R2C3=0, R2C4=2
+    [8, 1], [10, 3], [13, 1],   // R3C1=0, R3C3=2, R4C2=0
+    [14, 3], [15, 1],           // R4C3=2, R4C4=0
   ]);
   const restricted = (vs) => vs.every(v => v === 1 || v === 3);
   const cage = (vs) => {
-    const faces = [vs[1] - 1, vs[4] - 1];  // VA2, VA5
+    const faces = [vs[1] - 1, vs[4] - 1];  // R1C2, R2C1
     return allDistinct(faces) && faces[0] + faces[1] === 2;
   };
 
@@ -132,32 +132,34 @@ await runTest('restricted value domain (givens on a 0-3 grid) matches brute forc
   assert.ok(expected > 0, 'test case must be satisfiable');
 
   const restrictions = [];
-  for (let i = 1; i <= 16; i++) restrictions.push(`VA${i}_0_2`);
-  const input = '.Shape~VA~0-3.Var~A~~4x4' +
-    '.Cage~2~VA2~VA5' +
+  for (let i = 0; i < 16; i++) {
+    restrictions.push(`R${(i / 4 | 0) + 1}C${i % 4 + 1}_0_2`);
+  }
+  const input = '.Shape~4x4~0-3~Raw' +
+    '.Cage~2~R1C2~R2C1' +
     `.~${restrictions.join('~')}` +
-    '.~VA3_0~VA4_2~VA6_2~VA7_0~VA8_2~VA9_0~VA11_2~VA14_0~VA15_2~VA16_0';
+    '.~R1C3_0~R1C4_2~R2C2_2~R2C3_0~R2C4_2~R3C1_0~R3C3_2~R4C2_0~R4C3_2~R4C4_0';
   assert.equal(countSolutions(input), expected);
 });
 
 // ============================================================================
-// Semantics of allowed line/count constraints without the main grid.
+// Semantics of line/count constraints without the Sudoku defaults.
 // ============================================================================
 
-// VA cells 0-indexed. Values are 1-4.
+// Brute-force cells 0-indexed. Values are 1-4.
 const GIVENS_ROWS_3_4 = new Map([
-  [6, 1], [7, 4],                     // VA7-VA8:   1 4
-  [8, 2], [9, 4], [10, 1], [11, 3],   // VA9-VA12:  2 4 1 3
-  [12, 3], [13, 1], [14, 4], [15, 2], // VA13-VA16: 3 1 4 2
+  [6, 1], [7, 4],                     // R2C3-R2C4:   1 4
+  [8, 2], [9, 4], [10, 1], [11, 3],   // R3C1-R3C4:  2 4 1 3
+  [12, 3], [13, 1], [14, 4], [15, 2], // R4C1-R4C4: 3 1 4 2
 ]);
 const GIVENS_STR_ROWS_3_4 =
-  '.~VA7_1~VA8_4~VA9_2~VA10_4~VA11_1~VA12_3~VA13_3~VA14_1~VA15_4~VA16_2';
+  '.~R2C3_1~R2C4_4~R3C1_2~R3C2_4~R3C3_1~R3C4_3~R4C1_3~R4C2_1~R4C3_4~R4C4_2';
 
 await runTest('standalone Lunchbox self-enforces distinctness (brute force)', () => {
   // Lunchbox declares its own cells all-different; the crusts are 1 and
   // numValues, and the clue is the sum of values strictly between them.
   const lunchbox = (vs) => {
-    const line = [vs[0], vs[1], vs[2], vs[3]];  // VA1-VA4
+    const line = [vs[0], vs[1], vs[2], vs[3]];  // R1C1-R1C4
     if (!allDistinct(line)) return false;
     const lo = Math.min(line.indexOf(1), line.indexOf(4));
     const hi = Math.max(line.indexOf(1), line.indexOf(4));
@@ -166,33 +168,33 @@ await runTest('standalone Lunchbox self-enforces distinctness (brute force)', ()
     return sum === 5;
   };
 
-  const givens = new Map([...GIVENS_ROWS_3_4, [4, 1], [5, 2]]);  // VA5, VA6
+  const givens = new Map([...GIVENS_ROWS_3_4, [4, 1], [5, 2]]);  // R2C1, R2C2
   const expected = bruteForceCount(16, 4, givens, [lunchbox]);
   assert.ok(expected > 0, 'test case must be satisfiable');
 
-  const input = '.Shape~VA~4.Var~A~~4x4' +
-    '.Lunchbox~5~VA1~VA2~VA3~VA4' + GIVENS_STR_ROWS_3_4 + '~VA5_1~VA6_2';
+  const input = '.Shape~4x4~4~Raw' +
+    '.Lunchbox~5~R1C1~R1C2~R1C3~R1C4' + GIVENS_STR_ROWS_3_4 + '~R2C1_1~R2C2_2';
   assert.equal(countSolutions(input), expected);
 });
 
 await runTest('CountingCircles counts repeated values across circles (brute force)', () => {
   // Every value appearing in a circle must appear in exactly that many
   // circles; repeats outside the circles are unconstrained.
-  const circleCells = [0, 1, 5];  // VA1, VA2, VA6
+  const circleCells = [0, 1, 5];  // R1C1, R1C2, R2C2
   const countingCircles = (vs) => {
     const values = circleCells.map(c => vs[c]);
     return values.every(v => values.filter(o => o === v).length === v);
   };
 
   const givens = new Map(
-    [...GIVENS_ROWS_3_4, [2, 4], [3, 2], [4, 1]]);  // VA3, VA4, VA5
+    [...GIVENS_ROWS_3_4, [2, 4], [3, 2], [4, 1]]);  // R1C3, R1C4, R2C1
   const expected = bruteForceCount(16, 4, givens, [countingCircles]);
   assert.ok(expected > 0, 'test case must be satisfiable');
 
-  const input = '.Shape~VA~4.Var~A~~4x4' +
-    '.CountingCircles~VA1~VA2~VA6' + GIVENS_STR_ROWS_3_4 +
-    '~VA3_4~VA4_2~VA5_1';
+  const input = '.Shape~4x4~4~Raw' +
+    '.CountingCircles~R1C1~R1C2~R2C2' + GIVENS_STR_ROWS_3_4 +
+    '~R1C3_4~R1C4_2~R2C1_1';
   assert.equal(countSolutions(input), expected);
 });
 
-logSuiteComplete('main_cell_group_counting.test.js');
+logSuiteComplete('raw_grid_counting.test.js');

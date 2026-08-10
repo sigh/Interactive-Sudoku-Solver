@@ -1043,7 +1043,7 @@ class DefaultRegions extends BaseConstraintDisplayItem {
 
     const svg = this.getSvg();
 
-    if (this._noBoxes) {
+    if (this._noBoxes || geometry.gridType !== CellGeometry.SUDOKU_GRID_TYPE) {
       svg.setAttribute('display', 'none');
       return;
     }
@@ -1235,6 +1235,9 @@ class OutsideClue extends BaseConstraintDisplayItem {
     super.reshape(geometry);
     super.clear();
     this._outsideArrowMap.clear();
+
+    // Outside clues are only valid on a Sudoku grid.
+    if (geometry.gridType !== CellGeometry.SUDOKU_GRID_TYPE) return;
 
     const diagonalCellMap = SudokuConstraint.LittleKiller.cellMap(geometry);
     for (const arrowId in diagonalCellMap) {

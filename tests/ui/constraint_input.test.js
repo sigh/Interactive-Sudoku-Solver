@@ -566,6 +566,10 @@ const createShapeInput = () => {
   shapeSpecInput.setCustomValidity = () => { };
   shapeSpecInput.reportValidity = () => { };
   elementsById['shape-input'] = shapeSpecInput;
+  const gridTypeSelect = createMockElement('select');
+  gridTypeSelect.setCustomValidity = () => { };
+  gridTypeSelect.reportValidity = () => { };
+  elementsById['grid-type-input'] = gridTypeSelect;
   const minSelect = createMockElement('select');
   const maxSelect = createMockElement('select');
   elementsById['value-range-min'] = minSelect;
@@ -586,18 +590,9 @@ const createShapeInput = () => {
   };
   const shape = new ConstraintCategoryInput.Shape(collection);
   return {
-    shape, collection, shapeSpecInput, minSelect, maxSelect, varForm,
-    dropdownItems,
+    shape, collection, shapeSpecInput, gridTypeSelect, minSelect, maxSelect,
+    varForm, dropdownItems,
   };
-};
-
-const groupGeometry = (withPrimary) => {
-  const geometry = CellGeometry.fromShapeSpec('VA~1-6');
-  if (withPrimary) {
-    geometry._varCellRegistry.addGroups(
-      [{ prefix: 'VA', label: '', count: 36, columns: 6 }]);
-  }
-  return geometry;
 };
 
 await runTest('Shape.reshape shows the dimension spec', () => {
@@ -606,26 +601,21 @@ await runTest('Shape.reshape shows the dimension spec', () => {
   shape.reshape(CellGeometry.fromShapeSpec('9x9~0-8'));
   assert.equal(shapeSpecInput.value, '9x9');
 
-  // Cell groups render in the display form.
-  shape.reshape(groupGeometry(true));
-  assert.equal(shapeSpecInput.value, '$A');
+  // The grid type does not appear in the dims input.
+  shape.reshape(CellGeometry.fromShapeSpec('6x6~~Raw'));
+  assert.equal(shapeSpecInput.value, '6x6');
 });
 
-await runTest('Shape._applyShape rejects cell group shapes', () => {
+await runTest('Shape._applyShape rejects invalid specs', () => {
   const { shape, collection, shapeSpecInput } = createShapeInput();
 
-  const grid = CellGeometry.fromGridSize(9);
-  grid._varCellRegistry.addGroups(
-    [{ prefix: 'VA', label: '', count: 81, columns: 9 }]);
-  shape.reshape(grid);
+  shape.reshape(CellGeometry.fromGridSize(9));
 
-  // Neither a full group spec nor a bare prefix is accepted, even when the
-  // group exists.
-  shapeSpecInput.value = '$A~1-9';
+  shapeSpecInput.value = '$A';
   shape._applyShape();
   assert.equal(collection.shaped, null);
 
-  shapeSpecInput.value = '$A';
+  shapeSpecInput.value = 'VA~1-9';
   shape._applyShape();
   assert.equal(collection.shaped, null);
 });
@@ -637,42 +627,37 @@ await runTest('Shape value range dropdowns floor at one value', () => {
   shape.reshape(CellGeometry.fromShapeSpec('9x9'));
   assert.equal(maxSelect.children[0].value, 9);
 
-  // A cell group shape has no grid to floor from; one value is the minimum.
-  shape.reshape(groupGeometry(true));
+  // A Raw grid has no house floor; one value is the minimum.
+  shape.reshape(CellGeometry.fromShapeSpec('9x9~~Raw'));
   assert.equal(maxSelect.children[0].value, 1);
 });
 
-await runTest('Shape._applyValueRange keeps the dimensions', () => {
+await runTest('Shape._applyValueRange keeps the dimensions and type', () => {
   const { shape, collection } = createShapeInput();
 
   shape.reshape(CellGeometry.fromShapeSpec('9x9'));
   shape._applyValueRange(0, 8);
   assert.equal(collection.shaped.name, '9x9~0-8');
 
-  shape.reshape(groupGeometry(true));
+  shape.reshape(CellGeometry.fromShapeSpec('9x9~~Raw'));
   shape._applyValueRange(1, 8);
-  assert.equal(collection.shaped.mainCellGroup, 'VA');
+  assert.equal(collection.shaped.gridType, 'Raw');
   assert.equal(collection.shaped.numValues, 8);
 });
 
-await runTest('Shape var size prefills from the shape dimensions', () => {
+await runTest('Shape var size prefills from the grid dimensions', () => {
   const { shape, varForm } = createShapeInput();
   const sizeInput = varForm['var-count'];
 
   shape.reshape(CellGeometry.fromShapeSpec('9x9'));
   assert.equal(sizeInput.value, '9x9');
 
-  // No primary group registered yet: nothing to prefill from.
-  const geometry = groupGeometry(false);
-  shape.reshape(geometry);
-  assert.equal(sizeInput.value, '');
-
-  // The primary registering (as when a puzzle loads) fills the prefill in.
-  geometry._varCellRegistry.addGroups(
-    [{ prefix: 'VA', label: '', count: 18, columns: 9 }]);
-  assert.equal(sizeInput.value, '2x9');
+  shape.reshape(CellGeometry.fromShapeSpec('4x6~~Raw'));
+  assert.equal(sizeInput.value, '4x6');
 
   // A user-typed value survives later group changes.
+  const geometry = CellGeometry.fromGridSize(9);
+  shape.reshape(geometry);
   sizeInput.value = '4x4';
   geometry._varCellRegistry.addGroups(
     [{ prefix: 'VB', label: '', count: 4, columns: 0 }]);
@@ -682,7 +667,7 @@ await runTest('Shape var size prefills from the shape dimensions', () => {
 await runTest('Shape dropdown lists presets and current dims only', () => {
   const { shape, dropdownItems } = createShapeInput();
 
-  // Cell groups are never suggested, even ones with their own dimensions.
+  // Cell groups are never suggested.
   const grid = CellGeometry.fromGridSize(9);
   grid._varCellRegistry.addGroups(
     [{ prefix: 'VA', label: 'over', count: 4, columns: 2 }]);
@@ -691,38 +676,71 @@ await runTest('Shape dropdown lists presets and current dims only', () => {
     dropdownItems.children.map(i => i.textContent),
     ['9x9', '6x6', '16x16']);
 
-  // A non-preset primary adds its own dimensions.
-  const group = CellGeometry.fromShapeSpec('VA~1-6');
-  group._varCellRegistry.addGroups(
-    [{ prefix: 'VA', label: '', count: 18, columns: 9 }]);
-  shape.reshape(group);
+  // A non-preset grid adds its own dimensions.
+  shape.reshape(CellGeometry.fromGridSize(2, 9));
   assert.deepEqual(
     dropdownItems.children.map(i => i.textContent),
     ['9x9', '6x6', '16x16', '2x9']);
 });
 
-await runTest('_applyShape returns to the main grid with a dims spec', () => {
+await runTest('the grid type select follows the geometry', () => {
+  const { shape, gridTypeSelect } = createShapeInput();
+
+  assert.deepEqual(
+    gridTypeSelect.children.map(o => o.value), ['Sudoku', 'Raw']);
+
+  shape.reshape(CellGeometry.fromGridSize(9));
+  assert.equal(gridTypeSelect.value, 'Sudoku');
+
+  shape.reshape(CellGeometry.fromShapeSpec('9x9~~Raw'));
+  assert.equal(gridTypeSelect.value, 'Raw');
+});
+
+await runTest('_applyGridType keeps the dims and value range', () => {
+  const { shape, collection } = createShapeInput();
+
+  shape.reshape(CellGeometry.fromShapeSpec('6x6~0-5'));
+  shape._applyGridType('Raw');
+  assert.equal(collection.shaped.name, '6x6~0-5~Raw');
+});
+
+await runTest('_applyGridType reverts when the value range is invalid', () => {
+  const { shape, collection, gridTypeSelect } = createShapeInput();
+
+  // A 2-value Raw grid cannot become a Sudoku grid.
+  shape.reshape(CellGeometry.fromShapeSpec('9x9~1-2~Raw'));
+  gridTypeSelect.value = 'Sudoku';
+  shape._applyGridType('Sudoku');
+
+  assert.equal(collection.shaped, null);
+  assert.equal(gridTypeSelect.value, 'Raw');
+});
+
+await runTest('_applyShape keeps the grid type when typing dims', () => {
   const { shape, collection, shapeSpecInput } = createShapeInput();
 
-  shape.reshape(groupGeometry(true));
+  shape.reshape(CellGeometry.fromShapeSpec('9x9~~Raw'));
   shapeSpecInput.value = '6x6';
   shape._applyShape();
+  assert.equal(collection.shaped.name, '6x6~~Raw');
 
-  assert.equal(collection.shaped.mainCellGroup, null);
+  // An explicit type in the spec wins.
+  shapeSpecInput.value = '6x6~~Sudoku';
+  shape._applyShape();
   assert.equal(collection.shaped.name, '6x6');
 });
 
-await runTest('checkbox categories disable for a cell group shape', () => {
+await runTest('checkbox categories disable for a Raw grid', () => {
   const layout = new ConstraintCategoryInput.LayoutCheckbox(
     createMockCollection());
   const grid = CellGeometry.fromGridSize(9);
-  const groupShape = CellGeometry.fromShapeSpec('VA~1-6');
+  const raw = CellGeometry.fromShapeSpec('9x9~~Raw');
 
   layout.reshape(grid);
   assert.ok([...layout._checkboxes.values()].some(
     item => !item.element.disabled));
 
-  layout.reshape(groupShape);
+  layout.reshape(raw);
   assert.ok([...layout._checkboxes.values()].every(
     item => item.element.disabled));
 });

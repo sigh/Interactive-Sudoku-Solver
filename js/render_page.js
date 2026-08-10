@@ -740,8 +740,9 @@ class ConstraintManager {
       listener.reshape(geometry);
     }
 
-    for (const panel of this._panelsRequiringMainGrid) {
-      panel.style.display = geometry.mainCellGroup ? 'none' : '';
+    for (const panel of this._panelsRequiringSudokuGrid) {
+      panel.style.display =
+        geometry.gridType !== CellGeometry.SUDOKU_GRID_TYPE ? 'none' : '';
     }
 
     this.runUpdateCallback();
@@ -865,7 +866,7 @@ class ConstraintManager {
       categoryInput.setUpdateCallback(this.runUpdateCallback.bind(this));
     }
 
-    this._panelsRequiringMainGrid = ['layout-constraint-container',
+    this._panelsRequiringSudokuGrid = ['layout-constraint-container',
       'global-constraints-container', 'outside-clue-container']
       .map(id => document.getElementById(id));
 
@@ -873,13 +874,8 @@ class ConstraintManager {
     this._setUpFreeFormInput();
 
     // Clear button.
-    // Clear the puzzle onto the same shape: when a cell group is the
-    // primary, its defining constraint survives.
     document.getElementById('clear-constraints-button').onclick = () => {
-      const primary = this._geometry.mainCellGroup &&
-        this._rootCollection.constraintForVarPrefix(this._geometry.mainCellGroup);
       this._clear();
-      if (primary) this._rootCollection.addConstraint(primary);
     };
 
     // Copy to clipboard.
@@ -1250,7 +1246,8 @@ class ConstraintChipView {
     const svg = createSvgElement('svg');
     svg.classList.add('chip-icon');
 
-    const [numRows, numCols] = geometry.primaryDims() ?? [1, 1];
+    const numRows = geometry.numRows;
+    const numCols = geometry.numCols;
     const widthPixels = DisplayItem.CELL_SIZE * numCols;
     const heightPixels = DisplayItem.CELL_SIZE * numRows;
     const scale = this._CHIP_ICON_SIZE_PX / Math.max(widthPixels, heightPixels);

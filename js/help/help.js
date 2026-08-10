@@ -226,8 +226,13 @@ const CATEGORY_CONFIGS = {
     `
   },
   'Shape': {
-    description: 'Overall grid size',
-    instructions: `Select the grid shape using the "Shape" dropdown.`
+    description: 'Overall grid size, value range and grid type',
+    instructions: `
+      Select the grid shape using the "Shape" dropdown.
+      The "Type" dropdown sets the grid type: "Sudoku" grids have the usual
+      row, column and box constraints; "Raw" grids have no implicit
+      constraints, and values may repeat.
+    `
   },
 };
 

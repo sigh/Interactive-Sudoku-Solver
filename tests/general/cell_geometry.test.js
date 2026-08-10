@@ -129,6 +129,40 @@ await runTest('fromShapeSpec throws on invalid dimensions', () => {
   assert.throws(() => CellGeometry.fromShapeSpec('17x9'));
 });
 
+await runTest('fromShapeSpec parses a grid type', () => {
+  const raw = CellGeometry.fromShapeSpec('9x9~~Raw');
+  assert.equal(raw.gridType, 'Raw');
+  assert.equal(raw.numValues, 9);
+  assert.equal(raw.name, '9x9~~Raw');
+
+  const withRange = CellGeometry.fromShapeSpec('9x9~0-8~Raw');
+  assert.equal(withRange.gridType, 'Raw');
+  assert.equal(withRange.name, '9x9~0-8~Raw');
+
+  assert.equal(CellGeometry.fromShapeSpec('9x9').gridType, 'Sudoku');
+});
+
+await runTest('the Raw grid type floors numValues at one', () => {
+  assert.equal(CellGeometry.fromShapeSpec('9x9~1-2~Raw').numValues, 2);
+  assert.throws(() => CellGeometry.fromShapeSpec('9x9~1-2'), /Invalid numValues/);
+});
+
+await runTest('fromShapeSpec throws on invalid grid type specs', () => {
+  // The empty range slot exists only to position a grid type.
+  assert.throws(() => CellGeometry.fromShapeSpec('9x9~'));
+  assert.throws(() => CellGeometry.fromShapeSpec('9x9~~'));
+  assert.throws(() => CellGeometry.fromShapeSpec('9x9~~Bogus'));
+  assert.throws(() => CellGeometry.fromShapeSpec('VA~0-8~Raw'));
+});
+
+await runTest('withGridType keeps the value range and validates it', () => {
+  const raw = CellGeometry.fromShapeSpec('9x9~0-8~Raw');
+  assert.equal(raw.withGridType('Sudoku').name, '9x9~0-8');
+
+  const shading = CellGeometry.fromShapeSpec('9x9~1-2~Raw');
+  assert.throws(() => shading.withGridType('Sudoku'), /Invalid numValues/);
+});
+
 // ============================================================================
 // Cell indexing
 // ============================================================================
@@ -425,11 +459,11 @@ await runTest('withValueRange keeps the shape', () => {
   const grid = CellGeometry.fromShapeSpec('9x9').withValueRange(0, 8);
   assert.equal(grid.name, '9x9~0-8');
 
-  const group = CellGeometry.fromShapeSpec('VA~1-6').withValueRange(1, 8);
-  assert.equal(group.mainCellGroup, 'VA');
-  assert.equal(group.name, 'VA~8');
+  const raw = CellGeometry.fromShapeSpec('9x9~~Raw').withValueRange(1, 6);
+  assert.equal(raw.gridType, 'Raw');
+  assert.equal(raw.name, '9x9~6~Raw');
 
-  // The grid still floors numValues.
+  // A Sudoku grid still floors numValues.
   assert.throws(() => CellGeometry.fromShapeSpec('9x9').withValueRange(1, 6));
 });
 
@@ -452,41 +486,11 @@ await runTest('count-only groups resolve columns to the grid', () => {
   assert.equal(columns.get('VB'), 2);
 });
 
-await runTest('count-only groups resolve columns to the primary group', () => {
-  const columns = groupColumns(CellGeometry.fromShapeSpec('VA~1-6'), [
-    { prefix: 'VA', count: 36, columns: 6 },
-    { prefix: 'VB', count: 10, columns: 0 },
-  ]);
-  assert.equal(columns.get('VB'), 6);
-});
-
-await runTest('primaryDimsStr follows the primary', () => {
-  assert.equal(CellGeometry.fromGridSize(9).primaryDimsStr(), '9x9');
-
-  const geometry = CellGeometry.fromShapeSpec('VA~1-6');
-  assert.equal(geometry.primaryDimsStr(), '');
+await runTest('primaryCells covers exactly the grid cells', () => {
+  const geometry = CellGeometry.fromGridSize(2);
   geometry._varCellRegistry.addGroups(
-    [{ prefix: 'VA', label: '', count: 18, columns: 9 }]);
-  assert.equal(geometry.primaryDimsStr(), '2x9');
-});
-
-await runTest('primaryCells follows the primary', () => {
-  assert.deepEqual(
-    CellGeometry.fromGridSize(2).primaryCells(), [0, 1, 2, 3]);
-
-  const geometry = CellGeometry.fromShapeSpec('VA~1-6');
-  geometry._varCellRegistry.addGroups([
-    { prefix: 'VA', label: '', count: 4, columns: 2 },
-    { prefix: 'VB', label: '', count: 2, columns: 2 },
-  ]);
+    [{ prefix: 'VB', label: '', count: 2, columns: 2 }]);
   assert.deepEqual(geometry.primaryCells(), [0, 1, 2, 3]);
-});
-
-await runTest('count-only columns stay unresolved while the named group is missing', () => {
-  const columns = groupColumns(CellGeometry.fromShapeSpec('VA~1-6'), [
-    { prefix: 'VB', count: 10, columns: 0 },
-  ]);
-  assert.equal(columns.get('VB'), 0);
 });
 
 logSuiteComplete('CellGeometry');

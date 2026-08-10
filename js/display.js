@@ -914,7 +914,6 @@ export class GridDisplay extends DisplayItem {
   reshape(geometry) {
     super.reshape(geometry);
     this.clear();
-    if (!geometry.numGridCells) return;
 
     this.getSvg().append(svgPath(
       cellBlockLines(geometry.numGridCells, geometry.numCols),
@@ -937,7 +936,6 @@ export class BorderDisplay extends DisplayItem {
   reshape(geometry) {
     super.reshape(geometry);
     this.clear();
-    if (!geometry.numGridCells) return;
 
     this.getSvg().append(svgPath(
       cellBlockBorder(geometry.numGridCells, geometry.numCols),
@@ -945,15 +943,13 @@ export class BorderDisplay extends DisplayItem {
   }
 }
 
-const renderCellBlock = (count, columns, asMainGrid) => {
+const renderCellBlock = (count, columns) => {
   const g = createSvgElement('g');
   g.setAttribute('fill', 'none');
-  g.append(svgPath(cellBlockLines(count, columns), asMainGrid
-    ? GridDisplay.STYLE
-    : { 'stroke': 'rgb(180, 180, 180)', 'stroke-width': 1 }));
-  g.append(svgPath(cellBlockBorder(count, columns), asMainGrid
-    ? BorderDisplay.STYLE
-    : { 'stroke': 'rgb(100, 100, 100)', 'stroke-width': 1.5 }));
+  g.append(svgPath(cellBlockLines(count, columns),
+    { 'stroke': 'rgb(180, 180, 180)', 'stroke-width': 1 }));
+  g.append(svgPath(cellBlockBorder(count, columns),
+    { 'stroke': 'rgb(100, 100, 100)', 'stroke-width': 1.5 }));
   return g;
 };
 
@@ -1130,29 +1126,27 @@ export class VarCellDisplay extends DisplayItem {
     const svg = this.getSvg();
     svg.setAttribute('transform', `translate(${padding},${padding})`);
 
-    for (const { group, columns, yLabel, y, primary } of layout) {
+    for (const { group, columns, yLabel, y } of layout) {
       const count = group.cells.length;
-      const block = renderCellBlock(count, columns, primary);
+      const block = renderCellBlock(count, columns);
       block.setAttribute('transform', `translate(0,${y})`);
       svg.append(block);
 
       // Close button.
-      if (!primary) {
-        const close = createSvgElement('text');
-        close.textContent = '\u00D7';
-        setSvgAttrs(close, {
-          'x': 0,
-          'y': yLabel + labelHeight / 2 + 1,
-          'class': 'var-cell-close',
-        });
-        close.addEventListener('click', () => this._onRemove(group.prefix));
-        svg.append(close);
-      }
+      const close = createSvgElement('text');
+      close.textContent = '\u00D7';
+      setSvgAttrs(close, {
+        'x': 0,
+        'y': yLabel + labelHeight / 2 + 1,
+        'class': 'var-cell-close',
+      });
+      close.addEventListener('click', () => this._onRemove(group.prefix));
+      svg.append(close);
 
       // Draw label above the row.
       const label = createSvgElement('text');
       setSvgAttrs(label, {
-        'x': primary ? 0 : 14,
+        'x': 14,
         'y': yLabel + labelHeight - 3,
         'class': 'var-cell-label',
       });
@@ -1262,12 +1256,12 @@ export class CellPositioner {
     let maxWidth = gridWidth;
     const layout = [];
 
-    const addGroup = (group, primary) => {
+    const addGroup = (group) => {
       const columns = group.columns;
       const rows = Math.ceil(group.cells.length / columns);
-      const yLabel = primary ? 0 : yNext + gap;
+      const yLabel = yNext + gap;
       const y = yLabel + labelHeight;
-      layout.push({ group, columns, rows, yLabel, y, primary });
+      layout.push({ group, columns, rows, yLabel, y });
       yNext = Math.max(yNext, y + rows * cellSize);
       maxWidth = Math.max(maxWidth, columns * cellSize);
     };
@@ -1275,11 +1269,8 @@ export class CellPositioner {
     const visible = groups.filter(
       g => !g.hidden && g.cells.length && g.columns);
 
-    const primary = visible.find(
-      g => g.prefix === geometry.mainCellGroup);
-    if (primary) addGroup(primary, true);
     for (const group of visible) {
-      if (group !== primary) addGroup(group, false);
+      addGroup(group);
     }
 
     return {

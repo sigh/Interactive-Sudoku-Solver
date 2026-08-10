@@ -1,5 +1,5 @@
 const { SudokuConstraint, SudokuConstraintBase, CellArgs } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
-const { CellGraph } = await import('../cell_geometry.js' + self.VERSION_PARAM);
+const { CellGeometry, CellGraph } = await import('../cell_geometry.js' + self.VERSION_PARAM);
 const { SudokuSolver } = await import('./engine.js' + self.VERSION_PARAM);
 const { regexToNFA, NFASerializer } = await import('../nfa_builder.js' + self.VERSION_PARAM);
 const { memoize } = await import('../util.js' + self.VERSION_PARAM);
@@ -34,9 +34,11 @@ export class PuzzleSpec {
     this.regionSize = this.regionSizeOption
       ?? geometry.constructor.defaultNumValues(geometry.numRows, geometry.numCols);
 
-    this.boxRegions = byType.has('NoBoxes')
-      ? []
-      : SudokuConstraintBase.boxRegions(geometry, this.regionSizeOption);
+    this.boxRegions =
+      (geometry.gridType !== CellGeometry.SUDOKU_GRID_TYPE ||
+        byType.has('NoBoxes'))
+        ? []
+        : SudokuConstraintBase.boxRegions(geometry, this.regionSizeOption);
 
     this.hasChaosConstruction = byType.has('ChaosConstruction');
 
@@ -113,25 +115,20 @@ export class SudokuBuilder {
 
     // Check before var cell registration so a flagged group creator gets this
     // error, not one about its group.
-    for (const c of constraints) this._rejectIfMainGridRequired(c, geometry);
+    for (const c of constraints) this._rejectIfSudokuGridRequired(c, geometry);
 
     // The geometry enforces the cell-count limit here (throws if too many cells).
     geometry.addVarCellsForConstraints(constraints);
 
-    const mainCellGroup = geometry.mainCellGroup;
-    if (mainCellGroup && !geometry.varCellsForGroup(mainCellGroup)) {
-      throw new InvalidConstraintError(
-        `Shape: no cell group '${mainCellGroup}'.`);
-    }
-
     return { geometry, constraintMap };
   }
 
-  static _rejectIfMainGridRequired(constraint, geometry) {
-    if (geometry.mainCellGroup && constraint.constructor.REQUIRES_MAIN_GRID) {
+  static _rejectIfSudokuGridRequired(constraint, geometry) {
+    if (constraint.constructor.REQUIRES_SUDOKU_GRID &&
+      geometry.gridType !== CellGeometry.SUDOKU_GRID_TYPE) {
       throw new InvalidConstraintError(
-        `${constraint.constructor.displayName()} is defined in terms of ` +
-        'the main grid, which is not in use.');
+        `${constraint.constructor.displayName()} is only valid on a ` +
+        'Sudoku grid.');
     }
   }
 
@@ -150,7 +147,10 @@ export class SudokuBuilder {
     const constraints = [].concat(...constraintMap.values());
     const context = BuildContext.forConstraints(constraints, geometry);
 
-    yield* this._rowColHandlers(geometry);
+    // The Sudoku grid type's implicit constraints.
+    if (geometry.gridType === CellGeometry.SUDOKU_GRID_TYPE) {
+      yield* this._rowColHandlers(geometry);
+    }
 
     yield new HandlerModule.BoxRegionInfo(context.spec.boxRegions);
     yield* this._boxHandlers(context.spec.boxRegions);
@@ -308,7 +308,7 @@ export class SudokuBuilder {
 
       // Also checked in buildGeometry; repeated here to cover constraints
       // nested in composites.
-      this._rejectIfMainGridRequired(constraint, geometry);
+      this._rejectIfSudokuGridRequired(constraint, geometry);
       // Validate constraint is compatible with the geometry.
       const validateShape = constraint.constructor.VALIDATE_SHAPE_FN;
       if (validateShape && !validateShape(geometry)) {

@@ -10,57 +10,69 @@ export class CellGeometry {
   static MIN_SIZE = 1;
   static MAX_SIZE = 16;
 
+  static SUDOKU_GRID_TYPE = 'Sudoku';
+  static RAW_GRID_TYPE = 'Raw';
+  static GRID_TYPES = [this.SUDOKU_GRID_TYPE, this.RAW_GRID_TYPE];
+  static DEFAULT_GRID_TYPE = this.SUDOKU_GRID_TYPE;
+
   static _isValidDimension(dim) {
     return Number.isInteger(dim) && dim >= this.MIN_SIZE && dim <= this.MAX_SIZE;
   }
 
   // Public factory for square grids (one arg) or rectangular grids (two args).
   // Optionally accepts a numValues override as the third argument.
-  static fromGridSize(numRows, numCols = numRows, numValues = null, valueOffset = 0) {
+  static fromGridSize(numRows, numCols = numRows, numValues = null, valueOffset = 0,
+    gridType = this.DEFAULT_GRID_TYPE) {
     if (!this._isValidDimension(numRows) || !this._isValidDimension(numCols)) {
       return null;
     }
-    return new CellGeometry(numRows, numCols, numValues, valueOffset);
+    return new CellGeometry(numRows, numCols, numValues, valueOffset, gridType);
   }
 
-  // The dimensions are given literally ("9x9"), or taken from a cell group
-  // ("VA" — the group's own constraint declares them, and the main grid does
-  // not exist).
-  static fromShapeSpec(shapeSpec) {
-    const match = shapeSpec.match(
-      /^(?:(\d+)x(\d+)|([A-Z]+))(?:~(\d+)(?:-(\d+))?)?$/);
-    if (!match) {
+  // The spec has the form "<dims>[~<range>][~<gridType>]", with an empty
+  // range slot allowed when only the grid type is given (e.g. "9x9~~Raw").
+  // `defaultGridType` applies when the spec has no explicit grid type.
+  static fromShapeSpec(shapeSpec, defaultGridType = this.DEFAULT_GRID_TYPE) {
+    const parts = shapeSpec.split('~');
+    // An empty range slot is only allowed to position a grid type.
+    if (parts.length > 3 || parts[parts.length - 1] === '') {
       throw new Error('Invalid shape spec format: ' + shapeSpec);
     }
+    const [dimsPart, rangePart, typePart] = parts;
 
-    const mainCellGroup = match[3];
-    const numRows = parseInt(match[1]);
-    const numCols = parseInt(match[2]);
+    const dimsMatch = dimsPart.match(/^(\d+)x(\d+)$/);
+    if (!dimsMatch) {
+      throw new Error('Invalid shape spec format: ' + shapeSpec);
+    }
+    const numRows = parseInt(dimsMatch[1]);
+    const numCols = parseInt(dimsMatch[2]);
 
     let numValues = null;
     let valueOffset = 0;
-    if (match[5] !== undefined) {
-      // Range: "9x9~0-8"
-      const rangeStart = parseInt(match[4]);
-      numValues = parseInt(match[5]) - rangeStart + 1;
-      valueOffset = rangeStart - 1;
-    } else if (match[4] !== undefined) {
-      // Bare number: "9x9~10"
-      numValues = parseInt(match[4]);
-    }
-
-    if (!mainCellGroup) {
-      const geometry = this.fromGridSize(numRows, numCols, numValues, valueOffset);
-      if (!geometry) {
-        throw new Error('Invalid shape dimensions: ' + shapeSpec);
+    if (rangePart) {
+      const rangeMatch = rangePart.match(/^(\d+)(?:-(\d+))?$/);
+      if (!rangeMatch) {
+        throw new Error('Invalid shape spec format: ' + shapeSpec);
       }
-      return geometry;
+      if (rangeMatch[2] !== undefined) {
+        // Range: "9x9~0-8"
+        const rangeStart = parseInt(rangeMatch[1]);
+        numValues = parseInt(rangeMatch[2]) - rangeStart + 1;
+        valueOffset = rangeStart - 1;
+      } else {
+        // Bare number: "9x9~10"
+        numValues = parseInt(rangeMatch[1]);
+      }
     }
 
-    if (numValues === null) {
-      throw new Error('A value range is required for a cell group shape: ' + shapeSpec);
+    const gridType = typePart || defaultGridType;
+
+    const geometry = this.fromGridSize(
+      numRows, numCols, numValues, valueOffset, gridType);
+    if (!geometry) {
+      throw new Error('Invalid shape dimensions: ' + shapeSpec);
     }
-    return new CellGeometry(0, 0, numValues, valueOffset, mainCellGroup);
+    return geometry;
   }
 
   // The default grid geometry (9x9), as a fresh instance that is safe to add
@@ -69,50 +81,49 @@ export class CellGeometry {
     return this.fromGridSize(GEOMETRY_9x9.numRows, GEOMETRY_9x9.numCols);
   }
 
-  static makeName(numRows, numCols, numValues, valueOffset, mainCellGroup = null) {
+  static makeName(numRows, numCols, numValues, valueOffset,
+    gridType = this.DEFAULT_GRID_TYPE) {
     const dims = `${numRows}x${numCols}`;
     const range = valueOffset !== 0
       ? `${1 + valueOffset}-${numValues + valueOffset}` : `${numValues}`;
-    if (mainCellGroup) {
-      return `${mainCellGroup}~${range}`;
-    }
+    const typeSuffix = gridType !== this.DEFAULT_GRID_TYPE ? `~${gridType}` : '';
     if (valueOffset !== 0 || numValues !== this.defaultNumValues(numRows, numCols)) {
-      return `${dims}~${range}`;
+      return `${dims}~${range}${typeSuffix}`;
     }
-    return dims;
+    return typeSuffix ? `${dims}~${typeSuffix}` : dims;
   }
 
-  constructor(numRows, numCols, numValues = null, valueOffset = 0, mainCellGroup = null) {
+  constructor(numRows, numCols, numValues = null, valueOffset = 0,
+    gridType = CellGeometry.DEFAULT_GRID_TYPE) {
     if (valueOffset !== 0 && valueOffset !== -1) {
       throw Error('Invalid valueOffset: ' + valueOffset);
+    }
+    if (!CellGeometry.GRID_TYPES.includes(gridType)) {
+      throw Error('Invalid grid type: ' + gridType);
     }
 
     this.numRows = numRows;
     this.numCols = numCols;
     this.valueOffset = valueOffset;
+    this.gridType = gridType;
 
     // Derived properties
-    const defaultNumValues = this.constructor.defaultNumValues(numRows, numCols);
-    this.numValues = numValues ?? defaultNumValues;
+    this.numValues = numValues
+      ?? this.constructor.defaultNumValues(numRows, numCols);
 
-    // At least one value; the main grid's dimensions floor numValues
-    // when they exist.
-    const minNumValues = Math.max(1, defaultNumValues);
+    const minNumValues = this.constructor.numValuesFloor(
+      numRows, numCols, gridType);
     if (!Number.isInteger(this.numValues) || this.numValues < minNumValues || this.numValues > this.constructor.MAX_SIZE) {
       throw Error('Invalid numValues: ' + this.numValues);
     }
 
-    // The cell group solved in the main grid's place, or null.
-    this.mainCellGroup = mainCellGroup;
     this.numGridCells = numRows * numCols;
 
     this.name = this.constructor.makeName(
-      numRows, numCols, this.numValues, valueOffset, mainCellGroup);
+      numRows, numCols, this.numValues, valueOffset, gridType);
     this.gridDimsStr = `${numRows}x${numCols}`;
-    this.dimsSpec = mainCellGroup ?? this.gridDimsStr;
 
-    this._varCellRegistry = new VarCellRegistry(
-      this.numGridCells, numCols, mainCellGroup);
+    this._varCellRegistry = new VarCellRegistry(this.numGridCells, numCols);
     this._cellGraph = null;
     this._varCellRegistry.addChangeListener(() => { this._cellGraph = null; });
   }
@@ -133,26 +144,10 @@ export class CellGeometry {
     return this._varCellRegistry.getCellsForGroup(prefix);
   }
 
-  // The primary's dimensions as [rows, columns]: the grid's, or the primary
-  // group's when it stands in for the grid (null while that group is
-  // missing).
-  primaryDims() {
-    if (!this.mainCellGroup) return [this.numRows, this.numCols];
-    const primary = this.varCellGroups().find(
-      g => g.prefix === this.mainCellGroup);
-    return primary ? [primary.count / primary.columns, primary.columns] : null;
-  }
-
-  primaryDimsStr() {
-    const dims = this.primaryDims();
-    return dims ? `${dims[0]}x${dims[1]}` : '';
-  }
-
-  // The primary's cell indices: the cells a solution reports.
+  // The grid's cell indices: the cells a solution reports (var cells are
+  // excluded).
   primaryCells() {
-    return this.mainCellGroup
-      ? this.varCellsForGroup(this.mainCellGroup)
-      : Array.from({ length: this.numGridCells }, (_, i) => i);
+    return Array.from({ length: this.numGridCells }, (_, i) => i);
   }
 
   clearVarCells() {
@@ -190,23 +185,20 @@ export class CellGeometry {
         `(${this.totalCells()} cells already in use).`);
     }
 
-    // The primary group takes the grid's place (other groups default their
-    // columns to it), so it must declare dimensions.
-    const primary = specs.find(
-      g => g.prefix === this.mainCellGroup && !g.columns);
-    if (primary) {
-      throw new Error(
-        `Cell group '${primary.prefix}' needs explicit dimensions ` +
-        'to be the primary.');
-    }
-
     this._varCellRegistry.addGroups(specs);
   }
 
   // The same shape with a different value range.
   withValueRange(min, max) {
     return new CellGeometry(
-      this.numRows, this.numCols, max - min + 1, min - 1, this.mainCellGroup);
+      this.numRows, this.numCols, max - min + 1, min - 1, this.gridType);
+  }
+
+  // The same shape with a different grid type. Throws if the value range is
+  // not valid for the new type (e.g. too few values for a Sudoku grid).
+  withGridType(gridType) {
+    return new CellGeometry(
+      this.numRows, this.numCols, this.numValues, this.valueOffset, gridType);
   }
 
   minValue() {
@@ -310,16 +302,23 @@ export class CellGeometry {
     return Math.max(numRows, numCols);
   }
 
+  // The minimum numValues for a grid of the given type. A Sudoku grid needs
+  // enough values to fill its houses; a Raw grid (and a cell group shape,
+  // which has no grid dimensions) just needs one.
+  static numValuesFloor(numRows, numCols, gridType) {
+    if (gridType !== this.SUDOKU_GRID_TYPE) return 1;
+    return Math.max(1, this.defaultNumValues(numRows, numCols));
+  }
+
   isDefaultNumValues() {
     return this.numValues === this.constructor.defaultNumValues(this.numRows, this.numCols);
   }
 }
 
 class VarCellRegistry {
-  constructor(cellIndexOffset = 0, gridColumns = 0, mainCellGroup = null) {
+  constructor(cellIndexOffset = 0, gridColumns = 0) {
     this._cellIndexOffset = cellIndexOffset;
     this._gridColumns = gridColumns;
-    this._mainCellGroup = mainCellGroup;
     this._groups = new Map();
     this._sortedGroups = [];
     this._totalCells = 0;
@@ -376,11 +375,9 @@ class VarCellRegistry {
     const sorted = [...this._groups.values()].sort(
       (a, b) => a.prefix < b.prefix ? -1 : a.prefix > b.prefix ? 1 : 0);
 
-    // Count-only groups take their columns from the grid, or the primary
-    // group when it stands in for the grid. The stored specs keep the
-    // declared columns.
-    const defaultColumns = this._gridColumns ||
-      this._groups.get(this._mainCellGroup)?.columns || 0;
+    // Count-only groups take their columns from the grid. The stored specs
+    // keep the declared columns.
+    const defaultColumns = this._gridColumns;
 
     let next = this._cellIndexOffset;
     const resolved = [];
