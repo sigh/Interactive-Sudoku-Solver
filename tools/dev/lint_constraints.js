@@ -75,8 +75,12 @@ An input that cannot be parsed or run is an error, not guidance: it is reported
 as \`<file>:1: error: ...\` and always exits non-zero.`;
 
 const parseGridCell = (cell) => {
-  const match = /^R(\d+)C(\d+)$/.exec(cell);
-  return match ? { row: +match[1], col: +match[2] } : null;
+  // Canonical ids are single base-17 characters per axis (CELL_ID_CHAR), so
+  // rows/columns 10-16 are letters: R10C4 serializes as RaC4.
+  const match = /^R([1-9a-g])C([1-9a-g])$/i.exec(cell);
+  return match
+    ? { row: parseInt(match[1], 17), col: parseInt(match[2], 17) }
+    : null;
 };
 
 const isOrthAdjacent = (a, b) =>
@@ -203,8 +207,13 @@ const boxSize = (geometry, regionSize) =>
 // every row and column, plus default boxes unless NoBoxes is present.
 const enforcedHouseSets = (geometry, hasNoBoxes, regionSize) => {
   const houses = new Map();
+  // Only the Sudoku grid type has implicit houses (SudokuBuilder._handlers);
+  // a Raw grid enforces nothing, so nothing an encoding states is redundant.
+  if (geometry.gridType !== CellGeometry.SUDOKU_GRID_TYPE) return houses;
   const addHouse = (label, cells) => {
-    houses.set(cells.map(c => `R${c.row}C${c.col}`).sort().join(','), label);
+    // Keys must match the serialized form's base-17 cell ids (RaC4, not R10C4).
+    houses.set(cells.map(
+      c => `R${c.row.toString(17)}C${c.col.toString(17)}`).sort().join(','), label);
   };
 
   for (let r = 1; r <= geometry.numRows; r++) {
@@ -652,6 +661,70 @@ export const OUTPUT_RULES = [
         add(leaf.line(),
           `${leaf.type} on ${describeCells(leaf.cells)} repeats a cell, making it `
           + 'unsatisfiable under its all-different semantics');
+      },
+    }),
+  },
+  {
+    code: 'co-anchored-constraint-dropped',
+    tier: 'exact',
+    summary: 'two constraints sharing a uniqueness key collapse to one, silently',
+    docs: 'A class with a UNIQUENESS_KEY_FIELD holds one instance per key, and the\n'
+      + 'default merge keeps the last. Clue coverage cannot see the loss: both\n'
+      + 'instances name the same cells, so every cell still reaches a constraint.\n'
+      + 'Merge co-anchored clues into one instance carrying the conjunction (for\n'
+      + 'Quad, the union of the digit sets).',
+    make: () => ({
+      // ctx.leaves cannot serve this rule: SudokuParser applies the same dedupe,
+      // so by the time the tree exists one of the two is already gone. The text
+      // still holds both, so each line is parsed on its own.
+      finalize(ctx, add) {
+        const seen = new Map();
+        let depth = 0;
+        ctx.lines.forEach((raw, index) => {
+          const text = raw.trim();
+          if (!text) return;
+          const type = text.replace(/^\./, '').split('~')[0];
+          if (type === 'End') { depth = Math.max(0, depth - 1); return; }
+          // A leaf inside an Or is one branch's hypothesis, and a Replicate emits
+          // copies at distinct offsets; neither is two clues on one anchor.
+          if (['Or', 'And', 'Replicate'].includes(type)) { depth++; return; }
+          if (depth) return;
+          const cls = SudokuConstraint[type];
+          if (!cls || cls.UNIQUENESS_KEY_FIELD === null) return;
+          // A class merging by intersection loses nothing: two Givens on one cell
+          // should narrow that cell, which is exactly what Given does.
+          if (cls.mergeConstraints !== SudokuConstraintBase.mergeConstraints) return;
+          let constraints;
+          try {
+            constraints = collectLeaves(
+              SudokuParser.parseText(text), { inOr: false, inReplicate: false }, [])
+              .map(leaf => leaf.constraint)
+              .filter(c => c.type === type);
+          } catch (err) {
+            return;   // an unparseable line is another rule's finding
+          }
+          for (const constraint of constraints) {
+            let keys;
+            try {
+              keys = constraint.uniquenessKeys();
+            } catch (err) {
+              continue;
+            }
+            for (const key of keys) {
+              const id = `${type}\u0000${key}`;
+              const first = seen.get(id);
+              if (first === undefined) {
+                seen.set(id, index + 1);
+                continue;
+              }
+              add(index + 1,
+                `${type} shares uniqueness key ${JSON.stringify(String(key))} with the `
+                + `${type} on line ${first}; a puzzle holds one ${type} per key and the `
+                + 'later one replaces the earlier, so that clue is dropped with no '
+                + 'error -- merge them into a single instance');
+            }
+          }
+        });
       },
     }),
   },

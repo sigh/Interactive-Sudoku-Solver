@@ -454,6 +454,34 @@ await runTest('lint_constraints flags adjacency-paired clues that drop cells', (
   assert.doesNotMatch(report(diagonalWhisper), /adjacency-clue-drops-cells/);
 });
 
+await runTest('lint_constraints flags two clues collapsing onto one anchor', () => {
+  // eIYhjdAXqZw drew two digit circles at each corner, nudged apart only for
+  // rendering. Emitted as two Quads they key on the same topLeftCell and the
+  // later replaces the earlier -- four clues gone with no error. Clue coverage
+  // cannot see it either: both name the same four cells.
+  const collapsed = lintConstraintText(
+    '.Shape~9x9\n.Quad~R1C1~1~2\n.Quad~R1C1~3~4\n');
+  assert.match(report(collapsed),
+    /co-anchored-constraint-dropped.*Quad shares uniqueness key "R1C1".*line 2/);
+
+  // The merge the rule asks for.
+  assert.doesNotMatch(
+    report(lintConstraintText('.Shape~9x9\n.Quad~R1C1~1~2~3~4\n')),
+    /co-anchored-constraint-dropped/);
+
+  // Two branches of an Or are one hypothesis each, not two clues on one anchor.
+  assert.doesNotMatch(
+    report(lintConstraintText(
+      '.Shape~9x9\n.Or\n.Quad~R1C1~1~2\n.Quad~R1C1~3~4\n.End\n')),
+    /co-anchored-constraint-dropped/);
+
+  // Given merges by intersection, so two on one cell narrow it rather than
+  // losing one. Only the default last-one-wins merge drops a clue.
+  assert.doesNotMatch(
+    report(lintConstraintText('.Shape~9x9\n.~R1C1_1_2\n.~R1C1_2_3\n')),
+    /co-anchored-constraint-dropped/);
+});
+
 await runTest('lint_constraints --script runs inputs through the sandbox', async () => {
   const items = await lintScript(
     "return [new Shape('9x9'), new Sum('0_=_1_1_-1', 'R5C1', 'R5C2', 'R6C1')];\n");
@@ -892,12 +920,47 @@ await runTest('source rules see code, not comments', () => {
   assert.match(report(code), /sum-wire-format/);
 });
 
+// Blocker #1191: three of MAL2QLszGjE's clue rows list the candidate digits
+// 1, 4, 7, and the worker had to suppress the linter on each of them.
+await runTest('a stored triple is clue data, not box construction', () => {
+  const table = lintSource(SCRIPT_HEADER
+    + 'const circles = [\n'
+    + "  { cells: ['R1C8', 'R1C9'], values: [1, 4, 7] },\n"
+    + "  { cells: ['R5C4', 'R5C5'], values: [1, 4, 7] },\n"
+    + '];\n'
+    + "return [new Shape('9x9'), ...circles.map(c => new ContainExact(c.values.join('_'), ...c.cells))];\n");
+  assert.equal(table.length, 0, report(table));
+
+  // Taking the elements out is the pattern, however the triple is reached.
+  const iterated = lintSource(SCRIPT_HEADER
+    + 'const cells = [];\n'
+    + 'for (const r of [1, 4, 7]) for (const c of [1, 4, 7]) cells.push(makeCellId(r, c));\n'
+    + "return [new Shape('9x9')];\n");
+  assert.match(report(iterated), /manual-box-arithmetic/);
+});
+
+// Blocker #1278: boxRegions returns [] unless the grid type is Sudoku
+// (js/sudoku_constraint.js:269), so graph.boxes() cannot be preferred here.
+await runTest('a Raw grid has no boxes to prefer, so nothing is flagged', () => {
+  const build = 'const boxes = [1, 4, 7].flatMap(r => [1, 4, 7].map(\n'
+    + '  c => graph.block(makeCellId(r, c), 3, 3)));\n';
+  const raw = lintSource(SCRIPT_HEADER + build
+    + "return [new Shape('9x9', '0-5', 'Raw')];\n");
+  assert.equal(raw.length, 0, report(raw));
+
+  // The same construction on a Sudoku grid still has graph.boxes() to prefer.
+  const sudoku = lintSource(SCRIPT_HEADER + build
+    + "return [new Shape('9x9')];\n");
+  assert.match(report(sudoku), /manual-box-arithmetic/);
+});
+
 // An intentional local implementation is documented in the file itself, rather
 // than being re-litigated on every run.
 await runTest('// lint-ok silences one code on one line', () => {
   const trailing = lintSource(SCRIPT_HEADER
     + 'const origins = [1, 4, 7]; // lint-ok: manual-box-arithmetic\n'
     + 'const others = [1, 4, 7];\n'
+    + 'const boxes = origins.flatMap(r => others.map(c => makeCellId(r, c)));\n'
     + "return [new Shape('9x9')];\n");
   // The trailing comment excuses its own line, and only its own line.
   assert.deepEqual(trailing.map(i => i.line), [7], report(trailing));
@@ -905,6 +968,7 @@ await runTest('// lint-ok silences one code on one line', () => {
   const standalone = lintSource(SCRIPT_HEADER
     + '// lint-ok: manual-box-arithmetic\n'
     + 'const origins = [1, 4, 7];\n'
+    + 'const boxes = origins.flatMap(r => origins.map(c => makeCellId(r, c)));\n'
     + "return [new Shape('9x9')];\n");
   assert.equal(standalone.length, 0, report(standalone));
 

@@ -205,6 +205,12 @@ const numericConstants = (ctx) => {
 const isShapeCall = (node) => node?.type === 'NewExpression'
   && node.callee.type === 'Identifier' && node.callee.name === 'Shape';
 
+// CellGeometry.RAW_GRID_TYPE. SudokuConstraintBase.boxRegions returns [] unless
+// the grid type is Sudoku (js/sudoku_constraint.js:269), so graph.box(n) and
+// graph.boxes() are empty by design on a Raw grid and hand-built blocks are the
+// only way to get the standard tiling there.
+const RAW_GRID_TYPE = 'Raw';
+
 // Resolve the host Shape from the returned constraint array. Scripts may also
 // construct smaller Shape objects solely as value-range descriptors for an NFA;
 // lexical order cannot distinguish those from the Shape that defines the puzzle.
@@ -234,9 +240,11 @@ const returnedShapeCall = (ctx) => {
 // shares the app's alphabet grammar instead of reimplementing it. `const N =
 // 15` alphabets are resolved, since naming the alphabet is the common way to
 // widen it.
+const shapeCall = (ctx) => returnedShapeCall(ctx)
+  ?? ctx.nodesOfType('NewExpression').find(isShapeCall);
+
 const parseDeclaredShape = (ctx) => {
-  const call = returnedShapeCall(ctx)
-    ?? ctx.nodesOfType('NewExpression').find(isShapeCall);
+  const call = shapeCall(ctx);
   const spec = stringValue(call?.arguments[0]);
   if (spec === null) return null;
 
@@ -672,9 +680,12 @@ const RULES = [
       + 'exists, so that math is currently the only idiom. One base triple is\n'
       + 'never flagged -- a row whose cells happen to sit at 1, 4, 7 is not box\n'
       + 'construction. Numeric [1, 4, 7] needs two base uses (a row base and a\n'
-      + 'column base); corner strings need consecutive R{r}C1,R{r}C4,R{r}C7\n'
-      + 'runs for two or more base rows r.',
+      + 'column base), each one reached as a sequence rather than merely stored:\n'
+      + 'a clue table listing candidate digits is data, not geometry. Corner\n'
+      + 'strings need consecutive R{r}C1,R{r}C4,R{r}C7 runs for two or more base\n'
+      + 'rows r. A Raw grid is skipped entirely: graph.boxes() is empty there.',
     check(ctx) {
+      if (stringValue(shapeCall(ctx)?.arguments[2]) === RAW_GRID_TYPE) return [];
       const findings = ctx.nodesOfType('BinaryExpression').filter((bin) =>
         bin.operator === '*' && bin.left.type === 'Identifier'
         && /^b[rc]$/.test(bin.left.name) && numberValue(bin.right) !== null);
@@ -698,9 +709,21 @@ const RULES = [
         if (el) findings.push(el);
       }
       // Box cells need a row base AND a column base, so a numeric [1, 4, 7]
-      // is the pattern only where base triples are reached for at least twice:
-      // each literal counts once, and so does each later reference to a name
-      // bound to one. A lone `const cols = [1, 4, 7]` is one reach, not boxes.
+      // is the pattern only where base triples are reached at least twice:
+      // each use of a literal counts once, and so does each use of a name bound
+      // to one. A lone `const cols = [1, 4, 7]` is one reach, not boxes.
+      //
+      // A reach is the elements actually being taken out -- iterated, spread, or
+      // subscripted. A triple merely stored is data: MAL2QLszGjE's clue table
+      // gives each circle its three candidate digits, and three of those rows
+      // read [1, 4, 7], which is a digit set and names no cell at all.
+      const consumed = new Set();
+      walkAst(ctx.ast, (node, parent) => {
+        if (!parent) return;
+        if (parent.type === 'MemberExpression' && parent.object === node) consumed.add(node);
+        if (parent.type === 'ForOfStatement' && parent.right === node) consumed.add(node);
+        if (parent.type === 'SpreadElement') consumed.add(node);
+      });
       const triples = ctx.nodesOfType('ArrayExpression').filter((arr) =>
         arr.elements.length === 3
         && [1, 4, 7].every((v, i) => numberValue(arr.elements[i]) === v));
@@ -710,11 +733,10 @@ const RULES = [
           bound.add(decl.id.name);
         }
       }
-      // Identifier nodes include the binding occurrence itself, which is the
-      // literal already counted, so drop one per bound name.
-      const references = ctx.nodesOfType('Identifier')
-        .filter((id) => bound.has(id.name)).length - bound.size;
-      if (triples.length + references >= 2) findings.push(...triples);
+      const reaches = triples.filter((arr) => consumed.has(arr)).length
+        + ctx.nodesOfType('Identifier')
+          .filter((id) => bound.has(id.name) && consumed.has(id)).length;
+      if (reaches >= 2) findings.push(...triples);
       return findings;
     },
   },
