@@ -197,4 +197,82 @@ await runTest('CountingCircles counts repeated values across circles (brute forc
   assert.equal(countSolutions(input), expected);
 });
 
+// ============================================================================
+// Global constraints: positional semantics hold without the Sudoku defaults.
+// ============================================================================
+
+// A 2x3 grid (2 rows, 3 columns): cell index = (row-1)*3 + (col-1).
+const ADJACENT_2X3 = [[0, 1], [1, 2], [3, 4], [4, 5], [0, 3], [1, 4], [2, 5]];
+const WINDOWS_2X3 = [[0, 1, 3, 4], [1, 2, 4, 5]];
+
+await runTest('AntiConsecutive on a Raw grid matches brute force', () => {
+  const antiConsecutive = (vs) => ADJACENT_2X3.every(
+    ([a, b]) => Math.abs(vs[a] - vs[b]) !== 1);
+
+  const expected = bruteForceCount(6, 3, new Map(), [antiConsecutive]);
+  assert.ok(expected > 0, 'test case must be satisfiable');
+  assert.equal(
+    countSolutions('.Shape~2x3~3~Raw.AntiConsecutive'), expected);
+});
+
+await runTest('AntiTaxicab on a Raw grid matches brute force', () => {
+  const taxicab = (i, j) =>
+    Math.abs((i / 3 | 0) - (j / 3 | 0)) + Math.abs(i % 3 - j % 3);
+  const antiTaxicab = (vs) => {
+    for (let i = 0; i < 6; i++) {
+      for (let j = i + 1; j < 6; j++) {
+        if (vs[i] === vs[j] && taxicab(i, j) === vs[i]) return false;
+      }
+    }
+    return true;
+  };
+
+  const expected = bruteForceCount(6, 3, new Map(), [antiTaxicab]);
+  assert.ok(expected > 0, 'test case must be satisfiable');
+  assert.equal(countSolutions('.Shape~2x3~3~Raw.AntiTaxicab'), expected);
+});
+
+await runTest('GlobalEntropy on a Raw grid matches brute force', () => {
+  const band = (v) => (v - 1) / 3 | 0;
+  const entropy = (vs) => WINDOWS_2X3.every(
+    w => new Set(w.map(c => band(vs[c]))).size === 3);
+
+  const givens = new Map([[0, 1], [4, 5]]);
+  const expected = bruteForceCount(6, 9, givens, [entropy]);
+  assert.ok(expected > 0, 'test case must be satisfiable');
+  assert.equal(
+    countSolutions('.Shape~2x3~9~Raw.GlobalEntropy.~R1C1_1~R2C2_5'),
+    expected);
+});
+
+await runTest('GlobalMod on a Raw grid matches brute force', () => {
+  const residue = (v) => (v - 1) % 3;
+  const mod3 = (vs) => WINDOWS_2X3.every(
+    w => new Set(w.map(c => residue(vs[c]))).size === 3);
+
+  const givens = new Map([[0, 1], [4, 5]]);
+  const expected = bruteForceCount(6, 9, givens, [mod3]);
+  assert.ok(expected > 0, 'test case must be satisfiable');
+  assert.equal(
+    countSolutions('.Shape~2x3~9~Raw.GlobalMod.~R1C1_1~R2C2_5'), expected);
+});
+
+await runTest('DutchFlatmates on a Raw grid matches brute force', () => {
+  // A 3x2 grid: columns are [0, 2, 4] and [1, 3, 5], top to bottom. Every 5
+  // needs a 1 directly above or a 9 directly below.
+  const cols = [[0, 2, 4], [1, 3, 5]];
+  const dutch = (vs) => cols.every(col => col.every((c, i) =>
+    vs[c] !== 5 ||
+    (i > 0 && vs[col[i - 1]] === 1) ||
+    (i < col.length - 1 && vs[col[i + 1]] === 9)));
+
+  // The second column is fully given (including a 5 needing its 9 below).
+  const givens = new Map([[1, 5], [3, 9], [5, 7]]);
+  const expected = bruteForceCount(6, 9, givens, [dutch]);
+  assert.ok(expected > 0, 'test case must be satisfiable');
+  assert.equal(
+    countSolutions('.Shape~3x2~9~Raw.DutchFlatmates.~R1C2_5~R2C2_9~R3C2_7'),
+    expected);
+});
+
 logSuiteComplete('raw_grid_counting.test.js');

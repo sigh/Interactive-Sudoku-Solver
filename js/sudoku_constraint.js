@@ -1611,7 +1611,6 @@ export class SudokuConstraint {
       Only explicitly marked cell pairs satisfy Kropki (black/white dot)
       constraints.`);
     static CATEGORY = 'Global';
-    static REQUIRES_SUDOKU_GRID = true;
     static UNIQUENESS_KEY_FIELD = 'type';
 
     static fnKey = memoize((numValues, valueOffset = 0) =>
@@ -1625,7 +1624,6 @@ export class SudokuConstraint {
     static DESCRIPTION = (`
       Only explicitly marked cell pairs satisfy XV constraints.`);
     static CATEGORY = 'Global';
-    static REQUIRES_SUDOKU_GRID = true;
     static UNIQUENESS_KEY_FIELD = 'type';
 
     static fnKey = memoize((numValues, valueOffset = 0) =>
@@ -1788,7 +1786,6 @@ export class SudokuConstraint {
       possible distance from cell A to cell B when traversed only through
       adjacent cells.`);
     static CATEGORY = 'Global';
-    static REQUIRES_SUDOKU_GRID = true;
     static UNIQUENESS_KEY_FIELD = 'type';
     static VALIDATE_SHAPE_FN = (geometry) => geometry.valueOffset === 0;
 
@@ -1803,9 +1800,14 @@ export class SudokuConstraint {
 
       for (let r = 0; r < numRows; r++) {
         const rDist = Math.abs(r - row);
-        if (rDist === 0 || rDist >= dist) continue;
+        if (rDist > dist) continue;
 
         const cDist = dist - rDist;
+        if (cDist === 0) {
+          // rDist === dist >= 1, so this is a different cell.
+          cells.push(geometry.cellIndex(r, col));
+          continue;
+        }
         if (col - cDist >= 0) {
           cells.push(geometry.cellIndex(r, col - cDist));
         }
@@ -1822,12 +1824,11 @@ export class SudokuConstraint {
     static DESCRIPTION = (`
       No adjacent cells can have consecutive values.`);
     static CATEGORY = 'Global';
-    static REQUIRES_SUDOKU_GRID = true;
     static UNIQUENESS_KEY_FIELD = 'type';
 
     static fnKey = memoize((numValues, valueOffset = 0) =>
       fnToBinaryKey(
-        (a, b) => (a !== b + 1 && a !== b - 1 && a !== b),
+        (a, b) => (a !== b + 1 && a !== b - 1),
         numValues, valueOffset)
     );
 
@@ -1841,7 +1842,6 @@ export class SudokuConstraint {
       Each 2x2 box in the grid has to contain a low digit (1, 2, 3),
       a middle digit (4, 5, 6) and a high digit (7, 8, 9).`);
     static CATEGORY = 'Global';
-    static REQUIRES_SUDOKU_GRID = true;
     static UNIQUENESS_KEY_FIELD = 'type';
     static VALIDATE_SHAPE_FN = (geometry) =>
       geometry.numValues === 9 && geometry.valueOffset === 0;
@@ -1854,7 +1854,6 @@ export class SudokuConstraint {
       Each 2x2 box in the grid has to contain a digit from (1, 4, 7),
       a digit from (2, 5, 8) and a digit from (3, 6, 9).`);
     static CATEGORY = 'Global';
-    static REQUIRES_SUDOKU_GRID = true;
     static UNIQUENESS_KEY_FIELD = 'type';
     static VALIDATE_SHAPE_FN = (geometry) => geometry.numValues === 9;
 
@@ -1899,7 +1898,6 @@ export class SudokuConstraint {
       it. It may have both, but it doesn't need both.
       Only supported for when the allowed values are 1-9.`);
     static CATEGORY = 'Global';
-    static REQUIRES_SUDOKU_GRID = true;
     static UNIQUENESS_KEY_FIELD = 'type';
     static VALIDATE_SHAPE_FN = (geometry) =>
       geometry.numValues === 9 && geometry.valueOffset === 0;

@@ -193,13 +193,6 @@ const SUDOKU_GRID_ONLY_CASES = [
   ['Doppelganger', '.Doppelganger'],
   ['AntiKnight', '.AntiKnight'],
   ['AntiKing', '.AntiKing'],
-  ['AntiTaxicab', '.AntiTaxicab'],
-  ['AntiConsecutive', '.AntiConsecutive'],
-  ['GlobalEntropy', '.GlobalEntropy'],
-  ['GlobalMod', '.GlobalMod~3'],
-  ['DutchFlatmates', '.DutchFlatmates'],
-  ['StrictKropki', '.StrictKropki'],
-  ['StrictXV', '.StrictXV'],
   ['ChaosConstruction', '.ChaosConstruction'],
   ['Indexing', '.Indexing~C~R1C1'],
   // Blocked types nested inside composites must also be caught.
@@ -215,6 +208,23 @@ await runTestCases(
       () => buildHandlers(constraint),
       { name: 'InvalidConstraintError', message: /Sudoku grid/ },
     );
+  });
+
+// Global constraints are positional (adjacent pairs, 2x2 windows, column
+// lines) rather than house-based, so they stay valid on a Raw grid.
+await runTestCases(
+  'global constraints build on a Raw grid',
+  [
+    ['StrictKropki', '.StrictKropki'],
+    ['StrictXV', '.StrictXV'],
+    ['AntiTaxicab', '.AntiTaxicab'],
+    ['AntiConsecutive', '.AntiConsecutive'],
+    ['GlobalEntropy', '.GlobalEntropy'],
+    ['GlobalMod', '.GlobalMod'],
+    ['DutchFlatmates', '.DutchFlatmates'],
+  ], (input) => {
+    const constraint = SudokuParser.parseString('.Shape~9x9~~Raw' + input);
+    assert.ok(buildHandlers(constraint).length > 0);
   });
 
 await runTest('a Raw grid rejects Jigsaw', () => {

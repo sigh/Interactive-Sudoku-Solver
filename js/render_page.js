@@ -867,7 +867,7 @@ class ConstraintManager {
     }
 
     this._panelsRequiringSudokuGrid = ['layout-constraint-container',
-      'global-constraints-container', 'outside-clue-container']
+      'outside-clue-container']
       .map(id => document.getElementById(id));
 
     this._setUpCustomConstraintTabs();
