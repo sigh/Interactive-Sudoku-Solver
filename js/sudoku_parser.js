@@ -502,20 +502,21 @@ export class SudokuParser {
   }
 }
 
+// The short solution covers the grid cells only, excluding var cells.
 export const toShortSolution = (solution, geometry) => {
   const DEFAULT_VALUE = '.';
 
-  const cells = geometry.primaryCells();
-  const result = new Array(cells.length).fill(DEFAULT_VALUE);
+  const numGridCells = geometry.numGridCells;
+  const result = new Array(numGridCells).fill(DEFAULT_VALUE);
   const minValue = geometry.minValue();
   let maxValue = minValue;
-  for (const cell of cells) {
-    if (solution[cell] != null) maxValue = Math.max(maxValue, solution[cell]);
+  for (let i = 0; i < numGridCells; i++) {
+    if (solution[i] != null) maxValue = Math.max(maxValue, solution[i]);
   }
 
-  for (let i = 0; i < cells.length; i++) {
-    if (solution[cells[i]] != null) {
-      result[i] = valueToShortChar(solution[cells[i]], maxValue) ?? DEFAULT_VALUE;
+  for (let i = 0; i < numGridCells; i++) {
+    if (solution[i] != null) {
+      result[i] = valueToShortChar(solution[i], maxValue) ?? DEFAULT_VALUE;
     }
   }
   return result.join('');

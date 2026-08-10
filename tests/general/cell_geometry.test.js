@@ -486,12 +486,6 @@ await runTest('count-only groups resolve columns to the grid', () => {
   assert.equal(columns.get('VB'), 2);
 });
 
-await runTest('primaryCells covers exactly the grid cells', () => {
-  const geometry = CellGeometry.fromGridSize(2);
-  geometry._varCellRegistry.addGroups(
-    [{ prefix: 'VB', label: '', count: 2, columns: 2 }]);
-  assert.deepEqual(geometry.primaryCells(), [0, 1, 2, 3]);
-});
 
 logSuiteComplete('CellGeometry');
 

@@ -201,12 +201,7 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
     input.addEventListener('input', showDropdown);
     input.addEventListener('blur', () => {
       this._hideDropdown();
-      // Only apply if the input has changed from the current geometry,
-      // to avoid resetting the value range after a full spec like "9x9~0-8"
-      // has already been applied (reshape sets input to just "9x9").
-      if (!this._geometry || input.value.trim() !== this._displayedDimsSpec()) {
-        this._applyShape();
-      }
+      this._applyShape();
     });
 
     // Arrow keys move within the items, and always land on one.
@@ -257,7 +252,7 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
     this._highlightedIndex = index;
   }
 
-  // The dimension presets, the current dimensions, and the cell groups.
+  // The dimension presets and the current dimensions.
   _updateShapeDropdown() {
     const geometry = this._geometry;
     const applySpec = (spec) => {
@@ -265,8 +260,8 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
       this._applyShape();
     };
     const entries = [];
-    const addSpecEntry = (spec, text = spec) => entries.push(
-      { text, action: () => applySpec(spec) });
+    const addSpecEntry = (spec) => entries.push(
+      { text: spec, action: () => applySpec(spec) });
 
     this.constructor._SHAPE_PRESETS.forEach(spec => addSpecEntry(spec));
     const dims = geometry.gridDimsStr;
@@ -323,10 +318,6 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
     };
     this._minSelect.onchange = onchange;
     this._maxSelect.onchange = onchange;
-  }
-
-  _displayedDimsSpec() {
-    return this._geometry.gridDimsStr;
   }
 
   _applyShape() {
@@ -387,7 +378,7 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
 
   reshape(geometry) {
     this._geometry = geometry;
-    this._shapeSpecInput.value = this._displayedDimsSpec();
+    this._shapeSpecInput.value = geometry.gridDimsStr;
     this._shapeSpecInput.setCustomValidity('');
     this._gridTypeSelect.value = geometry.gridType;
     this._gridTypeSelect.setCustomValidity('');
@@ -397,11 +388,8 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
     this._updateVarSizeDefault();
     this._updateVarPrefixDefault();
     this._updateShapeDropdown();
-    geometry.onVarCellsChanged(() => {
-      this._updateVarSizeDefault();
-      this._updateVarPrefixDefault();
-      this._updateShapeDropdown();
-    });
+    // Only the prefix prefill depends on the var cell groups.
+    geometry.onVarCellsChanged(() => this._updateVarPrefixDefault());
   }
 
   // Prefill the size field with the grid's dimensions. A user-typed value is

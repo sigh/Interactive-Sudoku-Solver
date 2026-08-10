@@ -782,8 +782,9 @@ export class SolutionDisplay extends CellValueDisplay {
     this.renderGridValues(solution, colorFn);
 
     if (this._copyElem) {
-      this._copyElem.disabled = !this._geometry.primaryCells().every(
-        c => solution[c] != null && isFinite(solution[c]));
+      this._copyElem.disabled = !solution
+        .slice(0, this._geometry.numGridCells)
+        .every(v => v != null && isFinite(v));
     }
   }
 }

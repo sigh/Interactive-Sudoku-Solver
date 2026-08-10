@@ -18,8 +18,9 @@ Canonical terms used throughout the solver. Where legacy synonyms exist
 | **grid cells** | The 2D puzzle cells (`numGridCells`). | — |
 | **var cells** | User-declared extra cells outside the grid, managed by `VarCellRegistry` and addressed uniformly with grid cells. | state cells |
 | **search cells** | Grid cells + var cells — everything the search assigns (`numSearchCells`, from `CellGeometry.totalCells()`). | total cells |
-| **geometry** (`CellGeometry`) | The structural descriptor of a puzzle: dimensions, value range/offset, cell id/index codec, var-cell groups, cell adjacency. Metadata only — it holds no candidates or state. | GridShape, shape |
-| **shapeSpec** | The `"RxC~V"` string form of a geometry (e.g. `4x4~9`). | gridSpec |
+| **geometry** (`CellGeometry`) | The structural descriptor of a puzzle: dimensions, value range/offset, grid type, cell id/index codec, var-cell groups, cell adjacency. Metadata only — it holds no candidates or state. | GridShape, shape |
+| **shapeSpec** | The `"RxC[~range][~gridType]"` string form of a geometry (e.g. `4x4~9`, `9x9~0-8~Raw`). | gridSpec |
+| **grid type** | The implicit constraints on the grid: `Sudoku` adds the latin row/column/box defaults; `Raw` adds none. Non-Sudoku grids reject `REQUIRES_SUDOKU_GRID` constraints and suppress the house-derived optimizations. | — |
 | **`Shape`** | The *constraint* that declares a puzzle's geometry (serialized in URLs; distinct from `CellGeometry`). | — |
 | **grid** (in `enforceConsistency`) | The per-frame `Uint16Array` holding candidate masks for all search cells *plus* handler state lanes. Also called grid state. | — |
 | **handler** (`SudokuConstraintHandler`) | A constraint-enforcement object; the CSP-literature term is *propagator*. | — |

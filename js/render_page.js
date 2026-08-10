@@ -874,9 +874,8 @@ class ConstraintManager {
     this._setUpFreeFormInput();
 
     // Clear button.
-    document.getElementById('clear-constraints-button').onclick = () => {
-      this._clear();
-    };
+    document.getElementById('clear-constraints-button').onclick =
+      () => this._clear();
 
     // Copy to clipboard.
     const copyButton = document.getElementById('copy-constraints-button');

@@ -95,6 +95,10 @@ export class CellGeometry {
 
   constructor(numRows, numCols, numValues = null, valueOffset = 0,
     gridType = CellGeometry.DEFAULT_GRID_TYPE) {
+    if (!CellGeometry._isValidDimension(numRows) ||
+      !CellGeometry._isValidDimension(numCols)) {
+      throw Error(`Invalid dimensions: ${numRows}x${numCols}`);
+    }
     if (valueOffset !== 0 && valueOffset !== -1) {
       throw Error('Invalid valueOffset: ' + valueOffset);
     }
@@ -142,12 +146,6 @@ export class CellGeometry {
 
   varCellsForGroup(prefix) {
     return this._varCellRegistry.getCellsForGroup(prefix);
-  }
-
-  // The grid's cell indices: the cells a solution reports (var cells are
-  // excluded).
-  primaryCells() {
-    return Array.from({ length: this.numGridCells }, (_, i) => i);
   }
 
   clearVarCells() {
@@ -215,7 +213,7 @@ export class CellGeometry {
   }
 
   isSquare() {
-    return this.numGridCells > 0 && this.numRows === this.numCols;
+    return this.numRows === this.numCols;
   }
 
   static displayCellId(cellId) {
@@ -303,11 +301,10 @@ export class CellGeometry {
   }
 
   // The minimum numValues for a grid of the given type. A Sudoku grid needs
-  // enough values to fill its houses; a Raw grid (and a cell group shape,
-  // which has no grid dimensions) just needs one.
+  // enough values to fill its houses; a Raw grid just needs one.
   static numValuesFloor(numRows, numCols, gridType) {
     if (gridType !== this.SUDOKU_GRID_TYPE) return 1;
-    return Math.max(1, this.defaultNumValues(numRows, numCols));
+    return this.defaultNumValues(numRows, numCols);
   }
 
   isDefaultNumValues() {
@@ -316,7 +313,7 @@ export class CellGeometry {
 }
 
 class VarCellRegistry {
-  constructor(cellIndexOffset = 0, gridColumns = 0) {
+  constructor(cellIndexOffset, gridColumns) {
     this._cellIndexOffset = cellIndexOffset;
     this._gridColumns = gridColumns;
     this._groups = new Map();
