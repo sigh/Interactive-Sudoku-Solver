@@ -265,6 +265,9 @@ export class SudokuConstraintBase {
     },
     (geometry) => geometry.gridDimsStr);
   static boxRegions = memoize((geometry, size = null) => {
+    // Only the Sudoku grid type has default box regions.
+    if (geometry.gridType !== CellGeometry.SUDOKU_GRID_TYPE) return [];
+
     const numRows = geometry.numRows;
     const numCols = geometry.numCols;
     const effectiveSize = size ?? CellGeometry.defaultNumValues(numRows, numCols);
@@ -285,7 +288,7 @@ export class SudokuConstraintBase {
         const cellCol = i % boxWidth;
         return (boxRow * boxHeight + cellRow) * numCols + (boxCol * boxWidth + cellCol);
       }, numBoxes, effectiveSize);
-  }, (geometry, size = null) => `${geometry.gridDimsStr}~${size ?? CellGeometry.defaultNumValues(geometry.numRows, geometry.numCols)}`);
+  }, (geometry, size = null) => `${geometry.gridDimsStr}~${geometry.gridType}~${size ?? CellGeometry.defaultNumValues(geometry.numRows, geometry.numCols)}`);
   static disjointSetRegions = memoize((geometry, size = null) => {
     const numCols = geometry.numCols;
     const effectiveSize = size ?? CellGeometry.defaultNumValues(geometry.numRows, numCols);

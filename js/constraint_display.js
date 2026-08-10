@@ -7,7 +7,7 @@ const {
 } = await import('./display.js' + self.VERSION_PARAM);
 const { LineOptions, CellArgs } = await import('./sudoku_constraint.js' + self.VERSION_PARAM);
 const { createSvgElement, clearDOMNode } = await import('./util.js' + self.VERSION_PARAM);
-const { SudokuConstraint, SudokuConstraintBase } = await import('./sudoku_constraint.js' + self.VERSION_PARAM);
+const { SudokuConstraint, SudokuConstraintBase, OutsideConstraintBase } = await import('./sudoku_constraint.js' + self.VERSION_PARAM);
 const { CellGeometry, CellGraph } = await import('./cell_geometry.js' + self.VERSION_PARAM);
 
 const constraintDisplayOrder = () => [
@@ -1236,8 +1236,8 @@ class OutsideClue extends BaseConstraintDisplayItem {
     super.clear();
     this._outsideArrowMap.clear();
 
-    // Outside clues are only valid on a Sudoku grid.
-    if (geometry.gridType !== CellGeometry.SUDOKU_GRID_TYPE) return;
+    // No arrows on shapes where outside clues are invalid.
+    if (!OutsideConstraintBase.isValidForShape(geometry)) return;
 
     const diagonalCellMap = SudokuConstraint.LittleKiller.cellMap(geometry);
     for (const arrowId in diagonalCellMap) {

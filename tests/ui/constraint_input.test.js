@@ -664,23 +664,18 @@ await runTest('Shape var size prefills from the grid dimensions', () => {
   assert.equal(sizeInput.value, '4x4');
 });
 
-await runTest('Shape dropdown lists presets and current dims only', () => {
+await runTest('Shape dropdown lists the presets', () => {
   const { shape, dropdownItems } = createShapeInput();
 
-  // Cell groups are never suggested.
-  const grid = CellGeometry.fromGridSize(9);
-  grid._varCellRegistry.addGroups(
-    [{ prefix: 'VA', label: 'over', count: 4, columns: 2 }]);
-  shape.reshape(grid);
   assert.deepEqual(
     dropdownItems.children.map(i => i.textContent),
     ['9x9', '6x6', '16x16']);
 
-  // A non-preset grid adds its own dimensions.
+  // The list is static: reshaping does not change it.
   shape.reshape(CellGeometry.fromGridSize(2, 9));
   assert.deepEqual(
     dropdownItems.children.map(i => i.textContent),
-    ['9x9', '6x6', '16x16', '2x9']);
+    ['9x9', '6x6', '16x16']);
 });
 
 await runTest('the grid type select follows the geometry', () => {

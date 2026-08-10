@@ -1257,21 +1257,15 @@ export class CellPositioner {
     let maxWidth = gridWidth;
     const layout = [];
 
-    const addGroup = (group) => {
+    for (const group of groups) {
+      if (group.hidden || !group.cells.length) continue;
       const columns = group.columns;
       const rows = Math.ceil(group.cells.length / columns);
       const yLabel = yNext + gap;
       const y = yLabel + labelHeight;
       layout.push({ group, columns, rows, yLabel, y });
-      yNext = Math.max(yNext, y + rows * cellSize);
+      yNext = y + rows * cellSize;
       maxWidth = Math.max(maxWidth, columns * cellSize);
-    };
-
-    const visible = groups.filter(
-      g => !g.hidden && g.cells.length && g.columns);
-
-    for (const group of visible) {
-      addGroup(group);
     }
 
     return {

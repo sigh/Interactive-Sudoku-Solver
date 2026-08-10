@@ -26,9 +26,7 @@ export const extractConstraintTypes = (str) => {
       } else if (geometry.gridDimsStr !== GEOMETRY_9x9.gridDimsStr) {
         shapeTypes.push(geometry.gridDimsStr);
       }
-      const defaultNumValues = CellGeometry.defaultNumValues(
-        geometry.numRows, geometry.numCols);
-      if (geometry.numValues !== defaultNumValues || geometry.valueOffset !== 0) {
+      if (!geometry.isDefaultNumValues() || geometry.valueOffset !== 0) {
         shapeTypes.push(`${geometry.minValue()}-${geometry.maxValue()}`);
       }
     } else if (NAMED_CONSTRAINT_TYPES.has(type)) {

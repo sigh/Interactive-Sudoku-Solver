@@ -34,11 +34,9 @@ export class PuzzleSpec {
     this.regionSize = this.regionSizeOption
       ?? geometry.constructor.defaultNumValues(geometry.numRows, geometry.numCols);
 
-    this.boxRegions =
-      (geometry.gridType !== CellGeometry.SUDOKU_GRID_TYPE ||
-        byType.has('NoBoxes'))
-        ? []
-        : SudokuConstraintBase.boxRegions(geometry, this.regionSizeOption);
+    this.boxRegions = byType.has('NoBoxes')
+      ? []
+      : SudokuConstraintBase.boxRegions(geometry, this.regionSizeOption);
 
     this.hasChaosConstruction = byType.has('ChaosConstruction');
 

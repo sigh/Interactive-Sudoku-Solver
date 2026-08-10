@@ -8,7 +8,6 @@ ensureGlobalEnvironment();
 const { SudokuBuilder } = await import('../../js/solver/sudoku_builder.js');
 const { SudokuParser } = await import('../../js/sudoku_parser.js');
 const { SudokuConstraint, SudokuConstraintBase } = await import('../../js/sudoku_constraint.js');
-const { CellGeometry } = await import('../../js/cell_geometry.js');
 const HandlerModule = await import('../../js/solver/handlers.js');
 const SumHandlerModule = await import('../../js/solver/sum_handler.js');
 
@@ -155,12 +154,6 @@ await runTest('a Raw grid keeps the grid but adds no implicit constraints', () =
   assert.equal(geometry.parseCellId('R1C1').cellIndex, 0);
 
   assert.equal(countHandlers(buildHandlers(constraint), 'AllDifferent'), 0);
-});
-
-await runTest('a Raw grid allows fewer values than its dimensions', () => {
-  const geometry = CellGeometry.fromShapeSpec('9x9~1-2~Raw');
-  assert.equal(geometry.numValues, 2);
-  assert.throws(() => CellGeometry.fromShapeSpec('9x9~1-2'), /Invalid numValues/);
 });
 
 await runTest('a Raw grid keeps constraint-provided handlers on var cells', () => {

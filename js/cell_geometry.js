@@ -67,12 +67,7 @@ export class CellGeometry {
 
     const gridType = typePart || defaultGridType;
 
-    const geometry = this.fromGridSize(
-      numRows, numCols, numValues, valueOffset, gridType);
-    if (!geometry) {
-      throw new Error('Invalid shape dimensions: ' + shapeSpec);
-    }
-    return geometry;
+    return new CellGeometry(numRows, numCols, numValues, valueOffset, gridType);
   }
 
   // The default grid geometry (9x9), as a fresh instance that is safe to add
@@ -83,14 +78,19 @@ export class CellGeometry {
 
   static makeName(numRows, numCols, numValues, valueOffset,
     gridType = this.DEFAULT_GRID_TYPE) {
-    const dims = `${numRows}x${numCols}`;
+    const hasRange =
+      valueOffset !== 0 || numValues !== this.defaultNumValues(numRows, numCols);
     const range = valueOffset !== 0
       ? `${1 + valueOffset}-${numValues + valueOffset}` : `${numValues}`;
-    const typeSuffix = gridType !== this.DEFAULT_GRID_TYPE ? `~${gridType}` : '';
-    if (valueOffset !== 0 || numValues !== this.defaultNumValues(numRows, numCols)) {
-      return `${dims}~${range}${typeSuffix}`;
+
+    const parts = [`${numRows}x${numCols}`];
+    if (gridType !== this.DEFAULT_GRID_TYPE) {
+      // An empty range slot positions the grid type.
+      parts.push(hasRange ? range : '', gridType);
+    } else if (hasRange) {
+      parts.push(range);
     }
-    return typeSuffix ? `${dims}~${typeSuffix}` : dims;
+    return parts.join('~');
   }
 
   constructor(numRows, numCols, numValues = null, valueOffset = 0,
@@ -372,10 +372,6 @@ class VarCellRegistry {
     const sorted = [...this._groups.values()].sort(
       (a, b) => a.prefix < b.prefix ? -1 : a.prefix > b.prefix ? 1 : 0);
 
-    // Count-only groups take their columns from the grid. The stored specs
-    // keep the declared columns.
-    const defaultColumns = this._gridColumns;
-
     let next = this._cellIndexOffset;
     const resolved = [];
     for (const group of sorted) {
@@ -388,8 +384,10 @@ class VarCellRegistry {
         this._idToCell.set(id, group.cells[i]);
       }
 
+      // Count-only groups take their columns from the grid. The stored specs
+      // keep the declared columns.
       resolved.push(group.columns
-        ? group : { ...group, columns: defaultColumns, countOnly: true });
+        ? group : { ...group, columns: this._gridColumns, countOnly: true });
     }
 
     this._sortedGroups = resolved;

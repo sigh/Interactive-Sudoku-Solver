@@ -189,9 +189,8 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
   _setUpGridInput() {
     const input = this._shapeSpecInput;
     this._dropdown = document.getElementById('shape-dropdown');
-    this._dropdownItemsElem = document.getElementById('shape-dropdown-items');
-    this._dropdownItems = [];
     this._highlightedIndex = -1;
+    this._buildShapeDropdown();
 
     this._dropdown.onmouseleave = () => this._highlightDropdownItem(-1);
 
@@ -252,49 +251,32 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
     this._highlightedIndex = index;
   }
 
-  // The dimension presets and the current dimensions.
-  _updateShapeDropdown() {
-    const geometry = this._geometry;
-    const applySpec = (spec) => {
+  // The dropdown lists the dimension presets.
+  _buildShapeDropdown() {
+    const itemsElem = document.getElementById('shape-dropdown-items');
+    this._dropdownActions = this.constructor._SHAPE_PRESETS.map(spec => () => {
       this._shapeSpecInput.value = spec;
       this._applyShape();
-    };
-    const entries = [];
-    const addSpecEntry = (spec) => entries.push(
-      { text: spec, action: () => applySpec(spec) });
-
-    this.constructor._SHAPE_PRESETS.forEach(spec => addSpecEntry(spec));
-    const dims = geometry.gridDimsStr;
-    if (!this.constructor._SHAPE_PRESETS.includes(dims)) {
-      addSpecEntry(dims);
-    }
-
-    clearDOMNode(this._dropdownItemsElem);
-    this._dropdownActions = entries.map(entry => entry.action);
-    this._dropdownItems = entries.map((entry, i) => {
+    });
+    this._dropdownItems = this.constructor._SHAPE_PRESETS.map((spec, i) => {
       const item = document.createElement('div');
       item.className = 'shape-dropdown-item';
-      item.textContent = entry.text;
+      item.textContent = spec;
       item.onmousedown = (e) => {
         e.preventDefault();
         this._hideDropdown();
         this._dropdownActions[i]();
       };
       item.onmouseenter = () => this._highlightDropdownItem(i);
-      this._dropdownItemsElem.appendChild(item);
+      itemsElem.appendChild(item);
       return item;
     });
-    this._highlightDropdownItem(-1);
   }
 
   _setUpGridTypeInput() {
     const select = this._gridTypeSelect;
-    for (const gridType of CellGeometry.GRID_TYPES) {
-      const opt = document.createElement('option');
-      opt.value = gridType;
-      opt.textContent = gridType;
-      select.appendChild(opt);
-    }
+    this._setSelectOptions(
+      select, CellGeometry.GRID_TYPES, CellGeometry.DEFAULT_GRID_TYPE);
     select.onchange = () => this._applyGridType(select.value);
   }
 
@@ -387,7 +369,6 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
     this._varForm['var-count'].value = '';
     this._updateVarSizeDefault();
     this._updateVarPrefixDefault();
-    this._updateShapeDropdown();
     // Only the prefix prefill depends on the var cell groups.
     geometry.onVarCellsChanged(() => this._updateVarPrefixDefault());
   }
