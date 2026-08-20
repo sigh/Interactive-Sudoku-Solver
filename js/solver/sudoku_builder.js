@@ -663,11 +663,7 @@ export class SudokuBuilder {
 
         case 'Thermo':
           cells = constraint.cells.map(c => geometry.parseCellId(c).cellIndex);
-          for (let i = 1; i < cells.length; i++) {
-            yield new HandlerModule.BinaryConstraint(
-              cells[i - 1], cells[i],
-              SudokuConstraint.Thermo.fnKey(geometry.numValues, geometry.valueOffset));
-          }
+          yield new HandlerModule.Thermo(cells);
           break;
 
         case 'Whisper':

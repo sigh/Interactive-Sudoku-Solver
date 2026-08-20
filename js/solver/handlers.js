@@ -2015,6 +2015,57 @@ export class SameValuesIgnoreCount extends SameValues {
   }
 }
 
+export class Thermo extends SudokuConstraintHandler {
+  constructor(cells) {
+    super(cells);
+    // Ensure we dedupe identical thermos.
+    this.idStr = [this.constructor.name, ...cells].join('-');
+  }
+
+  initialize(initialGridCells, cellExclusions, geometry, stateAllocator) {
+    // A repeated cell would have to be less than itself. Rejecting it here lets
+    // enforceConsistency assume the cells are distinct.
+    return new Set(this.cells).size === this.cells.length;
+  }
+
+  enforceConsistency(grid, pQueue) {
+    const cells = this.cells;
+    const numCells = cells.length;
+
+    // Forward pass + backward pass for arc-consistency.
+    // Remove values which are not above the minimum of the previous cell.
+    let vPrev = grid[cells[0]];
+    for (let i = 1; i < numCells; i++) {
+      const cell = cells[i];
+      const v = grid[cell];
+      const vNew = v & ~(vPrev ^ (vPrev - 1));
+      if (!vNew) return false;
+      if (v !== vNew) {
+        grid[cell] = vNew;
+        pQueue.addForCell(cell);
+      }
+      vPrev = vNew;
+    }
+
+    // Remove values which are not below the maximum of the next cell.
+    // Since the forward pass leaves the minimums strictly increasing, every=
+    // cell keeps at least its minimum in the backward pass.
+    let vNext = vPrev;
+    for (let i = numCells - 2; i >= 0; i--) {
+      const cell = cells[i];
+      const v = grid[cell];
+      const vNew = v & ((1 << (31 - Math.clz32(vNext))) - 1);
+      if (v !== vNew) {
+        grid[cell] = vNew;
+        pQueue.addForCell(cell);
+      }
+      vNext = vNew;
+    }
+
+    return true;
+  }
+}
+
 export class Between extends SudokuConstraintHandler {
   constructor(cells) {
     super(cells);

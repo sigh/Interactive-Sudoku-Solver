@@ -988,10 +988,6 @@ export class SudokuConstraint {
       this.cells = cells;
     }
 
-    static fnKey = memoize((numValues, valueOffset = 0) =>
-      fnToBinaryKey((a, b) => a < b, numValues, valueOffset)
-    );
-
     static displayName() {
       return 'Thermometer';
     }

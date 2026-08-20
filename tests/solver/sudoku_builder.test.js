@@ -401,14 +401,20 @@ await runTest('PillArrow allows 0 as the leading pill digit', () => {
   assert.ok(!SudokuBuilder.build(unsatisfiable).nthSolution(0));
 });
 
-await runTest('Thermo produces BinaryConstraint handlers', () => {
+await runTest('Thermo produces a Thermo handler', () => {
   const constraint = new SudokuConstraint.Container([
     new SudokuConstraint.Thermo('R1C1', 'R2C1', 'R3C1'),
   ]);
   const handlers = buildHandlers(constraint);
-  assert.ok(hasHandler(handlers, 'BinaryConstraint'));
-  // 3-cell thermo → 2 pairwise binary constraints.
-  assert.equal(countHandlers(handlers, 'BinaryConstraint'), 2);
+  assert.equal(countHandlers(handlers, 'Thermo'), 1);
+});
+
+await runTest('Thermo with a repeated cell is unsatisfiable', () => {
+  // The handler relies on the cells being distinct.
+  for (const input of ['.Thermo~R1C1~R1C1', '.Thermo~R1C1~R1C2~R1C1']) {
+    const constraint = SudokuParser.parseString(input);
+    assert.ok(!SudokuBuilder.build(constraint).nthSolution(0));
+  }
 });
 
 await runTest('Diagonal produces AllDifferent handler', () => {
