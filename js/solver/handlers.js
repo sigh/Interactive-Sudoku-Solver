@@ -2038,7 +2038,7 @@ export class Thermo extends SudokuConstraintHandler {
     for (let i = 1; i < numCells; i++) {
       const cell = cells[i];
       const v = grid[cell];
-      const vNew = v & ~(vPrev ^ (vPrev - 1));
+      const vNew = v & (-(vPrev & -vPrev) << 1);
       if (!vNew) return false;
       if (v !== vNew) {
         grid[cell] = vNew;

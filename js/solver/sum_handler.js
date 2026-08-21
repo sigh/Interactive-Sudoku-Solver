@@ -568,7 +568,7 @@ export class Sum extends SudokuConstraintHandler {
         const x = v << sumMinusMin;
         // Remove any values GREATER than x. Even if all other squares
         // take their minimum values, these are too big.
-        if (!(v &= ((x & -x) << 1) - 1)) return false;
+        if (!(v &= x ^ (x - 1))) return false;
         grid[cells[i]] = v;
       }
 
