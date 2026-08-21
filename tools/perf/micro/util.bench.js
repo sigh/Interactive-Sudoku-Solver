@@ -9,15 +9,12 @@ const {
   RandomIntGenerator,
   arrayDifference,
   arrayIntersect,
-  arrayIntersectSize,
   arrayRemoveValue,
   arraysAreEqual,
   countOnes16bit,
   memoize,
   requiredBits,
-  setDifference,
   setIntersectSize,
-  setIntersectionToArray,
   setPeek,
 } = await import('../../../js/util.js' + self.VERSION_PARAM);
 
@@ -364,12 +361,6 @@ benchGroup('util::array', () => {
   }
 
   {
-    bench('arrayIntersectSize(len=64)', () => {
-      consume(arrayIntersectSize(a64, b64));
-    }, { innerIterations: 80_000, minSampleTimeMs: 25 });
-  }
-
-  {
     bench('arrayIntersect(len=256)', () => {
       consume(arrayIntersect(a256, b256).length);
     }, { innerIterations: 2_500, minSampleTimeMs: 25 });
@@ -379,12 +370,6 @@ benchGroup('util::array', () => {
     bench('arrayDifference(len=256)', () => {
       consume(arrayDifference(a256, b256).length);
     }, { innerIterations: 2_500, minSampleTimeMs: 25 });
-  }
-
-  {
-    bench('arrayIntersectSize(len=256)', () => {
-      consume(arrayIntersectSize(a256, b256));
-    }, { innerIterations: 5_000, minSampleTimeMs: 25 });
   }
 
   {
@@ -449,28 +434,9 @@ benchGroup('util::set', () => {
   }
 
   {
-    bench('setIntersectionToArray(iter len=64)', () => {
-      consume(setIntersectionToArray(setA, iterB64).length);
-    }, { innerIterations: 80_000, minSampleTimeMs: 25 });
-  }
-
-  {
     bench('setIntersectSize(iter len=256)', () => {
       consume(setIntersectSize(setA, iterB256));
     }, { innerIterations: 40_000, minSampleTimeMs: 25 });
-  }
-
-  {
-    bench('setIntersectionToArray(iter len=256)', () => {
-      consume(setIntersectionToArray(setA, iterB256).length);
-    }, { innerIterations: 20_000, minSampleTimeMs: 25 });
-  }
-
-  {
-    const setB = makeSet(256, 1024);
-    bench('setDifference(set,size=256)', () => {
-      consume(setDifference(setA, setB).size);
-    }, { innerIterations: 10_000, minSampleTimeMs: 25 });
   }
 
   {

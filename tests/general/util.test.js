@@ -14,21 +14,17 @@ const {
   camelCaseToWords,
   arrayDifference,
   arrayIntersect,
-  arrayIntersectSize,
   arrayRemoveValue,
   arraysAreEqual,
   mergeSortedArrays,
   elementarySymmetricSum,
-  setIntersectionToArray,
   setIntersectSize,
-  setDifference,
   setPeek,
   countOnes16bit,
   countOnes32bit,
   requiredBits,
   memoize,
   isIterable,
-  isPlainObject,
   shuffleArray,
   BitWriter,
   BitReader,
@@ -39,7 +35,6 @@ const {
   RandomIntGenerator,
   canonicalJSON,
   Timer,
-  IteratorWithCount,
 } = await import('../../js/util.js');
 
 // ============================================================================
@@ -124,10 +119,6 @@ await runTest('arrayDifference should return elements in a but not in b', () => 
 
 await runTest('arrayIntersect should return common elements', () => {
   assert.deepEqual(arrayIntersect([1, 2, 3], [2, 3, 4]), [2, 3]);
-});
-
-await runTest('arrayIntersectSize should return count of common elements', () => {
-  assert.equal(arrayIntersectSize([1, 2, 3], [2, 3, 4]), 2);
 });
 
 await runTest('arrayRemoveValue should remove value from array', () => {
@@ -217,23 +208,10 @@ await runTest('elementarySymmetricSum should return 1 for k=0', () => {
 // Set utilities
 // ============================================================================
 
-await runTest('setIntersectionToArray should return intersection as array', () => {
-  const a = new Set([1, 2, 3]);
-  const b = [2, 3, 4];
-  assert.deepEqual(setIntersectionToArray(a, b), [2, 3]);
-});
-
 await runTest('setIntersectSize should return count of common elements', () => {
   const a = new Set([1, 2, 3]);
   const b = [2, 3, 4];
   assert.equal(setIntersectSize(a, b), 2);
-});
-
-await runTest('setDifference should return elements in a but not in b', () => {
-  const a = new Set([1, 2, 3]);
-  const b = [2, 3];
-  const result = setDifference(a, b);
-  assert.deepEqual([...result], [1]);
 });
 
 await runTest('setPeek should return first element of set', () => {
@@ -301,7 +279,7 @@ await runTest('memoize should cache multiple argument results', () => {
 });
 
 // ============================================================================
-// isIterable / isPlainObject
+// isIterable
 // ============================================================================
 
 await runTest('isIterable should return true for arrays', () => {
@@ -318,19 +296,6 @@ await runTest('isIterable should return false for numbers', () => {
 
 await runTest('isIterable should return falsy for null', () => {
   assert.ok(!isIterable(null));
-});
-
-await runTest('isPlainObject should return true for plain objects', () => {
-  assert.equal(isPlainObject({}), true);
-  assert.equal(isPlainObject({ a: 1 }), true);
-});
-
-await runTest('isPlainObject should return false for arrays', () => {
-  assert.equal(isPlainObject([]), false);
-});
-
-await runTest('isPlainObject should return falsy for null', () => {
-  assert.ok(!isPlainObject(null));
 });
 
 // ============================================================================
@@ -849,44 +814,6 @@ await runTest('Timer.unpause when already running is safe', () => {
   timer.unpause(); // Already running, should be a no-op.
   timer.pause();
   assert.ok(timer.elapsedMs() >= 0);
-});
-
-// ============================================================================
-// IteratorWithCount
-// ============================================================================
-
-await runTest('IteratorWithCount counts iterations', () => {
-  const arr = [10, 20, 30];
-  const iter = new IteratorWithCount(arr[Symbol.iterator]());
-  assert.equal(iter.count, 0);
-
-  iter.next();
-  assert.equal(iter.count, 1);
-
-  iter.next();
-  assert.equal(iter.count, 2);
-
-  iter.next();
-  assert.equal(iter.count, 3);
-});
-
-await runTest('IteratorWithCount works in for-of loop', () => {
-  const arr = [1, 2, 3, 4, 5];
-  const iter = new IteratorWithCount(arr[Symbol.iterator]());
-  const collected = [];
-  for (const v of iter) {
-    collected.push(v);
-  }
-  assert.deepEqual(collected, [1, 2, 3, 4, 5]);
-  // Count includes the final done=true call.
-  assert.equal(iter.count, 6);
-});
-
-await runTest('IteratorWithCount with empty iterator', () => {
-  const iter = new IteratorWithCount([][Symbol.iterator]());
-  const result = iter.next();
-  assert.equal(result.done, true);
-  assert.equal(iter.count, 1);
 });
 
 await runTest('setSvgAttrs sets each attribute', () => {

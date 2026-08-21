@@ -126,10 +126,6 @@ export const arrayIntersect = (a, b) => {
   return a.filter(v => b.includes(v));
 };
 
-export const arrayIntersectSize = (a, b) => {
-  return a.reduce((p, v) => p + b.includes(v), 0);
-}
-
 // Merge two sorted, disjoint arrays.
 export const mergeSortedArrays = (a, b) => {
   const merged = new Array(a.length + b.length);
@@ -178,18 +174,7 @@ export const elementarySymmetricSum = (values, k) => {
   return dp[k];
 };
 
-// `a` must be a set, `b` must be iterable.
-export const setIntersectionToArray = (a, b) => {
-  const intersection = [];
-  for (const elem of b) {
-    if (a.has(elem)) {
-      intersection.push(elem)
-    }
-  }
-  return intersection;
-};
-
-// `a` must be a set, `b` must be iterable.
+// `a` must have a `has()` method (a Set or a BitSet), `b` must be iterable.
 export const setIntersectSize = (a, b) => {
   let count = 0;
   for (const elem of b) {
@@ -197,14 +182,6 @@ export const setIntersectSize = (a, b) => {
   }
   return count;
 }
-
-export const setDifference = (a, b) => {
-  const diff = new Set(a);
-  for (const elem of b) {
-    diff.delete(elem);
-  }
-  return diff;
-};
 
 export const setPeek = (a) => {
   for (const elem of a) {
@@ -299,20 +276,6 @@ export class Timer {
   }
 }
 
-export class IteratorWithCount {
-  constructor(iter) {
-    this._iter = iter;
-    this.count = 0;
-  }
-
-  next() {
-    this.count++;
-    return this._iter.next();
-  }
-
-  [Symbol.iterator] = () => this;
-}
-
 const makeDynamicLoader = (createElement) => {
   return (path) => {
     let loaded = false;
@@ -369,10 +332,6 @@ export const toggleDisabled = (element, disabled) => {
 
 export const isIterable = (obj) => {
   return obj && typeof obj[Symbol.iterator] === 'function';
-};
-
-export const isPlainObject = (obj) => {
-  return obj && obj.constructor === Object;
 };
 
 export const localTimestamp = () => {
