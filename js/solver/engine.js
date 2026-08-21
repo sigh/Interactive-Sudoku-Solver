@@ -1625,6 +1625,9 @@ export class HandlerSet {
   //   true if we added it to see.
   //   false if it already existed.
   _addToSeen(h) {
+    // Handlers without an idStr are unique, so they can never be duplicates.
+    if (h.idStr === null) return true;
+
     if (this._seen.has(h.idStr)) {
       // Make sure we mark the handler as essential if either
       // is essential.

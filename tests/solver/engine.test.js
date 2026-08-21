@@ -434,14 +434,39 @@ await runTest('HandlerSet.addSingletonHandlers adds to singleton map', () => {
 await runTest('HandlerSet.addSingletonHandlers throws on duplicate', () => {
   const hs = new HandlerSet([], NUM_SEARCH_CELLS);
   const h1 = new UniqueValueExclusion(0);
-  // Force same idStr to create a duplicate.
   const h2 = new UniqueValueExclusion(0);
-  h2.idStr = h1.idStr;
+  // Dedup keys off idStr, so give both the same one to make them duplicates.
+  h1.idStr = h2.idStr = 'duplicate-singleton';
 
   hs.addSingletonHandlers(h1);
   assert.throws(
     () => hs.addSingletonHandlers(h2),
     /Singleton handlers must be unique/);
+});
+
+await runTest('HandlerSet should not dedupe handlers without an idStr', () => {
+  const hs = new HandlerSet([], NUM_SEARCH_CELLS);
+  // A null idStr means "unique"; two identical-looking handlers both survive.
+  const h1 = new SudokuConstraintHandler([0, 1, 2]);
+  const h2 = new SudokuConstraintHandler([0, 1, 2]);
+  assert.equal(h1.idStr, null);
+
+  hs.add(h1, h2);
+  assert.equal(hs.numHandlers(), 2);
+});
+
+await runTest('HandlerSet should dedupe handlers sharing an idStr', () => {
+  const hs = new HandlerSet([], NUM_SEARCH_CELLS);
+  const h1 = new SudokuConstraintHandler([0, 1, 2]);
+  const h2 = new SudokuConstraintHandler([0, 1, 2]);
+  h1.idStr = h2.idStr = 'same-content';
+  // A duplicate is dropped, but a non-essential one must not downgrade the
+  // handler that is kept.
+  h2.essential = false;
+
+  hs.add(h1, h2);
+  assert.equal(hs.numHandlers(), 1);
+  assert.equal(hs.getAll()[0].essential, true);
 });
 
 await runTest('HandlerSet.numHandlers counts all handlers', () => {

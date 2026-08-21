@@ -24,8 +24,6 @@ export class InvalidConstraintError extends Error {
 export class SudokuConstraintHandler {
   static SINGLETON_HANDLER = false;
 
-  static _defaultId = 0;
-
   constructor(cells) {
     // This constraint is enforced whenever these cells are touched.
     // cells must not be written to. They can be updated during initialization,
@@ -34,10 +32,10 @@ export class SudokuConstraintHandler {
     // By default all constraints are essential for correctness.
     // The optimizer may add non-essential constraints to improve performance.
     this.essential = true;
-
-    const id = this.constructor._defaultId++;
-    // By default every id is unique.
-    this.idStr = this.constructor.name + '-' + id.toString();
+    // Handlers which two separate constructions can produce identically set an
+    // idStr describing that content, and HandlerSet dedupes on it. A null
+    // idStr means the handler is unique, and is never a duplicate of another.
+    this.idStr = null;
   }
 
   // Enforce the constraint on the grid and return:
