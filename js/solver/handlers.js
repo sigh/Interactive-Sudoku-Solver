@@ -2013,12 +2013,6 @@ export class SameValuesIgnoreCount extends SameValues {
 }
 
 export class Thermo extends SudokuConstraintHandler {
-  constructor(cells) {
-    super(cells);
-    // Ensure we dedupe identical thermos.
-    this.idStr = [this.constructor.name, ...cells].join('-');
-  }
-
   initialize(initialGridCells, cellExclusions, geometry, stateAllocator) {
     // A repeated cell would have to be less than itself. Rejecting it here lets
     // enforceConsistency assume the cells are distinct.
