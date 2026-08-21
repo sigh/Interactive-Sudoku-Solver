@@ -495,11 +495,18 @@ export class SudokuConstraintOptimizer {
         h => h.cells.length === boxSize);
 
     const numHandlers = allHandlers.length;
+
+    // Every house is tested against every other, so hold them as bitsets.
+    const { bitsets: houseCells } = BitSet.allocatePool(
+      geometry.totalCells(), numHandlers);
+    for (let i = 0; i < numHandlers; i++) {
+      for (const cell of allHandlers[i].cells) houseCells[i].add(cell);
+    }
+
     for (let i = 1; i < numHandlers; i++) {
       for (let j = 0; j < i; j++) {
         if (allHandlers[i].valueMask() !== allHandlers[j].valueMask()) continue;
-        const intersectionSize = arrayIntersectSize(
-          allHandlers[i].cells, allHandlers[j].cells);
+        const intersectionSize = houseCells[i].intersectCount(houseCells[j]);
         if (intersectionSize !== boxWidth && intersectionSize !== boxHeight) continue;
         const newHandler = new HandlerModule.SameValuesIgnoreCount(
           arrayDifference(allHandlers[i].cells, allHandlers[j].cells),
