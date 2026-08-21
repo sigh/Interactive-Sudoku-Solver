@@ -532,14 +532,20 @@ export class SudokuConstraintOptimizer {
   }
 
   // Find a non-overlapping set of handlers.
-  _findNonOverlappingSubset(handlers, fullHandlerSet) {
+  // `intersectionCache` is an optional Map for reusing getIntersectingIndexes
+  // results across calls -- see the caller for when that is valid.
+  _findNonOverlappingSubset(handlers, fullHandlerSet, intersectionCache = null) {
     const handlerIndexes = new BitSet(fullHandlerSet.numHandlers());
     for (const h of handlers) handlerIndexes.add(fullHandlerSet.getIndex(h));
 
     // Sort handers by number of overlapping handlers.
     const handlersByOverlaps = [];
     for (const h of handlers) {
-      const overlapIndexes = fullHandlerSet.getIntersectingIndexes(h);
+      let overlapIndexes = intersectionCache?.get(h);
+      if (overlapIndexes === undefined) {
+        overlapIndexes = fullHandlerSet.getIntersectingIndexes(h);
+        intersectionCache?.set(h, overlapIndexes);
+      }
       const numOverlap = overlapIndexes.intersectCount(handlerIndexes);
       handlersByOverlaps.push([h, numOverlap]);
     }
@@ -1102,6 +1108,10 @@ export class SudokuConstraintOptimizer {
     for (const region of allDiffRegions) allDiffHandlerIndexes.add(region.handlerIndex);
     // Reused across regions: each region is tested against every sum handler.
     const regionCells = new BitSet(cellExclusions.numSearchCells());
+    // A handler's intersecting set depends on the handler, not the region, and
+    // regions revisit the same sum handlers. Scoped to this pass only: adding
+    // handlers changes the result, and the caller adds ours once we return.
+    const intersectionCache = new Map();
 
     for (const baseRegion of allDiffRegions) {
       const h = baseRegion.handler;
@@ -1117,7 +1127,7 @@ export class SudokuConstraintOptimizer {
       // the same handler to be used in every region it intersects.
       const filteredSumHandlers = this._findNonOverlappingSubset(
         currentRegionSumIndexes.toSortedArray().map(i => handlerSet.getHandler(i)),
-        handlerSet);
+        handlerSet, intersectionCache);
 
       {
         const currentRegionDiffIndexes = intersectingHandlers.clone();

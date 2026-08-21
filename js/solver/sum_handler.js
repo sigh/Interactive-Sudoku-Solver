@@ -1,4 +1,4 @@
-const { memoize, MultiMap, countOnes16bit } = await import('../util.js' + self.VERSION_PARAM);
+const { memoize, MultiMap, countOnes16bit, sortedArrayCopy } = await import('../util.js' + self.VERSION_PARAM);
 const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM);
 const { SudokuConstraintHandler, HandlerUtil, InvalidConstraintError } = await import('./handlers.js' + self.VERSION_PARAM);
 const { GEOMETRY_MAX, GEOMETRY_9x9 } = await import('../cell_geometry.js' + self.VERSION_PARAM);
@@ -29,13 +29,19 @@ export class Sum extends SudokuConstraintHandler {
   }
 
   constructor(cells, sum, coeffs) {
-    const cellSet = new Set(cells);
     let coeffGroups;
 
-    if (cellSet.size === cells.length && !coeffs) {
-      // Shortcut the common case.
-      coeffGroups = [{ coeff: 1, cells: [...cells], exclusionGroups: [] }];
-    } else {
+    if (!coeffs) {
+      // Sorting is needed anyway for a consistent idStr, and deduping it at the
+      // same time doubles as the duplicate check.
+      const sortedCells = sortedArrayCopy(cells, /* removeDuplicates= */ true);
+      if (sortedCells.length === cells.length) {
+        // Shortcut the common case.
+        coeffGroups = [{ coeff: 1, cells: sortedCells, exclusionGroups: [] }];
+      }
+    }
+
+    if (coeffGroups === undefined) {
       coeffs = coeffs || Array(cells.length).fill(1);
 
       if (coeffs.length !== cells.length) {
@@ -51,7 +57,7 @@ export class Sum extends SudokuConstraintHandler {
 
       // If there are duplicates, then update the coefficients.
       // Not as efficient as it could be, but this is a rare case.
-      if (cellSet.size !== cells.length) {
+      if (new Set(cells).size !== cells.length) {
         const cellMap = new Map();
         for (let i = 0; i < cells.length; i++) {
           const cell = cells[i];
@@ -78,10 +84,10 @@ export class Sum extends SudokuConstraintHandler {
       for (let [coeff, coeffCells] of coeffMap) {
         coeffGroups.push({ coeff, cells: coeffCells, exclusionGroups: [] });
       }
-    }
 
-    // Sort cells for consistent idStr and exclusion cell performance.
-    coeffGroups.forEach(g => g.cells.sort((a, b) => a - b));
+      // Sort cells for consistent idStr and exclusion cell performance.
+      coeffGroups.forEach(g => g.cells.sort((a, b) => a - b));
+    }
 
     super(cells);
     this._rawSum = +sum;
