@@ -3,6 +3,9 @@ const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM)
 const { SudokuConstraintHandler, HandlerUtil, InvalidConstraintError } = await import('./handlers.js' + self.VERSION_PARAM);
 const { GEOMETRY_MAX, GEOMETRY_9x9 } = await import('../cell_geometry.js' + self.VERSION_PARAM);
 
+// Scratch for the cell -> index map in Sum.initialize.
+let cellIndexScratch = new Uint16Array(0);
+
 // Enforces a weighted linear equation `Σ coeff·value = sum` over the cells
 // (killer cages, arithmetic sums, equalities). See sum.md for the full
 // algorithm.
@@ -217,8 +220,13 @@ export class Sum extends SudokuConstraintHandler {
 
     {
       this._exclusionGroupIds = new Int16Array(this.cells.length);
-      const cellLookup = new Uint16Array(cellExclusions.numSearchCells());
-      this.cells.forEach((c, i) => cellLookup[c] = i);
+      const numSearchCells = cellExclusions.numSearchCells();
+      if (cellIndexScratch.length < numSearchCells) {
+        cellIndexScratch = new Uint16Array(numSearchCells);
+      }
+      const cellLookup = cellIndexScratch;
+      const cells = this.cells;
+      for (let i = 0; i < cells.length; i++) cellLookup[cells[i]] = i;
 
       for (let i = 0; i < this._coeffGroups.length; i++) {
         const { exclusionGroups, coeff } = this._coeffGroups[i];
