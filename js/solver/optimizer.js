@@ -5,7 +5,6 @@ const {
   setIntersectSize,
   arrayIntersect,
   arrayRemoveValue,
-  setIntersectionToArray,
   setDifference,
   BitSet,
   elementarySymmetricSum,
@@ -508,9 +507,12 @@ export class SudokuConstraintOptimizer {
         if (allHandlers[i].valueMask() !== allHandlers[j].valueMask()) continue;
         const intersectionSize = houseCells[i].intersectCount(houseCells[j]);
         if (intersectionSize !== boxWidth && intersectionSize !== boxHeight) continue;
+        const onlyInI = houseCells[i].clone();
+        onlyInI.subtract(houseCells[j]);
+        const onlyInJ = houseCells[j].clone();
+        onlyInJ.subtract(houseCells[i]);
         const newHandler = new HandlerModule.SameValuesIgnoreCount(
-          arrayDifference(allHandlers[i].cells, allHandlers[j].cells),
-          arrayDifference(allHandlers[j].cells, allHandlers[i].cells));
+          onlyInI.toSortedArray(), onlyInJ.toSortedArray());
         handlerSet.addAux(newHandler);
         this._logAddHandler(
           '_addGridHouseIntersections', newHandler, { aux: true });
@@ -532,14 +534,14 @@ export class SudokuConstraintOptimizer {
 
   // Find a non-overlapping set of handlers.
   _findNonOverlappingSubset(handlers, fullHandlerSet) {
-    const handlerIndexes = new Set(
-      handlers.map(h => fullHandlerSet.getIndex(h)));
+    const handlerIndexes = new BitSet(fullHandlerSet.numHandlers());
+    for (const h of handlers) handlerIndexes.add(fullHandlerSet.getIndex(h));
 
     // Sort handers by number of overlapping handlers.
     const handlersByOverlaps = [];
     for (const h of handlers) {
       const overlapIndexes = fullHandlerSet.getIntersectingIndexes(h);
-      const numOverlap = setIntersectSize(overlapIndexes, handlerIndexes);
+      const numOverlap = overlapIndexes.intersectCount(handlerIndexes);
       handlersByOverlaps.push([h, numOverlap]);
     }
     handlersByOverlaps.sort((a, b) => a[1] - b[1]);
@@ -1092,31 +1094,32 @@ export class SudokuConstraintOptimizer {
       allDiffRegions.map(region => [region.handlerIndex, region]));
     const newHandlers = [];
 
-    const allSumHandlerIndexes = new Set(
-      allSumHandlers.map(h => handlerSet.getIndex(h)));
-    const allDiffHandlerIndexes = new Set(
-      allDiffRegions.map(region => region.handlerIndex));
+    const allSumHandlerIndexes = new BitSet(handlerSet.numHandlers());
+    for (const h of allSumHandlers) allSumHandlerIndexes.add(handlerSet.getIndex(h));
+    const allDiffHandlerIndexes = new BitSet(handlerSet.numHandlers());
+    for (const region of allDiffRegions) allDiffHandlerIndexes.add(region.handlerIndex);
 
     for (const baseRegion of allDiffRegions) {
       const h = baseRegion.handler;
       // Find sum constraints which overlap this region.
-      let intersectingHandlers = handlerSet.getIntersectingIndexes(h);
-      const currentRegionSumIndexes = setIntersectionToArray(
-        intersectingHandlers, allSumHandlerIndexes);
-      if (currentRegionSumIndexes.length === 0) continue;
+      const intersectingHandlers = handlerSet.getIntersectingIndexes(h);
+      const currentRegionSumIndexes = intersectingHandlers.clone();
+      currentRegionSumIndexes.intersect(allSumHandlerIndexes);
+      if (currentRegionSumIndexes.isEmpty()) continue;
 
       // For the sum intersection, we need to ensure that the sum handlers don't
       // overlap themselves.
       // We do this separately for each region so that we don't have to force
       // the same handler to be used in every region it intersects.
       const [filteredSumHandlers] = this._findNonOverlappingSubset(
-        currentRegionSumIndexes.map(i => handlerSet.getHandler(i)),
+        currentRegionSumIndexes.toSortedArray().map(i => handlerSet.getHandler(i)),
         handlerSet);
 
       {
-        const intersectingAllDiffRegions = (
-          setIntersectionToArray(intersectingHandlers, allDiffHandlerIndexes)).map(
-            i => allDiffRegionByIndex.get(i));
+        const currentRegionDiffIndexes = intersectingHandlers.clone();
+        currentRegionDiffIndexes.intersect(allDiffHandlerIndexes);
+        const intersectingAllDiffRegions = currentRegionDiffIndexes.toSortedArray().map(
+          i => allDiffRegionByIndex.get(i));
         const sumIntersectionHandler = this._addSumIntersectionHandler(
           baseRegion, filteredSumHandlers, intersectingAllDiffRegions, allDiffRegionsBySize,
           cellExclusions, geometry);

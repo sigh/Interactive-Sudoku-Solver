@@ -9,6 +9,7 @@ const { SudokuBuilder } = await import('../../js/solver/sudoku_builder.js');
 const { SudokuConstraint } = await import('../../js/sudoku_constraint.js');
 const { CellGeometry } = await import('../../js/cell_geometry.js');
 const { SudokuSolver, HandlerSet } = await import('../../js/solver/engine.js');
+const { BitSet } = await import('../../js/util.js');
 const {
   SudokuConstraintHandler,
   AllDifferent,
@@ -441,6 +442,39 @@ await runTest('HandlerSet.addSingletonHandlers throws on duplicate', () => {
   assert.throws(
     () => hs.addSingletonHandlers(h2),
     /Singleton handlers must be unique/);
+});
+
+await runTest('HandlerSet.numHandlers counts all handlers', () => {
+  const hs = new HandlerSet([], NUM_SEARCH_CELLS);
+  assert.equal(hs.numHandlers(), 0);
+
+  hs.add(new AllDifferent([0, 1, 2]));
+  hs.addNonEssential(new AllDifferent([3, 4, 5]));
+  hs.addSingletonHandlers(new UniqueValueExclusion(0));
+
+  // Every kind of handler counts, since indexes span all of them.
+  assert.equal(hs.numHandlers(), 3);
+  assert.equal(hs.numHandlers(), hs.getAll().length);
+});
+
+await runTest('HandlerSet.getIntersectingIndexes returns cell-sharing handlers', () => {
+  // Plain handlers, so that the cells land in the ordinary handler map.
+  const base = new SudokuConstraintHandler([0, 1, 2]);
+  const overlapping = new SudokuConstraintHandler([2, 3, 4]);
+  const alsoOverlapping = new SudokuConstraintHandler([0, 7]);
+  const disjoint = new SudokuConstraintHandler([10, 11, 12]);
+  const hs = new HandlerSet(
+    [base, overlapping, alsoOverlapping, disjoint], NUM_SEARCH_CELLS);
+
+  const indexes = hs.getIntersectingIndexes(base);
+
+  // Excludes the handler itself, and any handler sharing no cell.
+  assert.deepEqual(
+    indexes.toSortedArray(),
+    [hs.getIndex(overlapping), hs.getIndex(alsoOverlapping)].sort((a, b) => a - b));
+
+  // Wide enough to be intersected with any other handler-index BitSet.
+  assert.equal(indexes.words.length, new BitSet(hs.numHandlers()).words.length);
 });
 
 logSuiteComplete('HandlerSet');

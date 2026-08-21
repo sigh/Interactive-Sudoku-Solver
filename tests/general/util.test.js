@@ -545,6 +545,57 @@ await runTest('BitSet.allocatePool should create pool of sets', () => {
   assert.equal(bitsets[1].has(5), false);
 });
 
+await runTest('BitSet.subtract should remove the other set\'s bits', () => {
+  const a = new BitSet(64);
+  for (const b of [1, 2, 40]) a.add(b);
+
+  const b = new BitSet(64);
+  for (const x of [2, 40, 63]) b.add(x);
+
+  a.subtract(b);
+  // Bits only in `a` survive; shared bits go; bits only in `b` are not added.
+  assert.deepEqual(a.toSortedArray(), [1]);
+  // `b` is untouched.
+  assert.deepEqual(b.toSortedArray(), [2, 40, 63]);
+});
+
+await runTest('BitSet.count should count set bits', () => {
+  const bs = new BitSet(96);
+  assert.equal(bs.count(), 0);
+
+  // Spread across words, including the highest bit of a word.
+  bs.add(0);
+  bs.add(31);
+  bs.add(32);
+  bs.add(95);
+  assert.equal(bs.count(), 4);
+
+  // Adding an existing bit does not change the count.
+  bs.add(31);
+  assert.equal(bs.count(), 4);
+
+  bs.remove(31);
+  assert.equal(bs.count(), 3);
+});
+
+await runTest('BitSet.toSortedArray should return bits in ascending order', () => {
+  const bs = new BitSet(96);
+  assert.deepEqual(bs.toSortedArray(), []);
+
+  // Add out of order, and across word boundaries.
+  for (const b of [95, 32, 0, 31, 64]) bs.add(b);
+  assert.deepEqual(bs.toSortedArray(), [0, 31, 32, 64, 95]);
+});
+
+await runTest('BitSet.toSortedArray length should agree with count', () => {
+  const bs = new BitSet(64);
+  for (const b of [2, 9, 40]) bs.add(b);
+
+  // A count() that under-reports would still produce the right values (the
+  // array grows past its preallocated length), so check the length too.
+  assert.equal(bs.toSortedArray().length, bs.count());
+});
+
 await runTest('BitSet.clone should copy bits', () => {
   const a = new BitSet(64);
   a.add(1);

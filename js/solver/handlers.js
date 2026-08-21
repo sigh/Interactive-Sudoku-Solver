@@ -4,7 +4,6 @@ const {
   memoize,
   countOnes16bit,
   isIterable,
-  arrayIntersect,
   RandomIntGenerator,
   shuffleArray,
   MultiMap,
@@ -318,7 +317,7 @@ export class ValueDependentUniqueValueExclusion extends SudokuConstraintHandler 
 
   initialize(initialGridCells, cellExclusions, geometry, stateAllocator) {
     // Remove cellExclusions, as it would be redundant.
-    const exclusions = new Set(cellExclusions.getArray(this._cell));
+    const exclusions = cellExclusions.getBitSet(this._cell);
     for (let i = 0; i < this._valueToCellMap.length; i++) {
       this._valueToCellMap[i] = new Uint16Array(
         this._valueToCellMap[i].filter(c => !exclusions.has(c)));
@@ -2429,12 +2428,7 @@ export class RequiredValues extends SudokuConstraintHandler {
 
     // Find any cells which are mutually exclusive with the entire
     // constraint and remove the values from them.
-    let commonExclusions = cellExclusions.getArray(cells[0]);
-    for (let i = 0; i < cells.length; i++) {
-      commonExclusions = arrayIntersect(
-        commonExclusions, cellExclusions.getArray(cells[i]));
-    }
-    for (const cell of commonExclusions) {
+    for (const cell of cellExclusions.getListExclusions(cells)) {
       if (!(initialGridCells[cell] &= ~this._valueMask)) return false;
     }
 

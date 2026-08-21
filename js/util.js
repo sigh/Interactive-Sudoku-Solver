@@ -706,6 +706,22 @@ export class BitSet {
     }
   }
 
+  count() {
+    let count = 0;
+    for (let i = 0; i < this.words.length; i++) {
+      count += countOnes32bit(this.words[i]);
+    }
+    return count;
+  }
+
+  toSortedArray() {
+    // Preallocating saves memory.
+    const result = new Array(this.count()).fill(0);
+    let i = 0;
+    this.forEachBit(b => { result[i++] = b; });
+    return result;
+  }
+
   intersect(other) {
     for (let i = 0; i < this.words.length; i++) {
       this.words[i] &= other.words[i];
@@ -718,6 +734,12 @@ export class BitSet {
       count += countOnes32bit(this.words[i] & other.words[i]);
     }
     return count;
+  }
+
+  subtract(other) {
+    for (let i = 0; i < this.words.length; i++) {
+      this.words[i] &= ~other.words[i];
+    }
   }
 
   hasIntersection(other) {
