@@ -7,6 +7,7 @@ const {
   RandomIntGenerator,
   shuffleArray,
   MultiMap,
+  sortedArrayCopy,
   BitSet
 } = await import('../util.js' + self.VERSION_PARAM);
 const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM);
@@ -224,9 +225,8 @@ export class AllDifferent extends SudokuConstraintHandler {
 
     this._enforcementType = enforcementType;
 
-    exclusionCells = Array.from(new Set(exclusionCells));
-    exclusionCells.sort((a, b) => a - b);
-    this._exclusionCells = exclusionCells;
+    this._exclusionCells = sortedArrayCopy(
+      exclusionCells, /* removeDuplicates= */ true);
   }
 
   initialize(initialGridCells, cellExclusions, geometry, stateAllocator) {
@@ -1808,8 +1808,7 @@ export class SameValues extends SudokuConstraintHandler {
   constructor(...cellSets) {
     // Sort to canonicalize the order, both within and between sets.
     // NOTE: We must copy before sorting (to avoid messing up order for the caller).
-    cellSets = cellSets.map(s => [...s].sort((a, b) => a - b))
-      .sort((a, b) => a[0] - b[0]);
+    cellSets = cellSets.map(s => sortedArrayCopy(s)).sort((a, b) => a[0] - b[0]);
 
     const setLen = cellSets[0].length;
     if (!cellSets.every(s => s.length === setLen)) {
@@ -2797,9 +2796,7 @@ export class CountingCircles extends SudokuConstraintHandler {
     // - Makes sure that the constraint performance is independent of the sort
     //   order of the cells.
     // - Required for exclusion grouping to work optimally.
-    cells = cells.slice();
-    cells.sort((a, b) => a - b);
-    super(cells);
+    super(sortedArrayCopy(cells));
   }
 
   static _sumCombinations = memoize((numValues) => {

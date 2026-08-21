@@ -7,6 +7,7 @@ const {
   BitSet,
   elementarySymmetricSum,
   mergeSortedArrays,
+  sortedArrayCopy,
   countOnes16bit
 } = await import('../util.js' + self.VERSION_PARAM);
 const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM);
@@ -691,8 +692,7 @@ export class SudokuConstraintOptimizer {
     };
 
     for (const h of allSumHandlers) {
-      const cells = [...h.cells];
-      cells.sort((a, b) => a - b);
+      const cells = sortedArrayCopy(h.cells);
 
       const r = recordFromCellsAndSum(cells, h.sum(), true);
       if (!r) continue;
@@ -1207,7 +1207,7 @@ export class SudokuConstraintOptimizer {
   // fixed-value regions.
   _makeJigsawIntersections(handlerSet, jigsawPieces) {
     const allHandlers = handlerSet.getAllofType(HandlerModule.PerfectAllDifferent);
-    const cellsKey = (cells) => [...cells].sort((a, b) => a - b).join(',');
+    const cellsKey = (cells) => sortedArrayCopy(cells).join(',');
     const pieceKeys = new Set(jigsawPieces.map(p => cellsKey(p.cells)));
     const isPiece = allHandlers.map(h => pieceKeys.has(cellsKey(h.cells)));
     const newHandlers = [];

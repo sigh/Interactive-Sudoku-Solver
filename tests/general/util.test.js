@@ -17,6 +17,7 @@ const {
   arrayRemoveValue,
   arraysAreEqual,
   mergeSortedArrays,
+  sortedArrayCopy,
   elementarySymmetricSum,
   setIntersectSize,
   setPeek,
@@ -143,6 +144,53 @@ await runTest('arraysAreEqual should return false for different arrays', () => {
 
 await runTest('arraysAreEqual should return false for different lengths', () => {
   assert.equal(arraysAreEqual([1, 2], [1, 2, 3]), false);
+});
+
+await runTest('sortedArrayCopy should copy an already-sorted array', () => {
+  const input = [1, 4, 9];
+  const result = sortedArrayCopy(input);
+
+  assert.deepEqual(result, [1, 4, 9]);
+  // A copy, not the input.
+  assert.notEqual(result, input);
+});
+
+await runTest('sortedArrayCopy should sort an unsorted array', () => {
+  const input = [9, 1, 4];
+  assert.deepEqual(sortedArrayCopy(input), [1, 4, 9]);
+  // The input is left alone.
+  assert.deepEqual(input, [9, 1, 4]);
+});
+
+await runTest('sortedArrayCopy should sort numerically, not lexicographically', () => {
+  assert.deepEqual(sortedArrayCopy([10, 9, 100, 2]), [2, 9, 10, 100]);
+});
+
+await runTest('sortedArrayCopy should keep duplicates by default', () => {
+  // Sorted-with-duplicates is not a violation when duplicates are allowed.
+  assert.deepEqual(sortedArrayCopy([1, 1, 4]), [1, 1, 4]);
+  assert.deepEqual(sortedArrayCopy([4, 1, 1]), [1, 1, 4]);
+});
+
+await runTest('sortedArrayCopy should remove duplicates when asked', () => {
+  assert.deepEqual(sortedArrayCopy([1, 1, 4], true), [1, 4]);
+  assert.deepEqual(sortedArrayCopy([4, 1, 4, 1], true), [1, 4]);
+  // Already strictly ascending: unchanged.
+  assert.deepEqual(sortedArrayCopy([1, 4, 9], true), [1, 4, 9]);
+});
+
+await runTest('sortedArrayCopy should accept typed arrays and return a plain Array', () => {
+  const result = sortedArrayCopy(new Uint16Array([9, 1, 1, 4]), true);
+
+  assert.ok(Array.isArray(result));
+  assert.deepEqual(result, [1, 4, 9]);
+});
+
+await runTest('sortedArrayCopy should handle empty and single-element input', () => {
+  assert.deepEqual(sortedArrayCopy([]), []);
+  assert.deepEqual(sortedArrayCopy([], true), []);
+  assert.deepEqual(sortedArrayCopy([7]), [7]);
+  assert.deepEqual(sortedArrayCopy([7], true), [7]);
 });
 
 await runTest('mergeSortedArrays should merge two sorted arrays', () => {

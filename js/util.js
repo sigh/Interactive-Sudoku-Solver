@@ -126,6 +126,21 @@ export const arrayIntersect = (a, b) => {
   return a.filter(v => b.includes(v));
 };
 
+// Ascending copy of `values`, optionally with duplicates removed. Input is
+// usually already in order, so only sort when the scan finds a violation.
+export const sortedArrayCopy = (values, removeDuplicates = false) => {
+  const copy = [...values];
+  const minDelta = removeDuplicates ? 1 : 0;
+  for (let i = 1; i < copy.length; i++) {
+    if (copy[i] - copy[i - 1] < minDelta) {
+      const fixed = removeDuplicates ? Array.from(new Set(copy)) : copy;
+      fixed.sort((a, b) => a - b);
+      return fixed;
+    }
+  }
+  return copy;
+};
+
 // Merge two sorted, disjoint arrays.
 export const mergeSortedArrays = (a, b) => {
   const merged = new Array(a.length + b.length);
