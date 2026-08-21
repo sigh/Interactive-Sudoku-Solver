@@ -1825,7 +1825,7 @@ export class SameValues extends SudokuConstraintHandler {
     this._buffer2 = null;
     this._stateOffset = -1;
 
-    this.idStr = [this.constructor.name, ...cellSets].join('-');
+    this.idStr = `${this.constructor.name}-${setLen}-${this.cells.join(',')}`;
   }
 
   initialize(initialGridCells, cellExclusions, geometry, stateAllocator) {
