@@ -1476,6 +1476,7 @@ class GridStateAllocator {
 
 export class HandlerSet {
   constructor(handlers, numSearchCells) {
+    this._numSearchCells = numSearchCells;
     this._allHandlers = [];
     this._seen = new Map();
     this._ordinaryIndexLookup = new Map();
@@ -1535,6 +1536,11 @@ export class HandlerSet {
 
   numHandlers() {
     return this._allHandlers.length;
+  }
+
+  // Grid cells + var cells: the capacity for a BitSet of cells.
+  numSearchCells() {
+    return this._numSearchCells;
   }
 
   getIndex(handler) {

@@ -198,10 +198,9 @@ await runTest('_fillInSumGap: returns empty when all cells covered', () => {
   const geometry = CellGeometry.fromGridSize(9);
 
   // All 81 cells covered by sum handlers.
-  const sumCells = new Set(shapeAllCells(geometry));
   const sumHandlers = [];
 
-  const result = optimizer._fillInSumGap(sumHandlers, sumCells, geometry);
+  const result = optimizer._fillInSumGap(sumHandlers, geometry);
   assert.deepEqual(result, []);
 });
 
@@ -210,10 +209,9 @@ await runTest('_fillInSumGap: returns empty when gap too large', () => {
   const geometry = CellGeometry.fromGridSize(9);
 
   // Only 72 cells covered, gap is 9 cells (>= numValues).
-  const sumCells = new Set(shapeAllCells(geometry).slice(0, 72));
   const sumHandlers = [];
 
-  const result = optimizer._fillInSumGap(sumHandlers, sumCells, geometry);
+  const result = optimizer._fillInSumGap(sumHandlers, geometry);
   assert.deepEqual(result, []);
 });
 
@@ -223,7 +221,6 @@ await runTest('_fillInSumGap: creates handler for small gap in 9x9', () => {
 
   // Cover 78 cells, leave 3 uncovered (cells 78, 79, 80).
   const coveredCells = shapeAllCells(geometry).slice(0, 78);
-  const sumCells = new Set(coveredCells);
 
   // Sum of all covered cells. Total grid sum for 9x9 = 9 * 45 = 405.
   // We need a fake sum handler that covers these cells.
@@ -231,7 +228,7 @@ await runTest('_fillInSumGap: creates handler for small gap in 9x9', () => {
   const sumHandler = new SumHandlerModule.Sum(coveredCells, coveredSum);
   const sumHandlers = [sumHandler];
 
-  const result = optimizer._fillInSumGap(sumHandlers, sumCells, geometry);
+  const result = optimizer._fillInSumGap(sumHandlers, geometry);
 
   assert.equal(result.length, 1);
   assert.ok(result[0] instanceof SumHandlerModule.Sum);
@@ -249,14 +246,13 @@ await runTest('_fillInSumGap: correct sum for 4x6 rectangular grid', () => {
 
   // Cover 22 cells, leave 2 uncovered.
   const coveredCells = shapeAllCells(geometry).slice(0, 22);
-  const sumCells = new Set(coveredCells);
 
   // Assume uncovered cells (22, 23) sum to 11.
   const coveredSum = 84 - 11;
   const sumHandler = new SumHandlerModule.Sum(coveredCells, coveredSum);
   const sumHandlers = [sumHandler];
 
-  const result = optimizer._fillInSumGap(sumHandlers, sumCells, geometry);
+  const result = optimizer._fillInSumGap(sumHandlers, geometry);
 
   assert.equal(result.length, 1);
   assert.equal(result[0].sum(), 11);
@@ -273,14 +269,13 @@ await runTest('_fillInSumGap: correct sum for 6x4 rectangular grid', () => {
 
   // Cover 20 cells, leave 4 uncovered.
   const coveredCells = shapeAllCells(geometry).slice(0, 20);
-  const sumCells = new Set(coveredCells);
 
   // Assume uncovered cells sum to 14.
   const coveredSum = 84 - 14;
   const sumHandler = new SumHandlerModule.Sum(coveredCells, coveredSum);
   const sumHandlers = [sumHandler];
 
-  const result = optimizer._fillInSumGap(sumHandlers, sumCells, geometry);
+  const result = optimizer._fillInSumGap(sumHandlers, geometry);
 
   assert.equal(result.length, 1);
   assert.equal(result[0].sum(), 14);
@@ -297,14 +292,13 @@ await runTest('_fillInSumGap: correct sum for 6x8 rectangular grid', () => {
 
   // Cover 45 cells, leave 3 uncovered.
   const coveredCells = shapeAllCells(geometry).slice(0, 45);
-  const sumCells = new Set(coveredCells);
 
   // Assume uncovered cells sum to 15.
   const coveredSum = 216 - 15;
   const sumHandler = new SumHandlerModule.Sum(coveredCells, coveredSum);
   const sumHandlers = [sumHandler];
 
-  const result = optimizer._fillInSumGap(sumHandlers, sumCells, geometry);
+  const result = optimizer._fillInSumGap(sumHandlers, geometry);
 
   assert.equal(result.length, 1);
   assert.equal(result[0].sum(), 15);
@@ -331,9 +325,8 @@ await runTest('_fillInSumGap: multiple sum handlers combine correctly', () => {
     new SumHandlerModule.Sum(cells2, sum2),
     new SumHandlerModule.Sum(cells3, sum3),
   ];
-  const sumCells = new Set([...cells1, ...cells2, ...cells3]);
 
-  const result = optimizer._fillInSumGap(sumHandlers, sumCells, geometry);
+  const result = optimizer._fillInSumGap(sumHandlers, geometry);
 
   assert.equal(result.length, 1);
   assert.equal(result[0].cells.length, 5);
@@ -346,14 +339,13 @@ await runTest('_fillInSumGap: handles single cell gap', () => {
 
   // Cover all but 1 cell.
   const coveredCells = shapeAllCells(geometry).slice(0, 80);
-  const sumCells = new Set(coveredCells);
 
   // Total = 405, leaving sum=5 for the last cell.
   const coveredSum = 400;
   const sumHandler = new SumHandlerModule.Sum(coveredCells, coveredSum);
   const sumHandlers = [sumHandler];
 
-  const result = optimizer._fillInSumGap(sumHandlers, sumCells, geometry);
+  const result = optimizer._fillInSumGap(sumHandlers, geometry);
 
   assert.equal(result.length, 1);
   assert.equal(result[0].cells.length, 1);
@@ -367,7 +359,6 @@ await runTest('_fillInSumGap: handles gap of numValues-1 cells', () => {
 
   // Cover all but 8 cells (numValues - 1 = 8).
   const coveredCells = shapeAllCells(geometry).slice(0, 73);
-  const sumCells = new Set(coveredCells);
 
   // Total = 405, remaining 8 cells sum to some value.
   const remainingSum = 36; // 1+2+3+4+5+6+7+8 = 36 as an example
@@ -375,7 +366,7 @@ await runTest('_fillInSumGap: handles gap of numValues-1 cells', () => {
   const sumHandler = new SumHandlerModule.Sum(coveredCells, coveredSum);
   const sumHandlers = [sumHandler];
 
-  const result = optimizer._fillInSumGap(sumHandlers, sumCells, geometry);
+  const result = optimizer._fillInSumGap(sumHandlers, geometry);
 
   assert.equal(result.length, 1);
   assert.equal(result[0].cells.length, 8);
@@ -387,33 +378,15 @@ await runTest('_fillInSumGap: adds handler to sumHandlers array', () => {
   const geometry = CellGeometry.fromGridSize(9);
 
   const coveredCells = shapeAllCells(geometry).slice(0, 78);
-  const sumCells = new Set(coveredCells);
   const coveredSum = 399;
   const sumHandler = new SumHandlerModule.Sum(coveredCells, coveredSum);
   const sumHandlers = [sumHandler];
 
   const initialLength = sumHandlers.length;
-  optimizer._fillInSumGap(sumHandlers, sumCells, geometry);
+  optimizer._fillInSumGap(sumHandlers, geometry);
 
   // The new handler should be pushed to sumHandlers.
   assert.equal(sumHandlers.length, initialLength + 1);
-});
-
-await runTest('_fillInSumGap: updates sumCells set', () => {
-  const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
-  const geometry = CellGeometry.fromGridSize(9);
-
-  const coveredCells = shapeAllCells(geometry).slice(0, 78);
-  const sumCells = new Set(coveredCells);
-  const coveredSum = 399;
-  const sumHandler = new SumHandlerModule.Sum(coveredCells, coveredSum);
-  const sumHandlers = [sumHandler];
-
-  assert.equal(sumCells.size, 78);
-  optimizer._fillInSumGap(sumHandlers, sumCells, geometry);
-
-  // sumCells should now include all cells.
-  assert.equal(sumCells.size, 81);
 });
 
 await runTest('_fillInSumGap: ignores handlers with cells outside grid', () => {
@@ -429,10 +402,9 @@ await runTest('_fillInSumGap: ignores handlers with cells outside grid', () => {
     [numGridCells, numGridCells + 1], 10);
   const gridHandler = new SumHandlerModule.Sum(gridCells, gridSum);
 
-  const sumCells = new Set([...gridCells, numGridCells, numGridCells + 1]);
   const sumHandlers = [gridHandler, outsideHandler];
 
-  const result = optimizer._fillInSumGap(sumHandlers, sumCells, geometry);
+  const result = optimizer._fillInSumGap(sumHandlers, geometry);
 
   // Should produce a handler for the 3 remaining grid cells.
   assert.equal(result.length, 1);
@@ -454,10 +426,9 @@ await runTest('_fillInSumGap: returns empty when only outside-grid handlers', ()
   // Gap = 16 cells >= numValues(4), so should return empty.
   const outsideHandler = new SumHandlerModule.Sum(
     [numGridCells, numGridCells + 1], 5);
-  const sumCells = new Set([numGridCells, numGridCells + 1]);
   const sumHandlers = [outsideHandler];
 
-  const result = optimizer._fillInSumGap(sumHandlers, sumCells, geometry);
+  const result = optimizer._fillInSumGap(sumHandlers, geometry);
   assert.deepEqual(result, []);
 });
 
@@ -467,13 +438,11 @@ await runTest('_fillInSumGap: returns empty for only Var sums on a widened tiny 
   const varCell = geometry.numGridCells;
   const varHandler = new SumHandlerModule.Sum([varCell], 0);
   const sumHandlers = [varHandler];
-  const sumCells = new Set([varCell]);
 
-  const result = optimizer._fillInSumGap(sumHandlers, sumCells, geometry);
+  const result = optimizer._fillInSumGap(sumHandlers, geometry);
 
   assert.deepEqual(result, []);
   assert.deepEqual(sumHandlers, [varHandler]);
-  assert.deepEqual(sumCells, new Set([varCell]));
 });
 
 await runTest('optimizer builds a Sum containing only a Var cell', async () => {
@@ -501,10 +470,9 @@ await runTest('_fillInSumGap: mixed inside/outside handler is excluded', () => {
   const mixedHandler = new SumHandlerModule.Sum(
     [13, numGridCells], 7);
 
-  const sumCells = new Set([...gridCells, 13, numGridCells]);
   const sumHandlers = [gridHandler, mixedHandler];
 
-  const result = optimizer._fillInSumGap(sumHandlers, sumCells, geometry);
+  const result = optimizer._fillInSumGap(sumHandlers, geometry);
 
   // Gap is 3 cells (16 - 13), which is < numValues(4), so a handler is created.
   assert.equal(result.length, 1);

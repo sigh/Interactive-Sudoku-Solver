@@ -548,7 +548,7 @@ export class SudokuConstraintOptimizer {
     // Start with the handlers with the least overlaps as they restrict future
     // choices the least.
     // i.e. greedy bin-packing.
-    const cellsIncluded = new Set();
+    const cellsIncluded = new BitSet(fullHandlerSet.numSearchCells());
     const nonOverlappingHandlers = [];
     for (const [h,] of handlersByOverlaps) {
       if (h.cells.some(c => cellsIncluded.has(c))) continue;
@@ -556,7 +556,7 @@ export class SudokuConstraintOptimizer {
       h.cells.forEach(c => cellsIncluded.add(c));
     }
 
-    return [nonOverlappingHandlers, cellsIncluded];
+    return nonOverlappingHandlers;
   }
 
   _optimizeSums(handlerSet, cellExclusions, boxRegions, geometry, effectiveValueInfo) {
@@ -570,11 +570,11 @@ export class SudokuConstraintOptimizer {
     const safeSumHandlers = allSumHandlers.filter(
       h => h.onlyUnitCoeffs() && h.cells.length > 0);
 
-    const [filteredSumHandlers, sumCells] =
+    const filteredSumHandlers =
       this._findNonOverlappingSubset(safeSumHandlers, handlerSet);
 
     handlerSet.addNonEssential(
-      ...this._fillInSumGap(filteredSumHandlers, sumCells, geometry));
+      ...this._fillInSumGap(filteredSumHandlers, geometry));
 
     handlerSet.addNonEssential(
       ...this._makeInnieOutieSumHandlers(
@@ -814,7 +814,7 @@ export class SudokuConstraintOptimizer {
     }
   }
 
-  _fillInSumGap(sumHandlers, sumCells, geometry) {
+  _fillInSumGap(sumHandlers, geometry) {
     // The grid total is only known when the rows are Sudoku houses.
     if (geometry.gridType !== CellGeometry.SUDOKU_GRID_TYPE) return [];
     // Fill in a gap if one remains.
@@ -837,7 +837,6 @@ export class SudokuConstraintOptimizer {
       [...remainingCells], remainingSum);
 
     sumHandlers.push(newHandler);
-    remainingCells.forEach(c => sumCells.add(c));
 
     if (this._debugLogger) {
       this._logAddHandler('_fillInSumGap', newHandler, {
@@ -1116,7 +1115,7 @@ export class SudokuConstraintOptimizer {
       // overlap themselves.
       // We do this separately for each region so that we don't have to force
       // the same handler to be used in every region it intersects.
-      const [filteredSumHandlers] = this._findNonOverlappingSubset(
+      const filteredSumHandlers = this._findNonOverlappingSubset(
         currentRegionSumIndexes.toSortedArray().map(i => handlerSet.getHandler(i)),
         handlerSet);
 

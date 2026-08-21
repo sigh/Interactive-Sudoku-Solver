@@ -482,6 +482,13 @@ await runTest('HandlerSet.numHandlers counts all handlers', () => {
   assert.equal(hs.numHandlers(), hs.getAll().length);
 });
 
+await runTest('HandlerSet.numSearchCells reports its constructed size', () => {
+  const hs = new HandlerSet([], NUM_SEARCH_CELLS);
+  // Fixed at construction: adding handlers does not change it.
+  hs.add(new AllDifferent([0, 1, 2]));
+  assert.equal(hs.numSearchCells(), NUM_SEARCH_CELLS);
+});
+
 await runTest('HandlerSet.getIntersectingIndexes returns cell-sharing handlers', () => {
   // Plain handlers, so that the cells land in the ordinary handler map.
   const base = new SudokuConstraintHandler([0, 1, 2]);
