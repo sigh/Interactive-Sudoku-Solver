@@ -80,7 +80,6 @@ export class ChaosConstruction extends SudokuConstraintHandler {
     this._regionLinks = [];
     this._regionShardState = new ChaosRegionShardState();
     this._effectiveValueMask = -1;
-    this.idStr = [this.constructor.name, this._numGridCells].join('|');
   }
 
   setEffectiveValueMask(mask) {
@@ -1603,7 +1602,12 @@ export class ChaosFixedValueRegionExclusion extends SudokuConstraintHandler {
     this._sourceIndex = sourceIndex;
     this._numGridCells = numGridCells;
     this._regionCellOffset = regionCellOffset;
-    this.idStr = [this.constructor.name, sourceIndex, triggerCell].join('|');
+  }
+
+  static DEDUPES = true;
+
+  dedupId() {
+    return [this.constructor.name, this._sourceIndex, this.cells[0]].join('|');
   }
 
   enforceConsistency(grid, pQueue) {

@@ -25,6 +25,10 @@ export class InvalidConstraintError extends Error {
 export class SudokuConstraintHandler {
   static SINGLETON_HANDLER = false;
 
+  // Set by handlers which two separate constructions can produce identically.
+  // Such handlers must implement dedupId(), which HandlerSet dedupes on.
+  static DEDUPES = false;
+
   constructor(cells) {
     // This constraint is enforced whenever these cells are touched.
     // cells must not be written to. They can be updated during initialization,
@@ -33,10 +37,11 @@ export class SudokuConstraintHandler {
     // By default all constraints are essential for correctness.
     // The optimizer may add non-essential constraints to improve performance.
     this.essential = true;
-    // Handlers which two separate constructions can produce identically set an
-    // idStr describing that content, and HandlerSet dedupes on it. A null
-    // idStr means the handler is unique, and is never a duplicate of another.
-    this.idStr = null;
+  }
+
+  // A string uniquely describing this handler, for dedup.
+  dedupId() {
+    throw new Error(this.constructor.name + ' must implement dedupId()');
   }
 
   // Enforce the constraint on the grid and return:
@@ -850,9 +855,12 @@ export class BinaryConstraint extends SudokuConstraintHandler {
     super([cell1, cell2]);
     this._key = key;
     this._tables = [];
+  }
 
-    // Ensure we dedupe binary constraints.
-    this.idStr = [this.constructor.name, key, cell1, cell2].join('-');
+  static DEDUPES = true;
+
+  dedupId() {
+    return [this.constructor.name, this._key, ...this.cells].join('-');
   }
 
   key() {
@@ -943,9 +951,12 @@ export class BinaryPairwise extends SudokuConstraintHandler {
     this._enableHiddenSingles = false;
     this._prefixCache = null;
     this._allChanged = new BitSet(cells.length || 1);
+  }
 
-    // Ensure we dedupe binary constraints.
-    this.idStr = [this.constructor.name, key, ...cells].join('-');
+  static DEDUPES = true;
+
+  dedupId() {
+    return [this.constructor.name, this._key, ...this.cells].join('-');
   }
 
   key() {
@@ -1823,8 +1834,14 @@ export class SameValues extends SudokuConstraintHandler {
     this._buffer1 = null;
     this._buffer2 = null;
     this._stateOffset = -1;
+  }
 
-    this.idStr = `${this.constructor.name}-${setLen}-${this.cells.join(',')}`;
+  static DEDUPES = true;
+
+  dedupId() {
+    // The sets are canonically ordered and all the same length, so the flat
+    // cells plus that length determine them: chunking recovers the sets.
+    return `${this.constructor.name}-${this._cellSets[0].length}-${this.cells.join(',')}`;
   }
 
   initialize(initialGridCells, cellExclusions, geometry, stateAllocator) {

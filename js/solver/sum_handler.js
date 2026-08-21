@@ -35,7 +35,7 @@ export class Sum extends SudokuConstraintHandler {
     let coeffGroups;
 
     if (!coeffs) {
-      // Sorting is needed anyway for a consistent idStr, and deduping it at the
+      // Sorting is needed anyway for a consistent dedupId, and deduping it at the
       // same time doubles as the duplicate check.
       const sortedCells = sortedArrayCopy(cells, /* removeDuplicates= */ true);
       if (sortedCells.length === cells.length) {
@@ -88,7 +88,7 @@ export class Sum extends SudokuConstraintHandler {
         coeffGroups.push({ coeff, cells: coeffCells, exclusionGroups: [] });
       }
 
-      // Sort cells for consistent idStr and exclusion cell performance.
+      // Sort cells for consistent dedupId and exclusion cell performance.
       coeffGroups.forEach(g => g.cells.sort((a, b) => a - b));
     }
 
@@ -96,12 +96,16 @@ export class Sum extends SudokuConstraintHandler {
     this._rawSum = +sum;
     this._coeffGroups = coeffGroups;
 
-    this.idStr = [
+  }
+
+  static DEDUPES = true;
+
+  dedupId() {
+    return [
       this.constructor.name,
-      sum,
+      this._rawSum,
       ...this._coeffGroups.map(g => g.coeff + ':' + g.cells.join(','))
     ].join('|');
-
   }
 
   onlyUnitCoeffs() {

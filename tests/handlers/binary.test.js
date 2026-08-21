@@ -52,14 +52,14 @@ await runTest('BinaryConstraint should store key', () => {
   assert.equal(handler.key(), key);
 });
 
-await runTest('BinaryConstraint should have unique idStr', () => {
+await runTest('BinaryConstraint should have unique dedupId', () => {
   const key = binaryKey((a, b) => a < b, 4);
   const h1 = new BinaryConstraint(0, 1, key);
   const h2 = new BinaryConstraint(0, 2, key);
   const h3 = new BinaryConstraint(0, 1, key);
 
-  assert.notEqual(h1.idStr, h2.idStr, 'different cells should have different idStr');
-  assert.equal(h1.idStr, h3.idStr, 'same cells and key should have same idStr');
+  assert.notEqual(h1.dedupId(), h2.dedupId(), 'different cells should have different dedupId');
+  assert.equal(h1.dedupId(), h3.dedupId(), 'same cells and key should have same dedupId');
 });
 
 // =============================================================================

@@ -1631,17 +1631,37 @@ export class HandlerSet {
   //   true if we added it to see.
   //   false if it already existed.
   _addToSeen(h) {
-    // Handlers without an idStr are unique, so they can never be duplicates.
-    if (h.idStr === null) return true;
+    if (!h.constructor.DEDUPES) return true;
 
-    if (this._seen.has(h.idStr)) {
-      // Make sure we mark the handler as essential if either
-      // is essential.
-      this._seen.get(h.idStr).essential ||= h.essential;
-      return false;
+    const hash = HandlerSet._cellsHash(h.cells);
+    const bucket = this._seen.get(hash);
+    if (bucket === undefined) {
+      this._seen.set(hash, [h]);
+      return true;
     }
-    this._seen.set(h.idStr, h);
+
+    // Duplicates share their cells, so they always reach here.
+    const id = h.dedupId();
+    for (const other of bucket) {
+      if (other.dedupId() === id) {
+        // Make sure we mark the handler as essential if either
+        // is essential.
+        other.essential ||= h.essential;
+        return false;
+      }
+    }
+    bucket.push(h);
     return true;
+  }
+
+
+  static _cellsHash(cells) {
+    // Seeded with the length so that a leading cell 0 still contributes.
+    let hash = cells.length;
+    for (let i = 0; i < cells.length; i++) {
+      hash = ((hash << 7) | (hash >>> 25)) ^ cells[i];
+    }
+    return hash;
   }
 
   _addAux(handler) {

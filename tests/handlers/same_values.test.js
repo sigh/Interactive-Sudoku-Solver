@@ -25,18 +25,18 @@ await runTest('SameValues should reject uneven set sizes', () => {
   );
 });
 
-await runTest('SameValues should normalize set ordering in idStr', () => {
-  // idStr is a dedup key, so what matters is that every ordering of the same
+await runTest('SameValues should normalize set ordering in dedupId', () => {
+  // dedupId is a dedup key, so what matters is that every ordering of the same
   // constraint produces the same one -- not the exact format.
-  const canonical = new SameValues([0, 2], [1, 3]).idStr;
+  const canonical = new SameValues([0, 2], [1, 3]).dedupId();
 
   // Reordered within each set, between the sets, and both.
-  assert.equal(new SameValues([2, 0], [3, 1]).idStr, canonical);
-  assert.equal(new SameValues([1, 3], [0, 2]).idStr, canonical);
-  assert.equal(new SameValues([3, 1], [2, 0]).idStr, canonical);
+  assert.equal(new SameValues([2, 0], [3, 1]).dedupId(), canonical);
+  assert.equal(new SameValues([1, 3], [0, 2]).dedupId(), canonical);
+  assert.equal(new SameValues([3, 1], [2, 0]).dedupId(), canonical);
 
   // A different constraint must not collide.
-  assert.notEqual(new SameValues([0, 1], [2, 3]).idStr, canonical);
+  assert.notEqual(new SameValues([0, 1], [2, 3]).dedupId(), canonical);
 });
 
 await runTest('SameValues should enforce shared value intersection', () => {

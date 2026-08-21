@@ -323,8 +323,8 @@ await runTest('Sum initialize adjusts internal sum by valueOffset', () => {
   // Internal values are 1-9. Adjustment: sum -= offset * numCells = 6 - (-1)*3 = 9.
   const { handler, context } = initializeSum({ numCells: 3, sum: 6, valueOffset: -1 });
 
-  // idStr should use the original (external) sum for deduplication.
-  assert.ok(handler.idStr.includes('|6|'), 'idStr should use external sum');
+  // dedupId should use the original (external) sum for deduplication.
+  assert.ok(handler.dedupId().includes('|6|'), 'dedupId should use external sum');
 
   // The adjusted internal sum is 9, which is 1+2+6, 1+3+5, or 2+3+4.
   // If we set cells to [2,3,4] (internal), the handler should accept.
