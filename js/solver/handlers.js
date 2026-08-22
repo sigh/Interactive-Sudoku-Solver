@@ -586,6 +586,9 @@ export class HandlerUtil {
       const candidates = unassigned.clone();
       let numCandidates = numUnassigned;
       const group = [];
+      // `candidates` only shrinks while this group grows, so a cell that has
+      // already been passed over can never become available again.
+      let scan = 0;
 
       // Greedily grow the group into a clique
       while (numCandidates > 0) {
@@ -593,9 +596,9 @@ export class HandlerUtil {
         let bestScore = -1;
         if (strategy === this.GREEDY_STRATEGY_FIRST) {
           // Choose the first available cell in the order of `cells`.
-          for (const cell of cells) {
-            if (candidates.has(cell)) {
-              bestCell = cell;
+          for (; scan < cells.length; scan++) {
+            if (candidates.has(cells[scan])) {
+              bestCell = cells[scan];
               break;
             }
           }
@@ -1819,7 +1822,13 @@ export class SameValues extends SudokuConstraintHandler {
   constructor(...cellSets) {
     // Sort to canonicalize the order, both within and between sets.
     // NOTE: We must copy before sorting (to avoid messing up order for the caller).
-    cellSets = cellSets.map(s => sortedArrayCopy(s)).sort((a, b) => a[0] - b[0]);
+    cellSets = cellSets.map(s => sortedArrayCopy(s));
+    if (cellSets.length === 2) {
+      // Micro-opt for the common case (2 sets).
+      if (cellSets[0][0] > cellSets[1][0]) cellSets.reverse();
+    } else {
+      cellSets.sort((a, b) => a[0] - b[0]);
+    }
 
     const setLen = cellSets[0].length;
     if (!cellSets.every(s => s.length === setLen)) {
