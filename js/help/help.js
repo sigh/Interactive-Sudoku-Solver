@@ -169,6 +169,13 @@ const CATEGORY_CONFIGS = {
     description: 'Constraints that apply to the entire grid',
     instructions: `Use the controls in the "Global constraints" panel.`
   },
+  'CellGroup': {
+    description: 'Constraints that apply to a whole group of cells at once',
+    instructions: `
+      Use the "Cell group constraints" panel, enabled when extra cells or a grid
+      type is added in the "Shape" panel.
+      Each constraint applies to one entire cell group, or to the grid itself.`
+  },
   'GivenCandidates': {
     description: 'Restrictions on the initial values of cells',
     instructions: `

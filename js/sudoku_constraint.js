@@ -181,13 +181,17 @@ export class SudokuConstraintBase {
   }
 
   // Whether this constraint can exist on the geometry: its type is valid for
-  // the shape, and all its cells exist.
+  // the shape, the groups it requires exist, and all its cells exist.
   isDefinedFor(geometry) {
     if (!this.constructor.isValidForShape(geometry)) {
       return false;
     }
     if (this.constructor.IS_COMPOSITE) {
       return this.constraints.every(c => c.isDefinedFor(geometry));
+    }
+    if (this.requiredVarCellPrefixes().some(
+      prefix => !geometry.varCellsForGroup(prefix))) {
+      return false;
     }
     try {
       for (const cellId of this.getCells(geometry)) {
@@ -200,6 +204,12 @@ export class SudokuConstraintBase {
   }
 
   getVarCellGroups(geometry) {
+    return [];
+  }
+
+  // Prefixes of the var cell groups which this constraint requires, but does
+  // not define itself.
+  requiredVarCellPrefixes() {
     return [];
   }
 
@@ -682,9 +692,14 @@ class ChaosConstraintBase extends SudokuConstraintBase {
     return new this.constructor(shiftFn(gridCell));
   }
 
+  requiredVarCellPrefixes() {
+    return ['CC'];
+  }
+
   getCells(geometry) {
     const regionCells = geometry.varCellsForGroup('CC');
-    if (!regionCells) return [this.cells[0], 'CC1'];
+    // Without the region cells, only the control cell can be resolved.
+    if (!regionCells) return [this.cells[0]];
 
     const regionCellOffset = regionCells[0];
     const ccCells = this.expandedRegionCells(geometry);
@@ -2580,7 +2595,7 @@ export class SudokuConstraint {
       values must form a single orthogonally-connected region.
       An optional size requires the region to contain exactly that
       many cells.`);
-    static CATEGORY = 'Experimental';
+    static CATEGORY = 'CellGroup';
 
     // Values may be a number, a flat array, or the serialized '1_2' string.
     constructor(groupPrefix, values, size) {
@@ -2605,15 +2620,22 @@ export class SudokuConstraint {
     }
 
     getCells(geometry) {
-      if (!this.groupPrefix) return [];
-      return (geometry.varCellsForGroup(this.groupPrefix) || []).map(
-        c => geometry.makeCellIdFromIndex(c));
+      const cells = this.groupPrefix
+        ? geometry.varCellsForGroup(this.groupPrefix) || []
+        : Array.from({ length: geometry.numGridCells }, (_, i) => i);
+      return cells.map(c => geometry.makeCellIdFromIndex(c));
+    }
+
+    requiredVarCellPrefixes() {
+      return this.groupPrefix ? [this.groupPrefix] : [];
     }
 
     chipLabel() {
-      const group = this.groupPrefix || 'grid';
+      const group = this.groupPrefix ?
+        CellGeometry.displayCellId(this.groupPrefix) : 'grid';
       const size = this.size === null ? '' : `, size ${this.size}`;
-      return `ConnectedValues (${group}: ${this.values.replace(/_/g, ',')}${size})`;
+      const values = this.values.replace(/_/g, ',');
+      return `${this.constructor.displayName()} (${group}: ${values}${size})`;
     }
   };
 

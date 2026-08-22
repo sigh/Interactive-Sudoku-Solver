@@ -615,6 +615,7 @@ class RootConstraintCollection extends ConstraintCollectionBase {
       case 'LinesAndSets':
       case 'ChaosConstruction':
       case 'Pairwise':
+      case 'CellGroup':
       case 'Experimental':
       case 'StateMachine':
         return this._chipViews.get('ordinary');
@@ -839,6 +840,7 @@ class ConstraintManager {
       new ConstraintCategoryInput.Global(
         selectedConstraintCollection, this.addUpdateListener.bind(this)),
       new ConstraintCategoryInput.LayoutCheckbox(selectedConstraintCollection),
+      new ConstraintCategoryInput.CellGroup(selectedConstraintCollection),
       new ConstraintCategoryInput.Region(
         selectedConstraintCollection, inputManager, chipViews.get('jigsaw')),
       new ConstraintCategoryInput.LinesAndSets(

@@ -114,10 +114,16 @@ await runTest('ChaosArrow maps grouped chaos arms for display', () => {
     'CC6', 'CC10', 'CC6', 'CC7', 'CC8']);
 });
 
-await runTest('ChaosArrow getCells survives missing CC cells for removal', () => {
+await runTest('ChaosArrow is not defined without the CC cells', () => {
   const geometry = CellGeometry.fromGridSize(4);
+  const constraint = new SudokuConstraint.ChaosArrow('R2C2');
 
-  assert.deepEqual(new SudokuConstraint.ChaosArrow('R2C2').getCells(geometry), ['R2C2', 'CC1']);
+  // Only the control cell can be resolved, so it is all getCells reports.
+  assert.deepEqual(constraint.getCells(geometry), ['R2C2']);
+  assert.equal(constraint.isDefinedFor(geometry), false);
+
+  geometry.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
+  assert.equal(constraint.isDefinedFor(geometry), true);
 });
 
 await runTest('ChaosArrow expands control-only arrows orthogonally', () => {
@@ -154,10 +160,16 @@ await runTest('ChaosCount allows var control cells', () => {
     SudokuConstraint.ChaosCount.VALIDATE_CELLS_FN(['VX', 'CC6', 'CC16'], geometry), true);
 });
 
-await runTest('ChaosCount getCells survives missing CC cells for removal', () => {
+await runTest('ChaosCount is not defined without the CC cells', () => {
   const geometry = CellGeometry.fromGridSize(4);
+  const constraint = new SudokuConstraint.ChaosCount('R2C2');
 
-  assert.deepEqual(new SudokuConstraint.ChaosCount('R2C2').getCells(geometry), ['R2C2', 'CC1']);
+  // Only the control cell can be resolved, so it is all getCells reports.
+  assert.deepEqual(constraint.getCells(geometry), ['R2C2']);
+  assert.equal(constraint.isDefinedFor(geometry), false);
+
+  geometry.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
+  assert.equal(constraint.isDefinedFor(geometry), true);
 });
 
 // Rectangular grid tests for boxRegions
@@ -1503,7 +1515,10 @@ await runTest('ConnectedValues accepts an empty group prefix (the main grid)', (
   const constraint = new SudokuConstraint.ConnectedValues('', [1, 2]);
   assert.equal(constraint.groupPrefix, '');
   assert.equal(constraint.toString(), '.ConnectedValues~~1_2');
-  assert.deepEqual(constraint.getCells(geometry9x9), []);
+  // The grid case covers every grid cell.
+  const cells = constraint.getCells(geometry9x9);
+  assert.equal(cells.length, geometry9x9.numGridCells);
+  assert.deepEqual([cells[0], cells.at(-1)], ['R1C1', 'R9C9']);
 });
 
 await runTest('ConnectedValues accepts an optional size', () => {
@@ -1537,6 +1552,19 @@ await runTest('ConnectedValues rejects nested value arrays', () => {
   assert.throws(
     () => new SudokuConstraint.ConnectedValues('VS', [1, [2, 3]]),
     { message: /must be a flat value set/ });
+});
+
+await runTest('ConnectedValues is not defined without its cell group', () => {
+  const geometry = CellGeometry.fromGridSize(9);
+  const constraint = new SudokuConstraint.ConnectedValues('VA', [1, 2]);
+  assert.equal(constraint.isDefinedFor(geometry), false);
+
+  geometry.addVarCellsForConstraints([new SudokuConstraint.Var('A', '', 9)]);
+  assert.equal(constraint.isDefinedFor(geometry), true);
+
+  // The grid is always present.
+  assert.equal(
+    new SudokuConstraint.ConnectedValues('', [1]).isDefinedFor(geometry), true);
 });
 
 logSuiteComplete('ConnectedValues');

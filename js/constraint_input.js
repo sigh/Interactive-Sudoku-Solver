@@ -624,6 +624,108 @@ ConstraintCategoryInput.LayoutCheckbox = class LayoutCheckbox extends CheckboxCa
   }
 }
 
+// Constraints which apply to a whole layer of cells: a var-cell group, or
+// the grid itself.
+ConstraintCategoryInput.CellGroup = class CellGroup extends ConstraintCategoryInput {
+  constructor(collection) {
+    super(collection);
+    this._geometry = null;
+
+    this._panel = document.getElementById('cell-group-constraint-container');
+    new CollapsibleContainer(this._panel, /* defaultOpen= */ true);
+    this._errorElem = document.getElementById('cell-group-constraint-error');
+
+    this._form = document.forms['connected-values-input'];
+    this._groupSelect = this._form['cell-group'];
+    document.getElementById('connected-values-tooltip').setAttribute(
+      'data-text', SudokuConstraint.ConnectedValues.DESCRIPTION);
+
+    this._form.onsubmit = e => {
+      e.preventDefault();
+      try {
+        this._clearError();
+        this._addConnectedValues();
+      } catch (err) {
+        this._showError(err.message || err);
+      }
+      return false;
+    };
+  }
+
+  reshape(geometry) {
+    this._geometry = geometry;
+    geometry.onVarCellsChanged(() => this._update());
+    this._update();
+  }
+
+  _update() {
+    this._panel.style.display = this._isApplicable() ? '' : 'none';
+    this._updateTargets();
+  }
+
+  _isApplicable() {
+    const geometry = this._geometry;
+    return geometry.varCellGroups().length > 0
+      || geometry.gridType !== CellGeometry.SUDOKU_GRID_TYPE;
+  }
+
+  _updateTargets() {
+    const select = this._groupSelect;
+    const selected = select.value;
+    clearDOMNode(select);
+
+    const addTarget = (prefix, text) => {
+      const option = document.createElement('option');
+      option.value = prefix;
+      option.textContent = text;
+      select.appendChild(option);
+    };
+
+    addTarget('', 'Grid');
+    for (const group of this._geometry.varCellGroups()) {
+      addTarget(
+        group.prefix,
+        CellGeometry.displayCellId(group.prefix)
+        + (group.label ? `: ${group.label}` : ''));
+    }
+
+    // A group which no longer exists falls back to the grid.
+    select.value = selected;
+  }
+
+  _parseValues() {
+    const input = this._form['values'].value.trim();
+    if (!input) throw new Error('Values are required.');
+    const minValue = this._geometry.minValue();
+    const maxValue = this._geometry.maxValue();
+    return input.split(/[,\s]+/).map(str => {
+      const value = +str;
+      if (!Number.isInteger(value) || value < minValue || value > maxValue) {
+        throw new Error(
+          `Value must be between ${minValue} and ${maxValue}: ${str}`);
+      }
+      return value;
+    });
+  }
+
+  _addConnectedValues() {
+    const constraint = new SudokuConstraint.ConnectedValues(
+      this._groupSelect.value,
+      this._parseValues(),
+      this._form['size'].value.trim());
+    this.collection.addConstraint(constraint);
+    this.runUpdateCallback();
+  }
+
+  getConstraintInputElement(constraintClass) {
+    if (!this.constructor.constraintClasses().includes(constraintClass)) {
+      return null;
+    }
+    // There is nothing to point at while the panel is hidden.
+    return this._geometry && this._isApplicable() ? this._groupSelect : null;
+  }
+}
+
 class MultiCellInput extends ConstraintCategoryInput {
   constructor(collection, inputManager, form) {
     super(collection);

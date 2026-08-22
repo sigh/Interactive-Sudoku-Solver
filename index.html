@@ -737,6 +737,28 @@ function accept(state) {
             </fieldset>
           </form>
 
+          <div class="constraint-panel hide-until-load" id="cell-group-constraint-container"
+            style="display:none">
+            <h2>Cell group constraints</h2>
+            <div class="vstack">
+              <form id="connected-values-input">
+                <div class="hstack">
+                  <label>
+                    Connected Values
+                    <span class="tooltip" id="connected-values-tooltip"></span>
+                  </label>
+                  <select name="cell-group"></select>
+                  <input type="text" name="values" placeholder="values" size="6" autocomplete="off"
+                    autocorrect="off">
+                  <input type="text" name="size" placeholder="size" pattern="[1-9][0-9]*" size="4"
+                    title="optional region size" autocomplete="off">
+                  <button type="submit" name="add-connected-values">Add</button>
+                </div>
+              </form>
+              <div id="cell-group-constraint-error" class="notice notice-error" style="display:none"></div>
+            </div>
+          </div>
+
           <div>
             <form id="composite-constraint-input">
               <fieldset tabindex="0" class="constraint-panel hide-until-load">
