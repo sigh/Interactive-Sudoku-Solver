@@ -31,6 +31,15 @@ const {
 } = await import('./constraint_input.js' + self.VERSION_PARAM);
 const { BottomDrawer, LazyDrawerManager } = await import('./bottom_drawer.js' + self.VERSION_PARAM);
 
+const bindGlobalShortcut = (key, action) => {
+  document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === key) {
+      e.preventDefault();
+      action();
+    }
+  });
+};
+
 export const initPage = () => {
   // Create grid.
   const container = document.getElementById('sudoku-grid');
@@ -57,13 +66,16 @@ export const initPage = () => {
       constraintManager, displayContainer, bodyElement),
   }, bottomDrawer);
 
-  new LazyDrawerManager({
+  const puzzleSelectorManager = new LazyDrawerManager({
     tabId: 'puzzle-selector',
     modulePath: './debug/puzzle_selector_panel.js',
     factory: (module, bodyElement) => new module.PuzzleSelectorPanel(
       constraintManager, bodyElement,
       (path) => sandboxHandler.openWithScript(path)),
   }, bottomDrawer);
+
+  // Ctrl/Cmd+P to toggle the puzzle selector.
+  bindGlobalShortcut('p', () => puzzleSelectorManager.toggle());
 
   setUpHeaderSettingsDropdown();
 
@@ -1908,12 +1920,9 @@ class SandboxHandler {
     });
 
     // Ctrl/Cmd+` to toggle sandbox.
-    document.addEventListener('keydown', (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === '`') {
-        e.preventDefault();
-        toggle.checked = !toggle.checked;
-        toggle.dispatchEvent(new Event('change'));
-      }
+    bindGlobalShortcut('`', () => {
+      toggle.checked = !toggle.checked;
+      toggle.dispatchEvent(new Event('change'));
     });
   }
 
