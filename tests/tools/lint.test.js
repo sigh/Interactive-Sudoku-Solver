@@ -676,6 +676,17 @@ await runTest('lint_constraints suggests Quad for a 2x2 ContainAtLeast', async (
     + "  new ContainAtLeast('4', 'R1C1', 'R1C2', 'R2C1', 'R2C2'),\n"
     + "  new ContainAtLeast('3', 'R3C1', 'R3C2', 'R3C3')];\n");
   assert.doesNotMatch(report(thermoFamily), /contain-at-least-use-quad/);
+
+  // Quad is a drawn grid clue. Four cells of a Var overlay can form a 2x2 in
+  // that layer's own geometry -- a shading layer's no-monochrome-2x2 rule is
+  // exactly this shape -- but no quad is drawn there, so ContainAtLeast stands.
+  const overlay = await lintScript(
+    "const graph = cellGraph('9x9');\n"
+    + "const shade = graph.makeOverlay('VS');\n"
+    + "return [new Shape('9x9'), shade.toVar('shade'),\n"
+    + "  shade.makeReplicate(new Given(shade.cells()[0], 1, 2)),\n"
+    + "  new ContainAtLeast('1_2', ...shade.at(graph.block('R1C1', 2, 2)))];\n");
+  assert.doesNotMatch(report(overlay), /contain-at-least-use-quad/);
 });
 
 // The cases above test the pure lint logic directly. This one exercises the CLI

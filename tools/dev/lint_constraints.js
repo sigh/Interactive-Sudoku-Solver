@@ -138,8 +138,21 @@ const replicableTemplateGroups = (instances, positionOf) => {
   return [...groups.values()];
 };
 
-const quadTopLeft = (cells, positionOf) => {
+// Quad is a drawn grid clue (its display class paints a quadruple circle at a
+// lattice corner), so it is only the native spelling on real grid cells. Four
+// cells of a Var overlay can form a 2x2 in that layer's own geometry, but no
+// quad is drawn there and ContainAtLeast is the honest constraint.
+const isGridCell = (cell, geometry) => {
+  try {
+    return geometry.parseCellId(cell).cellIndex < geometry.numGridCells;
+  } catch (e) {
+    return false;
+  }
+};
+
+const quadTopLeft = (cells, positionOf, geometry) => {
   if (!positionOf || cells.length !== 4 || new Set(cells).size !== 4) return null;
+  if (geometry && !cells.every(cell => isGridCell(cell, geometry))) return null;
   const positions = cells.map(positionOf);
   if (positions.some(p => p === null)) return null;
   if (new Set(positions.map(([, , subgraph]) => subgraph)).size !== 1) return null;
@@ -369,6 +382,7 @@ const makeContext = (text) => {
     replicateNodes,
     cellContext,
     positionOf: cellContext?.positionOf ?? null,
+    geometry: cellContext?.geometry ?? null,
     findLine: (type, firstCell) => findLine(lines, type, firstCell),
 
     // What a Given is, which three rules key off: an Or-branch hypothesis, a
@@ -452,7 +466,7 @@ export const OUTPUT_RULES = [
           if (!families.has(familyKey)) families.set(familyKey, []);
           families.get(familyKey).push({
             leaf,
-            topLeft: quadTopLeft(leaf.cells, ctx.positionOf),
+            topLeft: quadTopLeft(leaf.cells, ctx.positionOf, ctx.geometry),
           });
         },
         finalize(ctx, add) {

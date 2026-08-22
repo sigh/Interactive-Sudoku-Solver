@@ -4,7 +4,7 @@
 .~VS1_1_2
 .End
 .Replicate~_7f_7f_7f_7f~VS1
-.NFA~UgIX_EMhTHQlX_CEIQhCEP_WxjGMYxn_Y1jGMYxn_YxzGMYxn_Yxj2MYxn_YxjIMYxn_YxjGRYxn_YxjGMkxn_YxjGMZNn_YxjGMYyn_ra1rWta3_ta1rWta3_te1rWta3_tbFrWta3_ta2bWta3_ta1tWta3_ta1rbta3_ta1rW5a3_ta1rWt23_ta1rWtb3-CEIQhCH_hCEIQhCH-hCEIQhD-whCEIQh-4QhCEIQ-8IQhCEIe-EIQhCEO_CEIQhCG_hCEIQhC_whCEIQhA~_no-mono-2x2~VS1~VS2~VS10~VS11
+.ContainAtLeast~1_2~VS1~VS2~VS10~VS11
 .End
 .ConnectedValues~VS~1
 .ConnectedValues~VS~2

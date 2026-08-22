@@ -1366,7 +1366,7 @@ const EXAMPLE_EXTRA_VARIABLES = [
     src: ['https://www.youtube.com/watch?v=_Q1fvtndpsA', 'https://sudokupad.app/qc37ejydvj'],
     input: '/data/scripts/xin_yang_v2.js',
     solution: '861459273792316485435287619246891357153764928978523146317645892589132764624978531',
-    constraintTypes: ['Var', 'Replicate', 'ConnectedValues', 'WhiteDot', 'AllDifferent', 'PillArrow', 'Or', 'And', 'NFA: no-mono-2x2'],
+    constraintTypes: ['Var', 'Replicate', 'ConnectedValues', 'WhiteDot', 'AllDifferent', 'ContainAtLeast', 'PillArrow', 'Or', 'And'],
   },
   {
     name: 'Homogenous',
