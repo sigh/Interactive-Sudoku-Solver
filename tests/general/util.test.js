@@ -558,6 +558,40 @@ await runTest('BitSet.allocatePool should create pool of sets', () => {
   assert.equal(bitsets[1].has(5), false);
 });
 
+await runTest('BitSet.addAll should set every listed bit', () => {
+  const bs = new BitSet(128);
+  bs.addAll([0, 31, 32, 127]);
+  assert.deepEqual(bs.toSortedArray(), [0, 31, 32, 127]);
+
+  // Adding again is a no-op, and existing bits are kept.
+  bs.addAll([31, 64]);
+  assert.deepEqual(bs.toSortedArray(), [0, 31, 32, 64, 127]);
+
+  bs.addAll([]);
+  assert.deepEqual(bs.toSortedArray(), [0, 31, 32, 64, 127]);
+});
+
+await runTest('BitSet.addAll should accept a typed array', () => {
+  const bs = new BitSet(64);
+  bs.addAll(Uint16Array.from([3, 40]));
+  assert.deepEqual(bs.toSortedArray(), [3, 40]);
+});
+
+await runTest('BitSet.removeAll should clear every listed bit', () => {
+  const bs = new BitSet(128);
+  bs.addAll([0, 31, 32, 64, 127]);
+
+  bs.removeAll([31, 64]);
+  assert.deepEqual(bs.toSortedArray(), [0, 32, 127]);
+
+  // Removing an absent bit is a no-op.
+  bs.removeAll([31]);
+  assert.deepEqual(bs.toSortedArray(), [0, 32, 127]);
+
+  bs.removeAll(Uint16Array.from([0, 127]));
+  assert.deepEqual(bs.toSortedArray(), [32]);
+});
+
 await runTest('BitSet.subtract should remove the other set\'s bits', () => {
   const a = new BitSet(64);
   for (const b of [1, 2, 40]) a.add(b);

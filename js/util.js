@@ -638,10 +638,26 @@ export class BitSet {
     this.words[wordIndex] |= mask;
   }
 
+  addAll(bitIndexes) {
+    const words = this.words;
+    for (let i = 0; i < bitIndexes.length; i++) {
+      const bitIndex = bitIndexes[i];
+      words[bitIndex >>> 5] |= 1 << (bitIndex & 31);
+    }
+  }
+
   remove(bitIndex) {
     const wordIndex = bitIndex >>> 5;
     const mask = 1 << (bitIndex & 31);
     this.words[wordIndex] &= ~mask;
+  }
+
+  removeAll(bitIndexes) {
+    const words = this.words;
+    for (let i = 0; i < bitIndexes.length; i++) {
+      const bitIndex = bitIndexes[i];
+      words[bitIndex >>> 5] &= ~(1 << (bitIndex & 31));
+    }
   }
 
   has(bitIndex) {

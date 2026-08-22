@@ -379,25 +379,31 @@ class InternalSolver {
     // depend on the input order.
     // TODO: Do this in a more principled way. Consider doing this
     //       twice - once now and once after the optimizer runs.
-    handlers.sort((a, b) => {
+    // Read the sort keys out first: handlers of many different classes reach
+    // the comparator, making every property load on them megamorphic.
+    const keyed = handlers.map((h) => ({
+      handler: h,
+      numCells: h.cells.length,
+      name: h.constructor.name,
+      cells: h.cells.join(','),
+    }));
+    keyed.sort((a, b) => {
       // Put the handlers with the least cells first.
       // This just worked out better.
       // Most puzzles don't seem to depend too much on this order, but
       // it makes a 2x difference for some.
-      if (a.cells.length !== b.cells.length) {
-        return a.cells.length - b.cells.length;
+      if (a.numCells !== b.numCells) {
+        return a.numCells - b.numCells;
       }
       // After this it doesn't matter, as long as it is deterministic.
       // There still might be equal handlers after comparing cells and
       // the handler type, but that is ok.
-      if (a.constructor.name !== b.constructor.name) {
-        return a.constructor.name.localeCompare(b.constructor.name);
+      if (a.name !== b.name) {
+        return a.name.localeCompare(b.name);
       }
-      // Put cell comparison last as it is the most expensive.
-      const aCells = a.cells.join(',');
-      const bCells = b.cells.join(',');
-      return aCells.localeCompare(bCells);
+      return a.cells.localeCompare(b.cells);
     });
+    for (let i = 0; i < keyed.length; i++) handlers[i] = keyed[i].handler;
 
     const handlerSet = new HandlerSet(handlers, this._numSearchCells);
 
@@ -1524,11 +1530,9 @@ export class HandlerSet {
   // A BitSet of handler indexes, with capacity numHandlers().
   getIntersectingIndexes(handler) {
     const intersectingHandlers = new BitSet(this.numHandlers());
-    for (const c of handler.cells) {
-      const indexes = this._ordinaryHandlerMap[c];
-      for (let i = 0; i < indexes.length; i++) {
-        intersectingHandlers.add(indexes[i]);
-      }
+    const cells = handler.cells;
+    for (let i = 0; i < cells.length; i++) {
+      intersectingHandlers.addAll(this._ordinaryHandlerMap[cells[i]]);
     }
     intersectingHandlers.remove(this._ordinaryIndexLookup.get(handler));
     return intersectingHandlers;

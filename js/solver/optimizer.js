@@ -112,8 +112,9 @@ export class SudokuConstraintOptimizer {
 
     for (const handler of handlerSet) {
       const priority = handler.priority(geometry);
-      for (const cell of handler.cells) {
-        priorities[cell] += priority;
+      const cells = handler.cells;
+      for (let i = 0; i < cells.length; i++) {
+        priorities[cells[i]] += priority;
       }
     }
 
@@ -152,9 +153,11 @@ export class SudokuConstraintOptimizer {
       if (priority < minLinkedPriority) continue;
 
       mark++;
-      for (const cell of handler.cells) marks[cell] = mark;
+      const cells = handler.cells;
+      for (let i = 0; i < cells.length; i++) marks[cells[i]] = mark;
 
-      for (const cell of handler.cells) {
+      for (let i = 0; i < cells.length; i++) {
+        const cell = cells[i];
         const linkedCell = linkedCells[cell];
         if (linkedCell === NO_LINKED_CELL || cell > linkedCell) continue;
         if (marks[linkedCell] !== mark) continue;
@@ -498,7 +501,7 @@ export class SudokuConstraintOptimizer {
     const { bitsets: houseCells } = BitSet.allocatePool(
       geometry.totalCells(), numHandlers);
     for (let i = 0; i < numHandlers; i++) {
-      for (const cell of allHandlers[i].cells) houseCells[i].add(cell);
+      houseCells[i].addAll(allHandlers[i].cells);
     }
 
     for (let i = 1; i < numHandlers; i++) {
@@ -980,10 +983,10 @@ export class SudokuConstraintOptimizer {
     let totalSum = 0;
     const candidateCells = new BitSet(numSearchCells);
     const baseCells = new BitSet(numSearchCells);
-    for (const c of baseRegion.cells) baseCells.add(c);
+    baseCells.addAll(baseRegion.cells);
     for (const h of intersectingSumHandlers) {
       totalSum += h.sum();
-      for (const c of h.cells) candidateCells.add(c);
+      candidateCells.addAll(h.cells);
     }
     // Invariant from here: uncoveredBaseCells == baseCells - candidateCells.
     const uncoveredBaseCells = baseCells.clone();
@@ -1008,7 +1011,7 @@ export class SudokuConstraintOptimizer {
         }
         // This handler fills in an existing gap.
         totalSum += gapRegion.sum;
-        for (const c of gapRegion.cells) candidateCells.add(c);
+        candidateCells.addAll(gapRegion.cells);
         uncoveredBaseCells.subtract(candidateCells);
         usedExtraRegions = true;
         if (uncoveredBaseCells.isEmpty()) break;
@@ -1038,7 +1041,7 @@ export class SudokuConstraintOptimizer {
       if (intersectSize !== region.cellCount) continue;
       // This region is completely contained within the cells.
       totalSum -= region.sum;
-      for (const c of region.cells) candidateCells.remove(c);
+      candidateCells.removeAll(region.cells);
       candidateCount -= region.cellCount;
       removedExtraRegions = true;
       if (candidateCount === 0) break;
@@ -1147,7 +1150,7 @@ export class SudokuConstraintOptimizer {
       const constrainedCells = [];
       let constrainedSum = 0;
       regionCells.clear();
-      for (const c of h.cells) regionCells.add(c);
+      regionCells.addAll(h.cells);
       for (const k of filteredSumHandlers) {
         const overlapSize = setIntersectSize(regionCells, k.cells);
         if (overlapSize === k.cells.length) {
@@ -1388,7 +1391,7 @@ export class SudokuConstraintOptimizer {
     const piecesMap = new Map(sumHandlers.map(h => [h.cells, h.sum()]));
 
     const cellsInSum = new BitSet(geometry.totalCells());
-    for (const h of sumHandlers) for (const c of h.cells) cellsInSum.add(c);
+    for (const h of sumHandlers) cellsInSum.addAll(h.cells);
 
     const handleOverlap = (superRegion, piecesRegion, usedPieces) => {
       let diffA = superRegion.clone();
