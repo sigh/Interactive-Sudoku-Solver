@@ -1,4 +1,4 @@
-const { countOnes16bit, RandomIntGenerator } = await import('../util.js' + self.VERSION_PARAM);
+const { countOnes16bit, RandomIntGenerator, insertionSortInts } = await import('../util.js' + self.VERSION_PARAM);
 const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM);
 
 export const NO_LINKED_CELL = 0xffff;
@@ -635,7 +635,7 @@ export class CandidateSelector {
 
     // Sort cells so that the highest scoring cells are last,  and hence
     // searched first.
-    result.cells.sort((a, b) => conflictScores[a] - conflictScores[b]);
+    insertionSortInts(result.cells, conflictScores);
     return true;
   }
 

@@ -1,6 +1,6 @@
 const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM);
 const { SudokuConstraintHandler, InvalidConstraintError } = await import('./handlers.js' + self.VERSION_PARAM);
-const { countOnes16bit } = await import('../util.js' + self.VERSION_PARAM);
+const { countOnes16bit, insertionSortInts } = await import('../util.js' + self.VERSION_PARAM);
 const { NO_CELL, neighborTable, enclosingNeighbors } = await import('./connected_handler.js' + self.VERSION_PARAM);
 
 const DEFER_CONNECTIVITY = 2;
@@ -146,7 +146,7 @@ export class ChaosConstruction extends SudokuConstraintHandler {
     }
 
     if (!bestCells) return [0];
-    return bestCells.sort((a, b) => a - b);
+    return insertionSortInts(bestCells);
   }
 
   _configureShape(geometry) {

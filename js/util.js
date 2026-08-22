@@ -141,6 +141,24 @@ export const sortedArrayCopy = (values, removeDuplicates = false) => {
   return copy;
 };
 
+// Sort an integer array (plain or typed) into ascending order, in place.
+// Given `keys`, values are ordered by `keys[value]` instead of by themselves.
+// Linear on already-ordered input and allocation-free (no comparator closure,
+// no buffer for Array.sort to work in), but quadratic on badly ordered input:
+// only for arrays known to be short.
+export const insertionSortInts = (values, keys = null) => {
+  for (let i = 1; i < values.length; i++) {
+    const value = values[i];
+    const key = keys === null ? value : keys[value];
+    let j = i - 1;
+    for (; j >= 0 && (keys === null ? values[j] : keys[values[j]]) > key; j--) {
+      values[j + 1] = values[j];
+    }
+    values[j + 1] = value;
+  }
+  return values;
+};
+
 // Merge two sorted, disjoint arrays.
 export const mergeSortedArrays = (a, b) => {
   const merged = new Array(a.length + b.length);

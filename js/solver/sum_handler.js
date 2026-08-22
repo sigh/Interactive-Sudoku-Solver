@@ -1,4 +1,4 @@
-const { memoize, MultiMap, countOnes16bit, sortedArrayCopy } = await import('../util.js' + self.VERSION_PARAM);
+const { memoize, MultiMap, countOnes16bit, sortedArrayCopy, insertionSortInts } = await import('../util.js' + self.VERSION_PARAM);
 const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM);
 const { SudokuConstraintHandler, HandlerUtil, InvalidConstraintError } = await import('./handlers.js' + self.VERSION_PARAM);
 const { GEOMETRY_MAX, GEOMETRY_9x9 } = await import('../cell_geometry.js' + self.VERSION_PARAM);
@@ -89,7 +89,7 @@ export class Sum extends SudokuConstraintHandler {
       }
 
       // Sort cells for consistent dedupId and exclusion cell performance.
-      coeffGroups.forEach(g => g.cells.sort((a, b) => a - b));
+      for (const g of coeffGroups) insertionSortInts(g.cells);
     }
 
     super(cells);

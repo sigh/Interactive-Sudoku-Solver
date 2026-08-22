@@ -2,7 +2,7 @@ const { SudokuConstraint, SudokuConstraintBase, CellArgs } = await import('../su
 const { CellGeometry, CellGraph } = await import('../cell_geometry.js' + self.VERSION_PARAM);
 const { SudokuSolver } = await import('./engine.js' + self.VERSION_PARAM);
 const { regexToNFA, NFASerializer } = await import('../nfa_builder.js' + self.VERSION_PARAM);
-const { memoize } = await import('../util.js' + self.VERSION_PARAM);
+const { memoize, insertionSortInts } = await import('../util.js' + self.VERSION_PARAM);
 const HandlerModule = await import('./handlers.js' + self.VERSION_PARAM);
 const SumHandlerModule = await import('./sum_handler.js' + self.VERSION_PARAM);
 const NFAHandlerModule = await import('./nfa_handler.js' + self.VERSION_PARAM);
@@ -204,18 +204,17 @@ export class SudokuBuilder {
 
   static *_strictAdjHandlers(constraints, geometry, fnKey) {
     const numCells = geometry.numGridCells;
-    const intCmp = (a, b) => a - b;
     const pairId = p => p[0] + p[1] * numCells;
 
     // Find all the cell pairs that have constraints.
     const cellPairs = constraints
       .flatMap(c => c.adjacentPairs(geometry));
-    cellPairs.forEach(p => p.sort(intCmp));
+    for (const p of cellPairs) insertionSortInts(p);
     const pairIds = new Set(cellPairs.map(pairId));
 
     // Add negative constraints for all other cell pairs.
     for (const p of this._allAdjacentCellPairs(geometry)) {
-      p.sort(intCmp);
+      insertionSortInts(p);
       if (pairIds.has(pairId(p))) continue;
       yield new HandlerModule.BinaryConstraint(
         p[0], p[1], fnKey);
@@ -486,8 +485,7 @@ export class SudokuBuilder {
                 'Pill Arrow must have more cells than the pill size');
             }
 
-            const pillCells = cells.slice(0, pillSize);
-            pillCells.sort((a, b) => a - b);
+            const pillCells = insertionSortInts(cells.slice(0, pillSize));
 
             // Sorting the pill cells only gives an unambiguous reading order
             // when each successive cell is one step right, down, or down-right

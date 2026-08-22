@@ -18,6 +18,7 @@ const {
   arraysAreEqual,
   mergeSortedArrays,
   sortedArrayCopy,
+  insertionSortInts,
   elementarySymmetricSum,
   setIntersectSize,
   setPeek,
@@ -556,6 +557,68 @@ await runTest('BitSet.allocatePool should create pool of sets', () => {
   bitsets[0].add(5);
   assert.equal(bitsets[0].has(5), true);
   assert.equal(bitsets[1].has(5), false);
+});
+
+await runTest('insertionSortInts sorts ascending and returns the same array', () => {
+  const values = [5, 1, 4, 1, 3];
+  const result = insertionSortInts(values);
+  assert.deepEqual(values, [1, 1, 3, 4, 5]);
+  assert.equal(result, values, 'must sort in place, not copy');
+});
+
+await runTest('insertionSortInts leaves ordered input untouched', () => {
+  for (const input of [[], [7], [1, 2], [0, 0, 1, 9]]) {
+    assert.deepEqual(insertionSortInts(input.slice()), input);
+  }
+});
+
+await runTest('insertionSortInts sorts a typed array numerically', () => {
+  // Array.prototype.sort with no comparator would order these lexicographically
+  // (1, 10, 2); a numeric sort must not.
+  const values = Uint16Array.from([10, 2, 1]);
+  insertionSortInts(values);
+  assert.deepEqual(Array.from(values), [1, 2, 10]);
+});
+
+await runTest('insertionSortInts matches a numeric sort on random input', () => {
+  let seed = 7;
+  const rnd = (n) => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed % n; };
+  for (let t = 0; t < 2000; t++) {
+    const values = [];
+    for (let i = 0, n = rnd(12); i < n; i++) values.push(rnd(50));
+    const expected = values.slice().sort((a, b) => a - b);
+    assert.deepEqual(insertionSortInts(values.slice()), expected);
+  }
+});
+
+await runTest('insertionSortInts orders by keys when given', () => {
+  // Values are cell ids; keys are scores looked up by cell id.
+  const scores = [0, 50, 10, 99, 20];
+  const values = [1, 2, 3, 4];
+  insertionSortInts(values, scores);
+  // scores: 1->50, 2->10, 3->99, 4->20  =>  2, 4, 1, 3
+  assert.deepEqual(values, [2, 4, 1, 3]);
+});
+
+await runTest('insertionSortInts keyed mode is stable on tied keys', () => {
+  const scores = [0, 5, 5, 5];
+  const values = [3, 1, 2];
+  insertionSortInts(values, scores);
+  // All keys tie, so the original order must survive.
+  assert.deepEqual(values, [3, 1, 2]);
+});
+
+await runTest('insertionSortInts keyed mode matches a sort by the same key', () => {
+  let seed = 11;
+  const rnd = (n) => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed % n; };
+  const scores = new Float64Array(40);
+  for (let i = 0; i < 40; i++) scores[i] = rnd(5);
+  for (let t = 0; t < 2000; t++) {
+    const values = [];
+    for (let i = 0, n = rnd(10); i < n; i++) values.push(rnd(40));
+    const expected = values.slice().sort((a, b) => scores[a] - scores[b]);
+    assert.deepEqual(insertionSortInts(values.slice(), scores), expected);
+  }
 });
 
 await runTest('BitSet.addAll should set every listed bit', () => {
