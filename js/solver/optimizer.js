@@ -998,15 +998,15 @@ export class SudokuConstraintOptimizer {
     if (!uncoveredBaseCells.isEmpty()) {
       for (const gapRegion of gapRegions) {
         // Ignore any regions which intersect with the existing cells.
-        if (setIntersectSize(candidateCells, gapRegion.cells) > 0) continue;
+        if (candidateCells.hasIntersection(gapRegion.cellsBitSet)) continue;
         // Ignore any regions which don't cover the uncovered cells.
-        const intersectSize = setIntersectSize(uncoveredBaseCells, gapRegion.cells);
+        const intersectSize = uncoveredBaseCells.intersectCount(gapRegion.cellsBitSet);
         if (intersectSize === 0) continue;
         // Ignore handlers which only intersect in one square. This is likely
         // a row crossing a column, and is generally not useful.
         if (intersectSize === 1) continue;
         // Ensure the intersection only covers the uncovered cells.
-        if (intersectSize !== setIntersectSize(baseCells, gapRegion.cells)) {
+        if (intersectSize !== baseCells.intersectCount(gapRegion.cellsBitSet)) {
           continue;
         }
         // This handler fills in an existing gap.
@@ -1037,7 +1037,7 @@ export class SudokuConstraintOptimizer {
       // than candidateCells, all remaining regions are also too large.
       if (region.cellCount > candidateCount) break;
       // Ignore any regions which don't cover the cells.
-      const intersectSize = setIntersectSize(candidateCells, region.cells);
+      const intersectSize = candidateCells.intersectCount(region.cellsBitSet);
       if (intersectSize !== region.cellCount) continue;
       // This region is completely contained within the cells.
       totalSum -= region.sum;
@@ -1098,7 +1098,7 @@ export class SudokuConstraintOptimizer {
   _makeHiddenCageHandlers(handlerSet, allSumHandlers, cellExclusions, geometry) {
     const allDiffRegions = fixedSumRegions(
       handlerSet.getAllofType(HandlerModule.PerfectAllDifferent),
-      handlerSet, geometry);
+      handlerSet, geometry, cellExclusions.numSearchCells());
     const allDiffRegionsBySize = [...allDiffRegions].sort(
       (a, b) => a.cellCount - b.cellCount);
     const allDiffRegionByIndex = new Map(
@@ -1823,15 +1823,21 @@ const maxSumForValueCount = (valueCount, valueOffset) => (
 const maxSumForShape = (geometry) => (
   maxSumForValueCount(geometry.numValues, geometry.valueOffset));
 
-const fixedSumRegions = (handlers, handlerSet, geometry) => {
+const fixedSumRegions = (handlers, handlerSet, geometry, numSearchCells) => {
   const lookup = LookupTables.get(geometry.numValues);
-  return handlers.map(handler => {
+  // Each region is intersected with cell sets many times over, so keep its
+  // cells as a bitset too.
+  const { bitsets } = BitSet.allocatePool(numSearchCells, handlers.length);
+  return handlers.map((handler, i) => {
     const valueMask = handler.valueMask();
     const cellCount = handler.cells.length;
+    const cellsBitSet = bitsets[i];
+    cellsBitSet.addAll(handler.cells);
     return {
       handler,
       handlerIndex: handlerSet.getIndex(handler),
       cells: handler.cells,
+      cellsBitSet,
       cellCount,
       sum: lookup.sum[valueMask]
         + geometry.valueOffset * cellCount,
