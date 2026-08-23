@@ -1024,6 +1024,68 @@ export class ChaosRegionBorderDisplay extends DisplayItem {
   }
 }
 
+export class YinYangShadingDisplay extends DisplayItem {
+  // A light version of the .solution-group value color.
+  static FILL_COLOR = 'rgba(0, 128, 255, 0.15)';
+
+  constructor(svg, cellPositioner) {
+    super(svg, cellPositioner);
+    this._applyGridOffset(svg);
+    svg.setAttribute('fill', this.constructor.FILL_COLOR);
+    svg.setAttribute('stroke', 'none');
+  }
+
+  reshape(geometry) {
+    super.reshape(geometry);
+    this.clear();
+  }
+
+  setSolution(solution) {
+    this.clear();
+    if (!solution?.length) return;
+
+    const geometry = this._geometry;
+    let shadeCells = null;
+    if (geometry.gridType !== CellGeometry.YIN_YANG_GRID_TYPE) {
+      shadeCells = geometry.varCellsForGroup('YY');
+      if (!shadeCells || shadeCells.length !== geometry.numGridCells) return;
+    }
+
+    const shaded = geometry.minValue();
+    for (let cell = 0; cell < geometry.numGridCells; cell++) {
+      const shadeCell = shadeCells ? shadeCells[cell] : cell;
+      const value = solution[shadeCell];
+      const canBeShaded = isIterable(value) ? value.has(shaded) : value === shaded;
+      if (!canBeShaded) continue;
+      // A cell which may still take either shade gets a half fill.
+      const half = isIterable(value) && value.size > 1;
+      for (const target of shadeCell === cell ? [cell] : [cell, shadeCell]) {
+        this.getSvg().append(half
+          ? this._makeHalfCellSquare(target) : this._makeCellSquare(target));
+      }
+    }
+  }
+
+  // The half of the cell right of a steep '/' through the center.
+  _makeHalfCellSquare(cell) {
+    const [x, y] = this.cellCenter(cell);
+    const cellWidth = DisplayItem.CELL_SIZE;
+    const skew = cellWidth / 5;
+    const top = y - cellWidth / 2 + 1;
+    const bottom = y + cellWidth / 2 + 1;
+    const right = x + cellWidth / 2 + 1;
+    const path = createSvgElement('path');
+    path.setAttribute('d', [
+      'M', x - skew, bottom,
+      'L', right, bottom,
+      'L', right, top,
+      'L', x + skew, top,
+      'Z',
+    ].join(' '));
+    return path;
+  }
+}
+
 class CellHighlighter {
   constructor(display, cssClass) {
     this._cells = new Map();

@@ -11,6 +11,7 @@ const {
   HighlightDisplay,
   SolutionDisplay,
   ChaosRegionBorderDisplay,
+  YinYangShadingDisplay,
   CellValueDisplay,
 } = await import('./display.js' + self.VERSION_PARAM);
 const { toShortSolution } = await import('./sudoku_parser.js' + self.VERSION_PARAM);
@@ -138,6 +139,11 @@ export class SolutionController {
 
     this._displayContainer = displayContainer;
 
+    // Created first so the shading renders below the solution values.
+    this._yinYangShadingDisplay = new YinYangShadingDisplay(
+      displayContainer.getNewGroup('yin-yang-shading-group'),
+      displayContainer.getCellPositioner());
+
     this._diffDisplay = new CellValueDisplay(
       displayContainer.getNewGroup('diff-group'),
       null, displayContainer.getCellPositioner());
@@ -176,6 +182,7 @@ export class SolutionController {
     this._stateDisplay = new SolverStateDisplay(this._solutionDisplay, bottomDrawer);
     constraintManager.addReshapeListener(this._solutionDisplay);
     constraintManager.addReshapeListener(this._chaosRegionBorderDisplay);
+    constraintManager.addReshapeListener(this._yinYangShadingDisplay);
 
     // Create the SolverRunner with callbacks for UI updates
     this._solverRunner = new SolverRunner({
@@ -400,6 +407,7 @@ export class SolutionController {
     this._searchComplete = false;
     this._solutionDisplay.setSolution();
     this._chaosRegionBorderDisplay.setSolution();
+    this._yinYangShadingDisplay.setSolution();
     let mode = this._elements.mode.value;
     if (!mode) {
       mode = DEFAULT_MODE;
@@ -442,6 +450,7 @@ export class SolutionController {
     this._stepHighlighter.setCells([]);
     this._solutionDisplay.setSolution();
     this._chaosRegionBorderDisplay.setSolution();
+    this._yinYangShadingDisplay.setSolution();
     this._diffDisplay.clear();
     this._stateDisplay.clear();
     this._debugManager.clear();
@@ -553,12 +562,14 @@ export class SolutionController {
     if (!result) {
       this._solutionDisplay.setSolution();
       this._chaosRegionBorderDisplay.setSolution();
+      this._yinYangShadingDisplay.setSolution();
       return;
     }
 
     const colorFn = this._makeCandidateColorFn(result);
     this._solutionDisplay.setSolution(result.solution, colorFn);
     this._chaosRegionBorderDisplay.setSolution(result.solution, this._searchComplete);
+    this._yinYangShadingDisplay.setSolution(result.solution);
 
     if (result.highlightCells) {
       this._stepHighlighter.setCells(result.highlightCells);

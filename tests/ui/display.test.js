@@ -26,7 +26,7 @@ ensureGlobalEnvironment({
   documentValue: { createElementNS: (_ns, tag) => mockEl(tag) },
 });
 
-const { GridDisplay, BorderDisplay, VarCellDisplay } =
+const { GridDisplay, BorderDisplay, VarCellDisplay, YinYangShadingDisplay, CellPositioner } =
   await import('../../js/display.js');
 const { CellGeometry } = await import('../../js/cell_geometry.js');
 
@@ -78,6 +78,39 @@ await runTest('VarCellDisplay renders groups lightly with a close button', () =>
   assert.equal(label.textContent, '$B [3]: over');
   close.attrs.onclick();
   assert.deepEqual(removed, ['VB']);
+});
+
+await runTest('YinYangShadingDisplay fills decided shaded grid cells', () => {
+  const geometry = CellGeometry.fromShapeSpec('2x2~2~YinYang');
+  const positioner = new CellPositioner();
+  positioner.reshape(geometry);
+  const display = new YinYangShadingDisplay(mockEl('g'), positioner);
+  display.reshape(geometry);
+
+  // Full fills for the decided shaded (1) cells, a half fill (closed
+  // triangle path) for the undecided set, nothing for unshaded.
+  display.setSolution([1, 2, new Set([1, 2]), new Set([1])]);
+  const paths = display.getSvg().children.map(c => c.getAttribute('d'));
+  assert.equal(paths.length, 3);
+  assert.equal(paths.filter(d => d.endsWith('Z')).length, 1);
+
+  display.setSolution();
+  assert.equal(display.getSvg().children.length, 0);
+});
+
+await runTest('YinYangShadingDisplay fills the YY overlay and its grid cells', () => {
+  const geometry = CellGeometry.fromGridSize(2);
+  geometry._varCellRegistry.addGroups(
+    [{ prefix: 'YY', label: '', count: 4, columns: 2 }]);
+  const positioner = new CellPositioner();
+  positioner.reshape(geometry);
+  positioner.setVarCellGroups(geometry.varCellGroups());
+  const display = new YinYangShadingDisplay(mockEl('g'), positioner);
+  display.reshape(geometry);
+
+  // YY cells (indices 4-7) shade cells 0 and 3: each fills its grid cell too.
+  display.setSolution([2, 1, 1, 2, 1, 2, 2, 1]);
+  assert.equal(display.getSvg().children.length, 4);
 });
 
 logSuiteComplete('ui/display.test.js');
