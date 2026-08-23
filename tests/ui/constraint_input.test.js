@@ -682,7 +682,7 @@ await runTest('the grid type select follows the geometry', () => {
   const { shape, gridTypeSelect } = createShapeInput();
 
   assert.deepEqual(
-    gridTypeSelect.children.map(o => o.value), ['Sudoku', 'Raw']);
+    gridTypeSelect.children.map(o => o.value), ['Sudoku', 'Raw', 'YinYang']);
 
   shape.reshape(CellGeometry.fromGridSize(9));
   assert.equal(gridTypeSelect.value, 'Sudoku');
@@ -706,9 +706,14 @@ await runTest('_applyGridType reverts when the value range is invalid', () => {
   shape.reshape(CellGeometry.fromShapeSpec('9x9~1-2~Raw'));
   gridTypeSelect.value = 'Sudoku';
   shape._applyGridType('Sudoku');
-
   assert.equal(collection.shaped, null);
   assert.equal(gridTypeSelect.value, 'Raw');
+
+  // A valid range is kept: a 9-value Sudoku grid keeps its 9 values (the
+  // extras are for var cells).
+  shape.reshape(CellGeometry.fromGridSize(9));
+  shape._applyGridType('YinYang');
+  assert.equal(collection.shaped.name, '9x9~~YinYang');
 });
 
 await runTest('_applyShape keeps the grid type when typing dims', () => {
@@ -735,9 +740,15 @@ await runTest('checkbox categories disable for a Raw grid', () => {
   assert.ok([...layout._checkboxes.values()].some(
     item => !item.element.disabled));
 
+  // On a Raw grid only the checkboxes that don't need Sudoku rules (i.e.
+  // Yin-Yang) stay enabled.
   layout.reshape(raw);
-  assert.ok([...layout._checkboxes.values()].every(
-    item => item.element.disabled));
+  for (const item of layout._checkboxes.values()) {
+    assert.equal(
+      item.element.disabled,
+      item.constraint.type !== 'YinYang',
+      `${item.constraint.type} disabled state`);
+  }
 });
 
 logSuiteComplete('ConstraintCategoryInput.GivenCandidates');

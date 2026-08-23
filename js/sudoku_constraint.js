@@ -1779,6 +1779,33 @@ export class SudokuConstraint {
     }
   }
 
+  static YinYang = class YinYang extends SudokuConstraintBase {
+    static DESCRIPTION = (`
+      Adds a yin-yang shading layer over the grid: every cell is either
+      shaded or unshaded, each shade forms a single orthogonally-connected
+      region, and no 2x2 box is entirely one shade.
+      The shading is the YY cell group, where the grid's two lowest values
+      mean shaded and unshaded respectively.`);
+    static CATEGORY = 'LayoutCheckbox';
+    static UNIQUENESS_KEY_FIELD = 'type';
+    static VALIDATE_SHAPE_FN = (geometry) =>
+      geometry.gridType !== CellGeometry.YIN_YANG_GRID_TYPE
+      && geometry.numValues >= 2;
+
+    static displayName() {
+      return 'Yin-Yang';
+    }
+
+    getVarCellGroups(geometry) {
+      return [{
+        prefix: 'YY',
+        label: 'Yin-Yang',
+        count: geometry.numGridCells,
+        columns: geometry.numCols,
+      }];
+    }
+  }
+
   static AntiKing = class AntiKing extends SudokuConstraintBase {
     static DESCRIPTION = (`
       Cells which are a king's move away cannot have the same value.`);

@@ -402,7 +402,7 @@ const puzzlesExtraCells = [
   'Letter Little Killer',  // Var, Sum (with coeffs)
   'Hailstorm',  // 6x6, Var, Sum (with coeffs), NFA (comparing sums), Replicate, PerfectAllDifferent optimization
   {
-    ...PUZZLE_INDEX.get('Xin Yang v2'),  // ConnectedValues, Var, PillArrow, Or, And, Replicate
+    ...PUZZLE_INDEX.get('Xin Yang v2'),  // YinYang, PillArrow, Or, And
     input: '/data/scripts/xin_yang_v2.iss',
   },
   {

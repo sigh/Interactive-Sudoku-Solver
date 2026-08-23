@@ -12,7 +12,9 @@ export class CellGeometry {
 
   static SUDOKU_GRID_TYPE = 'Sudoku';
   static RAW_GRID_TYPE = 'Raw';
-  static GRID_TYPES = [this.SUDOKU_GRID_TYPE, this.RAW_GRID_TYPE];
+  static YIN_YANG_GRID_TYPE = 'YinYang';
+  static GRID_TYPES = [
+    this.SUDOKU_GRID_TYPE, this.RAW_GRID_TYPE, this.YIN_YANG_GRID_TYPE];
   static DEFAULT_GRID_TYPE = this.SUDOKU_GRID_TYPE;
 
   static _isValidDimension(dim) {
@@ -301,10 +303,14 @@ export class CellGeometry {
   }
 
   // The minimum numValues for a grid of the given type. A Sudoku grid needs
-  // enough values to fill its houses; a Raw grid just needs one.
+  // enough values to fill its houses; a YinYang grid needs its two shades; a
+  // Raw grid just needs one.
   static numValuesFloor(numRows, numCols, gridType) {
-    if (gridType !== this.SUDOKU_GRID_TYPE) return 1;
-    return this.defaultNumValues(numRows, numCols);
+    if (gridType === this.SUDOKU_GRID_TYPE) {
+      return this.defaultNumValues(numRows, numCols);
+    }
+    if (gridType === this.YIN_YANG_GRID_TYPE) return 2;
+    return 1;
   }
 
   isDefaultNumValues() {

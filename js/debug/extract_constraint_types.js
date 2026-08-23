@@ -21,8 +21,8 @@ export const extractConstraintTypes = (str) => {
     if (type === 'Shape') {
       if (end === -1) continue;  // bare Shape is the default grid
       const geometry = CellGeometry.fromShapeSpec(segment.slice(end + 1));
-      if (geometry.gridType === CellGeometry.RAW_GRID_TYPE) {
-        shapeTypes.push(`Raw ${geometry.gridDimsStr}`);
+      if (geometry.gridType !== CellGeometry.SUDOKU_GRID_TYPE) {
+        shapeTypes.push(`${geometry.gridType} ${geometry.gridDimsStr}`);
       } else if (geometry.gridDimsStr !== GEOMETRY_9x9.gridDimsStr) {
         shapeTypes.push(geometry.gridDimsStr);
       }

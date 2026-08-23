@@ -149,6 +149,10 @@ export class SudokuBuilder {
     if (geometry.gridType === CellGeometry.SUDOKU_GRID_TYPE) {
       yield* this._rowColHandlers(geometry);
     }
+    // The YinYang grid type's implicit constraints.
+    if (geometry.gridType === CellGeometry.YIN_YANG_GRID_TYPE) {
+      yield* this._yinYangLayerHandlers(geometry, 0, geometry.numGridCells);
+    }
 
     yield new HandlerModule.BoxRegionInfo(context.spec.boxRegions);
     yield* this._boxHandlers(context.spec.boxRegions);
@@ -199,6 +203,29 @@ export class SudokuBuilder {
   static *_boxHandlers(boxRegions) {
     for (const cells of boxRegions) {
       yield new HandlerModule.AllDifferent(cells);
+    }
+  }
+
+  static *_yinYangLayerHandlers(geometry, cellOffset, numCells) {
+    const shades = [geometry.minValue(), geometry.minValue() + 1];
+    yield new HandlerModule.GivenCandidates(new Map(
+      Array.from({ length: numCells }, (_, i) => [cellOffset + i, shades])));
+    for (const shade of shades) {
+      yield new ConnectedHandlerModule.ConnectedValues(
+        numCells, cellOffset, new Map([[[shade], 0]]));
+    }
+
+    // Anti-2x2: both shades must appear in each box.
+    const graph = geometry.cellGraph();
+    for (let i = 0; i < numCells; i++) {
+      const nw = cellOffset + i;
+      const ne = graph.traverse(nw, 0, 1);
+      const sw = graph.traverse(nw, 1, 0);
+      const se = graph.traverse(nw, 1, 1);
+      if (ne !== null && sw !== null && se !== null) {
+        yield new HandlerModule.RequiredValues(
+          [nw, ne, sw, se], shades, /* strict = */ false);
+      }
     }
   }
 
@@ -942,6 +969,14 @@ export class SudokuBuilder {
               cellOffset,
               new Map([
                 [constraint.values.split('_').map(v => +v), constraint.size || 0]]));
+          }
+          break;
+
+        case 'YinYang':
+          {
+            const groupCells = geometry.varCellsForGroup('YY');
+            yield* this._yinYangLayerHandlers(
+              geometry, groupCells[0], groupCells.length);
           }
           break;
 

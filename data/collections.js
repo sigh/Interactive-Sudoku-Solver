@@ -1366,7 +1366,7 @@ const EXAMPLE_EXTRA_VARIABLES = [
     src: ['https://www.youtube.com/watch?v=_Q1fvtndpsA', 'https://sudokupad.app/qc37ejydvj'],
     input: '/data/scripts/xin_yang_v2.js',
     solution: '861459273792316485435287619246891357153764928978523146317645892589132764624978531',
-    constraintTypes: ['Var', 'Replicate', 'ConnectedValues', 'WhiteDot', 'AllDifferent', 'ContainAtLeast', 'PillArrow', 'Or', 'And'],
+    constraintTypes: ['YinYang', 'WhiteDot', 'AllDifferent', 'PillArrow', 'Or', 'And'],
   },
   {
     name: 'Homogenous',
@@ -1374,7 +1374,7 @@ const EXAMPLE_EXTRA_VARIABLES = [
     src: ['https://www.youtube.com/watch?v=kM6Kwwkv3aM', 'https://sudokupad.app/0htle6wxey'],
     input: '/data/scripts/homogenous.js',
     solution: '3399999900633339990766330009071633660007166667777718888888771155444888125554444412225555541112222224',
-    constraintTypes: ['10x10 Raw', 'ConnectedValues', 'Arrow', 'Pair'],
+    constraintTypes: ['Raw 10x10', '0-9', 'ConnectedValues', 'Arrow', 'Pair: black dot', 'Pair: green dot'],
   },
   {
     name: '250!',

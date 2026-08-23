@@ -147,6 +147,17 @@ await runTest('the Raw grid type floors numValues at one', () => {
   assert.throws(() => CellGeometry.fromShapeSpec('9x9~1-2'), /Invalid numValues/);
 });
 
+await runTest('the YinYang grid type floors numValues at two', () => {
+  const shading = CellGeometry.fromShapeSpec('9x9~1-2~YinYang');
+  assert.equal(shading.gridType, 'YinYang');
+  assert.equal(shading.numValues, 2);
+  assert.equal(shading.name, '9x9~2~YinYang');
+
+  assert.equal(CellGeometry.fromShapeSpec('9x9~~YinYang').numValues, 9);
+  assert.throws(
+    () => CellGeometry.fromShapeSpec('9x9~1~YinYang'), /Invalid numValues/);
+});
+
 await runTest('fromShapeSpec throws on invalid grid type specs', () => {
   // The empty range slot exists only to position a grid type.
   assert.throws(() => CellGeometry.fromShapeSpec('9x9~'));
