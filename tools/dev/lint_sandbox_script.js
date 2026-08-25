@@ -117,6 +117,11 @@ const findingToItem = (rule, finding) => ({
     : finding.node?.loc.start.line ?? finding.line,
   code: rule.code,
   message: finding.message ?? rule.summary,
+  // A finding may opt out of `lint-ok` when no false positive is possible. Carried
+  // per finding, not per rule: a rule can have one decided branch and one that only
+  // reports what it cannot check. Stripped again in lintSource so the item shape a
+  // caller sees does not change.
+  unsuppressible: finding.unsuppressible === true,
 });
 
 // --- Node predicates shared across rules. ---
@@ -912,7 +917,9 @@ const RULES = [
       + 'widened, so any bare literal is reported as unverifiable rather than\n'
       + 'skipped -- that case is exactly where a narrow key silently misreads the\n'
       + 'wider domain. A machine compiled for the wrong alphabet is a real bug, but\n'
-      + 'values that flow through helpers stay unresolvable, so this stays heuristic.',
+      + 'values that flow through helpers stay unresolvable, so this stays heuristic.\n'
+      + 'The decided half -- a literal against a KNOWN Shape alphabet -- cannot be\n'
+      + 'silenced with lint-ok, because no false positive is possible there.',
     check(ctx) {
       const shape = ctx.declaredShape();
       if (!shape) return [];
@@ -923,13 +930,22 @@ const RULES = [
         if (shape.numValues !== null && call.literal === shape.numValues) continue;
         findings.push({
           node: call.node,
+          // Decided, so `lint-ok` cannot excuse it: BinaryConstraint.initialize
+          // sizes its table from geometry.numValues whatever the key was compiled
+          // with, so a literal differing from a KNOWN alphabet is always wrong and
+          // there is no false positive to review. TYbr45r4oQE shipped an all-UNSAT
+          // encoding by suppressing exactly this (blockers 1425, 1431). The other
+          // branch stays suppressible: with the alphabet set by an expression this
+          // reports what it cannot check, and a call passing the geometry through a
+          // helper the walk cannot see is a real false positive.
+          unsuppressible: shape.numValues !== null,
           message: shape.numValues === null
             ? `numValues literal ${call.literal} cannot be checked: the Shape's `
               + `alphabet is set by \`${shape.raw}\`, so it is widened by an unknown `
               + 'amount. Pass the Shape or the geometry itself, never a literal'
             : `numValues literal ${call.literal} does not match the declared `
               + `Shape's ${shape.numValues} values; pass the Shape or cellGeometry() `
-              + 'instead of a literal',
+              + 'instead of a literal (this finding cannot be suppressed)',
         });
       }
       return findings;
@@ -1022,7 +1038,10 @@ export const lintSource = (source, { only = null, ignore = null } = {}) => {
     rule.check(ctx).map((finding) => findingToItem(rule, finding)));
   const suppressed = suppressionsByLine(ctx);
   return dedupeGuidance(
-    items.filter(item => !suppressed.get(item.line)?.has(item.code)));
+    items
+      .filter(item => item.unsuppressible
+        || !suppressed.get(item.line)?.has(item.code))
+      .map(({ unsuppressible, ...item }) => item));
 };
 
 const USAGE = `\

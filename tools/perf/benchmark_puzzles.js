@@ -159,6 +159,11 @@ const toRow = (r, variant, vsBase) => {
     ms: Number(r.elapsedMs.toFixed(1)),
     msMedian: Number(s.median.toFixed(1)),
     msMax: Number(s.max.toFixed(1)),
+    // runSolve already keeps the first grid it reaches, so this costs nothing to
+    // report and saves the caller solving the puzzle a second time to recover it.
+    // '' when the search found no solution. The TSV table is unaffected: rowCells
+    // selects its columns by name.
+    solution: r.solution,
   };
   const extra = extraCounters(r.counters);
   if (extra) row.extra = extra;
