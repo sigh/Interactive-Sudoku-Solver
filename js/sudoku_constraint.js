@@ -2569,8 +2569,17 @@ export class SudokuConstraint {
       this.valueStr = values.replace(/_/g, ',');
     }
 
+    _compactValueStr() {
+      const counts = new Map();
+      for (const v of this.values.split('_')) {
+        counts.set(v, (counts.get(v) || 0) + 1);
+      }
+      return [...counts].map(
+        ([v, count]) => count > 1 ? `${count}×${v}` : v).join(' ');
+    }
+
     chipLabel() {
-      return `ContainAtLeast (${this.valueStr})`;
+      return `ContainAtLeast (${this._compactValueStr()})`;
     }
   }
 
@@ -2581,7 +2590,7 @@ export class SudokuConstraint {
       repeated in the list.`);
 
     chipLabel() {
-      return `ContainExact (${this.valueStr})`;
+      return `ContainExact (${this._compactValueStr()})`;
     }
   };
 
