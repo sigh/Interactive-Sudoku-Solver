@@ -42,7 +42,7 @@ const resolveInput = (input) => {
 
 const COLLECTIONS = await import('../../data/collections.js' + self.VERSION_PARAM);
 const { PUZZLE_INDEX, resolvePuzzleConfig } = await import('../../data/example_puzzles.js' + self.VERSION_PARAM);
-const { SudokuParser } = await import('../../js/sudoku_parser.js' + self.VERSION_PARAM);
+const { SudokuParser, toShortSolution } = await import('../../js/sudoku_parser.js' + self.VERSION_PARAM);
 const { SudokuBuilder } = await import('../../js/solver/sudoku_builder.js' + self.VERSION_PARAM);
 const { LookupTables } = await import('../../js/solver/lookup_tables.js' + self.VERSION_PARAM);
 
@@ -224,15 +224,20 @@ const STATUS = {
   MULTIPLE: 'multiple', UNIQUE: 'unique', FIRST: 'first',
 };
 
+// Decode the mask grid to values and let the app format it. String(value) per cell
+// broke above 9 -- a widened shape's value of 10 took two characters, so the string
+// came out longer than the board (blocker 1496) -- and the result is compared against
+// puzzle.solution, which is stored in the app's own short format.
 const solutionString = (grid, geometry) => {
   if (!grid) return '';
-  let result = '';
+  const values = new Array(geometry.numGridCells).fill(null);
   for (let cell = 0; cell < geometry.numGridCells; cell++) {
     const mask = grid[cell];
-    const fixed = mask && !(mask & (mask - 1));
-    result += fixed ? String(LookupTables.toOffsetValue(mask, geometry.valueOffset)) : '?';
+    if (mask && !(mask & (mask - 1))) {
+      values[cell] = LookupTables.toOffsetValue(mask, geometry.valueOffset);
+    }
   }
-  return result;
+  return toShortSolution(values, geometry);
 };
 
 // Build and run one puzzle under the given budgets, returning a result with
