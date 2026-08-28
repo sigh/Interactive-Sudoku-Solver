@@ -248,6 +248,17 @@ const returnedShapeCall = (ctx) => {
 const shapeCall = (ctx) => returnedShapeCall(ctx)
   ?? ctx.nodesOfType('NewExpression').find(isShapeCall);
 
+// The value count the grid spec gives on its own, before any widening. The
+// alphabet may be spelled as a second argument or as a `~` suffix, so the base
+// is the spec with the suffix stripped.
+const baseGridValues = (spec) => {
+  try {
+    return CellGeometry.fromShapeSpec(spec.split('~')[0]).numValues;
+  } catch {
+    return null;
+  }
+};
+
 const parseDeclaredShape = (ctx) => {
   const call = shapeCall(ctx);
   const spec = stringValue(call?.arguments[0]);
@@ -277,9 +288,9 @@ const parseDeclaredShape = (ctx) => {
     return null;  // Not a valid Shape declaration; nothing to check against.
   }
   if (alphabet && text === null) {
-    return { numValues: null, valueOffset: null, raw };  // Widened by an unknown amount.
+    return { numValues: null, valueOffset: null, raw, spec };  // Widened by an unknown amount.
   }
-  return { numValues: geometry.numValues, valueOffset: geometry.valueOffset, raw };
+  return { numValues: geometry.numValues, valueOffset: geometry.valueOffset, raw, spec };
 };
 
 // Whether encodeSpec's opts argument passes valueOffset. Anything the walk
@@ -903,6 +914,70 @@ const RULES = [
             + `${supplied} were supplied, so the trailing `
             + `${supplied - maxArity} cannot affect the intended constraint`;
         findings.push({ node: expr, message });
+      }
+      return findings;
+    },
+  },
+  {
+    code: 'stale-num-values',
+    summary: 'a `.numValues` read reports the un-widened grid count, not the declared '
+      + "Shape's; pass the Shape itself",
+    docs: 'On a widened board, `graph.gridGeometry()` is a snapshot taken before the\n'
+      + 'returned array\'s `Shape()` is applied, so `.numValues` off it is still the\n'
+      + 'old, narrower count. Anything built from that number is built for the wrong\n'
+      + 'alphabet -- and nothing downstream can tell: the serialized machine is\n'
+      + 'trimmed to its highest used symbol, so too-narrow and never-accepts-the-top\n'
+      + 'are the same object by then. Fires only where the declared Shape widens the\n'
+      + 'grid spec; a read off a Shape-derived binding is the correct idiom and is\n'
+      + 'not flagged.',
+    check(ctx) {
+      const shape = ctx.declaredShape();
+      if (!shape) return [];
+      const base = baseGridValues(shape.spec);
+      // Nothing to be stale against: an unwidened board's grid count IS the final
+      // one. A widening of unknown size (numValues null) still widens.
+      if (base === null || shape.numValues === base) return [];
+
+      // Reads off the Shape, or off anything built from it, are the right idiom.
+      // Derivation is transitive: `cellGraph(shape).gridGeometry()` already carries
+      // the widened count, so the chain has to be followed, not just the first hop.
+      const shapeNames = constBindings(ctx, (init) =>
+        isShapeCall(init) || subtreeHas(init, isShapeCall));
+      for (let grew = true; grew;) {
+        grew = false;
+        for (const decl of ctx.nodesOfType('VariableDeclarator')) {
+          if (decl.id.type !== 'Identifier' || !decl.init) continue;
+          if (shapeNames.has(decl.id.name)) continue;
+          if (!subtreeHas(decl.init, (n) =>
+            n.type === 'Identifier' && shapeNames.has(n.name))) continue;
+          shapeNames.add(decl.id.name);
+          grew = true;
+        }
+      }
+      const rootName = (node) => {
+        let cur = node;
+        while (cur?.type === 'MemberExpression' || cur?.type === 'CallExpression') {
+          cur = cur.type === 'MemberExpression' ? cur.object : cur.callee;
+        }
+        return cur?.type === 'Identifier' ? cur.name : null;
+      };
+
+      const findings = [];
+      for (const read of ctx.nodesOfType('MemberExpression')) {
+        if (memberName(read) !== 'numValues') continue;
+        if (subtreeHas(read.object, isShapeCall)) continue;
+        const root = rootName(read.object);
+        if (root && shapeNames.has(root)) continue;
+        findings.push({
+          node: read,
+          message: shape.numValues === null
+            ? `\`${ctx.text(read)}\` reports the grid spec's ${base} values, but the `
+              + `declared Shape widens the alphabet with \`${shape.raw}\`. Pass the `
+              + 'Shape itself, not a count read before it is applied'
+            : `\`${ctx.text(read)}\` reports the grid spec's ${base} values, but the `
+              + `declared Shape has ${shape.numValues}. Pass the Shape itself, not a `
+              + 'count read before it is applied',
+        });
       }
       return findings;
     },

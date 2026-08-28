@@ -115,6 +115,47 @@ await runTest('lint_sandbox_script flags numValues/Shape mismatch and id templat
   assert.match(report(items), /manual-cell-id-template/);
 });
 
+await runTest('stale-num-values flags a grid-geometry count on a widened Shape', () => {
+  // graph.gridGeometry() is a snapshot taken before the returned Shape is applied,
+  // so its numValues is the old, narrower count.
+  const items = lintSource(SCRIPT_HEADER
+    + "const graph = cellGraph('9x9');\n"
+    + 'const geometry = graph.gridGeometry();\n'
+    + 'const enc = NFA.encodeSpec(spec, geometry.numValues);\n'
+    + "return [new Shape('9x9', 12), new NFA(enc)];\n");
+  assert.match(report(items), /stale-num-values/);
+});
+
+await runTest('stale-num-values follows Shape derivation transitively', () => {
+  // cellGraph(shape).gridGeometry() already carries the widened count, so the
+  // chain has to be followed rather than only the first hop.
+  const items = lintSource(SCRIPT_HEADER
+    + "const shape = new Shape('9x9', 10);\n"
+    + 'const graph = cellGraph(shape);\n'
+    + 'const geometry = graph.gridGeometry();\n'
+    + 'const enc = NFA.encodeSpec(spec, geometry.numValues);\n'
+    + 'return [shape, new NFA(enc)];\n');
+  assert.doesNotMatch(report(items), /stale-num-values/);
+});
+
+await runTest('stale-num-values accepts a count read off the Shape itself', () => {
+  const items = lintSource(SCRIPT_HEADER
+    + "const shape = new Shape('9x9', 12);\n"
+    + 'const enc = NFA.encodeSpec(spec, shape.numValues);\n'
+    + 'return [shape, new NFA(enc)];\n');
+  assert.doesNotMatch(report(items), /stale-num-values/);
+});
+
+await runTest('stale-num-values ignores an unwidened board', () => {
+  // Without widening the grid spec's count IS the final count, so there is
+  // nothing for the read to be stale against.
+  const items = lintSource(SCRIPT_HEADER
+    + "const graph = cellGraph('9x9');\n"
+    + 'const enc = NFA.encodeSpec(spec, graph.gridGeometry().numValues);\n'
+    + "return [new Shape('9x9'), new NFA(enc)];\n");
+  assert.doesNotMatch(report(items), /stale-num-values/);
+});
+
 await runTest('value-range lint uses the returned host Shape, not an earlier local Shape', () => {
   const items = lintSource(SCRIPT_HEADER
     + "const binaryShape = new Shape('1x1', 2);\n"
