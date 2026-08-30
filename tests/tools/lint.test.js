@@ -115,6 +115,54 @@ await runTest('lint_sandbox_script flags numValues/Shape mismatch and id templat
   assert.match(report(items), /manual-cell-id-template/);
 });
 
+await runTest('num-values-mismatch resolves a const alias of the count', () => {
+  // Renaming the literal must not silence the decided branch: rFEBuV4ssgY
+  // aliased its flagged 2 to SHADE_VALUES and shipped the bug (#1762).
+  const items = lintSource(SCRIPT_HEADER
+    + 'const SHADE_VALUES = 2;\n'
+    + 'const key = Pair.fnToKey((a, b) => a === b, SHADE_VALUES);\n'
+    + "return [new Shape('9x9'), new Pair(key, 'x', 'R1C1', 'R1C2')];\n");
+  assert.match(report(items), /num-values-mismatch/);
+  assert.match(report(items), /via `SHADE_VALUES`/);
+  assert.match(report(items), /cannot be suppressed/);
+});
+
+await runTest('num-values-mismatch leaves a matching const alias alone', () => {
+  const items = lintSource(SCRIPT_HEADER
+    + 'const NV = 9;\n'
+    + 'const key = Pair.fnToKey((a, b) => a === b, NV);\n'
+    + "return [new Shape('9x9'), new Pair(key, 'x', 'R1C1', 'R1C2')];\n");
+  assert.doesNotMatch(report(items), /num-values-mismatch/);
+});
+
+await runTest('num-values-mismatch on a decided encodeSpec alias cannot be excused', () => {
+  // Even a deliberate sentinel cap belongs in the domain or the spec, not the
+  // table size (8L4ffie834I: widening to the geometry left its search
+  // bit-for-bit identical), so lint-ok does not silence the decided branch.
+  const items = lintSource(SCRIPT_HEADER
+    + 'const SENTINEL = 8;\n'
+    + '// lint-ok: num-values-mismatch\n'
+    + 'const enc = NFA.encodeSpec(spec, SENTINEL);\n'
+    + "return [new Shape('6x6', 13), new NFA(enc, 'x', 'R1C1')];\n");
+  assert.match(report(items), /num-values-mismatch/);
+  assert.match(report(items), /via `SENTINEL`/);
+  assert.match(report(items), /cannot be suppressed/);
+});
+
+await runTest('num-values-mismatch skips a count the Shape alphabet is built from', () => {
+  // `0-${N - 1}` against fnToKey(fn, N, -1) co-varies by construction: the
+  // alphabet cannot drift from the count, so the unverifiable branch is quiet
+  // (ApkQ64eyV5c). A count under a DIFFERENT symbol still reports.
+  const script = (countName) => SCRIPT_HEADER
+    + 'const N = 15;\n'
+    + `const ${countName === 'N' ? 'unused' : countName} = 15;\n`
+    + `const key = Pair.fnToKey((a, b) => a < b, ${countName}, -1);\n`
+    + 'return [new Shape(\'9x9\', `0-${N - 1}`), '
+    + "new Pair(key, 'x', 'R1C1', 'R1C2')];\n";
+  assert.doesNotMatch(report(lintSource(script('N'))), /num-values-mismatch/);
+  assert.match(report(lintSource(script('M'))), /num-values-mismatch/);
+});
+
 await runTest('stale-num-values flags a grid-geometry count on a widened Shape', () => {
   // graph.gridGeometry() is a snapshot taken before the returned Shape is applied,
   // so its numValues is the old, narrower count.

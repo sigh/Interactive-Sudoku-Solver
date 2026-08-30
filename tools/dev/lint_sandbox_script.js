@@ -310,29 +310,42 @@ const hasValueOffsetOption = (opts) => {
 // spelled as (a number literal or a `.numValues` read), and whether the call
 // passes an explicit value offset (opts.valueOffset for encodeSpec, the
 // positional third argument for fnToKey).
-const findValueRangeCalls = (ctx) =>
-  ctx.nodesOfType('CallExpression')
+const findValueRangeCalls = (ctx) => {
+  const consts = numericConstants(ctx);
+  return ctx.nodesOfType('CallExpression')
     .filter((n) => ['encodeSpec', 'fnToKey'].includes(calleeName(n)))
     .map((node) => {
       const args = node.arguments;
       const countArg = args[1];
 
-      const literal = numberValue(countArg);
+      let literal = numberValue(countArg);
+      let aliasName = null;
       let bareCountText = literal !== null ? String(literal) : null;
       if (countArg?.type === 'MemberExpression'
         && memberName(countArg) === 'numValues') {
         bareCountText = ctx.text(countArg);
       }
+      // A numeric const alias is the bare count wearing a name; resolve it so
+      // renaming the literal cannot silence the decided branch (rFEBuV4ssgY
+      // aliased its flagged 2 to SHADE_VALUES and shipped the bug; #1762).
+      if (literal === null && countArg?.type === 'Identifier'
+        && consts.has(countArg.name)) {
+        literal = consts.get(countArg.name);
+        aliasName = countArg.name;
+        bareCountText = countArg.name;
+      }
 
       return {
         node,
         literal,
+        aliasName,
         bareCountText,
         hasExplicitOffset: calleeName(node) === 'fnToKey'
           ? args.length >= 3
           : hasValueOffsetOption(args[2]),
       };
     });
+};
 
 // --- custom-neighbour-helper: what a candidate declaration must do. ---
 
@@ -986,15 +999,20 @@ const RULES = [
     code: 'num-values-mismatch',
     summary: 'NFA.encodeSpec / Pair.fnToKey numValues literal disagrees with the declared Shape',
     docs: 'Cross-references the `new Shape(...)` alphabet against encodeSpec/fnToKey\n'
-      + 'literals. The alphabet is read from a bare count (`12`), a string range\n'
+      + 'literals. A count given as a top-level numeric const resolves to its value,\n'
+      + 'so renaming the literal does not silence the check (#1762). The alphabet is\n'
+      + 'read from a bare count (`12`), a string range\n'
       + "(`'0-15'`, also in the `'9x9~0-15'` spec form), or a named constant. When it\n"
       + 'is set by an expression the width is unknown but the shape is certainly\n'
       + 'widened, so any bare literal is reported as unverifiable rather than\n'
       + 'skipped -- that case is exactly where a narrow key silently misreads the\n'
       + 'wider domain. A machine compiled for the wrong alphabet is a real bug, but\n'
       + 'values that flow through helpers stay unresolvable, so this stays heuristic.\n'
-      + 'The decided half -- a literal against a KNOWN Shape alphabet -- cannot be\n'
-      + 'silenced with lint-ok, because no false positive is possible there.',
+      + 'The decided half -- a fnToKey literal against a KNOWN Shape alphabet --\n'
+      + 'cannot be silenced with lint-ok, because a narrow Pair key always decodes\n'
+      + 'as a garbage relation. A decided encodeSpec finding stays suppressible: a\n'
+      + 'narrow NFA merely never accepts the top symbols, which a sentinel-capped\n'
+      + 'scan builds on purpose.',
     check(ctx) {
       const shape = ctx.declaredShape();
       if (!shape) return [];
@@ -1003,22 +1021,33 @@ const RULES = [
       for (const call of ctx.valueRangeCalls()) {
         if (call.literal === null) continue;
         if (shape.numValues !== null && call.literal === shape.numValues) continue;
+        // An unverifiable alphabet built from the same constant the call passes
+        // co-varies with it by construction (`0-${N - 1}` against fnToKey(fn, N)):
+        // the mismatch this rule exists for cannot arise, so stay silent rather
+        // than report what the author has already tied together.
+        if (shape.numValues === null && call.aliasName
+          && shape.raw?.includes(call.aliasName)) continue;
+        const spelled = call.aliasName
+          ? `${call.literal} (via \`${call.aliasName}\`)` : String(call.literal);
         findings.push({
           node: call.node,
           // Decided, so `lint-ok` cannot excuse it: BinaryConstraint.initialize
           // sizes its table from geometry.numValues whatever the key was compiled
-          // with, so a literal differing from a KNOWN alphabet is always wrong and
-          // there is no false positive to review. TYbr45r4oQE shipped an all-UNSAT
-          // encoding by suppressing exactly this (blockers 1425, 1431). The other
-          // branch stays suppressible: with the alphabet set by an expression this
-          // reports what it cannot check, and a call passing the geometry through a
-          // helper the walk cannot see is a real false positive.
+          // with, so a fnToKey literal differing from a KNOWN alphabet is always a
+          // garbage relation (TYbr45r4oQE shipped an all-UNSAT encoding by
+          // suppressing exactly this; blockers 1425, 1431). A narrow encodeSpec is
+          // "merely" a machine that never accepts the top symbols, but even a
+          // deliberate cap belongs in the domain or the spec, not the table size:
+          // 8L4ffie834I carried one for months and widening to the geometry left
+          // its search bit-for-bit identical. The unverifiable branch stays
+          // suppressible: a call passing the geometry through a helper the walk
+          // cannot see is a real false positive.
           unsuppressible: shape.numValues !== null,
           message: shape.numValues === null
-            ? `numValues literal ${call.literal} cannot be checked: the Shape's `
+            ? `numValues literal ${spelled} cannot be checked: the Shape's `
               + `alphabet is set by \`${shape.raw}\`, so it is widened by an unknown `
               + 'amount. Pass the Shape or the geometry itself, never a literal'
-            : `numValues literal ${call.literal} does not match the declared `
+            : `numValues literal ${spelled} does not match the declared `
               + `Shape's ${shape.numValues} values; pass the Shape or cellGeometry() `
               + 'instead of a literal (this finding cannot be suppressed)',
         });
