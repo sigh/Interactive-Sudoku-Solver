@@ -581,6 +581,47 @@ await runTest('Jigsaw round-trips for 16x16 grid', () => {
   }
 });
 
+// Partial coverage: '_' cells are explicitly in no region.
+
+await runTest('Jigsaw round-trips partial coverage via "_"', () => {
+  const layout = JIGSAW_9x9_LAYOUT.replaceAll('8', '_');
+  const geometry = CellGeometry.fromGridSize(9);
+  const jigsaws = [...SudokuConstraint.Jigsaw.makeFromArgs([layout], geometry)];
+  assert.equal(jigsaws.length, 8, 'unclaimed cells must not become a region');
+
+  const serialized = SudokuConstraint.Jigsaw.serialize(jigsaws);
+  assert.equal(serialized, `.Jigsaw~${layout}`);
+});
+
+await runTest('Jigsaw round-trips a single region with "_"', () => {
+  // Leading '_' cells must not shift region indexes.
+  const layout = '_'.repeat(72) + '000000000';
+  const geometry = CellGeometry.fromGridSize(9);
+  const jigsaws = [...SudokuConstraint.Jigsaw.makeFromArgs([layout], geometry)];
+  assert.equal(jigsaws.length, 1, 'a single region alongside "_" is a real constraint');
+
+  const serialized = SudokuConstraint.Jigsaw.serialize(jigsaws);
+  assert.equal(serialized, `.Jigsaw~${layout}`);
+});
+
+await runTest('Jigsaw.makeFromArgs rejects bad region sizes when "_" is present', () => {
+  const layout = '00000' + '_'.repeat(76);
+  const geometry = CellGeometry.fromGridSize(9);
+  assert.throws(
+    () => [...SudokuConstraint.Jigsaw.makeFromArgs([layout], geometry)],
+    /Inconsistent region sizes/
+  );
+});
+
+await runTest('Jigsaw.makeFromArgs still drops one odd-sized region in legacy layouts', () => {
+  // Legacy partial-coverage strings mark unclaimed cells like an ordinary
+  // region; here regions 7 and 8 merge into one 18-cell bucket.
+  const layout = JIGSAW_9x9_LAYOUT.replaceAll('8', '7');
+  const geometry = CellGeometry.fromGridSize(9);
+  const jigsaws = [...SudokuConstraint.Jigsaw.makeFromArgs([layout], geometry)];
+  assert.equal(jigsaws.length, 7, 'the odd-sized bucket should be dropped');
+});
+
 // ============================================================================
 // shiftCells / makeShifted
 // ============================================================================

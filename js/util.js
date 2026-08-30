@@ -808,6 +808,10 @@ export class MultiMap {
     this._map.clear();
   }
 
+  get size() {
+    return this._map.size;
+  }
+
   getMap() {
     return this._map;
   }

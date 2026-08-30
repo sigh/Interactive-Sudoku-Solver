@@ -900,6 +900,8 @@ export class SudokuConstraint {
     static REQUIRES_SUDOKU_GRID = true;
     static DISPLAY_CONFIG = { displayClass: 'Jigsaw' };
     static UNIQUENESS_KEY_FIELD = 'cells';
+    // Layout symbol for a cell in no region; never a valid region index.
+    static UNCLAIMED_CELL = '_';
 
     constructor(shapeSpec, ...cells) {
       super(shapeSpec, ...cells);
@@ -912,6 +914,8 @@ export class SudokuConstraint {
     static *makeFromArgs(args, geometry) {
       // Legacy format: .Jigsaw~<shapeSpec>~<layout>
       // New format:    .Jigsaw~<layout>
+      // The layout has one character per cell: a region index digit, or
+      // UNCLAIMED_CELL for a cell in no region.
       // Ignore any legacy leading argument(s) and take the layout as the last
       // argument.
       if (args.length < 1 || args.length > 2) {
@@ -925,29 +929,33 @@ export class SudokuConstraint {
           `but layout has ${layoutStr.length}`);
       }
 
+      const hasUnclaimedCells = layoutStr.includes(this.UNCLAIMED_CELL);
+
       const map = new MultiMap();
       for (let i = 0; i < layoutStr.length; i++) {
+        if (layoutStr[i] === this.UNCLAIMED_CELL) continue;
         map.add(layoutStr[i], i);
       }
 
       // If all the cells in the grid are in one region, then no constraint
       // is needed.
-      if (map.size === 1) return;
+      if (map.size === 1 && !hasUnclaimedCells) return;
 
       const maxRegionSize = geometry.numValues;
       const minRegionSize = CellGeometry.defaultNumValues(
         geometry.numRows, geometry.numCols);
 
-      let sawOtherRegionSize = false;
+      // Legacy strings mark unclaimed cells like an ordinary region, so
+      // tolerate one odd-sized region unless UNCLAIMED_CELL is in use.
+      let allowOtherRegionSize = !hasUnclaimedCells;
       for (const [, region] of map) {
         const len = region.length;
         if (len >= minRegionSize && len <= maxRegionSize) {
           yield new this(
             geometry.name,
             ...region.map(c => geometry.makeCellIdFromIndex(c)));
-        } else if (!sawOtherRegionSize) {
-          // Allow one region to have a different size for partially filled grids.
-          sawOtherRegionSize = true;
+        } else if (allowOtherRegionSize) {
+          allowOtherRegionSize = false;
         } else {
           throw Error('Inconsistent region sizes in jigsaw layout');
         }
@@ -976,13 +984,14 @@ export class SudokuConstraint {
       const indexMap = new Map();
       partsGrid.forEach((part) => {
         // Create a new index when we first encounter a part.
-        if (!indexMap.has(part)) {
+        if (part !== null && !indexMap.has(part)) {
           const index = indexMap.size;
           indexMap.set(part, index.toString(geometry.numValues + 1));
         }
       });
 
-      const layoutStr = partsGrid.map(part => indexMap.get(part)).join('');
+      const layoutStr = partsGrid.map(
+        part => part === null ? this.UNCLAIMED_CELL : indexMap.get(part)).join('');
       return this._argsToString(layoutStr);
     }
   }
