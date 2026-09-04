@@ -1,33 +1,41 @@
 const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM);
 const { SudokuConstraintHandler, InvalidConstraintError } = await import('./handlers.js' + self.VERSION_PARAM);
-const { memoize } = await import('../util.js' + self.VERSION_PARAM);
 
 export const NO_CELL = 0xffff;
 
-// neighbors[i * 4 + dir] is the orthogonal neighbour of position i (dir: 0 left,
-// 1 right, 2 up, 3 down), or `sentinel` at an edge. `numCells` cells in `numCols`
-// columns, the last row possibly partial.
-const buildNeighborTable = (numCells, numCols, sentinel) => {
-  const neighbors = new Uint16Array(numCells * 4).fill(sentinel);
+// Flat 4-neighbour table for the `numCells` cells from `cellOffset`, taken from
+// the geometry's cell graph: neighbors[i * 4 + dir] is the layer-local index
+// of position i's neighbour (dir: 0 left, 1 right, 2 up, 3 down, as in
+// CellGraph), or `sentinel` where the graph has none. Cached per graph.
+const neighborTableCache = new WeakMap();
+const neighborTableFor = (geometry, cellOffset, numCells, sentinel) => {
+  const graph = geometry.cellGraph();
+  let tables = neighborTableCache.get(graph);
+  if (!tables) neighborTableCache.set(graph, tables = new Map());
+  const key = `${cellOffset}:${numCells}:${sentinel}`;
+  let neighbors = tables.get(key);
+  if (neighbors) return neighbors;
+
+  neighbors = new Uint16Array(numCells * 4).fill(sentinel);
   for (let i = 0; i < numCells; i++) {
-    const col = i % numCols;
-    const offset = i * 4;
-    if (col > 0) neighbors[offset] = i - 1;
-    if (col + 1 < numCols && i + 1 < numCells) neighbors[offset + 1] = i + 1;
-    if (i >= numCols) neighbors[offset + 2] = i - numCols;
-    if (i + numCols < numCells) neighbors[offset + 3] = i + numCols;
+    const edges = graph.cellEdges(cellOffset + i);
+    for (let dir = 0; dir < 4; dir++) {
+      const neighbor = edges[dir];
+      if (neighbor !== null) neighbors[i * 4 + dir] = neighbor - cellOffset;
+    }
   }
+  tables.set(key, neighbors);
   return neighbors;
 };
 
 // Full grid, using NO_CELL at the edges.
-export const neighborTable = memoize((numRows, numCols) =>
-  buildNeighborTable(numRows * numCols, numCols, NO_CELL));
+export const neighborTable = (geometry) =>
+  neighborTableFor(geometry, 0, geometry.numGridCells, NO_CELL);
 
 // A cell layer whose missing-neighbour sentinel is `numCells` — a permanently
 // EXCLUDED states slot, so traversals need no edge checks.
-const layerNeighborTable = memoize((numCells, numCols) =>
-  buildNeighborTable(numCells, numCols, numCells));
+const layerNeighborTable = (geometry, cellOffset, numCells) =>
+  neighborTableFor(geometry, cellOffset, numCells, numCells);
 
 // `cell`'s in-grid neighbours if every one of them is in `cellSet`, else null.
 export const enclosingNeighbors = (gridNeighbors, cell, cellSet) => {
@@ -107,17 +115,18 @@ export class ConnectedValues extends SudokuConstraintHandler {
     }
 
     const numCells = this.cells.length;
-    // The grid, or a whole var-cell group. A group sets its own size and
-    // width, so the layer need not have the grid's shape. With no main grid
-    // (a primary cell group), offset 0 is the first var group, not the grid.
-    const layer = this.cells[0] === 0 && geometry.numGridCells ?
-      { count: geometry.numGridCells, columns: geometry.numCols } :
-      geometry.varCellGroups().find((g) => g.cells[0] === this.cells[0]);
-    if (layer?.count !== numCells) {
+    const cellOffset = this.cells[0];
+    // The grid, or a whole var-cell group; the cell graph carries each layer's
+    // own adjacency. With no main grid (a primary cell group), offset 0 is the
+    // first var group, not the grid.
+    const layerCount = cellOffset === 0 && geometry.numGridCells ?
+      geometry.numGridCells :
+      geometry.varCellGroups().find((g) => g.cells[0] === cellOffset)?.count;
+    if (layerCount !== numCells) {
       throw new InvalidConstraintError(
         'Connected Values must cover the grid or a whole var-cell group.');
     }
-    this._neighbors = layerNeighborTable(numCells, layer.columns);
+    this._neighbors = layerNeighborTable(geometry, cellOffset, numCells);
     this._traversalBuffer = new Uint16Array(numCells);
     this._states = new Uint8Array(numCells + 1);
 

@@ -10,11 +10,6 @@ const REGION_FIXED_COUNT_MASK = 0x1f;
 const REGION_VALUE_MASK_SHIFT = 14;
 const REGION_COUNT_MASK = (1 << REGION_VALUE_MASK_SHIFT) - 1;
 
-const cellsAreAdjacent = (cellA, cellB, numCols) => {
-  const delta = Math.abs(cellA - cellB);
-  return delta === numCols || (delta === 1 && (cellA / numCols | 0) === (cellB / numCols | 0));
-};
-
 // ChaosArrow and ChaosCount relate a control cell to an internal run length or
 // count: internal = control value + offset.
 const toInternalMask = (controlMask, offset) =>
@@ -195,7 +190,7 @@ export class ChaosConstruction extends SudokuConstraintHandler {
     const numGridCells = geometry.numGridCells;
 
     // === Immutable configuration (built once, never mutated) ===
-    this._neighbors = neighborTable(geometry.numRows, geometry.numCols);  // 4-neighbour adjacency
+    this._neighbors = neighborTable(geometry);  // 4-neighbour adjacency
 
     // === Branch state (saved/restored across backtracking by stateAllocator) ===
     // NOTE: the two allocate() calls must keep this relative order — offsets are
@@ -1154,9 +1149,10 @@ export class ChaosArrow extends SudokuConstraintHandler {
     const maxLength = Math.min(geometry.numValues + this._offset, maxArmCells);
     if (maxLength - this._offset < 1) return false;
 
+    const graph = geometry.cellGraph();
     this._canMergeRegionShards = this._regionRunArms.every(arm => {
       for (let i = 1; i < arm.length; i++) {
-        if (!cellsAreAdjacent(arm[i - 1], arm[i], geometry.numCols)) return false;
+        if (!graph.cellEdges(arm[i - 1]).includes(arm[i])) return false;
       }
       return true;
     });
@@ -1178,7 +1174,7 @@ export class ChaosArrow extends SudokuConstraintHandler {
     // (e.g. arrows in all four directions),
     // the run must extend into that arm, so the run length is >= 2. Unlike a
     // count, a run length has no per-cell growth, so this is purely static.
-    const neighbors = neighborTable(geometry.numRows, geometry.numCols);
+    const neighbors = neighborTable(geometry);
     const armSteps = new Set();
     for (const arm of this._regionRunArms) {
       if (arm.length >= 2) armSteps.add(arm[1]);
@@ -1469,10 +1465,11 @@ export class ChaosCount extends SudokuConstraintHandler {
     const maxCount = Math.min(geometry.numValues + this._offset, this._regionCells.length);
 
     const regionRunCells = this._regionRunCells;
+    const graph = geometry.cellGraph();
     const mergePairs = [];
     for (let i = 1; i < regionRunCells.length; i++) {
       for (let j = 0; j < i; j++) {
-        if (!cellsAreAdjacent(regionRunCells[i], regionRunCells[j], geometry.numCols)) continue;
+        if (!graph.cellEdges(regionRunCells[i]).includes(regionRunCells[j])) continue;
         mergePairs.push(j, i);
       }
     }
@@ -1483,7 +1480,7 @@ export class ChaosCount extends SudokuConstraintHandler {
     // an orthogonal neighbour; if every neighbour is itself a counted cell that
     // neighbour is counted, so the count is >= 2. The neighbours (as region-lane
     // cells) are kept for the stronger per-region check in enforceConsistency.
-    const neighbors = neighborTable(geometry.numRows, geometry.numCols);
+    const neighbors = neighborTable(geometry);
     const counted = new Set(regionRunCells);
     const regionCellOffset = this._regionCells[0] - regionRunCells[0];
     const enclosingCells = enclosingNeighbors(neighbors, regionRunCells[0], counted);

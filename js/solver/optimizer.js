@@ -281,6 +281,7 @@ export class SudokuConstraintOptimizer {
     const binaryHandlers = [
       ...handlerSet.getAllofType(HandlerModule.BinaryConstraint),
       ...handlerSet.getAllofType(HandlerModule.BinaryPairwise)];
+    const graph = geometry.cellGraph();
     const links = [];
     for (const handler of binaryHandlers) {
       if (handler.key() !== equalsKey) continue;
@@ -293,11 +294,7 @@ export class SudokuConstraintOptimizer {
           const regionCellB = cells[j];
           if (regionCellB < regionCellOffset || regionCellB >= regionCellLimit) continue;
           const cellB = regionCellB - regionCellOffset;
-          const delta = Math.abs(cellA - cellB);
-          if (delta === geometry.numCols
-            || (delta === 1 && (cellA / geometry.numCols | 0) === (cellB / geometry.numCols | 0))) {
-            links.push([cellA, cellB]);
-          }
+          if (graph.cellEdges(cellA).includes(cellB)) links.push([cellA, cellB]);
         }
       }
     }
@@ -370,8 +367,7 @@ export class SudokuConstraintOptimizer {
   // the count is a sound lower bound on the number of forced coincidences (hence
   // on the reduction in distinct labels).
   _countEnclosedRegionCoincidences(countedGridCells, geometry) {
-    const neighborTable = ConnectedHandlerModule.neighborTable(
-      geometry.numRows, geometry.numCols);
+    const neighborTable = ConnectedHandlerModule.neighborTable(geometry);
     const used = new Set();
     let reduction = 0;
 
