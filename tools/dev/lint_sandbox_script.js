@@ -874,7 +874,13 @@ const RULES = [
       + 'off-by-one encodes the wrong puzzle while still linting and solving;\n'
       + 'a grid-shaped Var group read through makeOverlay()/at() needs no index\n'
       + 'math. Literal and additive indices (cell(9), cell(i + 1)) are left\n'
-      + 'alone: only multiplicative row/column folding is flagged.',
+      + 'alone: only multiplicative row/column folding is flagged.\n'
+      + 'Two-argument cell(row, col) is never flagged: that form IS the\n'
+      + 'dimension-aware API this rule steers towards, and it folds against the\n'
+      + 'declared columns itself, so arithmetic in its row argument is addressing\n'
+      + 'the group rather than folding it. A layer whose rows are not 1:1 with\n'
+      + 'grid rows cannot be read through makeOverlay()/at() at all, since that\n'
+      + 'pairs var cells one-to-one with grid cells.',
     check(ctx) {
       const vars = constBindings(ctx, (init) =>
         init.type === 'NewExpression' && calleeName(init) === 'Var');
@@ -883,6 +889,8 @@ const RULES = [
       for (const call of ctx.nodesOfType('CallExpression')) {
         const varName = methodCallOn(call, 'cell', vars);
         const index = call.arguments[0];
+        // One argument only: cell(row, col) does the folding itself.
+        if (call.arguments.length !== 1) continue;
         if (!varName || !index || !subtreeHas(index, (n) =>
           n.type === 'BinaryExpression' && n.operator === '*')) continue;
         findings.push({

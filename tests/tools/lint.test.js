@@ -441,6 +441,11 @@ await runTest('lint_sandbox_script flags row-major arithmetic into Var cell()', 
     + 'const first = GRID.cell(1);\n'
     + 'const next = i => GRID.cell(i + 1);\n'
     + 'const unrelated = table.cell(r * 9 + c);\n'
+    // cell(row, col) folds against the declared columns itself, so arithmetic in
+    // its ROW argument addresses the group rather than folding it. A layer whose
+    // rows are not 1:1 with grid rows (19 rows over a 10x10 board) has no
+    // makeOverlay()/at() reading at all, so flagging it left no way to write it.
+    + 'const layer = GRID.cell((r - 1) * 2 + 1, c);\n'
     + "return [new Shape('1x1'), GRID];\n");
   assert.doesNotMatch(report(clean), /manual-var-cell-arithmetic/);
 });
