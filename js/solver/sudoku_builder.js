@@ -409,6 +409,10 @@ export class SudokuBuilder {
               throw new InvalidConstraintError(
                 'Chaos Construction requires grid cell count to be divisible by region size.');
             }
+            if (regionSize > geometry.numValues) {
+              throw new InvalidConstraintError(
+                'Chaos Construction region size cannot exceed the number of values.');
+            }
             const regionCells = geometry.varCellsForGroup('CC');
             if (!regionCells || regionCells.length !== geometry.numGridCells) {
               throw new InvalidConstraintError(

@@ -217,6 +217,26 @@ await runTest('ChaosConstruction accepts non-square grids', () => {
     true);
 });
 
+await runTest('ChaosConstruction rejects region size larger than the number of values', () => {
+  // 3x3 grid, 3 values: regionSize=9 divides 9 cells but a region cannot hold
+  // 9 distinct values.
+  const geometry = CellGeometry.fromShapeSpec('3x3');
+  const constraint = new SudokuConstraint.ChaosConstruction();
+  geometry.addVarCellsForConstraints([constraint]);
+
+  const grid = makeChaosGrid(geometry);
+  const regionCells = geometry.varCellsForGroup('CC');
+  const handler = new ChaosConstruction(geometry.numGridCells, regionCells[0], 9);
+
+  assert.throws(
+    () => handler.initialize(
+      grid,
+      createCellExclusions({ allUnique: false, numCells: geometry.totalCells() }),
+      geometry,
+      createStateAllocator(grid, geometry.totalCells())),
+    /region size cannot exceed the number of values/);
+});
+
 await runTest('ChaosConstruction rejects region size that does not divide grid cell count', () => {
   // 4x5 = 20 cells, regionSize=3 — 20 % 3 !== 0.
   const geometry = CellGeometry.fromShapeSpec('4x5');
@@ -1040,7 +1060,7 @@ await runTest('ChaosArrow derives minimum lengths from region shards', () => {
   const { grid, handler } = context;
   const arrowHandler = makeShardArrow(context, 0, [[0, 1, 2], [0, 4]]);
 
-  handler.regionShardState().merge(grid, 0, 1);
+  handler.regionShardState().merge(grid, 0, 1, createAccumulator());
 
   assert.equal(arrowHandler.enforceConsistency(grid, createAccumulator()), true);
   assert.equal(grid[0], valueMask(2, 3, 4));
