@@ -505,6 +505,9 @@ export class ChaosConstruction extends SudokuConstraintHandler {
     let componentRootCount = 0;
     let reachedFixedSize = shardSizes[startRoot];
     const maxExtraSize = this._regionSize - fixedSize;
+    // Shards fixed earlier in the pass can push the core past the region size.
+    this._scratchGridCells0Size = 0;
+    if (maxExtraSize < 0) return 0;
     rootCountsByDistance.fill(0, 0, maxExtraSize + 1);
     visitMarks[startRoot] = visitId;
     rootsByDistance[rootCountsByDistance[0]++] = startRoot;

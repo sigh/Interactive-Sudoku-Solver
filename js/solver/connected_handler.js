@@ -150,11 +150,10 @@ export class ConnectedValues extends SudokuConstraintHandler {
     const size = this._sizes[s];
     const states = this._states;
 
-    // The traversal may start at any decided cell (§3), so keep the last one
-    // seen.
+    // Any decided cell can seed the search (§3).
     let numPossible = 0;
     let numDecided = 0;
-    let possibleCell = 0;
+    let firstPossible = 0;
     let seedCell = 0;
     for (let i = 0; i < numCells; i++) {
       const value = grid[cellOffset + i];
@@ -162,8 +161,8 @@ export class ConnectedValues extends SudokuConstraintHandler {
         states[i] = EXCLUDED;
         continue;
       }
+      if (!numPossible) firstPossible = i;
       numPossible++;
-      possibleCell = i;
       if (value & ~valueMask) {
         states[i] = UNDECIDED;
       } else {
@@ -173,75 +172,108 @@ export class ConnectedValues extends SudokuConstraintHandler {
       }
     }
 
-    // Sets with a size: reach (§7.2) replaces the traversal below.
-    if (size) {
-      // The region needs numDecided <= size <= numPossible (§7.1).
-      if (numDecided > size || numPossible < size) return false;
-      // Exactly `size` possible cells: all are in the region (§7.3); reach
-      // then checks they are connected.
-      if (numPossible === size && numDecided < numPossible) {
-        this._resolveUndecidedState(grid, pQueue, valueMask, UNDECIDED, DECIDED,
-          numPossible - numDecided);
-        numDecided = numPossible;
-        seedCell = possibleCell;
-      }
-      // With no decided cell there is no seed, and nothing to deduce.
-      if (numDecided === 0) return true;
-      return this._enforceSizedSet(
-        grid, pQueue, s, seedCell, numDecided, numPossible);
+    // The region holds every decided cell, `size` cells if given, and at
+    // least one cell (§7.1).
+    if (size && numDecided > size) return false;
+    const target = size || Math.max(numDecided, 1);
+    if (numPossible < target) return false;
+    if (numDecided === 0) {
+      // No seed, nothing to deduce — unless every possible cell is in the
+      // region (§7.3): then the first seeds the search that decides the rest.
+      if (numPossible > target) return true;
+      this._resolveUndecidedState(
+        grid, pQueue, valueMask, UNDECIDED, DECIDED, 1);
+      numDecided = 1;
+      seedCell = firstPossible;
     }
 
-    // With no decided cell, non-emptiness fails on zero supports and forces the
-    // sole support when exactly one remains.
-    if (numDecided === 0) {
-      if (numPossible === 0) return false;
-      if (numPossible === 1) {
-        this._resolveUndecidedState(
-          grid, pQueue, valueMask, UNDECIDED, DECIDED, 1);
+    // Prune what the search cannot reach; a size bounds the path cost (§7.2).
+    // Forcing needs an incomplete region: a size, or a second blob (§7.4).
+    const budget = size ? size - numDecided : numCells;
+    const minBlobs = size ? 1 : 2;
+    const reached = this._reach(
+      budget, seedCell, numDecided, numPossible, minBlobs);
+    if (reached < 0) return false;
+    const pruned = numPossible - numDecided - (reached >> 1);
+    if (pruned) {
+      this._resolveUndecidedState(
+        grid, pQueue, valueMask, UNDECIDED, EXCLUDED, pruned);
+      numPossible -= pruned;
+    }
+    if (numPossible < target) return false;
+    if (numPossible === target) {
+      // All possible cells are in the region (§7.3).
+      if (numDecided < numPossible) {
+        this._resolveUndecidedState(grid, pQueue, valueMask,
+          UNDECIDED | VISITED, DECIDED, numPossible - numDecided);
       }
       return true;
     }
 
+    // Force only when a round will act (§4.4); overshooting a size fails (§4.2).
+    if (!(reached & 1)) return true;
+    numDecided = this._forceDoors(
+      grid, pQueue, valueMask, numDecided, minBlobs, size || numPossible);
+    if (!size || numDecided < size) return true;
+    if (numDecided > size) return false;
+
+    // Exactly full: the decided cells must be connected, and the rest leave.
+    for (let i = 0; i < numCells; i++) states[i] &= ~VISITED;
+    if (this._reach(0, seedCell, numDecided, numPossible, 1) < 0) return false;
+    this._resolveUndecidedState(
+      grid, pQueue, valueMask, UNDECIDED, EXCLUDED, numPossible - numDecided);
+    return true;
+  }
+
+  // Breadth-first search from the seed, marking reached cells VISITED. Decided
+  // cells are free; each undecided cell costs one of `budget` (§7.2). Undecided
+  // queue at the buffer's front, blob stack at its back (§6).
+  // Returns -1 if a decided cell is unreached, else undecidedSeen << 1, with
+  // bit 0 set when forcing would act: a single-door blob and >= minBlobs blobs.
+  _reach(budget, seedCell, numDecided, numPossible, minBlobs) {
+    const numCells = this.cells.length;
     const neighbors = this._neighbors;
     const buffer = this._traversalBuffer;
+    const states = this._states;
 
-    // Traverse the possible cells from `seedCell` (§3). Undecided cells queue
-    // FIFO from the front of `buffer`, the blob being drained is a LIFO from its
-    // back; the ends cannot meet (§6).
+    let head = 0;
+    let levelEnd = 0;
+    let queueEnd = 0;
+    let remainingBudget = budget;
+    let decidedSeen = 0;
+    let undecidedSeen = 0;
     let numBlobs = 0;
     let anySingleDoor = false;
-    let queueHead = 0;
-    let queueSize = 0;
-    let visitedDecided = 0;
     let seed = seedCell;
 
     while (true) {
       if (seed !== NO_CELL) {
+        // Walk the blob. Neighbours past the budget stay unmarked, to be pruned.
         numBlobs++;
         let door = NO_CELL;
         let stackTop = numCells;
         buffer[--stackTop] = seed;
         states[seed] = DECIDED | VISITED;
-        visitedDecided++;
+        decidedSeen++;
         while (stackTop < numCells) {
-          const cell = buffer[stackTop++];
-          const offset = cell << 2;
+          const offset = buffer[stackTop++] << 2;
           for (let dir = 0; dir < 4; dir++) {
             const neighbor = neighbors[offset + dir];
             const state = states[neighbor];
             if (state === DECIDED) {
               states[neighbor] = DECIDED | VISITED;
-              visitedDecided++;
+              decidedSeen++;
               buffer[--stackTop] = neighbor;
             } else if ((state & DECIDED) === UNDECIDED) {
-              // Undecided, marked or not — a door either way. Masking with
-              // UNDECIDED would also match a marked decided cell (§6).
+              // Undecided, marked or not (§6).
+              if (state === UNDECIDED) {
+                if (remainingBudget <= 0) continue;
+                states[neighbor] = UNDECIDED | VISITED;
+                buffer[queueEnd++] = neighbor;
+                undecidedSeen++;
+              }
               if (door !== neighbor) {
                 door = door === NO_CELL ? neighbor : MULTI_DOOR;
-              }
-              if (state === UNDECIDED) {
-                states[neighbor] = UNDECIDED | VISITED;
-                buffer[queueSize++] = neighbor;
               }
             }
           }
@@ -251,14 +283,15 @@ export class ConnectedValues extends SudokuConstraintHandler {
         continue;
       }
 
-      if (queueHead === queueSize ||
-        visitedDecided + queueSize === numPossible) break;
+      if (head === queueEnd || decidedSeen + undecidedSeen === numPossible) break;
+      if (head === levelEnd) {
+        levelEnd = queueEnd;
+        // Past the budget only unseen decided cells matter.
+        if (--remainingBudget <= 0 && decidedSeen === numDecided) break;
+      }
 
-      // Drain a decided neighbour's blob before reading this cell's remaining
-      // neighbours, or a blob touched on two sides counts twice — so the cell
-      // stays at the head and is expanded again after (§3.1).
-      const cell = buffer[queueHead];
-      const offset = cell << 2;
+      // Walk a blob first, then re-read this cell, so it is counted once (§3.1).
+      const offset = buffer[head] << 2;
       for (let dir = 0; dir < 4; dir++) {
         const neighbor = neighbors[offset + dir];
         const state = states[neighbor];
@@ -266,119 +299,17 @@ export class ConnectedValues extends SudokuConstraintHandler {
           seed = neighbor;
           break;
         }
-        if (state === UNDECIDED) {
+        if (state === UNDECIDED && remainingBudget > 0) {
           states[neighbor] = UNDECIDED | VISITED;
-          buffer[queueSize++] = neighbor;
+          buffer[queueEnd++] = neighbor;
+          undecidedSeen++;
         }
       }
-      if (seed === NO_CELL) queueHead++;
-    }
-
-    if (visitedDecided < numDecided) return false;
-
-    const visitedPossible = visitedDecided + queueSize;
-    if (visitedPossible < numPossible) {
-      this._resolveUndecidedState(grid, pQueue, valueMask, UNDECIDED, EXCLUDED,
-        numPossible - visitedPossible);
-      numPossible = visitedPossible;
-    }
-    if (numPossible === numDecided) return true;
-
-    // Exactly when forcing fires (§4.1), so a round only runs if it will force
-    // (§4.4). The prune cannot invalidate it: only unmarked cells are pruned.
-    if (numBlobs < 2 || !anySingleDoor) return true;
-    this._forceDoors(grid, pQueue, valueMask, numDecided, 2, numPossible);
-    return true;
-  }
-
-  // Sets with a size (§7): reach, then door forcing.
-  _enforceSizedSet(grid, pQueue, s, seedCell, numDecided, numPossible) {
-    const valueMask = this._valueMasks[s];
-    const size = this._sizes[s];
-
-    while (true) {
-      const undecidedSeen = this._reach(
-        size - numDecided, seedCell, numDecided);
-      if (undecidedSeen < 0) return false;
-      const pruned = numPossible - numDecided - undecidedSeen;
-      if (pruned) {
-        this._resolveUndecidedState(
-          grid, pQueue, valueMask, UNDECIDED, EXCLUDED, pruned);
-        numPossible -= pruned;
-        if (numPossible < size) return false;
-      }
-      if (numPossible === size) {
-        // Only `size` cells remain possible, so all are in the region
-        // (§7.3); each kept its shortest path to the seed blob, so it stays
-        // connected.
-        if (numDecided < numPossible) {
-          this._resolveUndecidedState(
-            grid, pQueue, valueMask, UNDECIDED | VISITED, DECIDED,
-            numPossible - numDecided);
-        }
-        return true;
-      }
-
-      // The region is incomplete, so even a lone blob's single door is
-      // forced (§7.4). Forcing past the size is a contradiction (§4.2).
-      // Landing on it exactly completes the region: the rounds' marks differ
-      // from classification's only in the VISITED bit, so clear it and
-      // repeat — the budget-0 reach settles the completed region.
-      numDecided = this._forceDoors(
-        grid, pQueue, valueMask, numDecided, 1, size);
-      if (numDecided < size) return true;
-      if (numDecided > size) return false;
-      const states = this._states;
-      const numCells = this.cells.length;
-      for (let i = 0; i < numCells; i++) states[i] &= ~VISITED;
-    }
-  }
-
-  // Bucketed 0-1 BFS from the seed blob over the classified states — decided
-  // steps free, undecided steps costing one of the `budget` unplaced region
-  // cells (§7.2). Marks reached cells VISITED, matching the traversal's
-  // marks (§6). Returns the number of undecided cells reached, or -1 when a
-  // decided cell is out of reach.
-  _reach(budget, seedCell, numDecided) {
-    const numCells = this.cells.length;
-    const neighbors = this._neighbors;
-    const buffer = this._traversalBuffer;
-    const states = this._states;
-
-    // Current bucket at the buffer's front (0-cost decided discoveries join
-    // it in place), next bucket collects at the back; the ends cannot meet (§6).
-    let head = 0;
-    let queueEnd = 0;
-    let backTop = numCells;
-    buffer[queueEnd++] = seedCell;
-    states[seedCell] = DECIDED | VISITED;
-    let decidedSeen = 1;
-    let undecidedSeen = 0;
-
-    for (let depth = 0; head < queueEnd; depth++) {
-      // The bucket at distance `budget` cannot take more undecided steps.
-      const bankUndecided = depth < budget;
-      while (head < queueEnd) {
-        const offset = buffer[head++] << 2;
-        for (let dir = 0; dir < 4; dir++) {
-          const neighbor = neighbors[offset + dir];
-          const state = states[neighbor];
-          if (state === DECIDED) {
-            states[neighbor] = DECIDED | VISITED;
-            buffer[queueEnd++] = neighbor;
-            decidedSeen++;
-          } else if (state === UNDECIDED && bankUndecided) {
-            states[neighbor] = UNDECIDED | VISITED;
-            buffer[--backTop] = neighbor;
-            undecidedSeen++;
-          }
-        }
-      }
-      while (backTop < numCells) buffer[queueEnd++] = buffer[backTop++];
+      if (seed === NO_CELL) head++;
     }
 
     if (decidedSeen < numDecided) return -1;
-    return undecidedSeen;
+    return (undecidedSeen << 1) | +(anySingleDoor && numBlobs >= minBlobs);
   }
 
   // Resolves the first `count` undecided cells in `fromState` into or out of
@@ -410,11 +341,9 @@ export class ConnectedValues extends SudokuConstraintHandler {
       // The scan marks cells VISITED; start each round from clear marks.
       for (let i = 0; i < numCells; i++) states[i] &= ~VISITED;
 
-      // Bank each blob's door one slot per blob at the front of `buffer`, the
-      // blob being traversed a LIFO from its back (§6). Doors are applied only
-      // after the scan — each must come from the pre-forcing snapshot (§4.2).
-      // The scan stops once every decided cell is seen: no blob is left to
-      // seed.
+      // Each blob's door goes in one slot at the front of `buffer`; the blob
+      // walk stacks from the back (§6). Doors are applied after the scan, so
+      // all come from the same snapshot (§4.2).
       let numBlobs = 0;
       let numVisited = 0;
       for (let i = 0; i < numCells && numVisited < numDecided; i++) {

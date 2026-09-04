@@ -473,9 +473,8 @@ untouched.
   in the handler reads and writes the same two mark values. (An earlier form
   avoided the per-round clear by alternating which VISITED polarity meant
   "unvisited"; the clear is one byte-and per cell in rounds that are rare —
-  gated on the size-free path, once-per-pass typically on the sized path —
-  and removing the polarity parameters measured node-identical and
-  wall-neutral.)
+  gated by §4.4 on both paths — and removing the polarity parameters measured
+  node-identical and wall-neutral.)
 - **Two ends of one array, again** (forcing rounds). A round uses the same
   split as §3, for the same reason: the banked doors take one slot per blob at
   the front of `_traversalBuffer`, and the blob being traversed is a LIFO from its
@@ -543,12 +542,17 @@ zero, so a second blob is unreachable (the fail) and every undecided cell is
 beyond reach (the strip). What remains is exactly the decided set,
 connected, of size `N`.
 
-The pass runs on freshly classified states, reusing the traversal buffer —
-current bucket from the front, next bucket collecting at the back — and
-marks by setting the VISITED bit, so reached cells end up exactly as §3's
-traversal would leave them and the forcing rounds' mark bookkeeping (§4.3,
-§6) follows with no restore step. The bucket at distance `budget` expands
-only 0-cost decided chains, keeping cutoff distances exact.
+The pass is §3's traversal with a budget — one routine serves both: a
+size-free set passes a budget no depth reaches. Undecided cells queue FIFO
+from the front of the traversal buffer in depth order, with each depth's end
+recorded when the depth begins, and a blob met at depth `d` is drained at
+once as a LIFO from the back, its doors queued at `d + 1`. Draining a blob
+on discovery and re-reading the discovering cell afterwards visits neighbours
+in the same order as expanding it in place, so the size-free and sized walks
+share one code path and one mark discipline: reached cells end up marked
+VISITED exactly as §6 describes, and the forcing rounds' bookkeeping (§4.3)
+follows with no restore step. At depth `budget` the walk expands only
+0-cost decided chains, keeping cutoff distances exact.
 
 ### 7.3 Exactly N possible cells
 
@@ -573,8 +577,12 @@ loop is entered — the reach pass returned otherwise), so the round's blob
 threshold drops from 2 to 1: a lone blob with a single door forces it.
 Everything else about forcing — the snapshot argument (§4.2), fixed-point
 iteration without re-traversal (§4.3) — is size-independent and unchanged.
-The rounds run without §4.4's gate: its door tally comes from the traversal,
-which a set with a size does not run.
+The rounds run under §4.4's gate as well: the reach pass is the traversal,
+and its door tally counts only doors that survive the strip. An unmarked
+undecided neighbour met at depth `budget` is never marked later (depths are
+processed in order) and is stripped, so it is not a door; a marked one is.
+That is exactly the set a round would see after the strip, so the gate stays
+exact for sized sets.
 
 One addition to the loop: each round forces every single-door blob of its
 snapshot at once, so `numDecided` can *pass* `N`. Every forced cell is
