@@ -480,64 +480,97 @@ export class NFA {
     const numSymbols = this.numSymbols();
     if (numSymbols === 0) return;
 
+    const transitions = this._transitions;
+
+    // Predecessors per symbol: pred[s][x] lists the states with a transition
+    // to x on s. Also each state's outgoing-symbol signature as a bitmask
+    // (NFASerializer.MAX_SYMBOLS is 16, so this fits in 32 bits).
+    const pred = new Array(numSymbols);
+    for (let s = 0; s < numSymbols; s++) {
+      const predS = pred[s] = new Array(numStates);
+      for (let x = 0; x < numStates; x++) predS[x] = [];
+    }
+    const symbolMask = new Uint32Array(numStates);
+    for (let a = 0; a < numStates; a++) {
+      const aTrans = transitions[a];
+      for (let s = 0; s < numSymbols; s++) {
+        const targets = aTrans[s];
+        if (!targets || !targets.length) continue;
+        symbolMask[a] |= 1 << s;
+        const predS = pred[s];
+        for (const target of targets) predS[target].push(a);
+      }
+    }
+
     // sim[a] is a BitSet where sim[a].has(b) means "a simulates b" (a ≥ b).
-    // Initialize: a simulates b if accept(b) implies accept(a).
+    // Initialize: a simulates b if accept(b) implies accept(a), and a has a
+    // transition on every symbol b has one on (a pair failing that would be
+    // removed on its first check anyway).
     const sim = new Array(numStates);
     for (let a = 0; a < numStates; a++) {
       sim[a] = new BitSet(numStates);
       const aAccepts = this._acceptIds.has(a);
+      const aMask = symbolMask[a];
       for (let b = 0; b < numStates; b++) {
-        // a can simulate b only if: b accepting => a accepting
-        if (!this._acceptIds.has(b) || aAccepts) {
+        if ((!this._acceptIds.has(b) || aAccepts)
+          && (symbolMask[b] & ~aMask) === 0) {
           sim[a].add(b);
         }
       }
     }
 
-    // Iteratively refine: remove pairs that violate simulation conditions.
-    // a simulates b requires: for all symbols s and all b' in delta(b,s),
-    // there exists a' in delta(a,s) such that a' simulates b'.
-    const transitions = this._transitions;
-    let changed = true;
-    while (changed) {
-      changed = false;
-      for (let a = 0; a < numStates; a++) {
-        const simA = sim[a];
-        const aTrans = transitions[a];
+    // a simulates b on symbol s requires: for all b' in delta(b,s), there
+    // exists a' in delta(a,s) such that a' simulates b'.
+    // Only called for pairs in sim, so delta(a,s) is non-empty whenever
+    // delta(b,s) is (guaranteed by the symbolMask check at initialization).
+    const simulatesOn = (a, b, s) => {
+      const bTargets = transitions[b][s];
+      if (!bTargets || !bTargets.length) return true;
+      const aTargets = transitions[a][s];
+      if (aTargets.length === 1 && bTargets.length === 1) {
+        // Common case: single targets on both sides.
+        return sim[aTargets[0]].has(bTargets[0]);
+      }
+      return bTargets.every(
+        bPrime => aTargets.some(aPrime => sim[aPrime].has(bPrime)));
+    };
 
-        for (let b = 0; b < numStates; b++) {
-          if (a === b || !simA.has(b)) continue;
-
-          // Check if a still simulates b.
-          const bTrans = transitions[b];
-
-          for (let s = 0; s < numSymbols; s++) {
-            const bTargets = bTrans[s];
-            if (!bTargets || !bTargets.length) continue;
-
-            const aTargets = aTrans[s];
-
-            if (!aTargets || !aTargets.length) {
-              // b has transition on s, but a doesn't - a cannot simulate b.
+    // Refine to the greatest fixpoint with a worklist. One full pass checks
+    // every pair and queues each removal; after that, removing (a', b') can
+    // only invalidate pairs (a, b) where a is a predecessor of a' and b is a
+    // predecessor of b' on the same symbol, so only those are re-examined.
+    const removedA = [];
+    const removedB = [];
+    for (let a = 0; a < numStates; a++) {
+      const simA = sim[a];
+      for (let b = 0; b < numStates; b++) {
+        if (a === b || !simA.has(b)) continue;
+        for (let s = 0; s < numSymbols; s++) {
+          if (!simulatesOn(a, b, s)) {
+            simA.remove(b);
+            removedA.push(a);
+            removedB.push(b);
+            break;
+          }
+        }
+      }
+    }
+    for (let i = 0; i < removedA.length; i++) {
+      const aPrime = removedA[i];
+      const bPrime = removedB[i];
+      for (let s = 0; s < numSymbols; s++) {
+        const predB = pred[s][bPrime];
+        if (!predB.length) continue;
+        const predA = pred[s][aPrime];
+        if (!predA.length) continue;
+        for (const a of predA) {
+          const simA = sim[a];
+          for (const b of predB) {
+            if (a === b || !simA.has(b)) continue;
+            if (!simulatesOn(a, b, s)) {
               simA.remove(b);
-              changed = true;
-              break;
-            }
-
-            // For each b' in bTargets, there must exist a' in aTargets
-            // such that sim[a'].has(b').
-            if (aTargets.length === 1 && bTargets.length === 1) {
-              // Common case: single targets on both sides.
-              if (!sim[aTargets[0]].has(bTargets[0])) {
-                simA.remove(b);
-                changed = true;
-                break;
-              }
-            } else if (!bTargets.every(
-              bPrime => aTargets.some(aPrime => sim[aPrime].has(bPrime)))) {
-              simA.remove(b);
-              changed = true;
-              break;
+              removedA.push(a);
+              removedB.push(b);
             }
           }
         }
