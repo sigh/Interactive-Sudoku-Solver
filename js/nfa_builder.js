@@ -6,7 +6,8 @@ const {
   canonicalJSON,
   memoize,
   requiredBits,
-  setPeek
+  setPeek,
+  sortedArrayCopy
 } = await import('./util.js' + self.VERSION_PARAM);
 
 // Convenience function to create a Symbol.
@@ -466,6 +467,79 @@ export class NFA {
     this.remapStates(remap);
   }
 
+  // True if every state has at most one target per symbol.
+  _isDeterministic() {
+    return this._transitions.every(
+      trans => trans.every(targets => !targets || targets.length <= 1));
+  }
+
+  // Removes from every target list the targets b for which dominates(a, b)
+  // holds for some other target a in the same list.
+  _pruneDominatedTargets(dominates) {
+    for (const trans of this._transitions) {
+      for (const targets of trans) {
+        if (!targets || targets.length <= 1) continue;
+        for (let i = targets.length - 1; i >= 0; i--) {
+          if (targets.some(a => dominates(a, targets[i]))) targets.splice(i, 1);
+        }
+      }
+    }
+  }
+
+  // Merges bisimilar states: same acceptance and, on every symbol, the same
+  // set of successor blocks. Bisimilar states are simulation-equivalent, so
+  // this is a cheap first cut of reduceBySimulation (a few passes over the
+  // transitions, against a relation quadratic in states), and on a
+  // deterministic automaton it is the whole reduction: there bisimulation is
+  // exactly mutual simulation, and pruning needs multiple targets.
+  _mergeBisimilarStates() {
+    const transitions = this._transitions;
+    const numStates = transitions.length;
+    const numSymbols = this.numSymbols();
+
+    // Repartition states by key. Block ids are assigned in order of first
+    // occurrence, so blocks are numbered by their smallest member, which is
+    // the numbering remapStates needs.
+    let block = null;
+    let numBlocks = 0;
+    const refine = (keyOf) => {
+      const ids = new Map();
+      const next = new Int32Array(numStates);
+      for (let a = 0; a < numStates; a++) {
+        const key = keyOf(a);
+        let id = ids.get(key);
+        if (id === undefined) ids.set(key, id = ids.size);
+        next[a] = id;
+      }
+      block = next;
+      numBlocks = ids.size;
+    };
+
+    // Start from acceptance, then split on each symbol's successor block
+    // until a full round over the symbols changes nothing.
+    refine(a => this._acceptIds.has(a) ? 1 : 0);
+    let prev;
+    do {
+      prev = numBlocks;
+      for (let s = 0; s < numSymbols; s++) {
+        const base = numBlocks + 1;
+        refine(a => {
+          const blocks = sortedArrayCopy((transitions[a][s] ?? []).map(t => block[t]), true);
+          if (blocks.length > 1) return `${block[a]}:${blocks.join(',')}`;
+          return block[a] * base + (blocks.length ? blocks[0] + 1 : 0);
+        });
+      }
+    } while (numBlocks !== prev);
+
+    if (numBlocks === numStates) return;
+
+    // Where a target list holds several states of one block, keep only the
+    // smallest in its position, as simulation pruning would (remapStates
+    // would keep the first occurrence instead).
+    this._pruneDominatedTargets((a, b) => a < b && block[a] === block[b]);
+    this.remapStates(block);
+  }
+
   // Reduces the NFA using forward simulation.
   // State A simulates state B if A accepts a superset of strings that B accepts.
   // When A simulates B, transitions to B can be redirected to A.
@@ -474,13 +548,18 @@ export class NFA {
     this._assertSealed();
     this._assertNoEpsilon();
 
-    const numStates = this._transitions.length;
-    if (numStates <= 1) return;
+    if (this._transitions.length <= 1 || this.numSymbols() === 0) return;
 
-    const numSymbols = this.numSymbols();
-    if (numSymbols === 0) return;
+    this._mergeBisimilarStates();
+    if (!this._isDeterministic()) this._reduceBySimulationRelation();
+  }
 
+  // Computes the simulation preorder, then prunes dominated transitions and
+  // merges simulation-equivalent states. Quadratic in the number of states.
+  _reduceBySimulationRelation() {
     const transitions = this._transitions;
+    const numStates = transitions.length;
+    const numSymbols = this.numSymbols();
 
     // Predecessors per symbol: pred[s][x] lists the states with a transition
     // to x on s. Also each state's outgoing-symbol signature as a bitmask
@@ -579,24 +658,8 @@ export class NFA {
 
     // Prune dominated transitions: if A simulates B (but not vice versa),
     // remove B from target sets. For mutual simulation, keep the smaller index.
-    const dominated = (b, targets) => {
-      const simB = sim[b];
-      for (const a of targets) {
-        if (sim[a].has(b) && (a < b || !simB.has(a))) return true;
-      }
-    };
-    for (let state = 0; state < numStates; state++) {
-      const trans = transitions[state];
-      for (let s = 0; s < numSymbols; s++) {
-        const targets = trans[s];
-        if (!targets || targets.length <= 1) continue;
-        for (let i = targets.length - 1; i >= 0; i--) {
-          if (dominated(targets[i], targets)) {
-            targets.splice(i, 1);
-          }
-        }
-      }
-    }
+    this._pruneDominatedTargets(
+      (a, b) => sim[a].has(b) && (a < b || !sim[b].has(a)));
 
     // Build remap: for each state, find the smallest state that simulates it
     // and is simulated by it (i.e., they are simulation-equivalent).

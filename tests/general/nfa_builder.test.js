@@ -6,7 +6,7 @@ import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 ensureGlobalEnvironment();
 
 const { regexToNFA, javascriptSpecToNFA, nfaToJavascriptSpec, optimizeNFA, NFASerializer, JavascriptNFABuilder, NFA, Symbol, SEGMENT_BREAK } = await import('../../js/nfa_builder.js');
-const { BitReader } = await import('../../js/util.js');
+const { BitReader, RandomIntGenerator } = await import('../../js/util.js');
 
 const evaluateNfa = (nfa, values) => {
   const epsilonClosure = (stateIds) => {
@@ -1363,6 +1363,161 @@ await runTest('reduceBySimulation should not prune when neither dominates', () =
   // Both paths should remain since neither dominates.
   expectAccepts(nfa, [1, 2], 'should accept [1,2]');
   expectAccepts(nfa, [1, 3], 'should accept [1,3]');
+});
+
+await runTest('reduceBySimulation should merge a state whose multiple targets are all equivalent', () => {
+  // state0 --[1]--> state1 --[3]--> state3 (accepting)
+  //                 state1 --[3]--> state4 (accepting)
+  // state0 --[2]--> state2 --[3]--> state3
+  // state3 and state4 are equivalent, so state1 (two targets) and state2
+  // (one target) are equivalent too, even though their target lists differ.
+  const nfa = new NFA();
+  for (let i = 0; i < 5; i++) nfa.addState();
+  nfa.addStartId(0);
+  nfa.addAcceptId(3);
+  nfa.addAcceptId(4);
+  nfa.addTransition(0, 1, Symbol(1));
+  nfa.addTransition(0, 2, Symbol(2));
+  nfa.addTransition(1, 3, Symbol(3));
+  nfa.addTransition(1, 4, Symbol(3));
+  nfa.addTransition(2, 3, Symbol(3));
+  nfa.seal();
+
+  nfa.reduceBySimulation();
+
+  assert.equal(nfa.numStates(), 3, 'should merge {1,2} and {3,4}');
+  assert.equal(nfa.getTransitionTargets(1, Symbol(3)).length, 1, 'merged targets should dedupe');
+  expectAccepts(nfa, [1, 3], 'should accept [1,3]');
+  expectAccepts(nfa, [2, 3], 'should accept [2,3]');
+  expectRejects(nfa, [1, 2], 'should reject [1,2]');
+});
+
+await runTest('reduceBySimulation should prune dominated transitions after merging equivalent states', () => {
+  // As in the pruning test, plus state5 equivalent to state1:
+  // state0 --[1]--> state1, state4, state5
+  // state1, state5 --[2]--> state2 (accepting), --[3]--> state3 (accepting)
+  // state4 --[2]--> state2
+  // state1 and state5 merge (as do state2 and state3); the merged state
+  // dominates state4, which is pruned.
+  const nfa = new NFA();
+  for (let i = 0; i < 6; i++) nfa.addState();
+  nfa.addStartId(0);
+  nfa.addAcceptId(2);
+  nfa.addAcceptId(3);
+  nfa.addTransition(0, 1, Symbol(1));
+  nfa.addTransition(0, 4, Symbol(1));
+  nfa.addTransition(0, 5, Symbol(1));
+  nfa.addTransition(1, 2, Symbol(2));
+  nfa.addTransition(1, 3, Symbol(3));
+  nfa.addTransition(5, 2, Symbol(2));
+  nfa.addTransition(5, 3, Symbol(3));
+  nfa.addTransition(4, 2, Symbol(2));
+  nfa.seal();
+
+  nfa.reduceBySimulation();
+
+  assert.equal(nfa.numStates(), 4, 'equivalent states should merge');
+  assert.deepEqual(nfa.getTransitionTargets(0, Symbol(1)), [1], 'only the dominating target should remain');
+  expectAccepts(nfa, [1, 2], 'should accept [1,2]');
+  expectAccepts(nfa, [1, 3], 'should accept [1,3]');
+});
+
+await runTest('reduceBySimulation matches a reference simulation on random automata', () => {
+  // The number of states after reduction must equal the number of
+  // simulation-equivalence classes (from a direct fixpoint computation), and
+  // the language must be unchanged.
+  const referenceEquivalenceClasses = (nfa) => {
+    const n = nfa.numStates();
+    if (nfa.numSymbols() === 0) return n;  // reduceBySimulation is a no-op.
+    const symbols = NFA.Symbol.all(nfa.numSymbols());
+    const sim = Array.from({ length: n }, (_, a) => Array.from(
+      { length: n }, (_, b) => !nfa.isAccepting(b) || nfa.isAccepting(a)));
+    for (let changed = true; changed;) {
+      changed = false;
+      for (let a = 0; a < n; a++) {
+        for (let b = 0; b < n; b++) {
+          if (!sim[a][b]) continue;
+          const violated = symbols.some(s => {
+            const aTargets = nfa.getTransitionTargets(a, s);
+            return !nfa.getTransitionTargets(b, s).every(
+              bp => aTargets.some(ap => sim[ap][bp]));
+          });
+          if (violated) {
+            sim[a][b] = false;
+            changed = true;
+          }
+        }
+      }
+    }
+    let classes = 0;
+    for (let b = 0; b < n; b++) {
+      let canonical = true;
+      for (let a = 0; a < b; a++) canonical &&= !(sim[a][b] && sim[b][a]);
+      classes += canonical;
+    }
+    return classes;
+  };
+
+  const rng = new RandomIntGenerator(42);
+  const randomBelow = (n) => rng.randomInt(n - 1);  // randomInt is inclusive.
+  const NUM_SYMBOLS = 3;
+  const MAX_LENGTH = 5;
+  const allStrings = [[]];
+  for (let i = 0; i < allStrings.length; i++) {
+    if (allStrings[i].length === MAX_LENGTH) continue;
+    for (let v = 1; v <= NUM_SYMBOLS; v++) allStrings.push([...allStrings[i], v]);
+  }
+
+  for (let iter = 0; iter < 300; iter++) {
+    const numStates = 2 + randomBelow(7);
+    const nondeterministic = randomBelow(4) === 0;
+    // targets[a][s - 1] is the target list of state a on symbol s.
+    const targets = Array.from({ length: numStates }, () => Array.from(
+      { length: NUM_SYMBOLS }, () => {
+        const count = randomBelow(10) < 6 ? 0 : 1 + (nondeterministic && randomBelow(2));
+        return Array.from({ length: count }, () => randomBelow(numStates));
+      }));
+    const accepting = Array.from({ length: numStates }, () => randomBelow(3) === 0);
+    // Clone some states, and sometimes list a clone beside its original, so
+    // equivalent states (and equivalent targets within one list) are common.
+    for (let i = 0; i < numStates / 2; i++) {
+      const src = randomBelow(numStates);
+      const clone = randomBelow(numStates);
+      if (src === clone) continue;
+      targets[clone] = targets[src].map(list => [...list]);
+      accepting[clone] = accepting[src];
+      for (const lists of targets) {
+        for (const list of lists) {
+          if (list.includes(src) && randomBelow(2)) list.push(clone);
+        }
+      }
+    }
+    const makeNfa = () => {
+      const nfa = new NFA();
+      for (let a = 0; a < numStates; a++) nfa.addState();
+      nfa.addStartId(0);
+      for (let a = 0; a < numStates; a++) {
+        if (accepting[a]) nfa.addAcceptId(a);
+        for (let s = 1; s <= NUM_SYMBOLS; s++) {
+          for (const to of targets[a][s - 1]) nfa.addTransition(a, to, Symbol(s));
+        }
+      }
+      nfa.seal();
+      return nfa;
+    };
+
+    const original = makeNfa();
+    const reduced = makeNfa();
+    reduced.reduceBySimulation();
+
+    const context = `case ${iter}: ${JSON.stringify({ targets, accepting })}`;
+    assert.equal(reduced.numStates(), referenceEquivalenceClasses(original),
+      `state count should match reference (${context})`);
+    for (const values of allStrings) {
+      assert.equal(evaluateNfa(reduced, values), evaluateNfa(original, values),
+        `language should be preserved for [${values}] (${context})`);
+    }
+  }
 });
 
 await runTest('optimizeNFA should close epsilon transitions', () => {
