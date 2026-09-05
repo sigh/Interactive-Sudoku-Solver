@@ -198,7 +198,11 @@ const findPuzzle = (query) => {
 // file. SudokuParser strips a text file's leading `#` comments.
 const resolveFileInput = async (input) => {
   if (!input.startsWith('/')) return input;
-  const text = readFileSync(join(PROJECT_ROOT, input), 'utf8');
+  const resolvedPath = resolve(PROJECT_ROOT, `.${input}`);
+  if (resolvedPath !== PROJECT_ROOT && !resolvedPath.startsWith(PROJECT_ROOT + sep)) {
+    throw new Error(`Input path "${input}" escapes the project root.`);
+  }
+  const text = readFileSync(resolvedPath, 'utf8');
   return input.endsWith('.js') ? runSandboxToConstraint(text) : text;
 };
 
