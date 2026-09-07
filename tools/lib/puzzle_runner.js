@@ -133,7 +133,7 @@ export const injectSolutionGivensForGroup = (input, digits, prefixes) => {
   let givens = '';
   for (let i = 0; i < digits.length; i++) {
     if (digits[i] === '.') continue;
-    givens += `.~${geometry.makeCellIdFromIndex(cells[i])}_${digits[i]}`;
+    givens += `.~${geometry.makeCellIdFromIndex(cells[i])}_${solutionValue(digits[i], geometry)}`;
   }
   return input + givens;
 };
