@@ -462,6 +462,31 @@ await runTest('Modular mod=1 is satisfiable', () => {
   assert.ok(solver.nthSolution(0), 'mod=1 Modular should be satisfiable');
 });
 
+await runTest('Modular mod=3 enforces every window on lines of any length', () => {
+  // Cells are in distinct rows and columns, and box-mates hold distinct
+  // digits, so only the Modular line decides validity.
+  const cells = ['R1C1', 'R2C3', 'R3C5', 'R4C7', 'R5C9', 'R6C2', 'R7C4', 'R8C6'];
+  const solvable = (digits) => {
+    const givens = cells.slice(0, digits.length).map(
+      (c, i) => `${c}_${digits[i]}`).join('~');
+    const constraint = SudokuParser.parseString(
+      `.Modular~3~${cells.slice(0, digits.length).join('~')}.~${givens}`);
+    return !!SudokuBuilder.build(constraint).nthSolution(0);
+  };
+
+  // Invalid: the 5 at position 6 shares a residue with the 8 at position 4
+  // (and for 4 cells the 8 at position 3 shares one with the 5 at position 1).
+  assert.equal(solvable([6, 5, 7, 9, 8, 1, 5, 2]), false, '8 cells');
+  assert.equal(solvable([6, 5, 7, 9, 8, 1, 5]), false, '7 cells');
+  assert.equal(solvable([6, 5, 7, 9, 8, 1, 5, 2, 7]), false, '9 cells');
+  assert.equal(solvable([6, 5, 7, 8]), false, '4 cells');
+  // The same prefixes with a consistent residue pattern are fine.
+  assert.equal(solvable([6, 5, 7, 9, 8, 1, 3, 2]), true, '8 cells');
+  assert.equal(solvable([6, 5, 7, 9, 8, 1, 3]), true, '7 cells');
+  assert.equal(solvable([6, 5, 7, 9, 8, 1, 3, 2, 4]), true, '9 cells');
+  assert.equal(solvable([6, 5, 7, 9]), true, '4 cells');
+});
+
 await runTest('Quad supports var-cell 2x2 squares', () => {
   const constraint = SudokuParser.parseString(
     '.Var~X~X~81.BlackDot~VX1~VX2~VX3~VX10.Quad~VX13~1~2~3~4');

@@ -1076,10 +1076,10 @@ export class SudokuConstraint {
 
   static Modular = class Modular extends SudokuConstraintBase {
     static DESCRIPTION = (
-      `Every sequential group of 'mod' cells on a the line must have
+      `Every sequential group of 'mod' cells on the line must have
        different values when taken modulo 'mod'.
-       If mod = 3, then every group of three cells on the line must contain a
-       digit from the group 147, one from 258, and one from 369.`);
+       With the default mod = 3, every group of three cells on the line must
+       contain one digit from each of the sets 147, 258, and 369.`);
     static CATEGORY = 'LinesAndSets';
     static DISPLAY_CONFIG = {
       displayClass: 'GenericLine',
@@ -1088,7 +1088,7 @@ export class SudokuConstraint {
     };
     static ARGUMENT_CONFIG = {
       label: 'mod',
-      default: 5,
+      default: 3,
     };
 
     constructor(mod, ...cells) {
@@ -1123,7 +1123,7 @@ export class SudokuConstraint {
 
   static Entropic = class Entropic extends SudokuConstraintBase {
     static DESCRIPTION = (`
-      Every sequential group of 3 cells on a the line must have different
+      Every sequential group of 3 cells on the line must have different
       values from the groups {1,2,3}, {4,5,6}, and {7,8,9}.`)
     static CATEGORY = 'LinesAndSets';
     static DISPLAY_CONFIG = {

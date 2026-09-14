@@ -1329,6 +1329,12 @@ await runTest('Modular accepts mod >= 1', () => {
   assert.equal(new SudokuConstraint.Modular(3, 'R1C1', 'R1C2').mod, 3);
 });
 
+await runTest('Modular defaults to mod 3', () => {
+  // Modular lines in sudoku variants are mod 3 (sets 147, 258, 369) unless
+  // stated otherwise, so the UI must offer that as the default argument.
+  assert.equal(SudokuConstraint.Modular.ARGUMENT_CONFIG.default, 3);
+});
+
 logSuiteComplete('Modular argument validation');
 
 // ============================================================================
