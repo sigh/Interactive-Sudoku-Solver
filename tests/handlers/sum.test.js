@@ -97,6 +97,62 @@ await runTest('Sum should solve mixed coefficient cages with negative terms', ()
   assert.equal(grid[3], valueMask(3), 'final cell resolved by remaining balance');
 });
 
+await runTest('Sum should not support a value with a pair that reuses it', () => {
+  // With 3 unfixed cells in a cage, a value must be supported by a pair of
+  // values which are distinct from it, not just from each other.
+  // Here 3 in the third cell is only supported by (3,4), so it must be removed.
+  const { handler, context } = initializeSum({ numCells: 3, sum: 10 });
+  const grid = applyCandidates(context.grid, {
+    0: [3, 4, 5, 6],
+    1: [3, 4, 5, 6],
+    2: [1, 3],
+  });
+
+  const result = handler.enforceConsistency(grid, createAccumulator());
+
+  assert.equal(result, true, 'cage should remain solvable');
+  assert.equal(grid[2], valueMask(1), 'value with only repeated support removed');
+  assert.equal(grid[0], valueMask(3, 4, 5, 6));
+  assert.equal(grid[1], valueMask(3, 4, 5, 6));
+});
+
+await runTest('Sum should allow repeated support when cells are not exclusive', () => {
+  const { handler, context } = initializeSum({
+    numCells: 3, sum: 10, cellExclusions: nonUniqueCells()
+  });
+  const grid = applyCandidates(context.grid, {
+    0: [3, 4, 5, 6],
+    1: [3, 4, 5, 6],
+    2: [1, 3],
+  });
+
+  const result = handler.enforceConsistency(grid, createAccumulator());
+
+  assert.equal(result, true);
+  assert.equal(grid[2], valueMask(1, 3), '(3,4,3) is valid without exclusions');
+});
+
+await runTest('Sum should allow a (1,1) pair when only some cells are exclusive', () => {
+  // Cells 0 and 2 are exclusive, cell 1 is not exclusive with either.
+  const cellExclusions = createCellExclusions({ allUnique: false });
+  cellExclusions.addMutualExclusion(0, 2);
+  const { handler, context } = initializeSum({
+    numCells: 3, sum: 5, cellExclusions
+  });
+  const grid = applyCandidates(context.grid, {
+    0: [1, 2],
+    1: [1, 3],
+    2: [3, 4],
+  });
+
+  const result = handler.enforceConsistency(grid, createAccumulator());
+
+  assert.equal(result, true);
+  assert.equal(grid[2], valueMask(3), '3 is supported by (1,1)');
+  assert.equal(grid[0], valueMask(1));
+  assert.equal(grid[1], valueMask(1));
+});
+
 await runTest('Sum should resolve cages with more than three unfixed cells', () => {
   const { handler, context } = initializeSum({ numCells: 4, sum: 22 });
   const grid = applyCandidates(context.grid, {

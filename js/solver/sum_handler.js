@@ -365,20 +365,25 @@ export class Sum extends SudokuConstraintHandler {
   }
 
   _enforceThreeRemainingCells(grid, cells, sum, exclusionIds) {
-    const numValues = this._sumData.numValues;
-
     let v0 = grid[cells[0]];
     let v1 = grid[cells[1]];
     let v2 = grid[cells[2]];
 
-    // Find each set of pairwise sums.
-    const pairwiseSums = this._sumData.pairwiseSums;
-    let sums2 = pairwiseSums[(v0 << numValues) | v1] << 2;
-    let sums1 = pairwiseSums[(v0 << numValues) | v2] << 2;
-    let sums0 = pairwiseSums[(v1 << numValues) | v2] << 2;
+    if (exclusionIds[0] === exclusionIds[1] && exclusionIds[0] === exclusionIds[2]) {
+      // All values must be distinct. Check each value against the other two
+      // cells with that value removed.
+      v2 = this._removeUnsupportedValues(v0, v1, v2, sum);
+      v1 = this._removeUnsupportedValues(v0, v2, v1, sum);
+      v0 = this._removeUnsupportedValues(v1, v2, v0, sum);
+    } else {
+      // Find each set of pairwise sums.
+      const numValues = this._sumData.numValues;
+      const pairwiseSums = this._sumData.pairwiseSums;
+      let sums2 = pairwiseSums[(v0 << numValues) | v1] << 2;
+      let sums1 = pairwiseSums[(v0 << numValues) | v2] << 2;
+      let sums0 = pairwiseSums[(v1 << numValues) | v2] << 2;
 
-    // If the cell values are possibly repeated, then handle that.
-    if (exclusionIds[0] !== exclusionIds[1] || exclusionIds[0] !== exclusionIds[2]) {
+      // If the cell values are possibly repeated, then handle that.
       if (exclusionIds[0] !== exclusionIds[1]) {
         sums2 |= this._sumData.doubles[v0 & v1];
       }
@@ -388,17 +393,17 @@ export class Sum extends SudokuConstraintHandler {
       if (exclusionIds[1] !== exclusionIds[2]) {
         sums0 |= this._sumData.doubles[v1 & v2];
       }
-    }
 
-    // Constrain each value based on the possible sums of the other two.
-    // NOTE: We don't care if a value is reused in the result, as that will
-    // be removed in one of the other two cases.
-    const shift = sum - 1;
-    const allValues = this._sumData.allValues;
-    const reverse = this._sumData.lookupTables.reverse;
-    v2 &= reverse[((sums2 << numValues) >> shift) & allValues];
-    v1 &= reverse[((sums1 << numValues) >> shift) & allValues];
-    v0 &= reverse[((sums0 << numValues) >> shift) & allValues];
+      // Constrain each value based on the possible sums of the other two.
+      // NOTE: This allows a pair to reuse the value of the third cell, even
+      //       when one of the pair is in the same exclusion group as it.
+      const shift = sum - 1;
+      const allValues = this._sumData.allValues;
+      const reverse = this._sumData.lookupTables.reverse;
+      v2 &= reverse[((sums2 << numValues) >> shift) & allValues];
+      v1 &= reverse[((sums1 << numValues) >> shift) & allValues];
+      v0 &= reverse[((sums0 << numValues) >> shift) & allValues];
+    }
 
     if (!(v0 && v1 && v2)) return false;
 
@@ -407,6 +412,28 @@ export class Sum extends SudokuConstraintHandler {
     grid[cells[2]] = v2;
 
     return true;
+  }
+
+  // Remove values from vc which can't be completed to the sum by a pair of
+  // distinct values from va and vb, both different from the value itself.
+  // All three cells must be in the same exclusion group.
+  _removeUnsupportedValues(va, vb, vc, sum) {
+    const pairwiseSums = this._sumData.pairwiseSums;
+    const numValues = this._sumData.numValues;
+    const base = (va << numValues) | vb;
+    // pairwiseSums has bit (s-3) set if the pair can sum to s, and x is
+    // 1 << (value-1). Hence bit (sum-4) of pairwiseSums[...] * x is set if
+    // the pair can sum to (sum - value).
+    // (Values too large to leave a valid pair sum never reach the target bit.)
+    const target = 1 << (sum - 4);
+    let values = vc;
+    while (values) {
+      const x = values & -values;
+      values ^= x;
+      const sums = pairwiseSums[base & ~(x | (x << numValues))];
+      if (!((sums * x) & target)) vc ^= x;
+    }
+    return vc;
   }
 
   // Solve small cases exactly and efficiently.
