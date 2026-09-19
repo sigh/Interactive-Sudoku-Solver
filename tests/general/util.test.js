@@ -559,6 +559,12 @@ await runTest('BitSet.allocatePool should create pool of sets', () => {
   assert.equal(bitsets[1].has(5), false);
 });
 
+await runTest('insertionSortInts sorts only the first length values', () => {
+  const values = new Uint32Array([5, 3, 4, 1, 2]);
+  insertionSortInts(values, null, 3);
+  assert.deepEqual([...values], [3, 4, 5, 1, 2]);
+});
+
 await runTest('insertionSortInts sorts ascending and returns the same array', () => {
   const values = [5, 1, 4, 1, 3];
   const result = insertionSortInts(values);

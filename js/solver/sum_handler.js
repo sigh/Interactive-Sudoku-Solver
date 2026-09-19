@@ -633,6 +633,9 @@ export class Sum extends SudokuConstraintHandler {
 
   // Scratch buffers for reuse so we don't have to create arrays at runtime.
   static _seenMinMaxs = new Uint32Array(GEOMETRY_MAX.numGridCells);
+  // Buffer for _restrictCellsSingleExclusionGroup. Cages are limited to 15
+  // cells (MAX_GROUP_SIZE).
+  static _sortedCellsBuffer = new Uint32Array(16);
 
   // Restricts cell values to only the ranges that are possible taking into
   // account uniqueness constraints between values.
@@ -805,14 +808,39 @@ export class Sum extends SudokuConstraintHandler {
     let requiredUnfixed = unfixedValues;
     const numUnfixed = cells.length - countOnes16bit(fixedValues);
 
+    // Collect the unfixed cells which don't have all the unfixed values,
+    // sorted by number of candidates (with the count packed into the high
+    // bits). These are the only cells which can rule out an option, by having
+    // a subset of cells with fewer values between them than cells.
+    const sortedCells = this.constructor._sortedCellsBuffer;
+    let numSortedCells = 0;
+    for (let i = 0; i < numCells; i++) {
+      // Ignore cells  with only fixed values
+      const u = grid[cells[i]] & ~fixedValues;
+      if (!u || u === unfixedValues) continue;
+      sortedCells[numSortedCells++] = (countOnes16bit(u) << 16) | u;
+    }
+    insertionSortInts(sortedCells, null, numSortedCells);
+
     let possibilities = 0;
     const options = this._sumData.killerCageSums[numUnfixed][sum - fixedSum];
     for (let i = 0; i < options.length; i++) {
       const o = options[i];
-      if (!(o & ~unfixedValues)) {
-        possibilities |= o;
-        requiredUnfixed &= o;
+      if (o & ~unfixedValues) continue;
+
+      // Reject the option if a prefix of the sorted cells has fewer values
+      // available between them than cells. This is sound but not complete
+      // (it doesn't find every subset of cells which violates this).
+      let union = 0;
+      let j = 0;
+      for (; j < numSortedCells; j++) {
+        union |= sortedCells[j] & o;
+        if (countOnes16bit(union) <= j) break;
       }
+      if (j < numSortedCells) continue;
+
+      possibilities |= o;
+      requiredUnfixed &= o;
     }
     if (!possibilities) return false;
 

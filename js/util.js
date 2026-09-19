@@ -146,8 +146,9 @@ export const sortedArrayCopy = (values, removeDuplicates = false) => {
 // Linear on already-ordered input and allocation-free (no comparator closure,
 // no buffer for Array.sort to work in), but quadratic on badly ordered input:
 // only for arrays known to be short.
-export const insertionSortInts = (values, keys = null) => {
-  for (let i = 1; i < values.length; i++) {
+// Only the first `length` values are sorted (default: the whole array).
+export const insertionSortInts = (values, keys = null, length = values.length) => {
+  for (let i = 1; i < length; i++) {
     const value = values[i];
     const key = keys === null ? value : keys[value];
     let j = i - 1;

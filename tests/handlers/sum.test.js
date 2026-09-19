@@ -153,6 +153,27 @@ await runTest('Sum should allow a (1,1) pair when only some cells are exclusive'
   assert.equal(grid[1], valueMask(1));
 });
 
+await runTest('Sum should reject cage options which a naked subset rules out', () => {
+  // Cells 0 and 1 must take {1,2}, so the remaining two cells must sum to 11.
+  // The options {1,3,4,6} and {2,3,4,5} fit the union of candidates, but not
+  // the cells.
+  const { handler, context } = initializeSum({ numCells: 4, sum: 14 });
+  const grid = applyCandidates(context.grid, {
+    0: [1, 2],
+    1: [1, 2],
+    2: [3, 4, 5, 6],
+    3: [3, 4, 5, 6],
+  });
+
+  const result = handler.enforceConsistency(grid, createAccumulator());
+
+  assert.equal(result, true);
+  assert.equal(grid[0], valueMask(1, 2));
+  assert.equal(grid[1], valueMask(1, 2));
+  assert.equal(grid[2], valueMask(5, 6));
+  assert.equal(grid[3], valueMask(5, 6));
+});
+
 await runTest('Sum should resolve cages with more than three unfixed cells', () => {
   const { handler, context } = initializeSum({ numCells: 4, sum: 22 });
   const grid = applyCandidates(context.grid, {
