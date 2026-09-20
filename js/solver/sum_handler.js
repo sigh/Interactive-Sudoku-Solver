@@ -633,9 +633,11 @@ export class Sum extends SudokuConstraintHandler {
 
   // Scratch buffers for reuse so we don't have to create arrays at runtime.
   static _seenMinMaxs = new Uint32Array(GEOMETRY_MAX.numGridCells);
-  // Buffer for _restrictCellsSingleExclusionGroup. Cages are limited to 15
+  // Buffers for _restrictCellsSingleExclusionGroup. Cages are limited to 15
   // cells (MAX_GROUP_SIZE).
   static _sortedCellsBuffer = new Uint32Array(16);
+  static _uniqueCellsBuffer = new Uint32Array(16);
+  static _uniqueCellPossibilitiesBuffer = new Uint16Array(16);
 
   // Restricts cell values to only the ranges that are possible taking into
   // account uniqueness constraints between values.
@@ -806,19 +808,33 @@ export class Sum extends SudokuConstraintHandler {
 
     const unfixedValues = allValues & ~fixedValues;
     let requiredUnfixed = unfixedValues;
-    const numUnfixed = cells.length - countOnes16bit(fixedValues);
+    const numUnfixed = numCells - countOnes16bit(fixedValues);
+    // Values which only one cell holds.
+    const uniqueValues = unfixedValues & ~nonUniqueValues;
 
-    // Collect the unfixed cells which don't have all the unfixed values,
-    // sorted by number of candidates (with the count packed into the high
-    // bits). These are the only cells which can rule out an option, by having
-    // a subset of cells with fewer values between them than cells.
+    // Collect two sets of cells which can rule out an option:
+    // - sortedCells: unfixed cells which don't have all the unfixed values,
+    //   sorted by number of candidates (packed into the high bits). A subset
+    //   of these may have fewer values between them than cells.
+    // - uniqueCells: cells holding a unique value (packed with the cell). In
+    //   any option containing such a value, the cell must take it.
     const sortedCells = this.constructor._sortedCellsBuffer;
+    const uniqueCells = this.constructor._uniqueCellsBuffer;
+    const uniqueCellPossibilities = this.constructor._uniqueCellPossibilitiesBuffer;
     let numSortedCells = 0;
+    let numUniqueCells = 0;
     for (let i = 0; i < numCells; i++) {
-      // Ignore cells  with only fixed values
-      const u = grid[cells[i]] & ~fixedValues;
-      if (!u || u === unfixedValues) continue;
-      sortedCells[numSortedCells++] = (countOnes16bit(u) << 16) | u;
+      const cell = cells[i];
+      const u = grid[cell] & ~fixedValues;
+      // Ignore fixed cells (or inconsistent cells with only fixed values).
+      if (!u) continue;
+      if (u !== unfixedValues) {
+        sortedCells[numSortedCells++] = (countOnes16bit(u) << 16) | u;
+      }
+      if (u & uniqueValues) {
+        uniqueCells[numUniqueCells] = (cell << 16) | (u & uniqueValues);
+        uniqueCellPossibilities[numUniqueCells++] = 0;
+      }
     }
     insertionSortInts(sortedCells, null, numSortedCells);
 
@@ -827,6 +843,15 @@ export class Sum extends SudokuConstraintHandler {
     for (let i = 0; i < options.length; i++) {
       const o = options[i];
       if (o & ~unfixedValues) continue;
+
+      // Reject the option if it requires two values which only one cell can
+      // hold. (The high bits of uniqueCells are masked off by `o`.)
+      let m = 0;
+      for (; m < numUniqueCells; m++) {
+        const forced = o & uniqueCells[m];
+        if (forced & (forced - 1)) break;
+      }
+      if (m < numUniqueCells) continue;
 
       // Reject the option if a prefix of the sorted cells has fewer values
       // available between them than cells. This is sound but not complete
@@ -839,6 +864,10 @@ export class Sum extends SudokuConstraintHandler {
       }
       if (j < numSortedCells) continue;
 
+      // Each unique cell is forced to its unique value in the option (if any).
+      for (m = 0; m < numUniqueCells; m++) {
+        uniqueCellPossibilities[m] |= (o & uniqueCells[m]) || o;
+      }
       possibilities |= o;
       requiredUnfixed &= o;
     }
@@ -854,12 +883,10 @@ export class Sum extends SudokuConstraintHandler {
       }
     }
 
-    // requiredValues are values that appear in all possible solutions.
-    // Those that are unique are hidden singles.
-    const hiddenSingles = requiredUnfixed & ~nonUniqueValues;
-    if (hiddenSingles) {
-      if (!HandlerUtil.exposeHiddenSingles(
-        grid, cells, hiddenSingles)) {
+    // Restrict cells with unique values to what the options allow for them.
+    // This includes hidden singles (unique values required by every option).
+    for (let m = 0; m < numUniqueCells; m++) {
+      if (!(grid[uniqueCells[m] >>> 16] &= uniqueCellPossibilities[m])) {
         return false;
       }
     }

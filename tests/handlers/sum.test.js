@@ -174,6 +174,42 @@ await runTest('Sum should reject cage options which a naked subset rules out', (
   assert.equal(grid[3], valueMask(5, 6));
 });
 
+await runTest('Sum should restrict a cell to the unique values the options force on it', () => {
+  // Options summing to 31: {1,6,7,8,9} and {2,5,7,8,9}. Only cell 0 can hold
+  // 1 or 2, so it must be one of them.
+  const { handler, context } = initializeSum({ numCells: 5, sum: 31 });
+  const grid = applyCandidates(context.grid, {
+    0: [1, 2, 5, 6, 7, 8, 9],
+    1: [5, 6, 7, 8, 9],
+    2: [5, 6, 7, 8, 9],
+    3: [5, 6, 7, 8, 9],
+    4: [5, 6, 7, 8, 9],
+  });
+
+  const result = handler.enforceConsistency(grid, createAccumulator());
+
+  assert.equal(result, true);
+  assert.equal(grid[0], valueMask(1, 2));
+  assert.equal(grid[1], valueMask(5, 6, 7, 8, 9));
+});
+
+await runTest('Sum should reject options needing two unique values in one cell', () => {
+  // Every option summing to 20 ({1,2,8,9}, {1,3,7,9}, {2,3,6,9}, {2,3,7,8})
+  // needs two of {1,2,3}, but only cell 0 can hold them. The union of
+  // candidates and the naked-subset check both accept these options.
+  const { handler, context } = initializeSum({ numCells: 4, sum: 20 });
+  const grid = applyCandidates(context.grid, {
+    0: [1, 2, 3],
+    1: [6, 7, 8, 9],
+    2: [6, 7, 8, 9],
+    3: [6, 7, 8, 9],
+  });
+
+  const result = handler.enforceConsistency(grid, createAccumulator());
+
+  assert.equal(result, false);
+});
+
 await runTest('Sum should resolve cages with more than three unfixed cells', () => {
   const { handler, context } = initializeSum({ numCells: 4, sum: 22 });
   const grid = applyCandidates(context.grid, {
