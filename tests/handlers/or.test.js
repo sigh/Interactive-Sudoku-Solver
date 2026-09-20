@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import { ensureGlobalEnvironment } from '../helpers/test_env.js';
 import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
-import { GridTestContext, createAccumulator, valueMask, initTypedHandler } from '../helpers/grid_test_utils.js';
+import { GridTestContext, createAccumulator, valueMask, initTypedHandler, createCellExclusions } from '../helpers/grid_test_utils.js';
 
 ensureGlobalEnvironment();
 
-const { Or, And, True, False, GivenCandidates } = await import('../../js/solver/handlers.js');
+const { Or, And, True, False, GivenCandidates, SameValues } = await import('../../js/solver/handlers.js');
 const { LookupTables } = await import('../../js/solver/lookup_tables.js');
 
 // Or requires a typed, state-extended grid and postInitialize; initTypedHandler
@@ -196,6 +196,63 @@ await runTest('nested Or rejects when every branch is dead', () => {
   grid[0] = valueMask(4);
   grid[1] = valueMask(4);
   assert.equal(outer.enforceConsistency(grid, createAccumulator()), false);
+});
+
+await runTest('leaf state from a live branch does not persist across calls', () => {
+  // Regression: a branch's SameValues restricted its sets to {1,2,3} in the
+  // scratch grid and set its "satisfied" flag; the Or kept the flag but not
+  // the pruning (the other branch allowed 4). A later call with the sets
+  // violated then short-circuited to "satisfied" and the Or accepted a grid
+  // no branch allows.
+  const context = new GridTestContext({ gridSize: [3, 4], numValues: 4 });
+  const numCells = context.geometry.numGridCells;
+  // Rows are houses, so each 3-cell set is mutually exclusive (the form that
+  // allocates the flag: >2 sets of >2 unique cells).
+  const cellExclusions = createCellExclusions({ allUnique: false, numCells });
+  for (let r = 0; r < 3; r++) {
+    for (let i = 0; i < 4; i++) {
+      for (let j = i + 1; j < 4; j++) {
+        cellExclusions.addMutualExclusion(r * 4 + i, r * 4 + j);
+      }
+    }
+  }
+  const sets = [[0, 1, 2], [4, 5, 6], [8, 9, 10]];
+  const handler = new Or(
+    new And(new SameValues(...sets)),
+    // Alternative branch: R3C4 = 4, indifferent to the sets.
+    new GivenCandidates([[11, 4]]));
+
+  const { result, grid } = initTypedHandler(context, handler, { cellExclusions });
+  assert.equal(result, true);
+
+  // Row 1 of the sets is {1,2,3}; the other rows are open.
+  for (const cell of sets[0]) grid[cell] = valueMask(1, 2, 3);
+  assert.equal(handler.enforceConsistency(grid, createAccumulator()), true);
+  // The union keeps 4 in the other rows (the second branch allows it).
+  assert.equal(grid[4], valueMask(1, 2, 3, 4));
+
+  // Now violate both branches: 4 in a set cell, and R3C4 != 4.
+  grid[4] = valueMask(4);
+  grid[11] = valueMask(1);
+  assert.equal(handler.enforceConsistency(grid, createAccumulator()), false);
+});
+
+await runTest('nested Or eliminations persist across calls', () => {
+  // The inverse guarantee: a nested Or's own state (its live-branch words)
+  // is still written back, so a branch eliminated under a live outer branch
+  // stays eliminated.
+  const context = new GridTestContext({ gridSize: [1, 4], numValues: 4 });
+  const inner = new Or(
+    new GivenCandidates([[0, 1]]), new GivenCandidates([[0, 2]]));
+  const outer = new Or(new And(inner), new GivenCandidates([[1, 4]]));
+  const { result, grid } = initTypedHandler(context, outer);
+  assert.equal(result, true);
+
+  grid[0] = valueMask(2, 3);
+  assert.equal(outer.enforceConsistency(grid, createAccumulator()), true);
+  // Inner branch 0 (cell 0 = 1) was eliminated in the outer's first branch.
+  assert.equal(inner._isInvalid(grid, 0), true);
+  assert.equal(inner._isInvalid(grid, 1), false);
 });
 
 logSuiteComplete('or.test.js');

@@ -303,6 +303,15 @@ const puzzlesSmallSizes = [
   '4x4: Full Rank - with ties',
   '4x4: Full Rank - unclued ties',
   '4x4: Full Rank - tied clues',
+  {
+    // Regression for a multi-branch Or persisting a branch's leaf handler
+    // state (b0670a9f). The SameValues branch is unsatisfiable in a Latin
+    // square (equal row sets would force equal values down column 4), so the
+    // Or reduces to R4C4=2, which picks one of the four reduced squares.
+    name: '4x4: Or with stale SameValues flag',
+    input: '.Shape~4x4~1-4.NoBoxes.~R1C1_1~R1C2_2~R1C3_3~R1C4_4~R2C1_2~R3C1_3~R4C1_4.Or.SameValues~3~R1C1~R1C2~R1C3~R2C1~R2C2~R2C3~R3C1~R3C2~R3C3.~R4C4_2.End',
+    solution: '1234214334214312',
+  },
 ];
 
 const puzzlesNonSquareGrids = [

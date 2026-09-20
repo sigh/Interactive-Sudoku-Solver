@@ -4130,6 +4130,32 @@ class NullPropagationQueue {
   addForCell(cell) { }
 }
 
+// A state allocator that delegates to another and records the lanes
+// allocated with `persistUnderOr`.
+// Bits (allocateBit) share words and are never persisted.
+class RecordingStateAllocator {
+  constructor(inner) {
+    this._inner = inner;
+    this._persistedLanes = [];
+  }
+
+  allocate(state, persistUnderOr = false) {
+    const offset = this._inner.allocate(state, persistUnderOr);
+    if (persistUnderOr) {
+      for (let i = 0; i < state.length; i++) this._persistedLanes.push(offset + i);
+    }
+    return offset;
+  }
+
+  allocateBit() {
+    return this._inner.allocateBit();
+  }
+
+  persistedLanes() {
+    return Uint16Array.from(this._persistedLanes);
+  }
+}
+
 export class Or extends SudokuConstraintHandler {
   constructor(...handlers) {
     // Exclusion cells need special handlings since they can't be handled
@@ -4206,13 +4232,17 @@ export class Or extends SudokuConstraintHandler {
     // makes.
     const initializationCells = new Set();
     const validHandlers = [];
+    const branchPersistedLanes = [];
     for (let h = 0; h < this._handlers.length; h++) {
       const handler = this._handlers[h];
 
+      // Per branch: the state lanes to write back after its scratch run.
+      const branchAllocator = new RecordingStateAllocator(stateAllocator);
       scratchGrid.set(initialGridCells);
-      if (!handler.initialize(scratchGrid, cellExclusions, geometry, stateAllocator)) {
+      if (!handler.initialize(scratchGrid, cellExclusions, geometry, branchAllocator)) {
         continue;
       }
+      branchPersistedLanes.push(branchAllocator.persistedLanes());
 
       const initialization = [];
       for (let i = 0; i < numSearchCells; i++) {
@@ -4227,6 +4257,7 @@ export class Or extends SudokuConstraintHandler {
     }
 
     this._handlers = validHandlers;
+    this._branchPersistedLanes = branchPersistedLanes;
     if (validHandlers.length === 0) return false;
 
     this._numSearchCells = numSearchCells;
@@ -4245,7 +4276,9 @@ export class Or extends SudokuConstraintHandler {
     } else {
       state[0] = this._handlers.length;
     }
-    this._stateOffset = stateAllocator.allocate(state);
+    // Branch eliminations are refutations, valid for the rest of the
+    // subtree, so this state persists when nested inside another Or.
+    this._stateOffset = stateAllocator.allocate(state, /* persistUnderOr= */ true);
 
     // Watch the branches' initialization cells plus any cells the branch
     // handlers added during their own initialize() (e.g. a nested Or over
@@ -4294,6 +4327,7 @@ export class Or extends SudokuConstraintHandler {
     const resultGrid = this._resultGrid;
     const scratchGrid = this._scratchGrid;
     const nullPropagationQueue = this._nullPropagationQueue;
+    const branchPersistedLanes = this._branchPersistedLanes;
     resultGrid.fill(0);
 
     for (let i = 0; i < this._handlers.length; i++) {
@@ -4316,9 +4350,15 @@ export class Or extends SudokuConstraintHandler {
       for (let j = 0; j < numSearchCells; j++) {
         resultGrid[j] |= scratchGrid[j];
       }
-      // Handler state is written directly to the grid.
-      for (let j = numSearchCells; j < grid.length; j++) {
-        grid[j] = scratchGrid[j];
+      // Write back only lanes the branch allocated with `persistUnderOr`
+      // (nested Or live-branch words). Other handler state stays in the
+      // scratch: it holds conclusions drawn from pruning that the union
+      // below discards, so persisting it let a branch short-circuit to
+      // "satisfied" on a grid that violated it. See SOLVER_ENGINE.md,
+      // "Composite safety".
+      const lanes = branchPersistedLanes[i];
+      for (let k = 0; k < lanes.length; k++) {
+        grid[lanes[k]] = scratchGrid[lanes[k]];
       }
     }
 

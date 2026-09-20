@@ -1435,7 +1435,14 @@ class GridStateAllocator {
     this._gridCells.fill(allValues);
   }
 
-  allocate(state) {
+  // Reserve state lanes initialized to `state`; returns their offset.
+  // `persistUnderOr` declares that the lanes hold refutations that stay
+  // valid for the rest of the search subtree (an Or's eliminated branches),
+  // so an enclosing Or writes them back after a branch's scratch run. The
+  // default is per-call state, which an enclosing Or discards each call
+  // (see SOLVER_ENGINE.md, "Composite safety"). The engine itself keys
+  // nothing off the flag; Or wraps this allocator to record it.
+  allocate(state, persistUnderOr = false) {
     const start = this._gridCells.length + this._extraState.length;
     this._extraState.push(...state);
     return start;

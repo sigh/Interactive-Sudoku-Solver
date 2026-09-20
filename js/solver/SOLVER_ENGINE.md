@@ -170,27 +170,47 @@ other state, a set bit clears again on backtrack — the idiom for
 running an expensive step at most once per branch (see `ChaosArrow`'s
 excluded flag).
 
+`allocate(state, persistUnderOr)` takes one flag: whether an enclosing
+`Or` should write the lanes back after running the handler on a scratch
+grid. Leave it off (the default) unless the lanes hold refutations that
+remain valid for the rest of the search subtree, as an `Or`'s own
+eliminated-branch words do. Bits are never persisted.
+
 ### Composite safety (`Or` / `And` nesting)
 
-`Or` speculatively enforces each branch on a scratch copy of the grid,
-unions the surviving branches' cell lanes back, and commits state lanes
-verbatim. A handler that already obeys the universal invariants — cell
-writes only narrow, `false` only when unsatisfiable, a state lane written
-only by its allocating handler — is safe to nest with no special effort;
-`Or` just leans on those harder (the union assumes subset results, a
-branch `false` becomes permanent for the subtree). Nesting adds only two
-rules beyond ordinary correctness:
+`Or` speculatively enforces each branch on a scratch copy of the grid and
+unions the surviving branches' cell lanes back. While more than one branch
+is live, a branch's **handler state lanes are not committed**: they stay
+in the scratch grid and are re-derived from their initial values on every
+call. Only lanes the branch allocated with `persistUnderOr` (a nested
+`Or`'s live-branch words) are written back; `Or` learns them by wrapping
+the allocator it hands each branch. Once a single branch remains, `Or`
+enforces it
+directly on the real grid and everything persists as at top level. A
+handler that already obeys the universal invariants — cell writes only
+narrow, `false` only when unsatisfiable, a state lane written only by its
+allocating handler — is safe to nest with no special effort; `Or` just
+leans on those harder (the union assumes subset results, a branch `false`
+becomes permanent for the subtree). Nesting adds only two rules beyond
+ordinary correctness:
 
 - **State lanes hold branch-scoped facts.** A lane written while enforcing
   branch `b` is only valid for solutions satisfying `b`, so it may be read
-  only from *within* the same branch. This is what makes monotonic-state
-  handlers (`Rellik`, `SameValues`) safe to nest: their lanes are private
-  and self-read. A lane with an out-of-branch reader is **not** nestable —
-  it is the one property the category allowlist below actually guards.
+  only from *within* the same branch. A lane with an out-of-branch reader
+  is **not** nestable — it is the one property the category allowlist
+  below actually guards.
 - **Re-derive each call; assume no persistence.** A previous call's cell
   writes may have been widened away by the union, so recompute from the
-  current grid plus your own lanes. (At top level writes persist; under
-  `Or` they may not.)
+  current grid plus your own lanes. Under a multi-branch `Or`, a leaf's
+  own lanes do not persist either, and they must not: a lane recording a
+  conclusion drawn from the branch's own pruning (e.g. `SameValues`'
+  "satisfied" flag, `Rellik`'s forced set) is only valid for grids that
+  keep that pruning, and the union does not. Committing such lanes let a
+  branch short-circuit to "satisfied" on a grid that violated it (fixed
+  2026-09-20; regression test in `tests/handlers/or.test.js`). Nested
+  `Or` eliminations are the exception because, with leaf state reset each
+  call, a branch's propagation is a monotone function of a grid that only
+  narrows along a search path.
 
 **Declaring safety.** Nesting is gated at build time by
 `CompositeConstraintBase._ALLOWED_CATEGORIES` in
