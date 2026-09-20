@@ -344,7 +344,7 @@ Derived handlers are marked as non-essential and can be disabled for debugging.
 | Method | Purpose |
 |--------|---------|
 | `countSolutions(limit)` | Count solutions up to `limit`. |
-| `estimatedCountSolutions(maxSamples)` | Estimate solution count using random sampling. If `maxSamples` is omitted, sampling continues until the caller aborts. |
+| `estimatedCountSolutions(maxSamples)` | Estimate solution count using random sampling (Knuth's estimator with exact tails); ends with an exact count once the tree becomes affordable. If `maxSamples` is omitted, sampling continues until the caller aborts. Progress state carries `estimate = { solutions, samples, tails, exact }`. See [ESTIMATION.md](ESTIMATION.md). |
 | `nthSolution(n)` | Return the nth solution grid, or `null`. |
 | `nthStep(n, stepGuides)` | Return the state at the nth branching point (for step-by-step UI). |
 | `solveAllPossibilities(threshold)` | Find all candidate values that appear in at least `threshold` solutions. |

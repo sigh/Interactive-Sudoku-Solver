@@ -110,15 +110,15 @@ export class SolverStateDisplay {
           }
           break;
         case 'estimatedSolutions':
-          if (state.extra?.estimate) {
+          if (state.estimate) {
             this._renderSolutionEstimate(
-              this._stateVars[v], state.extra.estimate.solutions, searchComplete);
+              this._stateVars[v], state.estimate, counters.solutions > 0);
           }
           break;
         case 'estimateSamples':
-          if (state.extra?.estimate) {
+          if (state.estimate) {
             this._renderNumberWithGaps(
-              this._stateVars[v], state.extra.estimate.samples);
+              this._stateVars[v], state.estimate.samples);
           }
           break;
         case 'puzzleSetupTime':
@@ -130,7 +130,7 @@ export class SolverStateDisplay {
           this._stateVars[v].textContent = text;
           break;
         case 'searchSpaceExplored':
-          if (!state.extra?.estimate) {
+          if (!state.estimate) {
             text = (counters.progressRatio * 100).toPrecision(3) + '%';
             if (searchComplete) text = '100%';
             this._stateVars[v].textContent = text;
@@ -142,30 +142,30 @@ export class SolverStateDisplay {
     }
   }
 
-  _renderSolutionEstimate(container, estimatedSolutions, searchComplete) {
-    // Round the estimate, but we know it must be at least 1 if it is non-zero.
-    let intEstimate = Math.round(estimatedSolutions);
-    if (intEstimate === 0 && estimatedSolutions > 0) intEstimate = 1;
+  _renderSolutionEstimate(container, estimate, hasSolution = false) {
+    // Never show ~0 after finding a solution, even if its search was discarded.
+    const minimum = !estimate.exact && (hasSolution || estimate.solutions > 0) ? 1 : 0;
+    this._renderLargeNumber(container, Math.max(minimum, Math.round(estimate.solutions)));
 
-    if (intEstimate < 1e6) {
-      this._renderNumberWithGaps(container, intEstimate);
-    } else {
-      const exponent = Math.floor(Math.log10(intEstimate));
-      const mantissa = intEstimate / Math.pow(10, exponent);
-      clearDOMNode(container);
-      container.appendChild(
-        document.createTextNode(mantissa.toFixed(3) + '×10'));
-      const sup = document.createElement('sup');
-      sup.textContent = exponent;
-      container.appendChild(sup);
-    }
-
-    // If we haven't found all the solutions, then show a ~ to indicate
-    // that this is an estimate.
-    if (!searchComplete) {
+    if (!estimate.exact) {
       container.insertBefore(
         document.createTextNode('~'), container.firstChild);
     }
+  }
+
+  _renderLargeNumber(container, n) {
+    if (n < 1e6) {
+      this._renderNumberWithGaps(container, n);
+      return;
+    }
+    const exponent = Math.floor(Math.log10(n));
+    const mantissa = n / Math.pow(10, exponent);
+    clearDOMNode(container);
+    container.appendChild(
+      document.createTextNode(mantissa.toFixed(3) + '×10'));
+    const sup = document.createElement('sup');
+    sup.textContent = exponent;
+    container.appendChild(sup);
   }
 
   _TEMPLATE_GAP_SPAN = (() => {
@@ -256,7 +256,7 @@ class StateHistoryDisplay {
   }
 
   add(state) {
-    const estimate = state.extra?.estimate;
+    const estimate = state.estimate;
     const newState = {
       timeMs: state.timeMs / 1000,
       guesses: state.counters.guesses,

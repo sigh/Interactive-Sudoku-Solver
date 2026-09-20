@@ -571,7 +571,7 @@ await runTest('estimate-solutions mode delivers a running estimate via state', a
   let estimate = null;
   const runner = new SolverRunner({
     stateHandler: (state) => {
-      if (state.extra?.estimate) estimate = state.extra.estimate;
+      if (state.estimate) estimate = state.estimate;
     },
   });
 
@@ -579,9 +579,10 @@ await runTest('estimate-solutions mode delivers a running estimate via state', a
   await runner.solve(constraint, { mode: 'estimate-solutions' });
   await waitForSettle();
 
-  assert.ok(estimate, 'Should receive an estimate in state.extra');
-  assert.equal(estimate.samples, ESTIMATE_TEST_MAX_SAMPLES);
-  // The simple puzzle is uniquely solvable, so the estimate is 1.
+  assert.ok(estimate, 'Should receive an estimate in state');
+  // The simple puzzle's tree is tiny, so the estimator counts it exactly
+  // as soon as its size estimate says it fits the work already spent.
+  assert.equal(estimate.exact, true);
   assert.equal(estimate.solutions, 1);
 });
 

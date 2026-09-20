@@ -56,17 +56,12 @@ export class SudokuSolver {
   }
 
   estimatedCountSolutions(maxSamples) {
-    const estimationCounters = {
-      solutions: 0,
-      samples: 0,
-    };
     return this._runCountFn(() => {
-      return this._internalSolver.estimatedCountSolutions(
-        estimationCounters, maxSamples);
-    }, estimationCounters);
+      return this._internalSolver.estimatedCountSolutions(maxSamples);
+    });
   }
 
-  _runCountFn(countFn, estimationCounters) {
+  _runCountFn(countFn) {
     this._reset();
 
     // Add a sample solution to the state updates, but only if a different
@@ -80,23 +75,21 @@ export class SudokuSolver {
           sampleSolution.subarray(0, this._numSearchCells), this._geometry.valueOffset)];
         this._internalSolver.unsetSampleSolution();
       }
-      if (estimationCounters) {
-        result.estimate = { ...estimationCounters };
-      }
       return result;
     };
 
-    let result = 0;
-    this._timer.runTimed(() => {
-      result = countFn();
-    });
+    try {
+      let result = 0;
+      this._timer.runTimed(() => {
+        result = countFn();
+      });
 
-    // Send progress one last time to ensure the last solution is sent.
-    this._sendProgress();
-
-    this._progressExtraStateFn = null;
-
-    return result;
+      // Send progress one last time to ensure the last solution is sent.
+      this._sendProgress();
+      return result;
+    } finally {
+      this._progressExtraStateFn = null;
+    }
   }
 
   nthSolution(n) {
@@ -202,17 +195,19 @@ export class SudokuSolver {
       };
     };
 
-    let result = null;
-    this._timer.runTimed(() => {
-      result = this._internalSolver.solveAllPossibilities(
-        solutions, candidateSupportThreshold || 1);
-    });
+    try {
+      let result = null;
+      this._timer.runTimed(() => {
+        result = this._internalSolver.solveAllPossibilities(
+          solutions, candidateSupportThreshold || 1);
+      });
 
-    // Send progress one last time to ensure all the solutions are sent.
-    this._sendProgress();
-    this._progressExtraStateFn = null;
-
-    return result;
+      // Send progress one last time to ensure all the solutions are sent.
+      this._sendProgress();
+      return result;
+    } finally {
+      this._progressExtraStateFn = null;
+    }
   }
 
   validateLayout() {
@@ -241,6 +236,10 @@ export class SudokuSolver {
       counters: counters,
       timeMs: this._timer.elapsedMs(),
       done: this._internalSolver.state === InternalSolver.STATE_EXHAUSTED,
+    }
+
+    if (this._internalSolver.estimationState) {
+      state.estimate = { ...this._internalSolver.estimationState };
     }
 
     return state;
@@ -472,6 +471,7 @@ class InternalSolver {
   reset() {
     this._stepState = null;
     this._currentRecFrame = null;
+    this.estimationState = null;
     this.counters = {
       valuesTried: 0,
       nodesSearched: 0,
@@ -781,7 +781,7 @@ class InternalSolver {
       const isNewNode = recFrame.newNode;
 
       const { nextDepth, value, count } = this._candidateSelector.selectNextCandidate(
-        cellDepth, grid, this._stepState, isNewNode);
+        cellDepth, recFrame.gridState, this._stepState, isNewNode);
       recFrame.newNode = false;
 
       if (count === 0) continue;
@@ -1069,56 +1069,160 @@ class InternalSolver {
     }
   }
 
-  estimatedCountSolutions(estimationCounters, maxSamples) {
-    const originalCandidateSelector = this._candidateSelector;
+  // Number of samples between doublings of the tail budget limit and sample weight.
+  static ESTIMATE_SAMPLES_PER_LEVEL = 64;
+  // Fraction of backtracks so far allowed for each sample's first exact search.
+  static ESTIMATE_SAMPLE_WORK_FRACTION = 1 / 16;
 
-    let result = this._estimatedCountSolutions(
-      estimationCounters, maxSamples);
+  // Knuth sampling with exact tails; see ESTIMATION.md.
+  estimatedCountSolutions(maxSamples, seed = 0) {
+    const estimationState = this.estimationState = {
+      solutions: 0,
+      samples: 0,
+      tails: 0,
+      exact: false,
+    };
+    const exactSelector = this._candidateSelector;
+    const sampler = new SamplingCandidateSelector(
+      this._geometry, this._numSearchCells, this._handlerSet, this._debugLogger, seed);
+    const sizes = new SubtreeSizeEstimates(this._numSearchCells);
+    const samplesPerLevel = InternalSolver.ESTIMATE_SAMPLES_PER_LEVEL;
+    const workFraction = InternalSolver.ESTIMATE_SAMPLE_WORK_FRACTION;
+    const samplingStart = this.counters.backtracks;
 
-    this._candidateSelector = originalCandidateSelector;
-    return result;
-  }
-
-  _estimatedCountSolutions(estimationCounters, maxSamples) {
-    // Solution count estimate is based on the algorithm from:
-    // "Estimating the Efficiency of Backtrack Programs" Knuth (1975)
-    // https://www.ams.org/journals/mcom/1975-29-129/S0025-5718-1975-0373371-6/S0025-5718-1975-0373371-6.pdf
-    //
-    // For each sample, we run a regular search but randomly select the
-    // candidate values at each step, and stop after one branch.
-
-    let totalEstimate = 0;
-    let numSamples = 0;
-
-    // Use a fixed seed so the result is deterministic.
-    // TODO: Allows us to save and restore the original.
-    this._candidateSelector = new SamplingCandidateSelector(
-      this._geometry, this._numSearchCells, this._handlerSet, this._debugLogger);
+    let weightedSum = 0;
+    let weightSum = 0;
 
     while (true) {
-      this._resetRun();
-      // Run one root-to-backtrack path (Knuth sampling).
-      // maxBacktracks:1 stops at the first backtrack (conflict or solution).
-      let foundSolution = false;
-      this.run({ maxBacktracks: 1 }, (grid) => { foundSolution = true; });
+      const numSamples = estimationState.samples;
+      const levelBudget = 2 ** Math.floor(numSamples / samplesPerLevel);
+      const work = this.counters.backtracks - samplingStart;
+      const budget = Math.max(1, Math.min(levelBudget, Math.floor(work * workFraction)));
 
-      if (foundSolution) {
-        totalEstimate += this._candidateSelector.getSolutionWeight();
+      const sample = this._estimateSample(
+        sampler, exactSelector, sizes.affordableDepth(budget), budget, sizes);
+      // Finishing a subtree does not mean the whole puzzle has been counted.
+      this._state = sample.exact
+        ? InternalSolver.STATE_EXHAUSTED : InternalSolver.STATE_INCOMPLETE;
+      if (sample.countedTail) estimationState.tails++;
+
+      if (sample.exact) {
+        estimationState.solutions = sample.solutions;
+        estimationState.exact = true;
+        return sample.solutions;
       }
 
-      numSamples++;
-      estimationCounters.solutions = totalEstimate / numSamples;
-      estimationCounters.samples = numSamples;
+      // Give each new batch twice the weight of the previous batch.
+      // Halve the accumulated sums instead of growing the weights.
+      if (numSamples > 0 && numSamples % samplesPerLevel === 0) {
+        weightedSum /= 2;
+        weightSum /= 2;
+      }
+      weightedSum += sample.solutions;
+      weightSum++;
+      estimationState.solutions = weightedSum / weightSum;
+      estimationState.samples++;
 
-      if (maxSamples && numSamples >= maxSamples) {
-        return estimationCounters.solutions;
+      if (maxSamples && estimationState.samples >= maxSamples) {
+        return estimationState.solutions;
       }
 
-      // Ensure that there are progress callbacks.
-      // However, we don't want the progress callback to report done.
-      this._state = InternalSolver.STATE_INCOMPLETE;
       this._progress.callback?.();
     }
+  }
+
+  // Make tailDepth random guesses, then count the remaining solutions exactly.
+  // If the search exceeds its budget, guess once more and retry with half.
+  _estimateSample(sampler, exactSelector, tailDepth, budget, sizes) {
+    const counters = this.counters;
+    sampler.startSample(tailDepth);
+    let solutionCount = 0;
+    const onSolution = () => { solutionCount++; };
+    this._runFrom(this._initialGridState, sampler, 1, onSolution);
+
+    let endLeaves = 1;  // A random path ends at one solution or conflict.
+    let failedDepth = -1;  // Where the first exact search ran out of budget.
+    let failedBudget = 0;
+    let tailBudget = budget;
+    let countedTail = false;
+    while (sampler.hasTail) {
+      sampler.hasTail = false;
+      const backtracksBefore = counters.backtracks;
+      solutionCount = 0;
+      if (this._runFrom(sampler.tailState, exactSelector, tailBudget, onSolution)) {
+        endLeaves = counters.backtracks - backtracksBefore;
+        countedTail = true;
+        break;
+      }
+      if (failedDepth < 0) {
+        failedDepth = sampler.guesses;
+        failedBudget = tailBudget;
+      }
+      // Discard the partial count and resume guessing from the saved grid.
+      solutionCount = 0;
+      tailBudget = Math.floor(tailBudget / 2);
+      sampler.resumeSample(tailBudget > 0 ? sampler.guesses + 1 : Infinity);
+      this._runFrom(sampler.tailState, sampler, 1, onSolution);
+    }
+
+    // Learn where future samples can afford exact counting. A search that
+    // ran out of budget must cost at least that budget to finish.
+    const weights = sampler.weights;
+    const endWeight = sampler.getPathWeight();
+    for (let g = 0; g <= sampler.guesses; g++) {
+      let leaves = endWeight / weights[g] * endLeaves;
+      if (g <= failedDepth) {
+        leaves = Math.max(leaves, weights[failedDepth] / weights[g] * failedBudget);
+      }
+      sizes.observe(g, leaves);
+    }
+    return {
+      solutions: endWeight * solutionCount,
+      exact: sampler.guesses === 0,
+      countedTail,
+    };
+  }
+
+  // Search from `state` for up to maxBacktracks additional backtracks (≥ 1).
+  // True means no branches remain for this selector. The sampler also returns
+  // true when it saves a grid for exact counting and stops choosing values.
+  _runFrom(state, selector, maxBacktracks, onSolution) {
+    if (!(maxBacktracks >= 1)) throw new Error(`invalid backtrack cap ${maxBacktracks}`);
+    const initialGridState = this._initialGridState;
+    const candidateSelector = this._candidateSelector;
+    this._initialGridState = state;
+    this._candidateSelector = selector;
+    try {
+      this._resetRun();
+      this.run({ maxBacktracks: this.counters.backtracks + maxBacktracks }, onSolution);
+      return this._state === InternalSolver.STATE_EXHAUSTED;
+    } finally {
+      this._initialGridState = initialGridState;
+      this._candidateSelector = candidateSelector;
+    }
+  }
+}
+
+// Estimates how many backtracks exact counting needs after a given number of guesses.
+class SubtreeSizeEstimates {
+  constructor(maxDepth) {
+    this._sum = new Float64Array(maxDepth + 1);
+    this._count = new Uint32Array(maxDepth + 1);
+  }
+
+  observe(depth, leaves) {
+    this._sum[depth] += leaves;
+    this._count[depth]++;
+  }
+
+  // First depth where estimated cost fits the budget; Infinity means keep guessing.
+  affordableDepth(budget) {
+    const sum = this._sum;
+    const count = this._count;
+    for (let g = 0; g < count.length; g++) {
+      if (count[g] > 0 && sum[g] < budget * count[g]) return g;
+    }
+    return Infinity;
   }
 }
 

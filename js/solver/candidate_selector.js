@@ -168,6 +168,7 @@ export class CandidateSelector {
   // selectNextCandidate finds the next candidate to try.
   // cellOrder will be updated such that cellOrder[cellDepth] is the next cell
   // to explore.
+  // gridState is the full solver state (cells first, then handler state).
   // Returns a { nextDepth, value, count } object (reused across calls — read it
   // immediately, do not retain):
   //   nextDepth: Index into cellOrder passing all singletons.
@@ -289,7 +290,7 @@ export class CandidateSelector {
       // Lazy: a tool calls snapshot() only for the decisions it ranks; most
       // don't, so the copies (grid, cell order, conflict scores) aren't taken.
       snapshot: () => ({
-        grid: gridState.slice(),
+        grid: gridState.slice(0, this._numSearchCells),
         cellOrder: cellOrder.slice(),
         conflictScores: this._conflictScores.scores.slice(),
         maxValueInfo: this._conflictScores.getMaxValueScore(),
@@ -457,11 +458,6 @@ export class CandidateSelector {
       if (this._findCustomCandidates(gridState, cellOrder, cellDepth, state)) {
         count = state.cells.length;
         value = state.value;
-        if (count > 1 && this._optionSelector !== null) {
-          const index = this._optionSelector.selectIndex(count);
-          [state.cells[index], state.cells[count - 1]] =
-            [state.cells[count - 1], state.cells[index]];
-        }
 
         cellOffset = cellOrder.indexOf(state.cells.pop(), cellDepth);
         this._candidateSelectionFlags[cellDepth] = 1
@@ -832,32 +828,62 @@ CandidateFinders.House = class House extends CandidateFinderBase {
   }
 };
 
-// An extension of the candidate selector which chooses values at random
-// from the chosen cell, and only searches a single branch of the tree.
+// Uses the base selector to choose cells, then picks a random candidate value.
 export class SamplingCandidateSelector extends CandidateSelector {
-  constructor(geometry, numSearchCells, handlerSet, debugLogger) {
+  constructor(geometry, numSearchCells, handlerSet, debugLogger, seed = 0) {
     super(geometry, numSearchCells, handlerSet, debugLogger);
-    this._totalWeight = new Float64Array(this._numSearchCells + 1);
-    this._totalWeight[0] = 1.0;
-    this._optionSelector = new RandomOptionSelector(/* seed = */ 0);
+    this._optionSelector = new RandomOptionSelector(seed);
+    // weights[g] multiplies the candidate counts at the first g random guesses.
+    this.weights = new Float64Array(numSearchCells + 1);
+    this.weights[0] = 1.0;
+    this.guesses = 0;
+    this._tailDepth = Infinity;
+
+    this.hasTail = false;  // A saved grid is waiting for exact counting.
+    this.tailState = null;
+  }
+
+  startSample(tailDepth) {
+    this.guesses = 0;
+    this.resumeSample(tailDepth);
+  }
+
+  // Stop when the sample reaches tailDepth guesses; Infinity disables the stop.
+  resumeSample(tailDepth) {
+    this._tailDepth = tailDepth;
+    this.hasTail = false;
   }
 
   selectNextCandidate(cellDepth, gridState, stepState, isNewNode) {
+    const result = CandidateSelector._selectNextCandidateResult;
     if (!isNewNode) {
-      const result = CandidateSelector._selectNextCandidateResult;
       result.nextDepth = 0;
       result.value = 0;
       result.count = 0;
       return result;
     }
 
-    const result = super.selectNextCandidate(cellDepth, gridState, stepState, isNewNode);
-    this._totalWeight[result.nextDepth] = this._totalWeight[cellDepth] * result.count;
+    // Save this node for exact counting instead of making another random guess.
+    if (this.guesses >= this._tailDepth) {
+      this.hasTail = true;
+      this.tailState ??= new Uint16Array(gridState.length);
+      this.tailState.set(gridState);
+      result.nextDepth = 0;
+      result.value = 0;
+      result.count = 0;
+      return result;
+    }
+
+    super.selectNextCandidate(cellDepth, gridState, stepState, isNewNode);
+    if (result.count > 1) {
+      this.weights[this.guesses + 1] = this.weights[this.guesses] * result.count;
+      this.guesses++;
+    }
     return result;
   }
 
-  getSolutionWeight() {
-    return this._totalWeight[this._numSearchCells];
+  getPathWeight() {
+    return this.weights[this.guesses];
   }
 }
 
@@ -873,10 +899,6 @@ class RandomOptionSelector {
       values = values & (values - 1);
     }
     return values & -values;
-  }
-
-  selectIndex(count) {
-    return this._rnd.randomInt(count - 1);
   }
 }
 

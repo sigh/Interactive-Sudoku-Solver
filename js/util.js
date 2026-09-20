@@ -568,7 +568,16 @@ export class RandomIntGenerator {
 
   // Random integer in the range [0, max].
   randomInt(max) {
-    return this._next() % (max + 1);
+    const range = max + 1;
+    // Reject the incomplete interval at the top of uint32 space. Without
+    // this, modulo maps a few outcomes to low values more often whenever
+    // `range` does not divide 2^32.
+    const limit = Math.floor(0x100000000 / range) * range;
+    let value;
+    do {
+      value = this._next();
+    } while (value >= limit);
+    return value % range;
   }
 }
 

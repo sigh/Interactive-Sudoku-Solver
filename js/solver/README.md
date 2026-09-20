@@ -3,6 +3,7 @@
 This directory contains the solver that finds solutions to Sudoku puzzles with arbitrary constraint combinations. It runs inside a Web Worker (see [../solver_worker.js](../solver_worker.js)) to keep the UI responsive.
 
 For a detailed description of the engine internals (propagation queue, search stack, grid state management, public API), see [SOLVER_ENGINE.md](SOLVER_ENGINE.md).
+For how the solution-count estimate works (Knuth sampling with exact tails), see [ESTIMATION.md](ESTIMATION.md).
 
 ## How It Works (High Level)
 

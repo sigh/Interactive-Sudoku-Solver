@@ -1,0 +1,87 @@
+[
+ {
+  "name": "Little Killer Sudoku [no givens]",
+  "input": ".LittleKiller~22~R1C1.LittleKiller~28~R2C1.LittleKiller~26~R3C1.LittleKiller~23~R1C5.LittleKiller~34~R1C7.LittleKiller~40~R1C8.LittleKiller~42~R1C9",
+  "truth": 22728
+ },
+ {
+  "name": "Lockout Lines (DSM 23 Quali Training) [half]",
+  "input": ".Lockout~4~R1C2~R2C2~R3C2~R4C2.Lockout~4~R4C2~R3C3~R2C3~R1C2.Lockout~4~R2C5~R2C4~R3C4~R3C5~R4C5~R4C4.Lockout~4~R4C6~R3C6~R2C6~R1C6~R2C7~R1C8~R2C8~R3C8~R4C8.Lockout~4~R6C3~R6C4~R7C4~R7C3~R8C3~R8C4.Lockout~4~R8C5~R8C6~R8C7~R7C6~R6C7~R6C6~R6C5.~R3C1_2~R5C4_5~R9C7_9",
+  "truth": 20996
+ },
+ {
+  "name": "Arrow [half]",
+  "input": ".Arrow~R1C5~R2C4~R3C3~R4C2~R5C1.Arrow~R3C7~R2C6~R3C5~R4C4~R5C3.Arrow~R6C2~R7C3~R6C4~R5C5~R4C6.Arrow~R7C4~R7C5~R7C6.Arrow~R6C7~R5C7~R4C7.Arrow~R5C9~R6C8~R7C7~R8C6~R9C5.~R1C2_6~R2C1_9~R9C1_4",
+  "truth": 35834
+ },
+ {
+  "name": "Skyscraper [half]",
+  "input": ".~R1C1_1~R1C9_8~R3C4_6~R5C1_5~R5C6_3~R7C4_8~R9C9_6~R9C1_9.Skyscraper~C5~5.Skyscraper~R2~2.Skyscraper~R4~4.Skyscraper~R6~6.Skyscraper~R8~8",
+  "truth": 197683
+ },
+ {
+  "name": "Entropy Sudoku [half]",
+  "input": ".~R1C1_8~R3C4_9~R4C6_8~R4C3_5~R6C4_1~R7C6_3~R6C7_4~R9C9_4.GlobalEntropy",
+  "truth": 3700
+ },
+ {
+  "name": "Little Killer Sudoku [half]",
+  "input": ".~R3C2_5~R5C4_3.LittleKiller~22~R1C1.LittleKiller~28~R2C1.LittleKiller~26~R3C1.LittleKiller~23~R1C5.LittleKiller~34~R1C7.LittleKiller~40~R1C8.LittleKiller~42~R1C9",
+  "truth": 1612
+ },
+ {
+  "name": "Between Lines Sudoku [half]",
+  "input": ".Between~R9C5~R8C6~R7C7~R6C8~R5C9.Between~R9C3~R8C4~R7C5~R6C6~R5C7~R4C8~R3C9.Between~R1C9~R2C8~R3C7~R4C6~R5C5~R6C4~R7C3~R8C2~R9C1.Between~R5C1~R4C2~R3C3~R2C4~R1C5.Between~R7C1~R6C2~R5C3~R4C4~R3C5~R2C6~R1C7.~R1C2_9~R2C7_1~R4C5_7~R5C2_3~R6C5_5~R8C3_9~R9C8_1",
+  "truth": 3546
+ },
+ {
+  "name": "Palindrome Sudoku [half]",
+  "input": ".Palindrome~R7C1~R6C2~R5C1~R4C2~R3C3~R2C4~R1C5~R2C6~R1C7.Palindrome~R9C3~R8C4~R9C5~R8C6~R7C7~R6C8~R5C9~R4C8~R3C9.Palindrome~R7C4~R7C5~R7C6~R6C7~R5C7~R4C7.Palindrome~R3C6~R3C5~R3C4~R4C3~R5C3~R6C3.~R1C1_6~R2C3_8~R2C7_9~R4C5_1~R5C5_4~R8C1_9~R8C7_8~R9C2_5",
+  "truth": 798
+ },
+ {
+  "name": "German Whispers [half]",
+  "input": ".Whisper~R8C1~R7C1~R7C2~R8C3~R9C3~R9C2.Whisper~R9C6~R8C7~R7C7~R7C8~R6C9~R5C8.Whisper~R6C3~R5C2~R4C3~R3C4~R2C5~R1C6~R1C7~R2C8~R3C8~R4C7~R5C6~R6C6~R7C6~R8C5~R7C4.Whisper~R4C5~R4C6~R3C7.~R1C5_1~R5C1_6~R7C3_3~R9C1_5",
+  "truth": 594
+ },
+ {
+  "name": "Thermo [half]",
+  "input": ".~R1C2_4~R2C1_2~R8C1_9~R9C2_1.Thermo~R9C4~R8C3~R7C2~R6C1~R5C2~R4C3.Thermo~R4C1~R3C2~R2C3~R1C4~R2C5~R3C6.Thermo~R1C6~R2C7~R3C8~R4C9~R5C8~R6C7.Thermo~R6C9~R7C8~R8C7~R9C6~R8C5~R7C4",
+  "truth": 858
+ },
+ {
+  "name": "Sequence sudoku [no givens]",
+  "input": ".NFA~VgGv_wQgxBRhyCf_RTVW0UUUV_ypZp4Siiiv-UXFHI0UUV_yilH4ISiiv-UUWm680UV_yiilkm3Civ-UUUWqiy0V_yiiill0GCv-UUUUWYaceAACUBCggqQEIAeIEQgkCEwIoAiwIWAigQsgGCAzAChA2gGgg6QHAQ-IHkAUBIghAQGgFKCIxBCAaAJMEJCAUA~_Arithmetic%20series~R7C4~R8C4~R9C4~R9C5~R9C6~R8C6~R7C6~R7C7~~R1C5~R2C4~R3C3~R3C4~~R4C3~R5C2~R5C3~R6C2~R7C1~R7C2~~R3C5~R4C5~R5C5~R6C5~~R4C7~R5C8~R5C7~~R6C8~R7C9~R7C8~~R2C6~R3C7~R3C6",
+  "truth": 3414
+ },
+ {
+  "name": "Slingshot sudoku [no givens]",
+  "input": ".ValueIndexing~R1C4~R2C4~R2C3~R2C2~R2C1.ValueIndexing~R1C6~R2C6~R2C7~R2C8~R2C9.ValueIndexing~R6C9~R7C9~R7C8~R7C7~R7C6~R7C5~R7C4~R7C3~R7C2~R7C1.ValueIndexing~R5C7~R5C8~R6C8~R7C8~R8C8~R9C8.ValueIndexing~R4C7~R4C6~R5C6~R6C6~R7C6~R8C6~R9C6.ValueIndexing~R4C3~R4C4~R5C4~R6C4~R7C4~R8C4~R9C4.ValueIndexing~R5C3~R5C2~R6C2~R7C2~R8C2~R9C2.ValueIndexing~R6C1~R7C1~R7C2~R7C3~R7C4~R7C5~R7C6~R7C7~R7C8~R7C9.V~R7C8~R7C9.V~R7C1~R7C2.V~R4C5~R5C5.X~R5C5~R6C5.X~R4C6~R5C6.X~R4C4~R5C4.X~R2C5~R3C5.X~R1C6~R1C7.X~R1C9~R1C8.X~R1C4~R1C3.X~R1C2~R1C1",
+  "truth": 352
+ },
+ {
+  "name": "Equality cages [no givens]",
+  "input": ".EqualityCage~R1C1~R1C2~R2C2~R2C1.EqualityCage~R3C2~R3C3.EqualityCage~R4C2~R4C3~R5C3~R5C2.EqualityCage~R9C2~R9C3~R8C3~R8C4.EqualityCage~R4C4~R4C5~R5C5~R5C6.EqualityCage~R3C4~R3C5~R3C6~R3C7.EqualityCage~R2C6~R2C7~R2C8~R2C9.EqualityCage~R3C8~R3C9.EqualityCage~R6C9~R7C9.EqualityCage~R7C7~R7C8~R8C8~R8C7.BlackDot~R4C1~R4C2~R8C1~R9C1~R7C6~R8C6~R8C7.BlackDot~R6C6~R6C7~R9C3~R9C2~R8C5~R9C5.WhiteDot~R8C1~R8C2~R1C7~R1C6~R7C7~R7C8.V~R2C7~R2C8~R2C2~R2C1~R8C3~R9C3",
+  "truth": 1282
+ },
+ {
+  "name": "Elementary [no givens]",
+  "input": ".WhiteDot~R8C9~R9C9.WhiteDot~R7C9~R7C8.WhiteDot~R8C4~R8C5.WhiteDot~R5C2~R5C1.WhiteDot~R5C2~R6C2.WhiteDot~R6C6~R6C5.WhiteDot~R5C8~R5C7.WhiteDot~R2C4~R2C5.WhiteDot~R2C2~R2C1.Whisper~6~R1C2~R2C2~R3C2.Whisper~6~R2C1~R3C2~R4C3.Whisper~6~R2C3~R3C2~R4C1.Whisper~4~R7C2~R8C2~R9C2.Whisper~4~R8C1~R8C2~R8C3.Whisper~4~R9C1~R9C2~R9C3.Whisper~2~R9C7~R9C8~R8C8~R7C8~R6C8.Whisper~2~R7C7~R7C8~R8C9.Whisper~2~R8C7~R7C8~R6C9.Whisper~4~R4C7~R3C8~R4C9.Whisper~4~R3C8~R2C8~R1C8.Whisper~4~R1C7~R1C8~R1C9.Whisper~4~R2C7~R2C8~R2C9.Whisper~3~R4C5~R5C5~R6C5~R7C5.Whisper~3~R5C4~R5C5~R5C6.Whisper~3~R6C4~R5C5~R6C6",
+  "truth": 120
+ },
+ {
+  "name": "Magic square [no givens]",
+  "input": ".AntiKnight.Diagonal~1.Diagonal~-1.EqualSum~R4C4~R4C5~R4C6~-~R5C4~R5C5~R5C6~-~R6C4~R6C5~R6C6~-~R4C4~R5C4~R6C4~-~R4C5~R5C5~R6C5~-~R4C6~R5C6~R6C6~-~R4C4~R5C5~R6C6~-~R4C6~R5C5~R6C4",
+  "truth": 288
+ },
+ {
+  "name": "empty 6x6",
+  "input": ".Shape~6x6",
+  "truth": 28200960
+ },
+ {
+  "name": "empty 9x9",
+  "input": ".",
+  "truth": 6.670903752021072e+21
+ }
+]
