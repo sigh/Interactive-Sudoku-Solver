@@ -15,6 +15,7 @@ causes.
 | `node tools/debug/verify_solution.js` | Check whether an encoding **accepts** a known solution (injects it as givens): prints `ACCEPTED`/`REJECTED` with a matching exit code. The bounded yes/no counterpart to `solve.js`. |
 | `node tools/debug/step_analysis.js` | Walk the search step by step. Explain why a branch was chosen, show pencilmarks/var-cell candidates, the per-step propagation log (what each handler pruned + the refuter), and where an ablation makes the branching diverge. |
 | `node tools/debug/search_hotspots.js` | Where the search concentrates over a (bounded) solve: the conflict heatmap, the cells re-guessed most (churn), the branch-factor shape (grid vs var, MRV gap), and the propagation yield (how often guesses eliminate nothing — branching into the void). The headless view of the debug UI's heatmap. |
+| `node tools/debug/true_candidate_profile.js` | Profile the actual **All possibilities** search in a short, bounded window: candidate-support discovery, time spent after the last discovery, handler/constraint cost, and branch hotspots. |
 | `node tools/debug/decision_trace.js` | Export a solve's branch decisions to a trace file, and replay a trace to force another run onto the same order. Replaying a trace under an ablation/revision (B-frozen-order) isolates how much of a search change is pruning vs selection. |
 | `node tools/debug/run_sandbox.js` | Run a [sandbox](../../js/sandbox/README.md) script outside the browser and print the constraints it returns. Generate or regenerate puzzle definitions (e.g. `.iss` files) without opening the browser; pipe the output into `solve.js`. |
 
@@ -195,6 +196,27 @@ node tools/debug/search_hotspots.js --max-backtracks 50000 --puzzle "Chaos Const
 
 A `capped` status means the run hit the backtrack limit, so the rankings reflect
 only the work done so far.
+
+---
+
+### `true_candidate_profile.js` — diagnose slow All possibilities searches
+
+This tool follows the same candidate-support search as `solveAllPossibilities`,
+including its branch-skipping after the first two solutions. At least one bound
+is required, so a 90-second reproduction can be diagnosed from its first few
+seconds:
+
+```sh
+node tools/debug/true_candidate_profile.js --max-ms 3000 \
+  --input '.Arrow~R3C3~R2C2~R1C2~R2C1.Arrow~R2C6~R3C7~R3C8~R3C9'
+```
+
+The discovery table separates finding candidate witnesses from proving that no
+unseen candidates remain. If support stops changing while backtracks continue,
+the expensive phase is the latter proof. Handler-class and concrete-instance
+tables attribute propagation cost; the instance table includes cell ids so
+individual arrows can be distinguished. `--max-backtracks` provides a
+deterministic bound for comparisons and can be combined with `--max-ms`.
 
 ---
 

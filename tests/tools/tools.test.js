@@ -22,6 +22,7 @@ import { main as solveMain } from '../../tools/debug/solve.js';
 import { main as verifyMain } from '../../tools/debug/verify_solution.js';
 import { main as stepMain } from '../../tools/debug/step_analysis.js';
 import { main as hotspotsMain } from '../../tools/debug/search_hotspots.js';
+import { main as trueCandidateProfileMain } from '../../tools/debug/true_candidate_profile.js';
 import { main as traceMain } from '../../tools/debug/decision_trace.js';
 import { main as sandboxMain } from '../../tools/debug/run_sandbox.js';
 import {
@@ -334,6 +335,21 @@ await runTest('search_hotspots.js runs', async () => {
 await runTest('search_hotspots.js requires --max-backtracks', async () => {
   const { thrown } = await capture(() => hotspotsMain(argv('search_hotspots.js', '--puzzle', PUZZLE)));
   assert.match(thrown?.message ?? '', /backtrack limit is required/);
+});
+
+await runTest('true_candidate_profile.js reports bounded all-possibilities work', async () => {
+  const { stdout } = await capture(() => trueCandidateProfileMain(argv(
+    'true_candidate_profile.js', '--max-backtracks', '100', '--puzzle', PUZZLE)));
+  assert.match(stdout, /status=(?:backtrack-cap|complete)/);
+  assert.match(stdout, /CANDIDATE DISCOVERY/);
+  assert.match(stdout, /HANDLER CLASSES/);
+  assert.match(stdout, /BRANCH HOTSPOTS/);
+});
+
+await runTest('true_candidate_profile.js requires an explicit bound', async () => {
+  const { thrown } = await capture(() => trueCandidateProfileMain(argv(
+    'true_candidate_profile.js', '--puzzle', PUZZLE)));
+  assert.match(thrown.message, /a bound is required/);
 });
 
 await runTest('decision_trace.js exports then self-replays exactly', async () => {
