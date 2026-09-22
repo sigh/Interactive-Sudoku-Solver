@@ -1,6 +1,8 @@
 import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { ensureGlobalEnvironment } from './helpers/test_env.js';
+import { guardListExclusions } from './helpers/cell_exclusion_guard.js';
 import {
   TestSuiteFailure,
   formatError,
@@ -117,6 +119,11 @@ if (options.list) {
 const failures = [];
 let filesRun = 0;
 const totalStart = performance.now();
+
+ensureGlobalEnvironment();
+const { CellExclusions } = await import('../js/solver/engine.js');
+CellExclusions.prototype.getListExclusions = guardListExclusions(
+  CellExclusions.prototype.getListExclusions);
 
 for (const testFile of orderedTests) {
   filesRun++;

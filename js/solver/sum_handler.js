@@ -1,4 +1,4 @@
-const { memoize, MultiMap, BitSet, countOnes16bit, sortedArrayCopy, insertionSortInts } = await import('../util.js' + self.VERSION_PARAM);
+const { memoize, MultiMap, countOnes16bit, sortedArrayCopy, insertionSortInts } = await import('../util.js' + self.VERSION_PARAM);
 const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM);
 const { SudokuConstraintHandler, HandlerUtil, InvalidConstraintError } = await import('./handlers.js' + self.VERSION_PARAM);
 const { GEOMETRY_MAX, GEOMETRY_9x9 } = await import('../cell_geometry.js' + self.VERSION_PARAM);
@@ -346,7 +346,8 @@ export class Sum extends SudokuConstraintHandler {
     // Both values are required in the pair. Reflected values cannot exclude peers.
     if (v0 === v1 && exclusionIds[0] >= 0 && exclusionIds[1] >= 0 &&
       countOnes16bit(v0) === 2) {
-      return this._enforceRequiredValueExclusionsForTwoOrThreeCells(grid, cells, v0, pQueue);
+      return HandlerUtil.enforceRequiredValueExclusions(
+        grid, cells, v0, this._cellExclusions, pQueue);
     }
 
     return true;
@@ -404,31 +405,10 @@ export class Sum extends SudokuConstraintHandler {
     const required = this._sumData.requiredTripleValues[sum];
     if (required && exclusionIds[0] >= 0 && exclusionIds[0] === exclusionIds[1] &&
       exclusionIds[0] === exclusionIds[2]) {
-      return this._enforceRequiredValueExclusionsForTwoOrThreeCells(grid, cells, required, pQueue);
+      return HandlerUtil.enforceRequiredValueExclusions(
+        grid, cells, required, this._cellExclusions, pQueue);
     }
 
-    return true;
-  }
-
-  // Each value must occur in at least one of the two or three cells.
-  _enforceRequiredValueExclusionsForTwoOrThreeCells(grid, cells, values, pQueue) {
-    const peers0 = this._cellExclusions.getBitSet(cells[0]).words;
-    const peers1 = this._cellExclusions.getBitSet(cells[1]).words;
-    const peers2 = cells.length === 3 ? this._cellExclusions.getBitSet(cells[2]).words : null;
-    for (let i = 0; i < peers0.length; i++) {
-      let peers = peers0[i] & peers1[i];
-      if (peers2) peers &= peers2[i];
-      while (peers) {
-        const bit = peers & -peers;
-        peers ^= bit;
-        const cell = BitSet.bitIndex(i, bit);
-        const candidates = grid[cell];
-        if (candidates & values) {
-          if (!(grid[cell] = candidates & ~values)) return false;
-          if (pQueue) pQueue.addForCell(cell);
-        }
-      }
-    }
     return true;
   }
 

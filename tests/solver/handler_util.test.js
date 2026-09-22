@@ -156,6 +156,84 @@ await runTest('enforceRequiredValueExclusions should handle single-cell value', 
   assert.equal(grid[3] & valueMask(5), 0, 'value 5 removed from cell 3');
 });
 
+await runTest('required value exclusions use the possible locations in a three-cell list', () => {
+  for (const count of [1, 2, 3]) {
+    const context = new GridTestContext();
+    const grid = context.grid;
+    const exclusions = createCellExclusions({ allUnique: false });
+    for (let cell = 0; cell < 3; cell++) grid[cell] = valueMask(2, 3);
+    for (let cell = 0; cell < count; cell++) {
+      grid[cell] |= valueMask(1);
+      for (const other of [31, 32, 80]) exclusions.addMutualExclusion(cell, other);
+    }
+    for (const other of [31, 32, 80]) grid[other] = valueMask(1, 4);
+    exclusions.getListExclusions = () => {
+      assert.fail('one to three locations should not use the whole-list cache');
+    };
+    const cachedCalls = [];
+    for (const method of ['getArray', 'getPairExclusions']) {
+      const original = exclusions[method];
+      exclusions[method] = function (...args) {
+        cachedCalls.push(method);
+        return original.apply(this, args);
+      };
+    }
+    const queue = createAccumulator();
+    assert.equal(HandlerUtil.enforceRequiredValueExclusions(
+      grid, [0, 1, 2], valueMask(1), exclusions, queue), true);
+    assert.deepEqual(cachedCalls,
+      count === 1 ? ['getArray'] : count === 2 ? ['getPairExclusions'] : []);
+    for (const other of [31, 32, 80]) {
+      assert.equal(grid[other], valueMask(4));
+      assert.ok(queue.touched.has(other));
+    }
+    grid[31] = valueMask(1);
+    assert.equal(HandlerUtil.enforceRequiredValueExclusions(
+      grid, [0, 1, 2], valueMask(1), exclusions, null), false);
+  }
+});
+
+await runTest('required value exclusions handle a reused three-cell buffer', () => {
+  const context = new GridTestContext();
+  const exclusions = createCellExclusions({ allUnique: false });
+  const cells = new Uint16Array([0, 1, 2]);
+  for (let cell = 0; cell < 6; cell++) {
+    exclusions.addMutualExclusion(cell, cell < 3 ? 7 : 8);
+  }
+  context.grid[7] = context.grid[8] = valueMask(1, 4);
+  assert.equal(HandlerUtil.enforceRequiredValueExclusions(
+    context.grid, cells, valueMask(1), exclusions, null), true);
+  assert.equal(context.grid[7], valueMask(4));
+  assert.equal(context.grid[8], valueMask(1, 4));
+  cells.set([3, 4, 5]);
+  assert.equal(HandlerUtil.enforceRequiredValueExclusions(
+    context.grid, cells, valueMask(1), exclusions, null), true);
+  assert.equal(context.grid[8], valueMask(4));
+});
+
+await runTest('three locations in a larger list retain the whole-list exclusion path', () => {
+  const context = new GridTestContext();
+  const exclusions = createCellExclusions({ allUnique: false });
+  const cells = [0, 1, 2, 3];
+  for (let cell = 0; cell < 3; cell++) {
+    context.grid[cell] = valueMask(1, 2);
+    exclusions.addMutualExclusion(cell, 4);
+  }
+  context.grid[3] = valueMask(2, 3);
+  context.grid[4] = valueMask(1, 4);
+  const original = exclusions.getListExclusions;
+  let listCalls = 0;
+  exclusions.getListExclusions = function (list) {
+    assert.equal(list, cells);
+    listCalls++;
+    return original.call(this, list);
+  };
+  assert.equal(HandlerUtil.enforceRequiredValueExclusions(
+    context.grid, cells, valueMask(1), exclusions, null), true);
+  assert.equal(listCalls, 1);
+  assert.equal(context.grid[4], valueMask(1, 4));
+});
+
 // ─── exclusionGroupSumInfo ─────────────────────────────────────────
 
 await runTest('exclusionGroupSumInfo should compute range and min for single group', () => {

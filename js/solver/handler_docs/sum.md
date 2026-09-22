@@ -242,8 +242,8 @@ behaves exactly like a positive one, and the cells are un-reflected afterwards.
 These cases are GAC for the residual equation: every kept value has an explicit
 completing assignment, and every removed value has none.
 
-`_enforceRequiredValueExclusionsForTwoOrThreeCells` removes required values from
-cells excluded by every cell in the pair or triple.
+`HandlerUtil.enforceRequiredValueExclusions` removes required values from
+cells excluded by every possible location of that value in the pair or triple.
 A pair with the same two-value domain requires both values. For a distinct triple,
 `requiredTripleValues[sum]` gives the values shared by all combinations for that
 total, independent of current domains; total 8 requires 1. The table is computed

@@ -461,14 +461,35 @@ export class HandlerUtil {
         }
       }
 
+      // Special-case exactly three cells.
+      // Required for the sum handler which passes 3-length cells arrays which
+      // aren't static lists.
+      if (cellCount === 3 && numCells === 3) {
+        const words0 = cellExclusions.getBitSet(cells[0]).words;
+        const words1 = cellExclusions.getBitSet(cells[1]).words;
+        const words2 = cellExclusions.getBitSet(cells[2]).words;
+        for (let i = 0; i < words0.length; i++) {
+          let excluded = words0[i] & words1[i] & words2[i];
+          while (excluded) {
+            const bit = excluded & -excluded;
+            excluded ^= bit;
+            const cell = BitSet.bitIndex(i, bit);
+            if (grid[cell] & value) {
+              if (!(grid[cell] &= ~value)) return false;
+              if (pQueue) pQueue.addForCell(cell);
+            }
+          }
+        }
+        continue;
+      }
+
       // Lookup the exclusion cells.
       // If there are more than 2 we use the intersection of the entire list.
-      const exclusionCells = (cellCount === 2)
+      const exclusionCells = cellCount === 2
         ? cellExclusions.getPairExclusions(pairIndex)
-        : (cellCount === 1)
+        : cellCount === 1
           ? cellExclusions.getArray(pairIndex)
           : cellExclusions.getListExclusions(cells);
-
       if (exclusionCells && exclusionCells.length) {
         if (!this.removeRequiredValueExclusions(
           grid, exclusionCells, value, pQueue)) {

@@ -144,6 +144,21 @@ await runTest('Sum removes required triple digits from the correct common peers'
   assert.ok(queue.touched.has(8) && queue.touched.has(9));
 });
 
+await runTest('Sum excludes a required triple digit using only its possible locations', () => {
+  const exclusions = nonUniqueCells();
+  for (const [a, b] of [[0, 1], [0, 2], [1, 2], [0, 3], [1, 3]]) {
+    exclusions.addMutualExclusion(a, b);
+  }
+  const { handler, context } = initializeSum({ numCells: 3, sum: 8, cellExclusions: exclusions });
+  const grid = applyCandidates(context.grid, {
+    0: [1, 2, 3, 4, 5], 1: [1, 2, 3, 4, 5], 2: [2, 3, 4, 5], 3: [1, 6],
+  });
+  const queue = createAccumulator();
+  assert.equal(handler.enforceConsistency(grid, queue), true);
+  assert.equal(grid[3], valueMask(6));
+  assert.ok(queue.touched.has(3));
+});
+
 await runTest('Sum does not remove peer candidates using reflected pair values', () => {
   // x-y=-5 permits (1,6) and (4,9). Reversing y makes both domains
   // {1,4}, but neither digit is required in the original pair.
