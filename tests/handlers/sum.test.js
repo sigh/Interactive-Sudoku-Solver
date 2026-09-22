@@ -97,6 +97,96 @@ await runTest('Sum should solve mixed coefficient cages with negative terms', ()
   assert.equal(grid[3], valueMask(3), 'final cell resolved by remaining balance');
 });
 
+await runTest('Sum excludes an arrow shaft pair from peers after its circle is fixed', () => {
+  const { handler, context } = initializeSum({
+    numCells: 4, sum: 0, coeffs: [1, 1, 1, -1],
+  });
+  const grid = applyCandidates(context.grid, {
+    0: [1, 4], 1: [3], 2: [1, 4], 3: [8], 4: [1, 4, 5],
+  });
+  const queue = createAccumulator();
+  assert.equal(handler.enforceConsistency(grid, queue), true);
+  assert.equal(grid[4], valueMask(5));
+  assert.ok(queue.touched.has(4), 'schedule constraints affected by peer pruning');
+  assert.equal(grid[0], valueMask(1, 4));
+  assert.equal(grid[2], valueMask(1, 4));
+  assert.equal(grid[3], valueMask(8));
+});
+
+await runTest('Sum removes required triple digits from the correct common peers', () => {
+  const context = new GridTestContext();
+  const exclusions = nonUniqueCells();
+  // Separate peer groups sharing the same exclusion relation. Both triples sum
+  // to 8, so each requires 1, but their peer eliminations must stay separate.
+  for (const group of [[0, 1, 2, 8], [4, 5, 6, 9]]) {
+    for (let i = 0; i < group.length; i++) {
+      for (let j = i + 1; j < group.length; j++) {
+        exclusions.addMutualExclusion(group[i], group[j]);
+      }
+    }
+  }
+  const arrows = [new Sum([0, 1, 2, 3], 0, [1, 1, 1, -1]),
+    new Sum([4, 5, 6, 7], 0, [1, 1, 1, -1])];
+  for (const arrow of arrows) {
+    assert.equal(context.initializeHandler(arrow, { cellExclusions: exclusions }), true);
+  }
+  const grid = applyCandidates(context.grid, {
+    0: [1, 2, 3, 4, 5], 1: [1, 2, 3, 4, 5], 2: [1, 2, 3, 4, 5], 3: [8],
+    4: [1, 2, 3, 4, 5], 5: [1, 2, 3, 4, 5], 6: [1, 2, 3, 4, 5], 7: [8],
+    8: [1, 6], 9: [1, 6],
+  });
+  const queue = createAccumulator();
+  assert.equal(arrows[0].enforceConsistency(grid, queue), true);
+  assert.equal(grid[8], valueMask(6));
+  assert.equal(grid[9], valueMask(1, 6));
+  assert.equal(arrows[1].enforceConsistency(grid, queue), true);
+  assert.equal(grid[9], valueMask(6));
+  assert.ok(queue.touched.has(8) && queue.touched.has(9));
+});
+
+await runTest('Sum does not remove peer candidates using reflected pair values', () => {
+  // x-y=-5 permits (1,6) and (4,9). Reversing y makes both domains
+  // {1,4}, but neither digit is required in the original pair.
+  const { handler, context } = initializeSum({
+    numCells: 2, sum: -5, coeffs: [1, -1],
+  });
+  const grid = applyCandidates(context.grid, {
+    0: [1, 4], 1: [6, 9], 2: [1, 4, 5],
+  });
+  const queue = createAccumulator();
+  assert.equal(handler.enforceConsistency(grid, queue), true);
+  assert.equal(grid[0], valueMask(1, 4));
+  assert.equal(grid[1], valueMask(6, 9), 'restore original values');
+  assert.equal(grid[2], valueMask(1, 4, 5), 'keep valid peer candidates');
+  assert.equal(queue.touched.size, 0);
+});
+
+await runTest('Sum required triple digits apply to ordinary cages but require distinct cells', () => {
+  for (const distinct of [true, false]) {
+    const exclusions = nonUniqueCells();
+    for (let cell = 0; cell < 3; cell++) {
+      exclusions.addMutualExclusion(cell, 3);
+      if (distinct) {
+        for (let other = cell + 1; other < 3; other++) exclusions.addMutualExclusion(cell, other);
+      }
+    }
+    const { handler, context } = initializeSum({ numCells: 3, sum: 8, cellExclusions: exclusions });
+    const grid = applyCandidates(context.grid, { 3: [1, 6] });
+    assert.equal(handler.enforceConsistency(grid, createAccumulator()), true);
+    assert.equal(grid[3], distinct ? valueMask(6) : valueMask(1, 6),
+      'without distinctness, (2,2,4) supports 1 in the common peer');
+  }
+});
+
+await runTest('Sum does not remove peer candidates using reflected triple values', () => {
+  const { handler, context } = initializeSum({
+    numCells: 3, sum: -8, coeffs: [-1, -1, -1],
+  });
+  const grid = applyCandidates(context.grid, { 3: [6, 9] });
+  assert.equal(handler.enforceConsistency(grid, createAccumulator()), true);
+  assert.equal(grid[3], valueMask(6, 9), 'reflected required 9 is not an original required digit');
+});
+
 await runTest('Sum should not support a value with a pair that reuses it', () => {
   // With 3 unfixed cells in a cage, a value must be supported by a pair of
   // values which are distinct from it, not just from each other.

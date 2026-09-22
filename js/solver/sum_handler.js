@@ -1,4 +1,4 @@
-const { memoize, MultiMap, countOnes16bit, sortedArrayCopy, insertionSortInts } = await import('../util.js' + self.VERSION_PARAM);
+const { memoize, MultiMap, BitSet, countOnes16bit, sortedArrayCopy, insertionSortInts } = await import('../util.js' + self.VERSION_PARAM);
 const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM);
 const { SudokuConstraintHandler, HandlerUtil, InvalidConstraintError } = await import('./handlers.js' + self.VERSION_PARAM);
 const { GEOMETRY_MAX, GEOMETRY_9x9 } = await import('../cell_geometry.js' + self.VERSION_PARAM);
@@ -255,13 +255,7 @@ export class Sum extends SudokuConstraintHandler {
       this._flags |= this.constructor._FLAG_CAGE;
     }
 
-    const hasNegative = this._coeffGroups.some(g => g.coeff < 0);
-    if (!hasNegative) {
-      // We can't use cell exclusions because the cell values have been changed.
-      // Thus it can't be used to exclude the value from other cells.
-      // (This is only relevant for calls to _enforceFewRemainingCells).
-      this._cellExclusions = cellExclusions;
-    }
+    this._cellExclusions = cellExclusions;
 
     // Ensure the shared scratch buffer is large enough.
     if (this.constructor._seenMinMaxs.length < this.cells.length) {
@@ -323,7 +317,7 @@ export class Sum extends SudokuConstraintHandler {
     }
   }
 
-  _enforceTwoRemainingCells(grid, cells, targetSum, exclusionIds) {
+  _enforceTwoRemainingCells(grid, cells, targetSum, exclusionIds, pQueue) {
     let v0 = grid[cells[0]];
     let v1 = grid[cells[1]];
 
@@ -349,22 +343,16 @@ export class Sum extends SudokuConstraintHandler {
     grid[cells[0]] = v0;
     grid[cells[1]] = v1;
 
-    // If there are two remaining values, and they can be in either cell
-    // (both cells have the same candidates) then they are both required
-    // values.
-    // NOTE: We can also do this for count === 1, but it results are slightly
-    //       worse.
-    if (v0 === v1 && this._cellExclusions && countOnes16bit(v0) === 2) {
-      if (!HandlerUtil.enforceRequiredValueExclusions(
-        grid, cells, v0, this._cellExclusions)) {
-        return false;
-      }
+    // Both values are required in the pair. Reflected values cannot exclude peers.
+    if (v0 === v1 && exclusionIds[0] >= 0 && exclusionIds[1] >= 0 &&
+      countOnes16bit(v0) === 2) {
+      return this._enforceRequiredValueExclusionsForTwoOrThreeCells(grid, cells, v0, pQueue);
     }
 
     return true;
   }
 
-  _enforceThreeRemainingCells(grid, cells, sum, exclusionIds) {
+  _enforceThreeRemainingCells(grid, cells, sum, exclusionIds, pQueue) {
     let v0 = grid[cells[0]];
     let v1 = grid[cells[1]];
     let v2 = grid[cells[2]];
@@ -411,6 +399,36 @@ export class Sum extends SudokuConstraintHandler {
     grid[cells[1]] = v1;
     grid[cells[2]] = v2;
 
+    // Values required by the total can be removed from common peers.
+    // All three cells must be distinct and have unreflected domains.
+    const required = this._sumData.requiredTripleValues[sum];
+    if (required && exclusionIds[0] >= 0 && exclusionIds[0] === exclusionIds[1] &&
+      exclusionIds[0] === exclusionIds[2]) {
+      return this._enforceRequiredValueExclusionsForTwoOrThreeCells(grid, cells, required, pQueue);
+    }
+
+    return true;
+  }
+
+  // Each value must occur in at least one of the two or three cells.
+  _enforceRequiredValueExclusionsForTwoOrThreeCells(grid, cells, values, pQueue) {
+    const peers0 = this._cellExclusions.getBitSet(cells[0]).words;
+    const peers1 = this._cellExclusions.getBitSet(cells[1]).words;
+    const peers2 = cells.length === 3 ? this._cellExclusions.getBitSet(cells[2]).words : null;
+    for (let i = 0; i < peers0.length; i++) {
+      let peers = peers0[i] & peers1[i];
+      if (peers2) peers &= peers2[i];
+      while (peers) {
+        const bit = peers & -peers;
+        peers ^= bit;
+        const cell = BitSet.bitIndex(i, bit);
+        const candidates = grid[cell];
+        if (candidates & values) {
+          if (!(grid[cell] = candidates & ~values)) return false;
+          if (pQueue) pQueue.addForCell(cell);
+        }
+      }
+    }
     return true;
   }
 
@@ -444,7 +462,7 @@ export class Sum extends SudokuConstraintHandler {
   //  - The targetSum is bounds-consistent with the current values.
   //    This is mostly to ensure that the targetSum is not negative after
   //    adjusting for negative coefficients.
-  _enforceFewRemainingCells(grid, targetSum, numUnfixed) {
+  _enforceFewRemainingCells(grid, targetSum, numUnfixed, pQueue) {
     if (numUnfixed === 1) {
       return this._enforceOneRemainingCell(grid, targetSum);
     }
@@ -491,9 +509,9 @@ export class Sum extends SudokuConstraintHandler {
     // numUnfixed must be 2 or 3. Call the appropriate enforcement function.
     const result = numUnfixed === 2
       ? this._enforceTwoRemainingCells(
-        grid, cellBuffer, targetSum, exclusionIdsBuffer)
+        grid, cellBuffer, targetSum, exclusionIdsBuffer, pQueue)
       : this._enforceThreeRemainingCells(
-        grid, cellBuffer, targetSum, exclusionIdsBuffer);
+        grid, cellBuffer, targetSum, exclusionIdsBuffer, pQueue);
 
     // Un-reverse the reversed cells.
     for (let i = 0; i < numReversed; i++) {
@@ -960,7 +978,7 @@ export class Sum extends SudokuConstraintHandler {
     if (hasFewUnfixed) {
       // If there are few remaining cells then handle them explicitly.
       const targetSum = sum - fixedSum;
-      if (!this._enforceFewRemainingCells(grid, targetSum, numUnfixed)) {
+      if (!this._enforceFewRemainingCells(grid, targetSum, numUnfixed, pQueue)) {
         return false;
       }
     } else {
@@ -1041,6 +1059,19 @@ class SumData {
 
       return table;
     })();
+
+    // Maps each sum to the digits required in every distinct triple making it.
+    // E.g. sum 8: {1,2,5} & {1,3,4} => bitmask {1}.
+    this.requiredTripleValues = new Uint16Array(3 * numValues + 1);
+    if (numValues >= 3) {
+      for (let sum = 0; sum < this.requiredTripleValues.length; sum++) {
+        const options = this.killerCageSums[3][sum];
+        if (!options?.length) continue;
+        let required = options[0];
+        for (let i = 1; i < options.length && required; i++) required &= options[i];
+        this.requiredTripleValues[sum] = required;
+      }
+    }
 
     // Precompute the sums for all pairs of cells. Assumes cells must be unique.
     //

@@ -205,6 +205,26 @@ await runTest('solveAllPossibilities multi-solution puzzle has multiple candidat
   assert.ok(foundMultiple, 'Expected at least one cell with multiple candidates');
 });
 
+await runTest('three arrows complete true candidates without exploring redundant subtrees', () => {
+  const constraint = new SudokuConstraint.Container([
+    new SudokuConstraint.Arrow('R3C3', 'R2C2', 'R1C2', 'R2C1'),
+    new SudokuConstraint.Arrow('R2C6', 'R3C7', 'R3C8', 'R3C9'),
+    new SudokuConstraint.Arrow('R4C3', 'R5C2', 'R5C1', 'R6C1'),
+  ]);
+  const solver = buildSolver(constraint);
+  solver.setProgressCallback(() => {
+    assert.ok(solver.state().counters.guesses < 50000,
+      'required shaft digits should prune subtrees before candidate search stalls');
+  }, 10);
+  const counts = solver.solveAllPossibilities();
+  // Independently checked by pinning all 729 cell/value pairs in the original
+  // solver. These two witnesses appear after the original search first stalls.
+  assert.equal([...counts].filter(Boolean).length, 687);
+  assert.equal(counts[14 * 9 + 8], 1, 'R2C6=9 is supported');
+  assert.equal(counts[6 * 9], 1, 'R1C7=1 is supported');
+  assert.equal(solver.state().done, true);
+});
+
 // ============================================================================
 // validateLayout
 // ============================================================================
