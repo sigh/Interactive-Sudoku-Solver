@@ -30,7 +30,9 @@ Run `benchmark_puzzles.js` or `profile.js` with `--help` for full options.
   solution) is success and `multiple` is a second solution found. `--solutions all`
   exhausts/counts everything. `--solutions 1` (first-solution only) is available
   but warns — first-solution timing/shape is **not** valid evidence for a handler
-  optimization.
+  optimization. For an **All possibilities** issue, also measure the actual
+  candidate-support search; `--solutions all` enumerates solutions and is not
+  that operation. See [`true_candidate_profile.js`](../debug/README.md#true_candidate_profilejs--diagnose-slow-all-possibilities-searches).
 
 ## Common recipes
 
@@ -50,19 +52,21 @@ node tools/perf/benchmark_puzzles.js --max-backtracks none --puzzles "Chaos Cons
 # Where does a handler spend time on this puzzle?
 node tools/perf/profile.js --max-backtracks 50000 --handler Sum --puzzles "Killer sudoku"
 
-# A whole collections.js set (e.g. the sum-heavy TAREK_ALL killers, ~1s for all 42),
+# A whole collections.js set (e.g. the sum-heavy TAREK_ALL killers, all 42),
 # best-of-3 timing per puzzle.
 node tools/perf/benchmark_puzzles.js --max-backtracks none --puzzles TAREK_ALL --repeat 3
 
 # A raw constraint string instead of a named puzzle.
 node tools/perf/benchmark_puzzles.js --max-backtracks none --input ".Cage~10~R1C1~R1C2~R1C3"
 
-# How did the working tree change vs HEAD? (wall time + counter deltas per puzzle).
-# Same workload flags as benchmark_puzzles.
-node tools/perf/bench_vs_ref.js --max-backtracks none --puzzles TAREK_ALL --repeat 5
+# Pin the baseline before editing; keep this SHA throughout the experiment.
+benchmark_ref=$(git rev-parse HEAD)
+node tools/perf/bench_vs_ref.js --ref "$benchmark_ref" \
+    --max-backtracks none --puzzles TAREK_ALL --repeat 5
 
 # As a behaviour-preserving gate for a pure refactor (fails if any counter moved).
-node tools/perf/bench_vs_ref.js --require-identical --max-backtracks none --puzzles TAREK_ALL --repeat 5
+node tools/perf/bench_vs_ref.js --ref "$benchmark_ref" --require-identical \
+    --max-backtracks none --puzzles TAREK_ALL --repeat 5
 ```
 
 **Two kinds of A/B, two tools.** `benchmark_puzzles --compare/--ablate` toggles a
@@ -145,35 +149,65 @@ refactoring checklist. The goal is a *measured* change that preserves solver
 semantics: the smallest production change that improves representative wall time
 without weakening required correctness.
 
-**Metric rule (non-negotiable).** Optimize for proof of uniqueness (see
-Conventions), never first-solution behaviour — don't use first-solution timing,
-guesses, or search shape as evidence, even as a quick diagnostic. Compare only
-runs that complete the proof (`unique`); a `capped` run is an incomplete proof,
-not a win/loss ranked by how much work it did.
+**Measure the requested operation.** Uniqueness proof is the default benchmark;
+All possibilities needs its own candidate-support run. Finding a first solution,
+enumerating all solutions, and finding every supported candidate have different
+stopping conditions. A bounded prefix is useful for diagnosis, but performance
+claims require completion of the requested operation. Report capped runs and
+status changes separately; do not add partial work to completed-set totals.
 
 **Workflow.**
 
-1. *Know the contract.* Separate the handler's semantic obligations (conflicts
+1. *Identify what is hard to prove.* For a stall visible in seconds, start with a
+   short bounded profile. Capture the branch, fixed values and candidate domains;
+   identify the specific unsupported value or missing deduction keeping search
+   alive. Time concentrated in a handler does not by itself explain why search
+   is hard. A pause in candidate discovery does not prove all candidates have
+   been found, and an unsupported value in one branch may be valid globally.
+2. *Know the contract and callers.* Separate semantic obligations (conflicts
    it must reject, propagation required for correctness) from propagation that is
-   only a search aid. Arc-consistency, hidden singles, Hall/distance/graph checks
-   are usually optional aids; cheap conflict checks that prune early usually
-   earn their keep. Keep a correctness-required rule even if expensive — optimize
-   its implementation, don't remove it.
-2. *Measure before changing.* Use a fast correctness-sized case plus ≥1 realistic
-   puzzle (or a calibrated ladder if the real one is too slow — keep the real one
-   in the set too, and order ladder givens spatially rather than front-loaded).
-   Record the cap with every result.
-3. *Ablate one rule at a time* with `--ablate`/`--compare`. Prototype an expensive
-   rule in its clearest form first; only invest in implementation tuning or gating
-   once it's shown to help. Test combinations after singles — propagation effects
-   are non-additive. Compare micro **and** macro: a faster single propagation that
-   grows total search is a loss.
-4. *Promote* only if it improves completed proof runs or turns capped runs into
-   completed ones, without losing required conflicts. Keep experimental
-   variants in `../lib/extensions/`; production holds only the chosen behaviour. Update
-   tests to assert the contract (conflicts kept; propagation intentionally
-   removed stays removed). Re-run finalist ablations afterwards — a new baseline can
-   make other variants newly viable or newly risky.
+   only a search aid. Inspect existing helpers before adding another implementation.
+   For a shared utility, audit every caller and verify which handlers the selected
+   puzzles actually build. Check assumptions about input representation,
+   mutability and lifetime before reusing logic.
+3. *Record the baseline and workload.* Resolve the baseline to a commit SHA;
+   branch names and `HEAD` can move. Record working-tree changes, operation,
+   puzzle names, runtime version and caps. Include the reproduction and workloads
+   covering the affected consumers. Verify that they exercise the changed code.
+4. *Separate propagation from implementation cost.* Test one idea at a time,
+   then combinations. Compare variants that retain the old deductions but change
+   traversal or caching, and variants that change deductions. This distinguishes
+   extra work per call from a different search tree. Stronger propagation can
+   increase guesses; combining two individually useful rules can be worse than
+   either alone. Reuse the benchmark and ablation tools before writing a harness.
+5. *Check cost and representation before generalizing.* Avoid adding allocation,
+   string keys or per-call setup to frequent paths without measured justification.
+   Preserve efficient existing cases when extending a helper. Specialize on
+   mathematical or representation preconditions, not puzzle identity. For a
+   simplification, account for added bookkeeping and branches as well as removed
+   code. A clearer prototype is useful for testing a deduction; its runtime is
+   not evidence that every implementation of the idea has the same cost.
+6. *Validate answers and measure finalists.* Compare solution contents, not only
+   counts; compare complete candidate sets for All possibilities. Use small
+   exhaustive or randomized assignment checks when pruning logic warrants them.
+   Counter identity checks measure search preservation, not correctness. Measure
+   the final shared implementation too: moving logic into a utility may change
+   consumers the initial prototype never exercised.
+7. *Decide from the whole comparison.* Report both runtime and guesses, including
+   regressions. A tradeoff can be acceptable for the user's workload, but a win on
+   one puzzle or aggregate is not a general improvement. Keep only the chosen
+   production behavior and meaningful contract tests. Record rejected variants
+   and their evidence so they need not be rediscovered.
+
+**Timing discipline.** Run timed variants sequentially without competing
+benchmarks. Use fresh processes for revision comparisons; repeat close results
+in reversed order or interleave warmed variants to reduce order effects. State
+the warmup and statistic: `benchmark_puzzles --repeat` reports best `ms` plus
+median/max, and `bench_vs_ref` reports both best and median ratios. A sum of
+per-puzzle medians is not the median of whole-batch runs. Both currently time
+search after construction; measure initialization separately if changing tables
+or caches. Remove profiling wrappers for final timing. Small deltas within the
+observed spread are inconclusive, even if printed with many decimal places.
 
 **Traps.**
 
@@ -182,14 +216,15 @@ not a win/loss ranked by how much work it did.
   the whole tree. Benchmark "no useful work" cleanups; the clean evidence is flat
   node/guess counts with lower wall time. Any node-count move is a heuristic side
   effect — confirm it's a net win across the workload, not one puzzle.
-- **Verify "behaviour-preserving", don't assume it.** A cache or incremental value
+- **Verify "search-preserving", don't assume it.** A cache or incremental value
   must reproduce *every* output the original fed downstream, including incidental
   ones — a tiebreak, a lowest-index choice, or iteration order can flip an
   order-sensitive consumer. Pass condition: identical search counters across the
-  workload; if any counter moves it isn't equivalent — find out why before judging
-  speed. To localize fast, keep both implementations and assert equality in-run,
-  then remove the scaffold before promoting.
-- **Tiny case helps, representative case hurts** → don't promote.
+  workload; if a counter moves, inspect the changed ordering or deductions before
+  attributing the timing difference to faster code. Identical valid answers can
+  still produce different search counters. To localize fast, keep both
+  implementations and assert equality in-run, then remove the scaffold before
+  promoting.
 - **Strong in ablation, weak in production** → suspect the trigger/scheduling model
   (e.g. a singleton-triggered handler fires only when the engine schedules fixed
   cells, not on every candidate change).
@@ -198,13 +233,18 @@ not a win/loss ranked by how much work it did.
 - Avoid special-casing specific constraint types or puzzles unless it's a robust,
   theory-backed optimization.
 
-**Experiment log.** Keep a short note per experiment so rejected ideas (and why)
-aren't rediscovered:
+**Experiment log.** Keep exact commands and per-puzzle results. Name the contents
+of a batch rather than referring only to its size. Summaries should show completed
+totals per relevant set, improved/regressed/unchanged counts, significant individual
+regressions, answer checks and capped statuses. Record the baseline SHA and enough
+raw data to reproduce the decision; do not put experiment history in code comments.
 
 ```markdown
 ## <name>
 Hypothesis: <what should improve and why>
-Command: <exact command>   Workloads: <puzzles, caps, seeds>
-| variant | wall | guesses | backtracks | nodes | notes |
+Baseline: <SHA and working-tree changes>   Runtime: <version>
+Command: <exact command>   Operation / workloads / caps / seeds: <...>
+Timing: <warmup, repetitions, statistic, construction included or excluded>
+| puzzle / set | variant | status | wall | guesses | backtracks | nodes | answers |
 Decision: promote / reject / keep investigating
 ```
