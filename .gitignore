@@ -12,4 +12,5 @@ coverage/
 package-lock.json
 .github/
 .claude/
+.agents/
 .DS_Store
