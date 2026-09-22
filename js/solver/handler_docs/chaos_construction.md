@@ -366,6 +366,14 @@ BFS bucketed by accumulated cell-distance (a Dijkstra-style expansion where each
 optional shard contributes its size to the path cost), with budget
 `maxExtra = s − fixedSize`.
 
+Each distance bucket is a linked stack: one head per distance and one next
+pointer per shard root. Incoming cost depends only on the destination shard,
+so processing predecessors in increasing distance order makes the first
+discovery minimal. Each root is queued at most once; no decrease-key is needed.
+Prepending roots preserves LIFO order within each bucket. This needs `O(N + s)`
+storage rather than reserving `N` entries for every distance. Bucket heads need
+`s` entries even on rectangular grids where there are fewer than `s` regions.
+
 ```text
 function growComponentFromCore(grid, shardMask, r, fixedSize, coreRoot):
     budget ← s − fixedSize
@@ -579,8 +587,14 @@ function enforceCount(grid):
         # dropping the highest tells us whether one may fail to.
         propagate those bounds to each listed cell's region candidates
     if the first cell's region becomes fixed:
-        UNION listed cells proven to share it into one shard
+        UNION adjacent listed cells fixed to that region
 ```
+
+Changed region cells are queued normally. ChaosCount also merges adjacent listed
+cells already fixed to the first cell's region, queuing the merge endpoints.
+ChaosConstruction's next shard rebuild can discover the same unions (§5.1), but
+performing them here makes the shard state available immediately and preserves
+the propagation scheduling of these clues.
 
 `initialize` clamps the control to the feasible count range `[minCount, maxCount]`.
 The first listed cell is always in its own region, so `minCount ≥ 1` (count 0 is

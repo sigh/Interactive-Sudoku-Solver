@@ -61,6 +61,21 @@ const enforce = (context) => {
   return { result, acc };
 };
 
+await runTest('ChaosConstruction preserves rectangular partitions through distance pruning', () => {
+  for (const shape of ['4x2', '2x4', '16x2', '2x16']) {
+    const context = makeChaosContext(shape);
+    const { geometry, grid, regionCells } = context;
+    assert.equal(context.initialized, true);
+    assert.equal(enforce(context).result, true);
+    // Each long row/column is a valid connected region. Its labels must
+    // survive even when the distance budget exceeds the number of regions.
+    for (let cell = 0; cell < geometry.numGridCells; cell++) {
+      const region = geometry.numCols === 2 ? cell % 2 : (cell / geometry.numCols | 0);
+      assert.ok(grid[regionCells[cell]] & (1 << region), `${shape}: cell ${cell}`);
+    }
+  }
+});
+
 const makeShardArrow = (context, controlCell, regionRunArms) => {
   const regionArms = regionRunArms.map(arm => arm.map(c => context.regionCells[c]));
   const handler = new ChaosArrow(controlCell, regionArms, regionRunArms, 0, context.geometry.numValues);

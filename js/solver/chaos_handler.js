@@ -250,12 +250,15 @@ export class ChaosConstruction extends SudokuConstraintHandler {
     //     operation and never cross a phase boundary; each is reused for unrelated
     //     transient roles (never live together) and aliased to a descriptive local
     //     at the use site. Named by size, not role. ===
-    this._scratchRegions0 = new Uint16Array(this._numRegions);
+    // Also holds distance-bucket heads: rectangles can have fewer regions
+    // than the region size (the maximum number of distance buckets).
+    this._scratchRegions0 = new Uint16Array(Math.max(this._numRegions, this._regionSize));
     // Uint8: these hold grid-cell indices / union-find roots only. Grid cells are
     // capped at 16x16 = 256 (numValues <= 16), so they never exceed 255 — unlike
     // the region-label var cells, which live above the grid and use Uint16 above.
     this._scratchGridCells0 = new Uint8Array(numGridCells);
-    this._scratchRoots0 = new Uint8Array(this._regionSize * Math.max(numGridCells, this._numValues));
+    // Hidden-single witnesses, then per-root bucket links (including NO_CELL).
+    this._scratchRoots0 = new Uint16Array(Math.max(numGridCells, this._numRegions * this._numValues));
 
     const regionCellOffset = this._regionCellOffset;
 
@@ -495,12 +498,11 @@ export class ChaosConstruction extends SudokuConstraintHandler {
     const shardOffset = this._regionShardOffset;
     const stack = this._scratchGridCells0;
     const visitMarks = this._visitMarks;
-    const rootsByDistance = this._scratchRoots0;
+    const nextRoots = this._scratchRoots0;
     // Connectivity runs after possible-count summaries have been consumed.
-    const rootCountsByDistance = this._scratchRegions0;
+    const headsByDistance = this._scratchRegions0;
     const shardSizes = shards.sizes;
     const nextCells = shards.nextCells;
-    const numGridCells = this._numGridCells;
     let componentSize = fixedSize;
     let componentRootCount = 0;
     let reachedFixedSize = shardSizes[startRoot];
@@ -508,14 +510,15 @@ export class ChaosConstruction extends SudokuConstraintHandler {
     // Shards fixed earlier in the pass can push the core past the region size.
     this._scratchGridCells0Size = 0;
     if (maxExtraSize < 0) return 0;
-    rootCountsByDistance.fill(0, 0, maxExtraSize + 1);
+    headsByDistance.fill(NO_CELL, 0, maxExtraSize + 1);
     visitMarks[startRoot] = visitId;
-    rootsByDistance[rootCountsByDistance[0]++] = startRoot;
+    nextRoots[startRoot] = NO_CELL;
+    headsByDistance[0] = startRoot;
 
     for (let rootDistance = 0; rootDistance <= maxExtraSize; rootDistance++) {
-      const bucketOffset = rootDistance * numGridCells;
-      while (rootCountsByDistance[rootDistance]) {
-        const root = rootsByDistance[bucketOffset + --rootCountsByDistance[rootDistance]];
+      while (headsByDistance[rootDistance] !== NO_CELL) {
+        const root = headsByDistance[rootDistance];
+        headsByDistance[rootDistance] = nextRoots[root];
 
         for (let cell = root; cell !== NO_CELL; cell = nextCells[cell]) {
           const neighborOffset = cell << 2;
@@ -543,8 +546,11 @@ export class ChaosConstruction extends SudokuConstraintHandler {
             }
 
             visitMarks[neighborRoot] = visitId;
-            rootsByDistance[neighborDistance * numGridCells
-              + rootCountsByDistance[neighborDistance]++] = neighborRoot;
+            // Incoming cost depends only on the destination shard. Increasing
+            // distance order makes first discovery minimal, so each root needs
+            // one link. Prepending preserves the former buckets' LIFO order.
+            nextRoots[neighborRoot] = headsByDistance[neighborDistance];
+            headsByDistance[neighborDistance] = neighborRoot;
             if (isFixedRoot) {
               reachedFixedSize += shardSizes[neighborRoot];
             } else {
