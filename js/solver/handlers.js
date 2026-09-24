@@ -2143,9 +2143,10 @@ export class Between extends SudokuConstraintHandler {
   }
 
   initialize(initialGridCells, cellExclusions, geometry, stateAllocator) {
-    const exclusionGroups = HandlerUtil.findExclusionGroups(
-      this._mids, cellExclusions).groups;
-    const maxGroupSize = Math.max(0, ...exclusionGroups.map(a => a.length));
+    const exclusionGroups = HandlerUtil.findOverlappingExclusionGroups(
+      sortedArrayCopy(this._mids, true), cellExclusions);
+    const maxGroupSize = Math.max(
+      this._mids.length ? 1 : 0, ...exclusionGroups.map(g => g.length));
     const minEndsDelta = maxGroupSize ? maxGroupSize + 1 : 0;
 
     this._binaryConstraint = new BinaryConstraint(

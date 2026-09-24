@@ -68,4 +68,25 @@ await runTest('init constrains endpoints via binary with exclusion groups', () =
   assert.equal(grid[3], valueMask(1, 4));
 });
 
+await runTest('empty middle does not require an endpoint gap', () => {
+  const context = new GridTestContext({ gridSize: [1, 4], numValues: 4 });
+  const handler = new Between([0, 3]);
+  const exclusions = createCellExclusions({ numCells: 4, allUnique: false });
+  assert(context.initializeHandler(handler, { cellExclusions: exclusions }));
+  context.grid[0] = context.grid[3] = valueMask(1);
+  assert(handler.enforceConsistency(context.grid, createAccumulator()));
+});
+
+for (const mids of [[1], [1, 2], [1, 1]]) {
+  await runTest(`middle cells ${mids} require a gap without exclusions`, () => {
+    const context = new GridTestContext({ gridSize: [1, 4], numValues: 4 });
+    const handler = new Between([0, ...mids, 3]);
+    const exclusions = createCellExclusions({ numCells: 4, allUnique: false });
+    assert(context.initializeHandler(handler, { cellExclusions: exclusions }));
+    context.grid[0] = valueMask(1);
+    assert(handler.enforceConsistency(context.grid, createAccumulator()));
+    assert.equal(context.grid[3], valueMask(3, 4));
+  });
+}
+
 logSuiteComplete('between.test.js');
