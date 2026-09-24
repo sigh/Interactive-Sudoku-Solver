@@ -177,4 +177,121 @@ await runTest('offset: control counts distinct values in a 0-indexed grid', () =
   assert.equal(grid[0], valueMask0(2));
 });
 
+const withExclusionPairs = () => {
+  const context = new GridTestContext({ gridSize: 4 });
+  const handler = new CountDistinct(0, [1, 2, 3, 4, 5]);
+  const exclusions = noExclusions(16);
+  exclusions.addMutualExclusion(1, 2);
+  exclusions.addMutualExclusion(3, 4);
+  assert(context.initializeHandler(handler, { cellExclusions: exclusions }));
+  return { handler, grid: context.grid };
+};
+
+await runTest('saturated exclusion groups restrict every counted cell', () => {
+  const { handler, grid } = withExclusionPairs();
+  grid[0] = valueMask(3);
+  grid[1] = grid[2] = valueMask(1, 2, 3);
+  grid[3] = grid[4] = valueMask(2, 3, 4);
+  const acc = createAccumulator();
+  assert(handler.enforceConsistency(grid, acc));
+  assert.equal(grid[5], valueMask(1, 2, 3, 4));
+
+  // Once only two values are allowed, both pairs use the entire value set.
+  grid[0] = valueMask(2);
+  assert(handler.enforceConsistency(grid, acc));
+  for (let c = 1; c <= 5; c++) assert.equal(grid[c], valueMask(2, 3));
+});
+
+await runTest('saturated groups reject an intersection smaller than the count', () => {
+  const { handler, grid } = withExclusionPairs();
+  grid[0] = valueMask(2);
+  grid[1] = grid[2] = valueMask(1, 2);
+  grid[3] = grid[4] = valueMask(2, 3);
+  assert.equal(handler.enforceConsistency(grid, createAccumulator()), false);
+});
+
+await runTest('saturated group propagation does not retain branch candidates', () => {
+  const { handler, grid } = withExclusionPairs();
+  grid[0] = valueMask(2);
+  for (const mask of [valueMask(1, 2), valueMask(3, 4)]) {
+    const branch = grid.slice();
+    branch[1] = branch[2] = mask;
+    assert(handler.enforceConsistency(branch, createAccumulator()));
+    for (let c = 1; c <= 5; c++) assert.equal(branch[c], mask);
+  }
+});
+
+await runTest('initialization discovers overlapping groups from pairwise exclusions', () => {
+  const context = new GridTestContext({ gridSize: 4 });
+  const handler = new CountDistinct(0, [1, 2, 3, 4, 5]);
+  const exclusions = noExclusions(16);
+  for (const group of [[1, 2, 3], [3, 4, 5]]) {
+    for (let i = 0; i < group.length; i++) for (let j = i + 1; j < group.length; j++) {
+      exclusions.addMutualExclusion(group[i], group[j]);
+    }
+  }
+  assert(context.initializeHandler(handler, { cellExclusions: exclusions }));
+  const grid = context.grid;
+  grid[0] = valueMask(3);
+  grid[1] = grid[2] = valueMask(1, 2, 3, 4);
+  grid[3] = grid[4] = grid[5] = valueMask(2, 3);
+  // The disjoint partition picks {1,2,3} and {4,5}, neither of which fails.
+  // The overlapping triple {3,4,5} needs three different values but has two.
+  assert.equal(handler.enforceConsistency(grid, createAccumulator()), false);
+});
+
+await runTest('exclusion propagation preserves exhaustive assignment supports', () => {
+  // Enumerate assignments independently of the propagator, with arbitrary
+  // exclusion graphs, both value offsets, and sometimes a counted control.
+  let seed = 29389;
+  const random = n => {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    return seed % n;
+  };
+  let supportedStates = 0;
+  for (const offset of [0, -1]) for (let trial = 0; trial < 300; trial++) {
+    const geometry = CellGeometry.fromGridSize(4, 4, 4, offset);
+    const context = new GridTestContext({ geometry });
+    const control = trial % 3 === 0 ? 3 : 4;
+    const handler = new CountDistinct(control, [0, 1, 2, 3]);
+    const exclusions = noExclusions(16);
+    const edges = [];
+    for (let a = 0; a < 4; a++) for (let b = a + 1; b < 4; b++) {
+      if (random(3) !== 0) continue;
+      edges.push([a, b]);
+      exclusions.addMutualExclusion(a, b);
+    }
+    const initialized = context.initializeHandler(handler, { cellExclusions: exclusions });
+    const grid = context.grid;
+    for (let c = 0; c < 5; c++) grid[c] &= 1 + random(15);
+    const supports = new Uint16Array(5);
+    const values = [];
+    let solutions = 0;
+    const enumerate = i => {
+      if (i === 4) {
+        const count = new Set(values).size;
+        if (count > 4 + offset || !(grid[control] & (1 << (count - offset - 1)))) return;
+        if (control < 4 && values[control] !== count) return;
+        solutions++;
+        for (let c = 0; c < 4; c++) supports[c] |= 1 << (values[c] - offset - 1);
+        supports[control] |= 1 << (count - offset - 1);
+        return;
+      }
+      for (let value = 1 + offset; value <= 4 + offset; value++) {
+        if (!(grid[i] & (1 << (value - offset - 1)))) continue;
+        if (edges.some(([a, b]) => b === i && values[a] === value)) continue;
+        values[i] = value;
+        enumerate(i + 1);
+      }
+    };
+    enumerate(0);
+    const valid = initialized && handler.enforceConsistency(grid, createAccumulator());
+    if (!solutions) continue;
+    supportedStates++;
+    assert(valid, 'must not reject a satisfying assignment');
+    for (let c = 0; c < 5; c++) assert.equal(supports[c] & ~grid[c], 0);
+  }
+  assert(supportedStates > 50, 'exercise satisfiable states as well as conflicts');
+});
+
 logSuiteComplete('count_distinct.test.js');

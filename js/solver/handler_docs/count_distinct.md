@@ -348,18 +348,44 @@ Two facts collapse this to one branchless loop with no per-owner storage:
 A value survives the min side iff it is in `supported`; the per-cell `keep` is
 `maxSup_j ∨ supported` intersected with `D_j` (§2.4).
 
-## 5. A Static Lower Bound from Exclusions
+## 5. Exclusion Groups
 
 One extra deduction is applied once, at `initialize`, that the value-domain
 reasoning above cannot make. If several counted cells are pairwise
 *mutually exclusive* — they share a row, column, or box, so the engine already
 forbids them from being equal — then they are guaranteed to take different values,
 so the distinct count is at least the size of the largest such group. The handler
-finds these groups with `HandlerUtil.findExclusionGroups` and raises the control's
+finds overlapping groups directly from `CellExclusions` with
+`HandlerUtil.findOverlappingExclusionGroups`, and raises the control's
 initial lower bound accordingly. This is sound (mutually exclusive cells really
 must differ) and is strictly extra information, because the NValue constraint by
 itself does not know that two counted cells cannot be equal. Domains only shrink
 during search, so the bound, applied once, never needs revisiting.
+
+Overlapping-group discovery runs only during initialization. It greedily grows a
+clique from an exclusion pair not covered by an earlier discovered group, then
+marks all pairs in that clique covered. For `n` counted cells it stops after at
+most `n` attempts, bounding both the number of groups and discovery work. This is a
+heuristic, not exhaustive clique enumeration; missed groups only weaken pruning.
+It needs no declared-group metadata and can combine exclusions from different
+constraints. Each new group starts from an uncovered pair, so groups cannot be
+duplicates and need no separate deduplication.
+
+The handler retains the distinct largest groups. If a group has `k` cells and
+the control allows at most `k` distinct values, the group must use every value
+used anywhere in the counted set. Before the local NValue propagation, restrict
+every counted cell to the intersection of these groups' candidate unions:
+
+```text
+allowed = intersection over groups G of (union of domains in G)
+D_cell &= allowed   for every counted cell
+```
+
+An intersection with fewer than `k` values is a conflict. When the control still
+allows more than `k` values, this step does nothing. Smaller exclusion groups
+cannot saturate while a larger group already requires more values, so they need
+not be retained. The groups are immutable during search; this rule needs neither
+outside-cell dependencies nor additional backtracking state.
 
 ## 6. Implementation Notes
 

@@ -594,6 +594,37 @@ export class HandlerUtil {
   // When choosing a candidate, pick the best fitting (most exclusions).
   static GREEDY_STRATEGY_BEST = 1;
 
+  // Greedily find at most cells.length groups of pairwise mutually exclusive
+  // cells. Groups may overlap; discovery is not exhaustive.
+  // Seeding from uncovered pairs prevents duplicate groups.
+  // Requires distinct cell indices.
+  static findOverlappingExclusionGroups(cells, cellExclusions) {
+    const n = cells.length;
+    const exclusions = cells.map(cell => cellExclusions.getBitSet(cell));
+    const covered = new BitSet(n * n);
+    const groups = [];
+    for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
+      if (covered.has(i * n + j) || !exclusions[i].has(cells[j])) continue;
+      const group = [i, j];
+      const candidates = exclusions[i].clone();
+      candidates.intersect(exclusions[j]);
+      for (let candidate = 0; candidate < n; candidate++) {
+        if (candidate === i || candidate === j) continue;
+        if (candidates.has(cells[candidate])) {
+          group.push(candidate);
+          candidates.intersect(exclusions[candidate]);
+        }
+      }
+      groups.push(group.map(index => cells[index]));
+      if (groups.length === n) return groups;
+      // Mark only pairs the outer loop has yet to visit.
+      for (const a of group) for (const b of group) {
+        if ((a === i && b > j) || (a > i && b > a)) covered.add(a * n + b);
+      }
+    }
+    return groups;
+  }
+
   static findExclusionGroupsGreedy(cells, cellExclusions, strategy = HandlerUtil.GREEDY_STRATEGY_BEST, bitset = null) {
     const unassigned = bitset || new BitSet(Math.max(...cells) + 1);
     unassigned.clear();
@@ -3084,10 +3115,11 @@ export class CountDistinct extends SudokuConstraintHandler {
     const offset = geometry.valueOffset;
     const numCells = this._countedCells.length;
 
-    // Static lower bound from mutually-exclusive counted cells (§5).
-    const exclusionGroups = HandlerUtil.findExclusionGroups(
-      Array.from(this._countedCells), cellExclusions).groups;
+    // Larger exclusion groups forces a higher count (§5).
+    const cells = sortedArrayCopy(this._countedCells, true);
+    const exclusionGroups = HandlerUtil.findOverlappingExclusionGroups(cells, cellExclusions);
     const minDistinct = Math.max(1, ...exclusionGroups.map(g => g.length));
+    this._exclusionGroups = exclusionGroups.filter(g => g.length === minDistinct);
 
     CountDistinct._ensureScratch(numCells);
     this._numUnfixed = 0;
@@ -3103,6 +3135,9 @@ export class CountDistinct extends SudokuConstraintHandler {
   // NValue propagator (`control = #distinct(counted)`). See count_distinct.md for
   // the full derivation; the section references below point into it.
   enforceConsistency(grid, pQueue) {
+    if (this._exclusionGroups.length &&
+      !this._restrictToExclusionGroups(grid, pQueue)) return false;
+
     const countedCells = this._countedCells;
     const numCells = countedCells.length;
     const offset = this._valueOffset;
@@ -3213,6 +3248,34 @@ export class CountDistinct extends SudokuConstraintHandler {
       }
     }
 
+    return true;
+  }
+
+  _restrictToExclusionGroups(grid, pQueue) {
+    const size = this._exclusionGroups[0].length;
+    const maxCount = LookupTables.maxValue(grid[this._controlCell]) + this._valueOffset;
+    if (maxCount > size) return true;
+    if (maxCount < size) return false;
+
+    // A group of k mutually-different cells uses every counted value when
+    // the count is at most k. Intersect the candidate unions of such groups.
+    let allowed = (1 << this._numValues) - 1;
+    for (const group of this._exclusionGroups) {
+      let values = 0;
+      for (const cell of group) values |= grid[cell];
+      allowed &= values;
+    }
+    if (countOnes16bit(allowed) < size) return false;
+
+    for (const cell of this._countedCells) {
+      const value = grid[cell];
+      const restricted = value & allowed;
+      if (!restricted) return false;
+      if (restricted !== value) {
+        grid[cell] = restricted;
+        pQueue.addForCell(cell);
+      }
+    }
     return true;
   }
 
