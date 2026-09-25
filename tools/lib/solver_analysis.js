@@ -20,6 +20,7 @@ import { fileURLToPath } from 'node:url';
 import { ensureGlobalEnvironment } from '../../tests/helpers/test_env.js';
 import { buildSolutionGivenLadder, DEFAULT_LADDER_COUNTS } from './ladder.js';
 import { runSandboxToConstraint } from './sandbox_runner.js';
+import { groupCellIndexes, solutionChar } from './puzzle_runner.js';
 
 ensureGlobalEnvironment();
 
@@ -248,7 +249,10 @@ const solutionString = (grid, geometry) => {
 // With `collectSolutions`, the result gains `solutionSet`: every solution found,
 // as sorted digit strings — sorted because two runs that explore the tree in a
 // different order enumerate the same solutions in a different order.
-export const runSolve = (puzzle, { maxBacktracks, maxSolutions, collectSolutions }, onSolver) => {
+// With `solutionGroup` (Var group prefixes), the result also gains `groupSolution`:
+// the first solution read off those groups, for an answer the main grid does not
+// hold (#2121).
+export const runSolve = (puzzle, { maxBacktracks, maxSolutions, collectSolutions, solutionGroup }, onSolver) => {
   const constraint = SudokuParser.parseText(resolveInput(puzzle.input));
   const geometry = constraint.getGeometry();
   // Reconstruct constraint instances from their type+args, as the worker and
@@ -267,7 +271,7 @@ export const runSolve = (puzzle, { maxBacktracks, maxSolutions, collectSolutions
   const solutionSet = collectSolutions ? [] : null;
   const start = performance.now();
   internal.run(Object.keys(mode).length ? mode : null, (grid) => {
-    if (!firstGrid) firstGrid = grid.slice(0, geometry.numGridCells);
+    if (!firstGrid) firstGrid = grid.slice(0, solutionGroup ? undefined : geometry.numGridCells);
     if (solutionSet) solutionSet.push(solutionString(grid, geometry));
   });
   const elapsedMs = performance.now() - start;
@@ -292,7 +296,21 @@ export const runSolve = (puzzle, { maxBacktracks, maxSolutions, collectSolutions
     solution: actual,
   };
   if (solutionSet) result.solutionSet = solutionSet;
+  // The solver's own geometry: the one its var cells were registered on, so the
+  // indexes are the grid's.
+  if (solutionGroup) result.groupSolution = groupSolutionString(firstGrid, solver.geometry(), solutionGroup);
   return result;
+};
+
+// The first solution over the named Var groups, spelt the way a solution is pinned
+// back onto them (puzzle_runner.js), with '.' for a cell the grid left unfixed.
+const groupSolutionString = (grid, geometry, prefixes) => {
+  if (!grid) return '';
+  return groupCellIndexes(geometry, prefixes).map((cell) => {
+    const mask = grid[cell];
+    if (!mask || (mask & (mask - 1))) return '.';
+    return solutionChar(LookupTables.toOffsetValue(mask, geometry.valueOffset), geometry);
+  }).join('');
 };
 
 // --- Ablations ---------------------------------------------------------------

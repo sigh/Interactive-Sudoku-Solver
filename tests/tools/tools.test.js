@@ -28,6 +28,7 @@ import { main as sandboxMain } from '../../tools/debug/run_sandbox.js';
 import {
   injectSolutionGivens, injectSolutionGivensForGroup,
 } from '../../tools/lib/puzzle_runner.js';
+import { runSolve } from '../../tools/lib/solver_analysis.js';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 
@@ -144,6 +145,24 @@ await runTest('verify_solution.js --solution-group pins the answer onto the grou
       '--solution', '1134', '--solution-group', 'VX')));
   assert.match(bad.thrown?.message ?? '', /rejected/);
   assert.match(bad.stdout, /Result: REJECTED/);
+});
+
+// The benchmark's --solution-group reads a found answer back off the groups (#2121):
+// the main grid is the 1x1 placeholder, so only the group holds the answer. It must
+// come out in the order and spelling the pinning above reads back in.
+await runTest('runSolve reads a solution off a Var group, round-tripping the pin', async () => {
+  // R1C1 is the placeholder: pinned so the only freedom is the group's.
+  const input = GROUP_PUZZLE + '.~R1C1_1.~VX1_4.~VX2_2.~VX3_1';
+  const result = runSolve({ name: 'group', input },
+    { maxBacktracks: 100, maxSolutions: 2, solutionGroup: ['VX'] });
+  assert.equal(result.status, 'unique');
+  assert.equal(result.groupSolution, '4213');
+  const back = await capture(() =>
+    verifyMain(argv('verify_solution.js', '--input', GROUP_PUZZLE,
+      '--solution', result.groupSolution, '--solution-group', 'VX')));
+  assert.match(back.stdout, /Result: ACCEPTED/);
+  assert.equal(runSolve({ name: 'group', input }, { maxBacktracks: 100 }).groupSolution,
+    undefined, 'no group asked for, none reported');
 });
 
 // A grid playing past 9 has to write each value as one character, and it numbers them

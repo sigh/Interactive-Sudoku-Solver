@@ -106,16 +106,15 @@ export const buildSolver = (input) => {
 // Several prefixes ('VL,VR') consume the digits in the order given: a canvas an
 // ISS grid cannot hold may need one group per region, and stacking them keeps each
 // region's own cell order intact rather than interleaving them into one group.
-export const injectSolutionGivensForGroup = (input, digits, prefixes) => {
-  // Resolve the geometry only -- building a solver here would compile every
-  // handler (and any NFA) a second time just to read the group's cell ids.
-  const constraint = SudokuBuilder.resolveConstraint(SudokuParser.parseText(input));
-  const geometry = constraint.getGeometry();
-  geometry.addVarCellsForConstraints([].concat(...constraint.toMap().values()));
+const groupNames = (prefixes) =>
+  Array.isArray(prefixes) ? prefixes : String(prefixes).split(',');
 
-  const names = Array.isArray(prefixes) ? prefixes : String(prefixes).split(',');
+// The cells of the named Var groups, in the order named. Pinning an answer onto
+// groups and reading one back off them both go through here, so the two agree on
+// which digit is which cell. `geometry` must already carry the groups' var cells.
+export const groupCellIndexes = (geometry, prefixes) => {
   const cells = [];
-  for (const prefix of names) {
+  for (const prefix of groupNames(prefixes)) {
     const groupCells = geometry.varCellsForGroup(prefix);
     if (!groupCells) {
       const known = geometry.varCellGroups().map(g => g.prefix).join(', ') || 'none';
@@ -124,6 +123,18 @@ export const injectSolutionGivensForGroup = (input, digits, prefixes) => {
     }
     cells.push(...groupCells);
   }
+  return cells;
+};
+
+export const injectSolutionGivensForGroup = (input, digits, prefixes) => {
+  // Resolve the geometry only -- building a solver here would compile every
+  // handler (and any NFA) a second time just to read the group's cell ids.
+  const constraint = SudokuBuilder.resolveConstraint(SudokuParser.parseText(input));
+  const geometry = constraint.getGeometry();
+  geometry.addVarCellsForConstraints([].concat(...constraint.toMap().values()));
+
+  const names = groupNames(prefixes);
+  const cells = groupCellIndexes(geometry, names);
   if (cells.length !== digits.length) {
     const sizes = names.length > 1 ? ` (${names.join(' + ')})` : '';
     throw new Error(
@@ -178,6 +189,10 @@ export const injectSolutionGivens = (input, digits) => {
 // spells 1 as 'A' instead, but that is not what payloads store -- BYD4TsYH9lU's
 // published 1-15 solution is hex, so reading 'a' as 1 would silently pin the wrong
 // digits.) Value ids take plain decimal, so the character is widened back out here.
+// How a solution string spells one value: the inverse of solutionValue below.
+export const solutionChar = (value, geometry) =>
+  geometry.maxValue() < 10 ? String(value) : value.toString(36);
+
 const solutionValue = (char, geometry) => {
   const maxValue = geometry.maxValue();
   if (maxValue < 10) return char;
