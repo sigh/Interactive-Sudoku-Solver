@@ -865,6 +865,11 @@ textarea {
   min-height: 1em;
 }
 
+#solution-iteration-state.disabled a {
+  color: inherit;
+  cursor: default;
+}
+
 #fake-input {
   opacity: 0;
   cursor: pointer;

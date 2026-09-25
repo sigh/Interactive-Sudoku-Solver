@@ -546,16 +546,7 @@ export class SolutionController {
 
   _solveStatusChanged(isSolving, method) {
     this._stateDisplay.setSolveStatus(isSolving, method);
-
-    if (isSolving) {
-      this._elements.stop.disabled = false;
-      this._elements.start.disabled = true;
-      this._elements.forward.disabled = true;
-      this._elements.end.disabled = true;
-      this._elements.back.disabled = true;
-    } else {
-      this._elements.stop.disabled = true;
-    }
+    this._elements.stop.disabled = !isSolving;
   }
 
   _handleResultUpdate(result) {
@@ -616,20 +607,23 @@ export class SolutionController {
     }
   }
 
+  // Navigation and step guides are disabled while a fetch is in flight, as
+  // the runner ignores them then.
   _handleIterationChange(state) {
     this._elements.iterationState.textContent = state.description || '';
+    this._elements.iterationState.classList.toggle('disabled', state.fetching);
 
-    this._elements.back.disabled = state.isAtStart;
-    this._elements.start.disabled = state.isAtStart;
-    this._elements.forward.disabled = state.isAtEnd;
-    this._elements.end.disabled = state.isAtEnd;
+    this._elements.back.disabled = state.fetching || state.isAtStart;
+    this._elements.start.disabled = state.fetching || state.isAtStart;
+    this._elements.forward.disabled = state.fetching || state.isAtEnd;
+    this._elements.end.disabled = state.fetching || state.isAtEnd;
 
     // Build status element from statusData (for step-by-step mode)
     if (state.statusData) {
       this._elements.iterationState.appendChild(
         document.createTextNode(' '));
       this._elements.iterationState.appendChild(
-        this._buildStatusElement(state.statusData, state.onValueSelect));
+        this._buildStatusElement(state.statusData));
     }
   }
 
@@ -649,7 +643,7 @@ export class SolutionController {
   }
 
   // Build a DOM element for step-by-step status display.
-  _buildStatusElement(statusData, onValueSelect) {
+  _buildStatusElement(statusData) {
     const statusElem = document.createElement('span');
 
     if (statusData.values && statusData.values.length) {
@@ -662,9 +656,7 @@ export class SolutionController {
         const valueLink = document.createElement('a');
         valueLink.href = 'javascript:void(0)';
         valueLink.textContent = value;
-        if (onValueSelect) {
-          valueLink.onclick = () => onValueSelect(value);
-        }
+        valueLink.onclick = () => this._solverRunner.selectValue(value);
         statusElem.appendChild(valueLink);
       }
       statusElem.appendChild(document.createTextNode('}'));

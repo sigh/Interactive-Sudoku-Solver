@@ -869,6 +869,7 @@ class ScriptedStepSolver {
 
   nthStep(n, stepGuides) {
     this.calls.push({ n, guideSteps: [...stepGuides.keys()] });
+    this.lastGuides = structuredClone(stepGuides);
     return new Promise((resolve, reject) => {
       this._pending.push({ resolve, reject });
     });
@@ -909,7 +910,7 @@ await runTest('a failed step leaves the position on the displayed step', async (
     const iterations = [];
     const runner = new SolverRunner({
       onError: (e) => errors.push(e),
-      onIterationChange: (state) => iterations.push(state.index),
+      onIterationChange: (state) => iterations.push(state),
     });
     await runner.solve(makeSimpleConstraint(), { mode: 'step-by-step' });
     await waitForSettle();
@@ -922,7 +923,10 @@ await runTest('a failed step leaves the position on the displayed step', async (
     await waitForSettle();
 
     assert.equal(errors.length, 1);
-    assert.deepEqual(iterations, [0], 'the failed step is never reported as shown');
+    assert.deepEqual(iterations.filter(s => !s.fetching).map(s => s.index), [0, 0],
+      'the failed step is never reported as shown');
+    assert.equal(iterations.at(-1).fetching, false,
+      'the failure is reported, so the controls re-enable');
 
     // A guide applies to the displayed step (0), not the failed one (1).
     runner.handleAltClick(0);
@@ -935,6 +939,86 @@ await runTest('a failed step leaves the position on the displayed step', async (
     runner.next();
     await waitForSettle();
     assert.equal(solver.calls.at(-1).n, 1);
+    solver.resolveNext();
+    await waitForSettle();
+  });
+});
+
+// ============================================================================
+// One fetch at a time
+// ============================================================================
+
+await runTest('moves and guides are ignored while a step is being fetched', async () => {
+  await withScriptedStepSolver(async (solver) => {
+    const errors = [];
+    const iterations = [];
+    const runner = new SolverRunner({
+      onError: (e) => errors.push(e),
+      onIterationChange: (state) => iterations.push(state),
+    });
+    await runner.solve(makeSimpleConstraint(), { mode: 'step-by-step' });
+    await waitForSettle();
+    solver.resolveNext();  // Step 0 displayed.
+    await waitForSettle();
+    assert.equal(iterations.at(-1).fetching, false);
+
+    runner.next();  // Step 1 in flight.
+    await waitForSettle();
+    assert.equal(solver.calls.length, 2);
+    assert.deepEqual(
+      { index: iterations.at(-1).index, fetching: iterations.at(-1).fetching },
+      { index: 0, fetching: true },
+      'the UI is told a fetch is in flight, still showing step 0');
+
+    runner.handleAltClick(0);
+    runner.selectValue(1);
+    runner.next();
+    runner.previous();
+    runner.toStart();
+    runner.toEnd();
+    await waitForSettle();
+    assert.equal(solver.calls.length, 2, 'no solver call starts mid-fetch');
+
+    solver.resolveNext();  // Step 1 displayed.
+    await waitForSettle();
+    assert.deepEqual(errors, []);
+    assert.deepEqual(
+      { index: iterations.at(-1).index, fetching: iterations.at(-1).fetching },
+      { index: 1, fetching: false });
+
+    // Once the fetch lands, a guide applies to the displayed step.
+    runner.handleAltClick(0);
+    await waitForSettle();
+    assert.deepEqual(solver.calls.at(-1), { n: 1, guideSteps: [1] });
+    solver.resolveNext();
+    await waitForSettle();
+
+    // Selecting a value guides the displayed step too.
+    runner.selectValue(2);
+    await waitForSettle();
+    assert.equal(solver.calls.at(-1).n, 1);
+    assert.equal(solver.lastGuides.get(1).value, 2);
+    solver.resolveNext();
+    await waitForSettle();
+  });
+});
+
+await runTest('a fetch from a replaced solve does not lift the new solve\'s gate', async () => {
+  await withScriptedStepSolver(async (solver) => {
+    const runner = new SolverRunner();
+    await runner.solve(makeSimpleConstraint(), { mode: 'step-by-step' });
+    await waitForSettle();
+    // Solve A's step 0 is still in flight when solve B starts.
+    await runner.solve(makeSimpleConstraint(), { mode: 'step-by-step' });
+    await waitForSettle();
+    assert.equal(solver.calls.length, 2);
+
+    solver.resolveNext();  // A's stale step lands; B's step 0 still in flight.
+    await waitForSettle();
+    runner.next();
+    await waitForSettle();
+    assert.equal(solver.calls.length, 2, 'B is still fetching, so next is ignored');
+
     solver.resolveNext();
     await waitForSettle();
   });

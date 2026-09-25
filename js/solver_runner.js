@@ -15,6 +15,8 @@ class SolverSession {
   constructor() {
     this._abortController = new AbortController();
     this._solver = null;
+    // Number of result fetches in flight for this session.
+    this.fetchesInFlight = 0;
   }
 
   isAborted() {
@@ -291,6 +293,11 @@ class StepByStepModeHandler extends ModeHandler {
     this._listener();
   }
 
+  handleValueSelect(step, value) {
+    this._addStepGuideValue(step, value);
+    this._listener();
+  }
+
   _invalidateStepGuides(minStep) {
     for (const [s,] of this._stepGuides) {
       if (s >= minStep) this._stepGuides.delete(s);
@@ -319,7 +326,6 @@ class StepByStepModeHandler extends ModeHandler {
     const guide = this._stepGuides.get(step);
     guide.value = value;
     guide.depth = this._currentDepth;
-    this._listener();
   }
 
   _handleStep(i, result) {
@@ -353,8 +359,6 @@ class StepByStepModeHandler extends ModeHandler {
       description: `Step ${i}`,
       highlightCells: result.guessCell ? [result.guessCell] : [],
       branchCells: new Set(result.branchCells),
-      // Provide callback for value selection (for step-by-step UI)
-      onValueSelect: (value) => this._addStepGuideValue(i, value),
     }
   }
 
@@ -590,30 +594,32 @@ export class SolverRunner {
   }
 
   // --- Iteration control ---
+  //
+  // Moves and guides start a fetch, so they are ignored while one is in
+  // flight. This keeps at most one solver request outstanding. The same
+  // state is reported to the UI (onIterationChange's `fetching`), which
+  // disables these controls to match.
 
-  next() {
-    this._follow = false;
-    this._update(this._index + 1);
+  _isFetching() {
+    return this._session?.fetchesInFlight > 0;
   }
 
-  previous() {
-    this._follow = false;
-    this._update(this._index - 1);
+  next() { this._move(this._index + 1); }
+  previous() { this._move(this._index - 1); }
+  toStart() { this._move(0); }
+  // While following, the index is replaced by the last available one.
+  toEnd() { this._move(this._index, true); }
+
+  _move(index, follow = false) {
+    if (this._isFetching()) return;
+    this._follow = follow;
+    this._update(index);
   }
 
-  toStart() {
-    this._follow = false;
-    this._update(0);
-  }
-
-  toEnd() {
-    this._follow = true;
-    this._update();
-  }
-
-  // --- Alt-click handling ---
+  // --- Step guides ---
 
   handleAltClick(cellIndex) {
+    if (this._isFetching()) return;
     if (!this._handler?.ALLOW_ALT_CLICK) return;
     if (!this._currentResult?.solution) return;
 
@@ -625,6 +631,13 @@ export class SolverRunner {
     }
 
     this._handler.handleAltClick(this._index, cellIndex);
+  }
+
+  // Select one of the guess values listed for the displayed step.
+  selectValue(value) {
+    if (this._isFetching()) return;
+    if (!this._handler?.ALLOW_ALT_CLICK) return;
+    this._handler.handleValueSelect(this._index, value);
   }
 
   // --- Internal ---
@@ -648,36 +661,43 @@ export class SolverRunner {
       index = Math.max(0, Math.min(index, handler.maxIndex()));
     }
 
-    // Fetch result
-    const result = await handler.get(index);
-
-    if (session.isAborted()) return;
-
-    this._index = index;
-    this._currentResult = result || null;
-
-    // Notify update
-    this._onUpdate(this._currentResult);
-
-    // Notify iteration state change
-    if (handler.ITERATION_CONTROLS) {
-      const isAtStart = this._index === 0;
-      const isAtEnd = this._index >= handler.maxIndex();
-      this._onIterationChange({
-        index: this._index,
-        maxIndex: handler.maxIndex(),
-        isAtStart,
-        isAtEnd,
-        description: result?.description || '',
-        statusData: result?.statusData || null,
-        onValueSelect: result?.onValueSelect || null,
-      });
+    // Fetch and show the result. Report the fetch starting and finishing
+    // (whether it succeeded or failed).
+    session.fetchesInFlight++;
+    this._notifyIterationChange();
+    try {
+      const result = await handler.get(index);
+      if (session.isAborted()) return;
+      this._index = index;
+      this._currentResult = result || null;
+      this._onUpdate(this._currentResult);
+    } finally {
+      session.fetchesInFlight--;
+      this._notifyIterationChange();
     }
 
     // Continue following if needed
     if (this._follow && this._index < handler.maxIndex() && !session.isAborted()) {
       this._update();
     }
+  }
+
+  // Report the displayed position, and whether a fetch is in flight.
+  _notifyIterationChange() {
+    const handler = this._handler;
+    if (!handler?.ITERATION_CONTROLS) return;
+
+    const index = this._index;
+    const result = this._currentResult;
+    this._onIterationChange({
+      index: index,
+      maxIndex: handler.maxIndex(),
+      isAtStart: index === 0,
+      isAtEnd: index >= handler.maxIndex(),
+      fetching: this._isFetching(),
+      description: result?.description || '',
+      statusData: result?.statusData || null,
+    });
   }
 }
 
