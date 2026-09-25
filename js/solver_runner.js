@@ -552,6 +552,7 @@ export class SolverRunner {
       solver = await SolverProxy.makeSolver(
         constraints,
         (state) => {
+          if (session.isAborted()) return;
           this._stateHandler(state);
           if (state.extra?.solutions) {
             handler.add(...state.extra.solutions);
@@ -561,27 +562,27 @@ export class SolverRunner {
           }
         },
         (isSolving, method) => {
+          if (session.isAborted()) return;
           this._isSolving = isSolving;
           this._statusHandler(isSolving, method);
         },
         debugHandler
       );
     } catch (e) {
+      if (session.isAborted()) return;
       this._handleException(e);
       this._statusHandler(false, 'terminate');
       return;
     }
 
     session.setSolver(solver);
+    if (session.isAborted()) return;
 
     // Set up handler update listener
     handler.setUpdateListener(() => this._update());
     handler.setErrorListener((e) => this._handleException(e));
 
-    // Run the handler (if session wasn't aborted during setup)
-    if (!session.isAborted()) {
-      handler.run(solver).catch((e) => this._handleException(e));
-    }
+    handler.run(solver).catch((e) => this._handleException(e));
 
     // Initial update
     this._update();
@@ -594,8 +595,11 @@ export class SolverRunner {
     this._session = null;
     this._handler = null;
     this._currentResult = null;
-    this._isSolving = false;
     this._follow = false;
+    if (this._isSolving) {
+      this._isSolving = false;
+      this._statusHandler(false, 'terminate');
+    }
   }
 
   // --- Iteration control ---

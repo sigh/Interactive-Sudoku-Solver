@@ -1139,6 +1139,92 @@ await runTest('in a streaming mode, following lasts until the solve finishes', a
 });
 
 // ============================================================================
+// Replaced solves
+// ============================================================================
+
+// Solver builds that finish only when the test resolves or rejects them.
+const withDeferredSolverBuilds = async (fn) => {
+  const builds = [];
+  const savedMakeSolver = SolverProxy.makeSolver;
+  SolverProxy.makeSolver = (constraints, stateHandler, statusHandler) =>
+    new Promise((resolve, reject) => {
+      builds.push({ stateHandler, statusHandler, resolve, reject });
+    });
+  try {
+    await fn(builds);
+  } finally {
+    SolverProxy.makeSolver = savedMakeSolver;
+  }
+};
+
+const makeIdleSolver = () => ({
+  solveAllPossibilities: () => new Promise(() => { }),
+  nthSolution: () => new Promise(() => { }),
+  terminate() { this.terminated = true; },
+});
+
+await runTest('a solve replaced while its solver is built has no effect', async () => {
+  await withDeferredSolverBuilds(async (builds) => {
+    const states = [];
+    const statuses = [];
+    const runner = new SolverRunner({
+      stateHandler: (state) => states.push(state),
+      statusHandler: (isSolving, method) => statuses.push(method),
+    });
+    const solveA = runner.solve(makeSimpleConstraint(), { mode: 'all-possibilities' });
+    const solveB = runner.solve(makeSimpleConstraint(), { mode: 'solutions' });
+
+    // A's build reports and finishes after B replaced it.
+    builds[0].statusHandler(false, 'init');
+    builds[0].stateHandler({ done: false });
+    const solverA = makeIdleSolver();
+    builds[0].resolve(solverA);
+    assert.equal(await solveA, undefined);
+    assert.ok(solverA.terminated);
+    assert.deepEqual(states, []);
+    assert.deepEqual(statuses, []);
+
+    builds[1].resolve(makeIdleSolver());
+    assert.ok((await solveB) instanceof Modes.SOLUTIONS);
+  });
+});
+
+await runTest('abort while the solver is built reports the stop once', async () => {
+  await withDeferredSolverBuilds(async (builds) => {
+    const statuses = [];
+    const runner = new SolverRunner({
+      statusHandler: (isSolving, method) => statuses.push([isSolving, method]),
+    });
+    const solve = runner.solve(makeSimpleConstraint(), { mode: 'all-possibilities' });
+    builds[0].statusHandler(true, 'init');
+
+    runner.abort();
+    // The build finishing afterwards is ignored.
+    builds[0].statusHandler(false, 'init');
+    const solver = makeIdleSolver();
+    builds[0].resolve(solver);
+
+    assert.equal(await solve, undefined);
+    assert.ok(solver.terminated);
+    assert.deepEqual(statuses, [[true, 'init'], [false, 'terminate']]);
+    assert.equal(runner.isSolving(), false);
+  });
+});
+
+await runTest('a replaced solve\'s build failure is not reported', async () => {
+  await withDeferredSolverBuilds(async (builds) => {
+    const errors = [];
+    const runner = new SolverRunner({ onError: (e) => errors.push(e) });
+    const solveA = runner.solve(makeSimpleConstraint(), { mode: 'all-possibilities' });
+    runner.solve(makeSimpleConstraint(), { mode: 'all-possibilities' });
+
+    builds[0].reject(new Error('boom'));
+    assert.equal(await solveA, undefined);
+    assert.deepEqual(errors, []);
+  });
+});
+
+// ============================================================================
 // Cleanup
 // ============================================================================
 
