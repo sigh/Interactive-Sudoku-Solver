@@ -499,6 +499,8 @@ button.copy-to-clipboard-failed::after {
   box-sizing: border-box;
   border-left: 0.13em solid currentColor;
   border-right: 0.13em solid currentColor;
+  /* Allow clicks go to the button underneath */
+  pointer-events: none;
 }
 
 .highlight-group>.selected-cells {
