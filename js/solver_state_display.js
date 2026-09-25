@@ -429,7 +429,7 @@ class StateHistoryDisplay {
     chartContainer.appendChild(titleElem);
 
     const canvasContainer = document.createElement('div');
-    canvasContainer.style.height = this.CHART_HEIGHT;
+    canvasContainer.style.height = `${this.CHART_HEIGHT}px`;
     chartContainer.appendChild(canvasContainer);
 
     const ctx = document.createElement('canvas');

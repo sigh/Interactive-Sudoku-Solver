@@ -91,6 +91,11 @@ body {
   align-self: center;
 }
 
+/* Block, so no space is left below it for text descenders. */
+#sudoku-grid>svg {
+  display: block;
+}
+
 .click-interceptor-svg {
   z-index: 100;
   position: absolute;
