@@ -51,7 +51,7 @@ class ModeHandler {
 
   ITERATION_CONTROLS = false;
   ALLOW_DOWNLOAD = false;
-  ALLOW_ALT_CLICK = false;
+  ALLOW_STEP_GUIDES = false;
 
   constructor() {
     this._solver = null;
@@ -268,7 +268,7 @@ class StepByStepModeHandler extends ModeHandler {
       Alt-click on a cell to force the solver to resolve it next.`;
 
   ITERATION_CONTROLS = true;
-  ALLOW_ALT_CLICK = true;
+  ALLOW_STEP_GUIDES = true;
 
   constructor() {
     super();
@@ -485,6 +485,7 @@ export class SolverRunner {
     this._onError = options.onError || ((e) => console.error(e));
     this._onUpdate = options.onUpdate || (() => { });
     this._onIterationChange = options.onIterationChange || (() => { });
+    this._onFetchStart = options.onFetchStart || (() => { });
 
     this._session = null;
     this._handler = null;
@@ -596,9 +597,9 @@ export class SolverRunner {
   // --- Iteration control ---
   //
   // Moves and guides start a fetch, so they are ignored while one is in
-  // flight. This keeps at most one solver request outstanding. The same
-  // state is reported to the UI (onIterationChange's `fetching`), which
-  // disables these controls to match.
+  // flight. This keeps at most one solver request outstanding. The UI is told
+  // when a fetch starts (onFetchStart) and when it finishes
+  // (onIterationChange), and disables these controls to match.
 
   _isFetching() {
     return this._session?.fetchesInFlight > 0;
@@ -620,7 +621,7 @@ export class SolverRunner {
 
   handleAltClick(cellIndex) {
     if (this._isFetching()) return;
-    if (!this._handler?.ALLOW_ALT_CLICK) return;
+    if (!this._handler?.ALLOW_STEP_GUIDES) return;
     if (!this._currentResult?.solution) return;
 
     // Check if the cell has multiple possibilities (iterable)
@@ -636,7 +637,7 @@ export class SolverRunner {
   // Select one of the guess values listed for the displayed step.
   selectValue(value) {
     if (this._isFetching()) return;
-    if (!this._handler?.ALLOW_ALT_CLICK) return;
+    if (!this._handler?.ALLOW_STEP_GUIDES) return;
     this._handler.handleValueSelect(this._index, value);
   }
 
@@ -664,7 +665,7 @@ export class SolverRunner {
     // Fetch and show the result. Report the fetch starting and finishing
     // (whether it succeeded or failed).
     session.fetchesInFlight++;
-    this._notifyIterationChange();
+    if (handler.ITERATION_CONTROLS) this._onFetchStart();
     try {
       const result = await handler.get(index);
       if (session.isAborted()) return;

@@ -196,6 +196,7 @@ export class SolutionController {
         this._stateDisplay.setSolveStatus(false, 'terminate');
       },
       onUpdate: (result) => this._handleResultUpdate(result),
+      onFetchStart: () => this._handleFetchStart(),
       onIterationChange: (state) => this._handleIterationChange(state),
     });
 
@@ -608,7 +609,16 @@ export class SolutionController {
   }
 
   // Navigation and step guides are disabled while a fetch is in flight, as
-  // the runner ignores them then.
+  // the runner ignores them then. They are re-enabled by the
+  // _handleIterationChange that follows.
+  _handleFetchStart() {
+    this._elements.iterationState.classList.add('disabled');
+    this._elements.back.disabled = true;
+    this._elements.start.disabled = true;
+    this._elements.forward.disabled = true;
+    this._elements.end.disabled = true;
+  }
+
   _handleIterationChange(state) {
     this._elements.iterationState.textContent = state.description || '';
     this._elements.iterationState.classList.toggle('disabled', state.fetching);

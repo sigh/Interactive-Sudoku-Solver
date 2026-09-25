@@ -598,7 +598,7 @@ await runTest('validate-layout mode handler properties', async () => {
   // validate-layout has no iteration controls or downloads
   assert.equal(handler.ITERATION_CONTROLS, false);
   assert.equal(handler.ALLOW_DOWNLOAD, false);
-  assert.equal(handler.ALLOW_ALT_CLICK, false);
+  assert.equal(handler.ALLOW_STEP_GUIDES, false);
 });
 
 await runTest('validate-layout mode reports a valid layout with a sample solution', async () => {
@@ -642,7 +642,7 @@ await runTest('step-by-step mode returns step data with statusData', async () =>
   await waitForSettle();
 
   assert.ok(handler);
-  assert.equal(handler.ALLOW_ALT_CLICK, true);
+  assert.equal(handler.ALLOW_STEP_GUIDES, true);
   assert.equal(handler.ITERATION_CONTROLS, true);
 
   assert.ok(updateResult);
@@ -737,7 +737,7 @@ await runTest('handleAltClick should be safe when no handler', () => {
   runner.handleAltClick(0);
 });
 
-await runTest('handleAltClick should be ignored for modes without ALLOW_ALT_CLICK', async () => {
+await runTest('handleAltClick should be ignored for modes without ALLOW_STEP_GUIDES', async () => {
   const runner = new SolverRunner();
   const constraint = makeSimpleConstraint();
 
@@ -923,7 +923,7 @@ await runTest('a failed step leaves the position on the displayed step', async (
     await waitForSettle();
 
     assert.equal(errors.length, 1);
-    assert.deepEqual(iterations.filter(s => !s.fetching).map(s => s.index), [0, 0],
+    assert.deepEqual(iterations.map(s => s.index), [0, 0],
       'the failed step is never reported as shown');
     assert.equal(iterations.at(-1).fetching, false,
       'the failure is reported, so the controls re-enable');
@@ -952,8 +952,10 @@ await runTest('moves and guides are ignored while a step is being fetched', asyn
   await withScriptedStepSolver(async (solver) => {
     const errors = [];
     const iterations = [];
+    let fetchStarts = 0;
     const runner = new SolverRunner({
       onError: (e) => errors.push(e),
+      onFetchStart: () => fetchStarts++,
       onIterationChange: (state) => iterations.push(state),
     });
     await runner.solve(makeSimpleConstraint(), { mode: 'step-by-step' });
@@ -961,14 +963,14 @@ await runTest('moves and guides are ignored while a step is being fetched', asyn
     solver.resolveNext();  // Step 0 displayed.
     await waitForSettle();
     assert.equal(iterations.at(-1).fetching, false);
+    const reportsBefore = iterations.length;
 
     runner.next();  // Step 1 in flight.
     await waitForSettle();
     assert.equal(solver.calls.length, 2);
-    assert.deepEqual(
-      { index: iterations.at(-1).index, fetching: iterations.at(-1).fetching },
-      { index: 0, fetching: true },
-      'the UI is told a fetch is in flight, still showing step 0');
+    assert.equal(fetchStarts, 2, 'the UI is told a fetch is in flight');
+    assert.equal(iterations.length, reportsBefore,
+      'nothing else is reported until the fetch finishes');
 
     runner.handleAltClick(0);
     runner.selectValue(1);
