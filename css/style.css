@@ -490,6 +490,17 @@ button.copy-to-clipboard-failed::after {
   padding: 0;
 }
 
+/* Sized and offset to match the ink of the « ‹ › » glyphs. */
+.pause-icon {
+  position: relative;
+  top: 0.09em;
+  width: 0.36em;
+  height: 0.45em;
+  box-sizing: border-box;
+  border-left: 0.13em solid currentColor;
+  border-right: 0.13em solid currentColor;
+}
+
 .highlight-group>.selected-cells {
   fill: rgb(0, 0, 255);
   opacity: 0.1;

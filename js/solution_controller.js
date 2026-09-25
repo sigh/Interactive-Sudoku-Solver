@@ -196,7 +196,7 @@ export class SolutionController {
         this._stateDisplay.setSolveStatus(false, 'terminate');
       },
       onUpdate: (result) => this._handleResultUpdate(result),
-      onFetchStart: () => this._handleFetchStart(),
+      onFetchStart: (following) => this._lockIterationControls(following),
       onIterationChange: (state) => this._handleIterationChange(state),
     });
 
@@ -222,6 +222,9 @@ export class SolutionController {
       copyUrl: document.getElementById('copy-url-button'),
     }
 
+    this._pauseIcon = document.createElement('span');
+    this._pauseIcon.className = 'pause-icon';
+
     this._elements.copyUrl.onclick = () => {
       copyToClipboard(this._shareUrlToString(), this._elements.copyUrl);
     };
@@ -236,7 +239,10 @@ export class SolutionController {
       thresholdValue.textContent = thresholdInput.value;
       this._handleThresholdChange();
     };
-    this._elements.stop.onclick = () => this._solverRunner.abort();
+    this._elements.stop.onclick = () => {
+      this._solverRunner.abort();
+      this._lockIterationControls();
+    };
     this._elements.solve.onclick = () => this._solve();
 
     this._setUpAutoSolve();
@@ -396,7 +402,7 @@ export class SolutionController {
     this._elements.forward.onclick = () => this._solverRunner.next();
     this._elements.back.onclick = () => this._solverRunner.previous();
     this._elements.start.onclick = () => this._solverRunner.toStart();
-    this._elements.end.onclick = () => this._solverRunner.toEnd();
+    this._elements.end.onclick = () => this._solverRunner.toggleFollowing();
   }
 
   _showIterationControls(show) {
@@ -611,12 +617,12 @@ export class SolutionController {
   // Navigation and step guides are disabled while a fetch is in flight, as
   // the runner ignores them then. They are re-enabled by the
   // _handleIterationChange that follows.
-  _handleFetchStart() {
+  _lockIterationControls(following = false) {
     this._elements.iterationState.classList.add('disabled');
     this._elements.back.disabled = true;
     this._elements.start.disabled = true;
     this._elements.forward.disabled = true;
-    this._elements.end.disabled = true;
+    this._renderEndButton(following, !following);
   }
 
   _handleIterationChange(state) {
@@ -626,7 +632,8 @@ export class SolutionController {
     this._elements.back.disabled = state.fetching || state.isAtStart;
     this._elements.start.disabled = state.fetching || state.isAtStart;
     this._elements.forward.disabled = state.fetching || state.isAtEnd;
-    this._elements.end.disabled = state.fetching || state.isAtEnd;
+    this._renderEndButton(
+      state.following, !state.following && (state.fetching || state.isAtEnd));
 
     // Build status element from statusData (for step-by-step mode)
     if (state.statusData) {
@@ -635,6 +642,13 @@ export class SolutionController {
       this._elements.iterationState.appendChild(
         this._buildStatusElement(state.statusData));
     }
+  }
+
+  _renderEndButton(following, disabled) {
+    const end = this._elements.end;
+    end.disabled = disabled;
+    end.replaceChildren(following ? this._pauseIcon : '\u00BB');
+    end.title = following ? 'stop following' : 'end';
   }
 
   _downloadSolutionFile(solutions) {

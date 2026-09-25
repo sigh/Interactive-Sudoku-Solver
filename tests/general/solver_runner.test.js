@@ -890,7 +890,12 @@ class ScriptedStepSolver {
     this._pending.shift().reject(error);
   }
 
-  terminate() { }
+  // Resolve the oldest outstanding step as the end of the search.
+  resolveEnd() {
+    this._pending.shift().resolve(null);
+  }
+
+  terminate() { this.terminated = true; }
 }
 
 const withScriptedStepSolver = async (fn) => {
@@ -1024,6 +1029,113 @@ await runTest('a fetch from a replaced solve does not lift the new solve\'s gate
     solver.resolveNext();
     await waitForSettle();
   });
+});
+
+// ============================================================================
+// Following
+// ============================================================================
+
+await runTest('toggling follow off lets the step in flight land and requests no more', async () => {
+  await withScriptedStepSolver(async (solver) => {
+    const iterations = [];
+    const fetchStarts = [];
+    const runner = new SolverRunner({
+      onFetchStart: (following) => fetchStarts.push(following),
+      onIterationChange: (state) => iterations.push(state),
+    });
+    await runner.solve(makeSimpleConstraint(), { mode: 'step-by-step' });
+    await waitForSettle();
+    solver.resolveNext();  // Step 0 displayed.
+    await waitForSettle();
+
+    runner.toggleFollowing();  // Following; step 1 in flight.
+    await waitForSettle();
+    assert.equal(fetchStarts.at(-1), true, 'the UI is told playback is following');
+
+    // Allowed mid-fetch: it starts no fetch.
+    runner.toggleFollowing();
+    assert.equal(iterations.at(-1).following, false);
+    assert.equal(iterations.at(-1).fetching, true);
+
+    solver.resolveNext();  // Step 1 lands.
+    await waitForSettle();
+    assert.equal(iterations.at(-1).index, 1);
+    assert.equal(solver.calls.length, 2, 'no further step is requested');
+    assert.ok(!solver.terminated, 'the solver is left alone');
+  });
+});
+
+await runTest('following ends at the end of the step search', async () => {
+  await withScriptedStepSolver(async (solver) => {
+    const iterations = [];
+    const runner = new SolverRunner({
+      onIterationChange: (state) => iterations.push(state),
+    });
+    const handler = await runner.solve(makeSimpleConstraint(), { mode: 'step-by-step' });
+    await waitForSettle();
+    solver.resolveNext();  // Step 0.
+    await waitForSettle();
+
+    runner.toEnd();
+    await waitForSettle();
+    solver.resolveNext();  // Step 1; following requests step 2.
+    await waitForSettle();
+    assert.equal(iterations.at(-1).following, true);
+    solver.resolveEnd();  // Step 2 is the end of the search.
+    await waitForSettle();
+
+    assert.equal(handler.isDone(), true);
+    assert.deepEqual(
+      { index: iterations.at(-1).index, following: iterations.at(-1).following },
+      { index: 2, following: false });
+    assert.equal(solver.calls.length, 3);
+
+    // A guide changes the search path, so its end is unknown again.
+    runner.previous();
+    await waitForSettle();
+    solver.resolveNext();  // Step 1.
+    await waitForSettle();
+    runner.handleAltClick(0);
+    assert.equal(handler.isDone(), false);
+    await waitForSettle();
+    solver.resolveNext();
+    await waitForSettle();
+  });
+});
+
+await runTest('in a streaming mode, following lasts until the solve finishes', async () => {
+  let pushState = null;
+  const savedMakeSolver = SolverProxy.makeSolver;
+  SolverProxy.makeSolver = async (constraint, stateHandler) => {
+    pushState = stateHandler;
+    return {
+      solveAllPossibilities: () => new Promise(() => { }),
+      terminate() { },
+    };
+  };
+  try {
+    const iterations = [];
+    const runner = new SolverRunner({
+      onIterationChange: (state) => iterations.push(state),
+    });
+    await runner.solve(makeSimpleConstraint(), { mode: 'all-possibilities' });
+    await waitForSettle();
+
+    runner.toEnd();
+    await waitForSettle();
+    pushState({ extra: { solutions: [[1, 2], [2, 1]] } });
+    await waitForSettle();
+    assert.deepEqual(
+      { index: iterations.at(-1).index, following: iterations.at(-1).following },
+      { index: 2, following: true },
+      'caught up, but still following while the solver works');
+
+    pushState({ done: true });
+    await waitForSettle();
+    assert.equal(iterations.at(-1).following, false);
+  } finally {
+    SolverProxy.makeSolver = savedMakeSolver;
+  }
 });
 
 // ============================================================================

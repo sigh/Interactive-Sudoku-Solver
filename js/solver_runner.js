@@ -278,6 +278,7 @@ class StepByStepModeHandler extends ModeHandler {
     this._currentDepth = -1;
   }
 
+  // No-op: notifying the listener here would refresh while a step is in flight.
   setDone() { }
 
   async run(solver) {
@@ -302,6 +303,7 @@ class StepByStepModeHandler extends ModeHandler {
     for (const [s,] of this._stepGuides) {
       if (s >= minStep) this._stepGuides.delete(s);
     }
+    this._done = false;
   }
 
   _addStepGuideCell(step, cell) {
@@ -331,6 +333,7 @@ class StepByStepModeHandler extends ModeHandler {
   _handleStep(i, result) {
     if (result === null) {
       this._numSteps = i;
+      this._done = true;
       return {
         description: `Step ${i} [Done]`,
         diff: [],
@@ -592,6 +595,7 @@ export class SolverRunner {
     this._handler = null;
     this._currentResult = null;
     this._isSolving = false;
+    this._follow = false;
   }
 
   // --- Iteration control ---
@@ -610,6 +614,16 @@ export class SolverRunner {
   toStart() { this._move(0); }
   // While following, the index is replaced by the last available one.
   toEnd() { this._move(this._index, true); }
+
+  // Stopping starts no fetch, so it is allowed mid-fetch.
+  toggleFollowing() {
+    if (!this._follow) {
+      this.toEnd();
+      return;
+    }
+    this._follow = false;
+    this._notifyIterationChange();
+  }
 
   _move(index, follow = false) {
     if (this._isFetching()) return;
@@ -665,13 +679,16 @@ export class SolverRunner {
     // Fetch and show the result. Report the fetch starting and finishing
     // (whether it succeeded or failed).
     session.fetchesInFlight++;
-    if (handler.ITERATION_CONTROLS) this._onFetchStart();
+    if (handler.ITERATION_CONTROLS) this._onFetchStart(this._follow);
     try {
       const result = await handler.get(index);
       if (session.isAborted()) return;
       this._index = index;
       this._currentResult = result || null;
       this._onUpdate(this._currentResult);
+      if (this._follow && index >= handler.maxIndex() && handler.isDone()) {
+        this._follow = false;
+      }
     } finally {
       session.fetchesInFlight--;
       this._notifyIterationChange();
@@ -696,6 +713,7 @@ export class SolverRunner {
       isAtStart: index === 0,
       isAtEnd: index >= handler.maxIndex(),
       fetching: this._isFetching(),
+      following: this._follow,
       description: result?.description || '',
       statusData: result?.statusData || null,
     });
