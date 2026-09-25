@@ -16,7 +16,8 @@ causes.
 | `node tools/debug/step_analysis.js` | Walk the search step by step. Explain why a branch was chosen, show pencilmarks/var-cell candidates, the per-step propagation log (what each handler pruned + the refuter), and where an ablation makes the branching diverge. |
 | `node tools/debug/search_hotspots.js` | Where the search concentrates over a (bounded) solve: the conflict heatmap, the cells re-guessed most (churn), the branch-factor shape (grid vs var, MRV gap), and the propagation yield (how often guesses eliminate nothing — branching into the void). The headless view of the debug UI's heatmap. |
 | `node tools/debug/true_candidate_profile.js` | Profile the actual **All possibilities** search in a short, bounded window: candidate-support discovery, time spent after the last discovery, handler/constraint cost, and branch hotspots. |
-| `node tools/debug/decision_trace.js` | Export a solve's branch decisions to a trace file, and replay a trace to force another run onto the same order. Replaying a trace under an ablation/revision (B-frozen-order) isolates how much of a search change is pruning vs selection. |
+| `node tools/debug/decision_trace.js` | Export and replay a flat sequence of branch decisions. Useful for self-reproduction; cross-variant replay does not establish matching subtrees. |
+| `node tools/debug/search_experiment.js` | Compare cell/value choices from a verified execution prefix, measure local and remaining work, or locate the first different guess/conflict/solution event between variants. |
 | `node tools/debug/run_sandbox.js` | Run a [sandbox](../../js/sandbox/README.md) script outside the browser and print the constraints it returns. Generate or regenerate puzzle definitions (e.g. `.iss` files) without opening the browser; pipe the output into `solve.js`. |
 
 Run any script with `--help` for the full option reference.
@@ -267,17 +268,97 @@ node tools/debug/decision_trace.js --max-backtracks none --puzzle "Chaos Constru
 whenever it is still applicable, and reports the **guided fraction**:
 
 ```sh
-# B-frozen-order: replay A's trace under an ablation. A guided ratio near 100%
-# with the guess count unchanged means the ablation was pure selection (no
-# pruning value); a large guess change at high guided-fraction is pruning.
+# Replay A's sequence under an ablation. This is an ordering intervention;
+# its guided fraction does not establish that subtrees correspond.
 node tools/debug/decision_trace.js --max-backtracks none --puzzle "Chaos Construction" \
   --ablate demote-off --replay /tmp/a.ndjson
 ```
 
 Replaying a trace against its own build reproduces it exactly (100% guided,
-identical counters); a forced order can never turn a solvable puzzle unsolvable.
-Below ~90% guided the replaying build prunes a different tree and the tool says
-so — the decomposition is unmeasurable, reported honestly rather than as a
-number. Only **plain single-cell branches** are traced/forced; custom multi-cell
+identical counters). Across variants, an applicable recorded choice can belong
+to a different subtree: even 100% guided does not isolate pruning, selection,
+or learning. Only **plain single-cell branches** are traced/forced; custom multi-cell
 candidates (house/digit branches) are left to the heuristic, so on puzzles that
 lean on them the guided fraction is measured over the plain decisions.
+
+### `search_experiment.js` — controlled search interventions
+
+```sh
+node tools/debug/search_experiment.js --puzzle MATHEMAGIC_KILLERS --index 0 \
+  --at 21 --max-backtracks 1000000 --out /tmp/decision.json
+
+node tools/debug/search_experiment.js --puzzle 'Chaos Construction: 6x6' \
+  --at 2 --choices same,plain,runner-up --max-backtracks none
+
+node tools/debug/search_experiment.js --puzzle MATHEMAGIC_KILLERS --index 0 \
+  --at 21 --choices same --learning frozen --max-backtracks 1000000
+```
+
+`--at` is a one-based fresh branch index, including custom placement branches.
+Each alternative starts with a fresh solver and naturally re-executes the same
+history. The tool verifies a SHA-256 fingerprint of the execution prefix and a
+snapshot of the target state, then changes that one choice. An unchanged control
+must reproduce the complete report. It never reconstructs a node from givens.
+
+Choices: `same` preserves the original branch; `plain` replaces a placement
+branch with the selected cell's full domain; `mrv` chooses minimum domain size
+with current cell order breaking ties; `runner-up` selects the highest-ranked
+other cell; `max-value` uses the selected cell's highest value and a plain branch.
+The cell ranking includes conflict score, domain size, linked-cell and value
+boosts, using scores before selection's possible demotion of the preceding
+guess. It is not a ranking of custom placement branches.
+
+The JSON reports:
+
+- The target's domains, handler state, cell order, scores, ranking and prefix fingerprint.
+- The immediate propagation reductions and refuting handler, if any.
+- Work below the first arm, the whole selected node, and the remaining search.
+  A node closes when traversal returns above its starting cell depth. Work
+  includes forced processing and sibling trials. Each local total records
+  whether its subtree was exhausted; partial totals are not a performance verdict.
+- First-solution counters and credit assigned to forced versus guessed cells.
+- Full digit solution sets, checked for equality when both searches exhaust.
+
+`--learning frozen` disables increments, decay and demotion after reaching the
+target; `last-guess` credits the nearest active guessed ancestor, including its
+value score. These apply throughout the remaining search, not just the selected
+subtree. They are interventions, not reconstructions of another run's learning.
+The cap includes prefix work. Timing is intentionally omitted: these runs are
+instrumented, and no-op verification concerns search counters and answers.
+
+For propagation or other code experiments, `--compare-module /tmp/variant.mjs`
+loads a module exporting `apply()`, which installs the variant and returns a
+restore function. The tool compares complete runs and finds the first different
+guess, contradiction or solution event, including sibling retries. It stops aligning there: later branch indexes
+are not comparable. Equal event prefixes do not imply equal domains or scores.
+
+The library `tools/lib/search_experiment.js` also exposes `observeSearch`,
+`runDecisionExperiment` and `compareSearches`. Use its `configure(solver)` hook
+for targeted attribution experiments, explicit `{cell, value}` choices for
+crossovers, `onEvent` for streamed execution events, and `maxSolutions: 0`
+for exhaustive small-instance tests. Private solver access is confined to this
+analysis adapter. A prefix fingerprint is a reproducibility check, not a
+serializable checkpoint or a proof of state equivalence across implementations.
+
+For one-time credit attribution, `tools/lib/conflict_credit_experiment.js`
+exports `runCreditExperiment(puzzle, budgets, {at, failure, recipient})`.
+`failure` counts calls to conflict-score increment (not solution backtracks);
+`recipient` is `{cell, value}`, with a zero-based search cell and a single-bit
+value mask. `at` selects the fresh branch whose local work will be measured and
+must precede the credit update. The helper compares original, cell-only,
+value-only and combined credit, preserving the real increment/decay logic.
+
+It verifies the execution prefix and failed state, reproduces an unchanged
+control, checks completed digit solution sets, and captures both sides of the
+first different selection with their ranking terms. Selections include forced
+processing and sibling retries; the reported index is zero-based after the
+target conflict. Later indices are not aligned across diverged searches.
+`boostDifference` is the first different output of the value-score query before
+or at that split, including queries at forced steps where ranking may not use it.
+It measures potential signal differences, not necessarily changed choices.
+
+Use `{referenceMode: 'cell', modes: ['both']}` to isolate the value component
+conditional on a cell-credit change. A null divergence on a capped run establishes
+only that no split was observed within the recorded prefix. These experiments
+report instrumented counters, not performance timings, and do not change the
+production strategy.

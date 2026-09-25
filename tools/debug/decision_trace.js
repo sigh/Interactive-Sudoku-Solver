@@ -12,15 +12,13 @@
 //                        (cell, value) whenever it is still applicable (cell
 //                        unfixed, value present), reporting the guided fraction
 //                        and where the run diverged. Replaying a trace under a
-//                        different build (an ablation, a revision) is B-frozen-
-//                        order: node ratio vs the original isolates pure pruning
-//                        value from selection/learning shifts. Replaying a trace
+//                        different build is a sequence-guided intervention, not
+//                        an isolation of pruning from selection. Replaying a trace
 //                        against its own build reproduces it exactly (100%
 //                        guided, identical counters) — the correctness check.
 //
-// A trace is only meaningful at ~90%+ guided; below that, alignment has broken
-// down (the replaying build prunes a different tree) and the decomposition is
-// unmeasurable — reported honestly rather than as a number.
+// Applicability does not establish matching ancestry. Even 100% guided can
+// apply decisions to different subtrees after a propagation change.
 //
 // Usage:
 //   node tools/debug/decision_trace.js --max-backtracks <n|none> [options]
@@ -158,8 +156,8 @@ const runExport = (puzzle, budgets, out) => {
 // (cell, value) whenever applicable; classify each node as:
 //   guided   — forced onto the recorded decision (of which `overrode`: the live
 //              heuristic would have picked differently — where the orders differ).
-//   free     — the recorded cell was already fixed or its value pruned, so the
-//              run reached the same point for free (pure pruning value).
+//   free     — the recorded cell was fixed or its value absent. This does not
+//              establish that the corresponding original subtree was pruned.
 //   diverged — the trace ran out while the run kept branching (the replaying
 //              build has a bigger/other tree; the frozen order can't reach here).
 const runReplay = (puzzle, budgets, tracePath, top) => {
@@ -201,10 +199,8 @@ const runReplay = (puzzle, budgets, tracePath, top) => {
     `backtracks=${result.counters.backtracks} nodes=${result.counters.nodesSearched}`);
   console.log(`branch nodes=${nodes}  guided=${guided} (${guidedPct.toFixed(1)}%, ` +
     `${overrode} overriding the heuristic)  free=${free}  diverged=${diverged}`);
-  if (guidedPct < 90) {
-    console.log('WARNING: <90% guided — the replaying build prunes a different tree; ' +
-      'the frozen-order decomposition is unmeasurable here.');
-  }
+  console.log('Replay checks decision applicability, not matching ancestry. ' +
+    'Cross-variant ratios do not isolate pruning from selection or learning.');
   if (overrides.length) {
     console.log(`\nfirst ${overrides.length} order overrides:`);
     for (const o of overrides) console.log(`  ${o}`);

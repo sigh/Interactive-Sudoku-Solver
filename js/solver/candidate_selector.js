@@ -194,12 +194,6 @@ export class CandidateSelector {
       totalCandidateCount === this._prevCandidateCount) {
       this._conflictScores.demote(cellOrder[cellDepth - 1]);
     }
-    // Watch this node's guess if it branches widely enough to be worth demoting:
-    // store the candidate count it leaves behind (its child still having it means
-    // it eliminated nothing). -1 = not watching.
-    this._prevCandidateCount = isNewNode && count >= MIN_BRANCH_COUNT_FOR_DEMOTE
-      ? totalCandidateCount - (countOnes16bit(gridState[cellOrder[cellOffset]]) - 1)
-      : -1;
     if (cellDepth === 0 && this._debugLogger.logLevel >= 2) {
       this._debugLogger.log({
         loc: 'selectNextCandidate',
@@ -221,6 +215,11 @@ export class CandidateSelector {
         cellDepth, cellOrder, gridState, cellOffset, value, count,
         best.heuristicCell, !stepState);
     }
+
+    // Watch the chosen guess for a child with no propagation eliminations.
+    this._prevCandidateCount = isNewNode && count >= MIN_BRANCH_COUNT_FOR_DEMOTE
+      ? totalCandidateCount - (countOnes16bit(gridState[cellOrder[cellOffset]]) - 1)
+      : -1;
 
     // Adjust the value for step-by-step.
     if (stepState) {
@@ -277,10 +276,8 @@ export class CandidateSelector {
   // returned override. Returns the (possibly overridden) [cellOffset, value,
   // count]. A custom candidate (flag 1) is a multi-cell house/digit branch
   // (placementCells share placementValue); a plain branch is one cell's values.
-  // Only a plain branch is overridable — a custom branch isn't representable as
-  // a single (cell, value) — and only when allowOverride (outside step mode, so
-  // the step guide's adjustment isn't fought). An override yields another plain
-  // branch, so the search stays complete.
+  // An override selects a plain cell branch, replacing any pending placement
+  // branch. Overrides are disabled in step mode so they cannot fight the guide.
   _consultDecisionHook(cellDepth, cellOrder, gridState, cellOffset, value, count, heuristicCell, allowOverride) {
     const cell = cellOrder[cellOffset];
     const isCustom = this._candidateSelectionFlags[cellDepth] === 1;
@@ -304,13 +301,18 @@ export class CandidateSelector {
       descriptor.placementCells = [cell, ...[...state.cells].reverse()];
     }
     const override = this._decisionHook(descriptor);
-    if (override !== null && allowOverride && !isCustom) {
+    if (override !== null && allowOverride) {
       const newOffset = cellOrder.indexOf(override.cell, cellDepth);
-      if (newOffset !== -1) {
-        cellOffset = newOffset;
-        value = override.value;
-        count = countOnes16bit(gridState[cellOrder[cellOffset]]);
+      const mask = gridState[override.cell];
+      if (newOffset === -1 || !mask || !(mask & (mask - 1)) ||
+        !Number.isInteger(override.value) || override.value <= 0 ||
+        (override.value & (override.value - 1)) || !(mask & override.value)) {
+        throw new Error('Decision override must select an unfixed cell and one of its values');
       }
+      cellOffset = newOffset;
+      value = override.value;
+      count = countOnes16bit(mask);
+      this._candidateSelectionFlags[cellDepth] = 0;
     }
     return [cellOffset, value, count];
   }

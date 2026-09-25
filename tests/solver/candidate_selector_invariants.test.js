@@ -316,4 +316,32 @@ await runTest('CandidateSelector selects singletons at cell indices > 255', () =
   assert.equal(gridState[branchCell], value, 'branches on a bubbled singleton');
 });
 
+await runTest('Decision overrides watch the actual wide guess for demotion', () => {
+  const context = new GridTestContext({ gridSize: 9 });
+  const { selector } = makeSelector(context);
+  const grid = context.createGrid({ fill: context.lookupTables.allValues });
+  grid[0] = 3;
+  selector.setDecisionHook(() => ({ cell: 1, value: 1 }));
+  const [, , count] = select(selector, 0, grid, null, true);
+  assert.equal(count, 9);
+  assert.equal(selector._prevCandidateCount, 2 + 80 * 9 - 8);
+});
+
+await runTest('Decision overrides reject invalid values and replace placement branches completely', () => {
+  const context = new GridTestContext({ gridSize: 4 });
+  const { selector } = makeSelector(context);
+  const grid = context.createGrid({ fill: context.lookupTables.allValues });
+  for (const value of [0, 3, 16, -1]) {
+    selector.setDecisionHook(() => ({ cell: 0, value }));
+    assert.throws(() => select(selector, 0, grid, null, true), /Decision override/);
+  }
+  // Exercise the same hook with an already nominated placement branch.
+  selector._candidateSelectionFlags[0] = 1;
+  selector._candidateSelectionStates[0].cells = [2, 3];
+  selector.setDecisionHook(() => ({ cell: 1, value: 2 }));
+  const choice = selector._consultDecisionHook(0, selector.getCellOrder(), grid, 0, 1, 3, 0, true);
+  assert.deepEqual(choice, [1, 2, 4]);
+  assert.equal(selector._candidateSelectionFlags[0], 0);
+});
+
 logSuiteComplete('CandidateSelector invariants');
