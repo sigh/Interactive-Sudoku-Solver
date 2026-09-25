@@ -857,6 +857,90 @@ await runTest('solutions prefetch errors are reported to onError', async () => {
 });
 
 // ============================================================================
+// Committed position
+// ============================================================================
+
+// A step-mode solver whose steps resolve or fail only when the test says so.
+class ScriptedStepSolver {
+  constructor() {
+    this.calls = [];
+    this._pending = [];
+  }
+
+  nthStep(n, stepGuides) {
+    this.calls.push({ n, guideSteps: [...stepGuides.keys()] });
+    return new Promise((resolve, reject) => {
+      this._pending.push({ resolve, reject });
+    });
+  }
+
+  // Resolve the oldest outstanding step with a grid that has one
+  // multi-valued cell (cell 0), so it can be guided.
+  resolveNext() {
+    this._pending.shift().resolve({
+      pencilmarks: [new Set([1, 2]), 3],
+      branchCells: [],
+      isSolution: false,
+      hasConflict: false,
+    });
+  }
+
+  rejectNext(error) {
+    this._pending.shift().reject(error);
+  }
+
+  terminate() { }
+}
+
+const withScriptedStepSolver = async (fn) => {
+  const solver = new ScriptedStepSolver();
+  const savedMakeSolver = SolverProxy.makeSolver;
+  SolverProxy.makeSolver = async () => solver;
+  try {
+    await fn(solver);
+  } finally {
+    SolverProxy.makeSolver = savedMakeSolver;
+  }
+};
+
+await runTest('a failed step leaves the position on the displayed step', async () => {
+  await withScriptedStepSolver(async (solver) => {
+    const errors = [];
+    const iterations = [];
+    const runner = new SolverRunner({
+      onError: (e) => errors.push(e),
+      onIterationChange: (state) => iterations.push(state.index),
+    });
+    await runner.solve(makeSimpleConstraint(), { mode: 'step-by-step' });
+    await waitForSettle();
+    solver.resolveNext();  // Step 0 displayed.
+    await waitForSettle();
+
+    runner.next();
+    await waitForSettle();
+    solver.rejectNext(new Error('boom'));
+    await waitForSettle();
+
+    assert.equal(errors.length, 1);
+    assert.deepEqual(iterations, [0], 'the failed step is never reported as shown');
+
+    // A guide applies to the displayed step (0), not the failed one (1).
+    runner.handleAltClick(0);
+    await waitForSettle();
+    assert.deepEqual(solver.calls.at(-1), { n: 0, guideSteps: [0] });
+    solver.resolveNext();
+    await waitForSettle();
+
+    // The next move retries step 1 instead of skipping to step 2.
+    runner.next();
+    await waitForSettle();
+    assert.equal(solver.calls.at(-1).n, 1);
+    solver.resolveNext();
+    await waitForSettle();
+  });
+});
+
+// ============================================================================
 // Cleanup
 // ============================================================================
 

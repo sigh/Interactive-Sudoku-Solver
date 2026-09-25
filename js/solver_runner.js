@@ -592,21 +592,18 @@ export class SolverRunner {
   // --- Iteration control ---
 
   next() {
-    this._index++;
     this._follow = false;
-    this._update();
+    this._update(this._index + 1);
   }
 
   previous() {
-    this._index--;
     this._follow = false;
-    this._update();
+    this._update(this._index - 1);
   }
 
   toStart() {
-    this._index = 0;
     this._follow = false;
-    this._update();
+    this._update(0);
   }
 
   toEnd() {
@@ -632,11 +629,13 @@ export class SolverRunner {
 
   // --- Internal ---
 
-  _update() {
-    this._uncheckUpdate().catch((e) => { this._handleException(e); });
+  // Show the result at index (default: refresh the current one). _index only
+  // changes once the result is shown, so it always matches the display.
+  _update(index = this._index) {
+    this._uncheckUpdate(index).catch((e) => { this._handleException(e); });
   }
 
-  async _uncheckUpdate() {
+  async _uncheckUpdate(index) {
     const handler = this._handler;
     const session = this._session;
 
@@ -644,16 +643,17 @@ export class SolverRunner {
 
     // Update index based on mode and bounds
     if (this._follow) {
-      this._index = handler.maxIndex();
+      index = handler.maxIndex();
     } else {
-      this._index = Math.max(0, Math.min(this._index, handler.maxIndex()));
+      index = Math.max(0, Math.min(index, handler.maxIndex()));
     }
 
     // Fetch result
-    const result = await handler.get(this._index);
+    const result = await handler.get(index);
 
     if (session.isAborted()) return;
 
+    this._index = index;
     this._currentResult = result || null;
 
     // Notify update
