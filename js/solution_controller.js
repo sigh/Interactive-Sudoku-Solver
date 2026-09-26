@@ -472,6 +472,7 @@ export class SolutionController {
     this._debugManager.clear();
     this._flameGraphManager.clear();
     this._showIterationControls(false);
+    this._elements.download.disabled = true;
     clearDOMNode(this._elements.error);
     clearDOMNode(this._elements.iterationState);
   }
@@ -511,9 +512,6 @@ export class SolutionController {
     this._resetSolver();
 
     const debugHandler = await this._makeDebugHandler();
-
-    // Set up download handler
-    this._elements.download.disabled = true;  // Will be enabled after solve starts
 
     // Node: modeHandler can be null if initialization failed.
     const modeHandler = await this._solverRunner.solve(constraints, { mode, debugHandler });

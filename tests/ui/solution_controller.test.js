@@ -488,6 +488,25 @@ await runTest('download and the step controls are enabled only for modes that ha
   });
 });
 
+await runTest('resetting the solver disables download', async () => {
+  await withSolverBuilds(async (builds) => {
+    const controller = makeController();
+    const { mode, autoSolve, download } = controller._elements;
+
+    mode.value = 'all-possibilities';
+    const solve = controller._solve();
+    await settle();
+    builds.shift()();
+    await solve;
+    assert.equal(download.disabled, false);
+
+    // With auto-solve off, a change resets the solver instead of solving.
+    autoSolve.checked = false;
+    controller._update();
+    assert.equal(download.disabled, true);
+  });
+});
+
 await runTest('a solve replaced before it starts leaves the page set up for the new one', async () => {
   await withSolverBuilds(async (builds) => {
     const controller = makeController();
