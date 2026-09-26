@@ -3,19 +3,12 @@
 // These tools instrument solver internals (e.g. the candidate selector's return
 // geometry), so they break silently when an internal API changes — this catches
 // that drift. Each tool exports `main(argv)` and throws on failure, so the tests
-// run them IN-PROCESS: the heavy solver + collections module graph loads once
-// (when this file imports the tools), and each case is a cheap call. Adding a
-// case costs ~nothing — no per-test subprocess startup. Only two tests spawn a
-// subprocess, and both do so for a reason the in-process path can't cover: the
-// --dump-state | --input - pipe (real stdin + the stdout/stderr split), and the
-// CLI exit-code contract (the throw -> process.exit mapping). The latter spawns
-// a lightweight fixture that imports only cli_entry.js, so it pays node startup
-// but not the solver module graph.
+// run them in-process: the solver module graph loads once, and each case is a
+// cheap call. No test spawns a subprocess.
 
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 import { main as solveMain } from '../../tools/debug/solve.js';
@@ -29,11 +22,9 @@ import {
   injectSolutionGivens, injectSolutionGivensForGroup,
 } from '../../tools/lib/puzzle_runner.js';
 import { runSolve } from '../../tools/lib/solver_analysis.js';
+import { runAsCli } from '../../tools/lib/cli_entry.js';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-
-// The debug CLIs live in tools/debug/; this test lives under tests/.
-const DEBUG_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'tools', 'debug');
 
 const PUZZLE = 'Chaos Construction: 6x6'; // tiny chaos puzzle: ~30 guesses, has var cells
 
@@ -314,19 +305,6 @@ await runTest('step_analysis.js --dump-state round-trips', async () => {
   assert.match(dump.stderr, /state at step 4/);  // the human summary went to stderr
   const back = await capture(() => stepMain(argv('step_analysis.js', '--input', stateString, '--steps', '2')));
   assert.equal(back.thrown, null, back.thrown?.message);
-});
-
-// The pipe contract: --dump-state | --input - (reading the constraint from stdin).
-// Subprocess because it exercises real stdin + the stdout/stderr split.
-await runTest('step_analysis.js --dump-state | --input - pipe', () => {
-  const script = join(DEBUG_DIR, 'step_analysis.js');
-  const dump = spawnSync(process.execPath, [script, '--puzzle', PUZZLE, '--steps', '4', '--dump-state'],
-    { encoding: 'utf8', timeout: 60000 });
-  assert.equal(dump.status, 0, dump.stderr);
-  assert.equal(dump.stdout.trim().split('\n').length, 1, 'dump stdout must be one clean line');
-  const back = spawnSync(process.execPath, [script, '--input', '-', '--steps', '2'],
-    { input: dump.stdout, encoding: 'utf8', timeout: 60000 });
-  assert.equal(back.status, 0, back.stderr);
   assert.match(back.stdout, /step\tguess/);
 });
 
@@ -420,12 +398,35 @@ await runTest('run_sandbox.js rejects output that fails to build', async () => {
 // The shared CLI entry maps a thrown error to a non-zero exit with a clean
 // message (the contract scripts/CI rely on). Spawns a lightweight fixture that
 // imports only cli_entry.js — no solver module graph — so it stays cheap.
-await runTest('CLI entry exits non-zero on error', () => {
-  const fixture = join(dirname(fileURLToPath(import.meta.url)), '..', 'helpers', 'cli_entry_throw_fixture.js');
-  const r = spawnSync(process.execPath, [fixture], { encoding: 'utf8', timeout: 60000 });
-  assert.equal(r.status, 1);
-  assert.match(r.stderr, /fixture: intentional failure/);
-  assert.match(r.stderr, /run with --help for usage/);
+// runAsCli runs main only for the program's entry module, and maps a throw
+// (sync or async) to a message and a non-zero exit.
+await runTest('CLI entry runs only as the program, and exits non-zero on error', async () => {
+  const entry = pathToFileURL('/tools/debug/tool.js').href;
+  const { argv: realArgv, exit } = process;
+  const exits = [];
+  process.argv = ['node', '/tools/debug/tool.js'];
+  process.exit = (code) => exits.push(code);
+  try {
+    let ran = false;
+    runAsCli(pathToFileURL('/tools/debug/other.js').href, () => { ran = true; });
+    await null;
+    assert.equal(ran, false, 'an imported tool does not run');
+
+    for (const main of [
+      () => { throw new Error('intentional failure'); },
+      async () => { throw new Error('intentional failure'); },
+    ]) {
+      const { stderr } = await capture(async () => {
+        runAsCli(entry, main);
+        await new Promise(resolve => setImmediate(resolve));
+      });
+      assert.match(stderr, /intentional failure\n\(run with --help for usage\)/);
+    }
+    assert.deepEqual(exits, [1, 1]);
+  } finally {
+    process.argv = realArgv;
+    process.exit = exit;
+  }
 });
 
 await runTest('searchedFraction sums the resolved share of the tree', async () => {

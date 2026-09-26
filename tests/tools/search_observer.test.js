@@ -1,13 +1,15 @@
 import assert from 'node:assert/strict';
 import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
-import { resolvePuzzles, runSolve } from '../../tools/lib/solver_analysis.js';
+import { runSolve } from '../../tools/lib/solver_analysis.js';
 import { observeSolver } from '../../tools/lib/search_observer.js';
 
 const puzzle = { name: '4x4', input: '.Shape~4x4' };
+// Chaos Construction adds region cells, searched by placement.
+const chaosPuzzle = { name: 'chaos 4x4', input: '.Shape~4x4.ChaosConstruction' };
 const budgets = { maxBacktracks: 100, maxSolutions: 2, collectSolutions: true };
 
 await runTest('Observation preserves plain and placement searches, with copied explanations', () => {
-  for (const p of [puzzle, resolvePuzzles(['Chaos Construction: 6x6'])[0]]) {
+  for (const p of [puzzle, chaosPuzzle]) {
     const baseline = runSolve(p, budgets);
     let selections = 0, solutions = 0, restored;
     const result = runSolve(p, budgets, solver => {
