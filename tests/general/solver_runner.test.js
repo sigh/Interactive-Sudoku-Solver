@@ -3,6 +3,7 @@ import { performance as perf } from 'node:perf_hooks';
 
 import { ensureGlobalEnvironment } from '../helpers/test_env.js';
 import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
+import { ScriptedStepSolver } from '../helpers/scripted_step_solver.js';
 
 ensureGlobalEnvironment({
   needWindow: true,
@@ -14,6 +15,7 @@ ensureGlobalEnvironment({
 const { SudokuBuilder } = await import('../../js/solver/sudoku_builder.js');
 const { SudokuConstraint } = await import('../../js/sudoku_constraint.js');
 const { CellGeometry } = await import('../../js/cell_geometry.js');
+const { SudokuParser } = await import('../../js/sudoku_parser.js');
 const { Timer } = await import('../../js/util.js');
 const {
   SolverRunner,
@@ -145,6 +147,10 @@ SolverProxy.makeSolver = async (constraint, stateHandler, statusHandler, debugHa
   proxy._notifyState();
   return proxy;
 };
+
+// A killer whose step-by-step search has to guess.
+const KILLER_HARD =
+  'S<J<<O<<KJ^<<^<^>^^<N<<<J^Q^S^O>>^^^>^W^<<^>^^O^<<^T^J^^^>>>^>^>^ML<S<<^^>^<^<<^<';
 
 // Simple constraint for testing
 const makeSimpleConstraint = () => {
@@ -421,86 +427,70 @@ await runTest('solve should abort previous solve when called again', async () =>
 // Iteration control
 // ============================================================================
 
-await runTest('next should increment index and trigger update', async () => {
-  let iterationState = null;
+await runTest('next, previous and toStart move from the displayed solution', async () => {
+  // The worker answers in a later task, so a background solution can't arrive
+  // in the middle of a move. LocalSolverProxy answers at once; model the worker.
+  const savedMakeSolver = SolverProxy.makeSolver;
+  SolverProxy.makeSolver = async (...args) => {
+    const proxy = await savedMakeSolver(...args);
+    const nthSolution = proxy.nthSolution.bind(proxy);
+    proxy.nthSolution = async (n) => {
+      await waitForSettle();
+      return nthSolution(n);
+    };
+    return proxy;
+  };
+  const settle = async () => {
+    for (let i = 0; i < 5; i++) await waitForSettle();
+  };
+
+  const iterations = [];
   const runner = new SolverRunner({
-    onIterationChange: (state) => { iterationState = state; },
+    onIterationChange: (state) => iterations.push(state),
   });
+  // An empty grid has many solutions to move between.
+  await runner.solve(new SudokuConstraint.Container([]), { mode: 'solutions' });
+  await settle();
 
-  const constraint = makeSimpleConstraint();
-  await runner.solve(constraint, { mode: 'solutions' });
-  await waitForCallback();
+  const shown = () => {
+    const s = iterations.at(-1);
+    return [s.index, s.description, s.isAtStart];
+  };
+  assert.deepEqual(shown(), [0, 'Solution 1', true]);
 
-  assert.ok(iterationState);
-  const initialIndex = iterationState.index;
-
-  runner.next();
-  await waitForCallback();
-
-  // Index should have incremented (or stayed at max if at end)
-  assert.ok(iterationState.index >= initialIndex);
+  const moves = [
+    ['next', [1, 'Solution 2', false]],
+    ['next', [2, 'Solution 3', false]],
+    ['previous', [1, 'Solution 2', false]],
+    ['toStart', [0, 'Solution 1', true]],
+    ['previous', [0, 'Solution 1', true]],
+  ];
+  try {
+    for (const [move, expected] of moves) {
+      runner[move]();
+      await settle();
+      assert.deepEqual(shown(), expected, move);
+    }
+  } finally {
+    SolverProxy.makeSolver = savedMakeSolver;
+  }
 });
 
-await runTest('previous should decrement index and trigger update', async () => {
-  let iterationState = null;
+await runTest('toEnd shows the last result', async () => {
+  const iterations = [];
   const runner = new SolverRunner({
-    onIterationChange: (state) => { iterationState = state; },
+    onIterationChange: (state) => iterations.push(state),
   });
+  await runner.solve(makeSimpleConstraint(), { mode: 'all-possibilities' });
+  await waitForSettle();
 
-  const constraint = makeSimpleConstraint();
-  await runner.solve(constraint, { mode: 'solutions' });
-  await waitForCallback();
+  runner.toggleFollowing();
+  await waitForSettle();
 
-  // Move forward first
-  runner.next();
-  await waitForCallback();
-  const afterNext = iterationState.index;
-
-  // Then move back
-  runner.previous();
-  await waitForCallback();
-
-  assert.ok(iterationState.index <= afterNext);
-});
-
-await runTest('toStart should set index to 0', async () => {
-  let iterationState = null;
-  const runner = new SolverRunner({
-    onIterationChange: (state) => { iterationState = state; },
-  });
-
-  const constraint = makeSimpleConstraint();
-  await runner.solve(constraint, { mode: 'solutions' });
-  await waitForCallback();
-
-  // Move forward
-  runner.next();
-  await waitForCallback();
-
-  // Go to start
-  runner.toStart();
-  await waitForCallback();
-
-  assert.ok(iterationState);
-  assert.equal(iterationState.index, 0);
-});
-
-await runTest('toEnd should set follow mode', async () => {
-  let iterationState = null;
-  const runner = new SolverRunner({
-    onIterationChange: (state) => { iterationState = state; },
-  });
-
-  const constraint = makeSimpleConstraint();
-  await runner.solve(constraint, { mode: 'all-possibilities' });
-  await waitForCallback();
-
-  runner.toEnd();
-  await waitForCallback();
-
-  assert.ok(iterationState);
-  // Should be at the end
-  assert.equal(iterationState.isAtEnd, true);
+  const s = iterations.at(-1);
+  assert.deepEqual(
+    [s.index, s.description, s.isAtEnd, s.following],
+    [0, 'Unique solution', true, false]);
 });
 
 // ============================================================================
@@ -748,37 +738,39 @@ await runTest('handleAltClick should be ignored for modes without ALLOW_STEP_GUI
   runner.handleAltClick(0);
 });
 
-await runTest('handleAltClick in step-by-step mode with iterable cell triggers guide', async () => {
-  let updateResult = null;
+await runTest('step guides change the displayed step and the next one', async () => {
+  let result = null;
   const iterations = [];
   const runner = new SolverRunner({
-    onUpdate: (result) => { updateResult = result; },
-    onIterationChange: (state) => { iterations.push({ ...state }); },
+    onUpdate: (r) => { result = r; },
+    onIterationChange: (state) => iterations.push(state),
   });
-
-  const constraint = makeSimpleConstraint();
+  // A search that has to guess, so step 0 is a guess with several options.
+  const constraint = SudokuParser.parseText(KILLER_HARD);
   await runner.solve(constraint, { mode: 'step-by-step' });
   await waitForSettle();
+  // Step 0 is the grid before any guess; step 1 is the first guess.
+  runner.next();
+  await waitForSettle();
+  assert.equal(result.highlightCells.length, 1, 'step 1 is a guess');
 
-  // Find a cell with multiple possibilities (an iterable, not a string)
-  if (updateResult?.solution) {
-    let cellIndex = -1;
-    for (let i = 0; i < updateResult.solution.length; i++) {
-      const v = updateResult.solution[i];
-      if (v && typeof v !== 'string' && typeof v[Symbol.iterator] === 'function') {
-        cellIndex = i;
-        break;
-      }
-    }
-    if (cellIndex >= 0) {
-      const itersBefore = iterations.length;
-      runner.handleAltClick(cellIndex);
-      await waitForSettle();
-      // handleAltClick should trigger an update cycle
-      assert.ok(iterations.length > itersBefore,
-        'handleAltClick should trigger iteration change');
-    }
-  }
+  // Alt-click another multi-valued cell: step 1 now guesses that cell.
+  const geometry = CellGeometry.fromGridSize(9);
+  const cellIndex = result.solution.findIndex((v, i) =>
+    v instanceof Set && geometry.makeCellIdFromIndex(i) !== result.highlightCells[0]);
+  runner.handleAltClick(cellIndex);
+  await waitForSettle();
+  assert.deepEqual(result.highlightCells, [geometry.makeCellIdFromIndex(cellIndex)]);
+  assert.equal(iterations.at(-1).index, 1);
+
+  // Select the last listed value: the next step has the cell set to it.
+  const value = iterations.at(-1).statusData.values.at(-1);
+  runner.selectValue(value);
+  await waitForSettle();
+  runner.next();
+  await waitForSettle();
+  assert.equal(iterations.at(-1).index, 2);
+  assert.equal(result.solution[cellIndex], value);
 });
 
 // ============================================================================
@@ -859,44 +851,6 @@ await runTest('solutions prefetch errors are reported to onError', async () => {
 // ============================================================================
 // Committed position
 // ============================================================================
-
-// A step-mode solver whose steps resolve or fail only when the test says so.
-class ScriptedStepSolver {
-  constructor() {
-    this.calls = [];
-    this._pending = [];
-  }
-
-  nthStep(n, stepGuides) {
-    this.calls.push({ n, guideSteps: [...stepGuides.keys()] });
-    this.lastGuides = structuredClone(stepGuides);
-    return new Promise((resolve, reject) => {
-      this._pending.push({ resolve, reject });
-    });
-  }
-
-  // Resolve the oldest outstanding step with a grid that has one
-  // multi-valued cell (cell 0), so it can be guided.
-  resolveNext() {
-    this._pending.shift().resolve({
-      pencilmarks: [new Set([1, 2]), 3],
-      branchCells: [],
-      isSolution: false,
-      hasConflict: false,
-    });
-  }
-
-  rejectNext(error) {
-    this._pending.shift().reject(error);
-  }
-
-  // Resolve the oldest outstanding step as the end of the search.
-  resolveEnd() {
-    this._pending.shift().resolve(null);
-  }
-
-  terminate() { this.terminated = true; }
-}
 
 const withScriptedStepSolver = async (fn) => {
   const solver = new ScriptedStepSolver();
