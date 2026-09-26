@@ -113,10 +113,21 @@ export class SudokuSolver {
   }
 
   nthStep(n, stepGuides) {
-    this._reset();
     n++;  // Convert to 1-indexed target.
 
-    // Step mode: always run from scratch (deterministic replay).
+    // Copy the guides, converting user-visible values to solver values.
+    const offset = this._geometry.valueOffset;
+    const guides = new Map();
+    for (const [k, guide] of stepGuides) {
+      const g = { ...guide };
+      if (Number.isInteger(g.value)) g.value -= offset;
+      guides.set(k, g);
+    }
+
+    // Continue the paused run if moving forward with the same guides,
+    // otherwise run from scratch.
+    if (!this._internalSolver.canContinueSteps(n, guides)) this._reset();
+
     this._debugLogger.enableStepLogs = false;
     if (this._debugLogger.enableLogs) {
       this._debugLogger.log({
@@ -126,22 +137,10 @@ export class SudokuSolver {
       });
     }
 
-    // Convert user-visible step guide values to solver values.
-    const offset = this._geometry.valueOffset;
-    if (stepGuides && offset !== 0) {
-      const converted = new Map();
-      for (const [k, guide] of stepGuides) {
-        const g = { ...guide };
-        if (Number.isInteger(g.value)) g.value -= offset;
-        converted.set(k, g);
-      }
-      stepGuides = converted;
-    }
-
     let result = null;
     this._timer.runTimed(() => {
       this._internalSolver.run(
-        { step: { n, stepGuides, onStep: (r) => { result = r; } } },
+        { step: { n, stepGuides: guides, onStep: (r) => { result = r; } } },
         () => { });
     });
     if (!result) return null;
@@ -506,8 +505,7 @@ class InternalSolver {
     // used internally).
     // Candidate selector must be made aware of the new conflict scores.
     this._candidateSelector.reset(this._conflictScores);
-    this._recDepth = 0;
-    this._iterationCounter = 0;
+    this._resumePosition = { recDepth: 0, iterationCounter: 0, selection: null };
 
     this._state = InternalSolver.STATE_UNSTARTED;
   }
@@ -618,7 +616,7 @@ class InternalSolver {
 
   _initStepState(stepMode) {
     this._stepState = {
-      stepGuides: stepMode.stepGuides ?? null,
+      stepGuides: stepMode.stepGuides,
       stepTarget: stepMode.n,
       step: 1,
       oldGrid: new Uint16Array(this._numSearchCells),
@@ -630,6 +628,27 @@ class InternalSolver {
     if (this._debugLogger.enableLogs) {
       this._debugLogger.enableStepLogs = (1 === stepMode.n);
     }
+  }
+
+  // Whether a paused step run can continue to step n, instead of restarting.
+  canContinueSteps(n, stepGuides) {
+    const stepState = this._stepState;
+    return this._state === InternalSolver.STATE_RESUMABLE && stepState !== null &&
+      n > stepState.step &&
+      JSON.stringify([...stepGuides]) === JSON.stringify([...stepState.stepGuides]);
+  }
+
+  _continueSteps(stepMode) {
+    const stepState = this._stepState;
+    stepState.stepTarget = stepMode.n;
+    // Count the step it paused at, unless that node is about to be re-run.
+    if (this._resumePosition.selection === null) this._incStep();
+  }
+
+  // Save the loop position, so the next run() continues from it.
+  _saveResumePosition(recDepth, iterationCounter, selection = null) {
+    this._resumePosition = { recDepth, iterationCounter, selection };
+    this._state = InternalSolver.STATE_RESUMABLE;
   }
 
   _incStep() {
@@ -700,7 +719,8 @@ class InternalSolver {
   // Run the solver.
   //
   // If in STATE_RESUMABLE, continues from the saved position; mode must be
-  // { maxSolutions } with maxSolutions exceeding the current solution count.
+  // { maxSolutions } with maxSolutions exceeding the current solution count,
+  // or { step } when paused in a step run.
   // If in STATE_UNSTARTED, starts a fresh search; mode may be null for
   // exhaustive, { maxSolutions }, { maxBacktracks }, or { step }.
   // Any other state throws — call reset() first.
@@ -710,10 +730,11 @@ class InternalSolver {
     if (this._state === InternalSolver.STATE_UNSTARTED) {
       this._initRun(mode);
     } else if (this._state === InternalSolver.STATE_RESUMABLE) {
-      if (!mode?.maxSolutions) {
+      if (mode?.step && this._stepState) {
+        this._continueSteps(mode.step);
+      } else if (!mode?.maxSolutions) {
         throw new Error('run() from resumable state requires maxSolutions');
-      }
-      if (mode.maxSolutions <= this.counters.solutions) {
+      } else if (mode.maxSolutions <= this.counters.solutions) {
         throw new Error(
           `run() maxSolutions (${mode.maxSolutions}) must exceed ` +
           `current solution count (${this.counters.solutions})`);
@@ -756,11 +777,11 @@ class InternalSolver {
     }
 
     counters.nodesSearched++;
-    this._recDepth = 1;
+    this._resumePosition.recDepth = 1;
   }
 
   // Pure search loop — no initialisation, no state restoration.
-  // Reads starting position from this._recDepth and this._iterationCounter.
+  // Reads starting position from this._resumePosition.
   _runLoop(mode, onSolution) {
     const yieldEveryStep = !!mode?.step;
     const stepTarget = yieldEveryStep ? mode.step.n : 0;
@@ -769,8 +790,8 @@ class InternalSolver {
     const progressFrequencyMask = this._progress.frequencyMask;
     const recStack = this._recStack;
     const counters = this.counters;
-    let recDepth = this._recDepth;
-    let iterationCounter = this._iterationCounter;
+    let { recDepth, iterationCounter, selection: resumeSelection } =
+      this._resumePosition;
 
     while (recDepth) {
       let recFrame = recStack[--recDepth];
@@ -780,11 +801,36 @@ class InternalSolver {
       let grid = recFrame.gridCells;
       const isNewNode = recFrame.newNode;
 
-      const { nextDepth, value, count } = this._candidateSelector.selectNextCandidate(
-        cellDepth, recFrame.gridState, this._stepState, isNewNode);
+      const { nextDepth, value, count } = resumeSelection ??
+        this._candidateSelector.selectNextCandidate(
+          cellDepth, recFrame.gridState, this._stepState, isNewNode);
+      resumeSelection = null;
       recFrame.newNode = false;
 
       if (count === 0) continue;
+
+      if (yieldEveryStep) {
+        const stepState = this._stepState;
+        // Only stop when we are at a new node with multiple options.
+        // If it is not a new node then we just backtracked, so there is
+        // nothing interesting to show.
+        if (count > 1 && isNewNode) {
+          if (stepState.step >= stepTarget) {
+            mode.step.onStep(
+              this._makeStepYieldResult(grid, InternalSolver.STEP_RESULT_GUESS));
+            recFrame.newNode = true;
+            this._saveResumePosition(
+              recDepth + 1, iterationCounter, { nextDepth, value, count });
+            return;
+          }
+          this._incStep();
+        }
+        if (!isNewNode || count !== 1) {
+          stepState.oldGrid.set(grid);
+          stepState.pendingGuess.cellDepth = cellDepth;
+          stepState.pendingGuess.guess = value;
+        }
+      }
 
       // Assume the remaining progress is evenly distributed among the value
       // options.
@@ -811,26 +857,6 @@ class InternalSolver {
       }
 
       const cell = this._candidateSelector.getCellAtDepth(cellDepth);
-
-      if (yieldEveryStep) {
-        const stepState = this._stepState;
-        // Only stop when we are at a new node with multiple options.
-        // If it is not a new node then we just backtracked, so there is
-        // nothing interesting to show.
-        if (count > 1 && isNewNode) {
-          if (stepState.step >= stepTarget) {
-            mode.step.onStep(
-              this._makeStepYieldResult(grid, InternalSolver.STEP_RESULT_GUESS));
-            return;
-          }
-          this._incStep();
-        }
-        if (!isNewNode || count !== 1) {
-          stepState.oldGrid.set(grid);
-          stepState.pendingGuess.cellDepth = cellDepth;
-          stepState.pendingGuess.guess = value;
-        }
-      }
 
       if (count !== 1) {
         // We only need to start a new recursion frame when there is more than
@@ -882,6 +908,7 @@ class InternalSolver {
           if (this._stepState.step >= stepTarget) {
             mode.step.onStep(
               this._makeStepYieldResult(grid, InternalSolver.STEP_RESULT_CONFLICT));
+            this._saveResumePosition(recDepth, iterationCounter);
             return;
           }
           this._incStep();
@@ -916,14 +943,13 @@ class InternalSolver {
           if (this._stepState.step >= stepTarget) {
             mode.step.onStep(
               this._makeStepYieldResult(grid, InternalSolver.STEP_RESULT_SOLUTION));
+            this._saveResumePosition(recDepth, iterationCounter);
             return;
           }
           this._incStep();
         }
         if (maxSolutions && counters.solutions >= maxSolutions) {
-          this._recDepth = recDepth;
-          this._iterationCounter = iterationCounter;
-          this._state = InternalSolver.STATE_RESUMABLE;
+          this._saveResumePosition(recDepth, iterationCounter);
           return;
         }
         if (maxBacktracks && counters.backtracks >= maxBacktracks) {

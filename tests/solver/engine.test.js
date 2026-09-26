@@ -7,6 +7,7 @@ ensureGlobalEnvironment();
 
 const { SudokuBuilder } = await import('../../js/solver/sudoku_builder.js');
 const { SudokuConstraint } = await import('../../js/sudoku_constraint.js');
+const { SudokuParser } = await import('../../js/sudoku_parser.js');
 const { CellGeometry } = await import('../../js/cell_geometry.js');
 const { SudokuSolver, HandlerSet } = await import('../../js/solver/engine.js');
 const { SamplingCandidateSelector } = await import('../../js/solver/candidate_selector.js');
@@ -542,6 +543,55 @@ await runTest('nthStep returns null for contradictory puzzle', () => {
   if (step) {
     assert.equal(step.hasConflict, true);
   }
+});
+
+const KILLER_HARD =
+  'S<J<<O<<KJ^<<^<^>^^<N<<<J^Q^S^O>>^^^>^W^<<^>^^O^<<^T^J^^^>>>^>^>^ML<S<<^^>^<^<<^<';
+const GERMAN_WHISPERS =
+  '.Whisper~R8C1~R7C1~R7C2~R8C3~R9C3~R9C2.Whisper~R9C6~R8C7~R7C7~R7C8~R6C9~R5C8.Whisper~R6C3~R5C2~R4C3~R3C4~R2C5~R1C6~R1C7~R2C8~R3C8~R4C7~R5C6~R6C6~R7C6~R8C5~R7C4.Whisper~R4C5~R4C6~R3C7.~R1C5_1~R2C2_5~R5C1_6~R5C9_9~R7C3_3~R8C8_3~R9C1_5~R9C5_3';
+const makeStepSolver = (input = KILLER_HARD) => SudokuBuilder.build(
+  SudokuBuilder.resolveConstraint(SudokuParser.parseText(input)));
+
+await runTestCases('nthStep in any order matches a fresh solver', [
+  ['killer', KILLER_HARD],
+  ['german whispers', GERMAN_WHISPERS],
+], (input) => {
+  const solver = makeStepSolver(input);
+  const guides = new Map();
+  const check = (n) => {
+    const step = solver.nthStep(n, guides);
+    assert.deepEqual(step, makeStepSolver(input).nthStep(n, guides), `step ${n}`);
+    return step;
+  };
+
+  for (let n = 0; n <= 60; n++) check(n);
+  // Guide the displayed step, as alt-clicking a cell does, then move on
+  // without refetching it.
+  const step = check(60);
+  const cell = step.pencilmarks.findIndex(v => v instanceof Set);
+  guides.set(60, { cell, depth: step.branchCells.length - 1 });
+  for (let n = 61; n <= 100; n++) check(n);
+  check(60);
+
+  check(400);
+  check(50);
+  check(51);
+  assert.equal(solver.nthStep(1e6, guides), null);
+  check(120);
+});
+
+await runTest('nthStep continues forward instead of restarting', () => {
+  const solver = makeStepSolver();
+  let resets = 0;
+  const reset = solver._internalSolver.reset.bind(solver._internalSolver);
+  solver._internalSolver.reset = () => { resets++; reset(); };
+
+  for (let n = 0; n <= 100; n++) solver.nthStep(n, new Map());
+  solver.nthStep(500, new Map());
+  assert.equal(resets, 1);
+
+  solver.nthStep(50, new Map());
+  assert.equal(resets, 2, 'going back restarts');
 });
 
 await runTest('nthStep debug logs support extra solver state', () => {
