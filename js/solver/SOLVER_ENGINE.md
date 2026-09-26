@@ -156,8 +156,11 @@ Handler classes are defined across [handlers.js](handlers.js),
 ### State Model
 
 Fields on `this` are constant across all search branches — set during
-construction or `initialize`, unchanged during search. If a handler needs
-per-branch state (state that should be saved and restored during
+construction or `initialize`, unchanged during search. (The one exception is a
+pure memo: a cache keyed on the handler's full input, checked against the
+current grid before reuse, so results never depend on call history — see
+`NFAConstraint`, [handler_docs/nfa.md](handler_docs/nfa.md) §8.) If a handler
+needs per-branch state (state that should be saved and restored during
 backtracking), it allocates slots via `stateAllocator.allocate(state)`
 during `initialize`. This returns an offset into the grid state array.
 During `enforceConsistency`, the allocated state is accessed via

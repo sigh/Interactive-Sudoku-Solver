@@ -89,9 +89,10 @@ All states' transition lists are slices of a single flat `Uint32Array`
 
 A propagation needs the reachable **set** of states at each of the `k+1` cell
 boundaries. The constructor allocates that pool once with `BitSet.allocatePool`:
-`statesList` is `k+1` `BitSet`s ("layers") backed by a single `Uint32Array`
-(`_stateWords`). Because they share one buffer, the whole pool is cleared with one
-`_stateWords.fill(0)` and reused on every call — propagation allocates nothing.
+`statesList` is `k+1` `BitSet`s ("layers"), plus one scratch layer the forward
+pass builds each new layer in, backed by a single `Uint32Array`. The pool is
+reused on every call — propagation allocates nothing — and between calls the
+layers also serve as a memo (§8).
 
 ## 4. The Propagation Algorithm
 
@@ -228,8 +229,8 @@ argument of §5 carries over verbatim.
   ops with no branches on symbols. It relies on candidate sets and symbol masks
   both fitting in the low 16 bits.
 - **No per-call allocation.** Both the transition lists and the `k+1`-layer state
-  pool are single flat `Uint32Array`s built once; each call only does one
-  `fill(0)` and then reads/writes words.
+  pool are single flat `Uint32Array`s built once; each call only reads and
+  writes words.
 - **Inlined hot loops.** The forward and backward passes operate directly on the
   bitsets' `.words` arrays — the bit iteration *and* the `add` / `has` / `bitIndex`
   operations are inlined rather than called as `BitSet` methods, because the method
@@ -239,6 +240,36 @@ argument of §5 carries over verbatim.
 - **Small automata.** The compile-time reductions in `optimizeNFA` (dead-state
   removal and simulation merging) keep `numStates` down, which bounds both the
   memory of the state pool and the work per layer.
-- **Recomputed each call.** There is no incremental state between calls: a single
-  call is `O(k × activeStates × avgTransitions)`, recomputing both passes from the
-  current candidate sets every time the handler runs.
+- **Incremental between calls.** A full call is `O(k × activeStates ×
+  avgTransitions)`. Most calls see a line that barely changed, so the handler
+  memoizes the last successful call and redoes only the part that can differ
+  (§8).
+
+## 8. Memoization Between Calls
+
+Many calls see a line that is unchanged or only slightly narrowed since the
+last call. So after each successful call the handler keeps `_memoValues`, each
+step's candidates on return; the layers then hold exactly the states on an
+accepted path under those candidates (§4, "What the layers mean").
+
+If no cell has gained a value since, every state on an accepted path now was on
+one then, so each stored layer still contains all of them. The next call
+therefore reuses the layers:
+
+- **Forward**, a step whose candidates and incoming layer are both unchanged
+  leaves its outgoing layer unchanged, so it is skipped. Each recomputed layer
+  is intersected with the stored one, which can't lose a needed state.
+- **Backward** starts after the last recomputed step, since every later step
+  already filters to itself, and stops left of the first recomputed step once
+  a layer is unchanged, since every layer further left then is too.
+
+If nothing was recomputed, the line is already at its fixpoint. Extra states
+that survive the forward pass can't reach acceptance and are removed by the
+backward pass, so the result is identical to a from-scratch call.
+
+The memo is not used before the first successful call, after a failed one
+(which can leave layers half-written), or when a cell gained a value (e.g.
+after a backtrack); the call then runs a full pass. It is keyed only on the
+line's candidates, so it is safe under backtracking and `Or`'s scratch grids.
+Lines that visit a cell twice are never memoized: pruning one visit changes
+what the other sees partway through a pass, so a pass is not idempotent.

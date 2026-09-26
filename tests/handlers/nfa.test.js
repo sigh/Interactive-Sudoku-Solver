@@ -243,6 +243,17 @@ await runTest('NFAConstraint backward pass should fail when final states are not
   assert.equal(result, false);
 });
 
+await runTest('NFAConstraint backward pass should drop non-accepting final states', () => {
+  // After `11` the automaton is in the (non-accepting) `1*` loop, which reaches
+  // the final layer; only `12` is accepted.
+  const cnfa = compressNFA(regexToNFA('1*2', 2));
+  const handler = new NFAConstraint([[0, 1]], cnfa);
+
+  const grid = [valueMask(1, 2), valueMask(1, 2)];
+  assert.equal(handler.enforceConsistency(grid, createAccumulator()), true);
+  assert.deepEqual(grid, [valueMask(1), valueMask(2)]);
+});
+
 await runTest('NFAConstraint backward pass should prune values not reaching accepting state', () => {
   const nfa = regexToNFA('(12|34)', 4);
   const cnfa = compressNFA(nfa);
@@ -364,7 +375,7 @@ await runTest('NFAConstraint should be reusable across multiple calls', () => {
   assert.equal(grid4[0], valueMask(1));
 });
 
-await runTest('NFAConstraint internal state should be cleared between calls', () => {
+await runTest('NFAConstraint should not be affected by earlier calls', () => {
   const nfa = regexToNFA('(12|21)', 2);
   const cnfa = compressNFA(nfa);
   const handler = new NFAConstraint([[0, 1]], cnfa);
@@ -380,6 +391,156 @@ await runTest('NFAConstraint internal state should be cleared between calls', ()
   grid2[0] = valueMask(2);
   grid2[1] = valueMask(1);
   assert.equal(handler.enforceConsistency(grid2, createAccumulator()), true);
+});
+
+// =============================================================================
+// NFAConstraint memoization
+// =============================================================================
+
+// Mulberry32: a small seeded PRNG so failures are reproducible.
+const makeRng = (seed) => () => {
+  seed = (seed + 0x6D2B79F5) | 0;
+  let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+};
+
+const randomSubset = (rng, mask) => {
+  let subset = 0;
+  for (let v = mask; v; v &= v - 1) {
+    if (rng() < 0.5) subset |= v & -v;
+  }
+  return subset;
+};
+
+// A random nondeterministic automaton over values 1..numValues. Sum-like
+// specs give many states (multi-word layers); table specs give irregular
+// nondeterminism.
+const randomSpec = (rng, numValues, multiSegment) => {
+  if (rng() < 0.5) {
+    const limit = 20 + Math.floor(rng() * 60);
+    const modulus = 2 + Math.floor(rng() * 5);
+    return {
+      startState: 0,
+      transition: (s, v) => {
+        if (v === SEGMENT_BREAK) return s % modulus === 0 ? 0 : [];
+        return s + v <= limit ? s + v : [];
+      },
+      accept: (s) => s % modulus === 0,
+    };
+  }
+  const numStates = 3 + Math.floor(rng() * 40);
+  const table = [];
+  for (let s = 0; s < numStates; s++) {
+    const row = [];
+    for (let v = 0; v <= numValues; v++) {
+      const targets = [];
+      const count = Math.floor(rng() * 3);
+      for (let k = 0; k < count; k++) targets.push(Math.floor(rng() * numStates));
+      row.push(targets);
+    }
+    table.push(row);
+  }
+  const accepting = new Set();
+  for (let s = 0; s < numStates; s++) if (rng() < 0.4) accepting.add(s);
+  return {
+    startState: 0,
+    transition: (s, v) => table[s][v === SEGMENT_BREAK ? numValues : v - 1],
+    accept: (s) => accepting.has(s) || !multiSegment && s === numStates - 1,
+  };
+};
+
+const recordingAccumulator = () => {
+  const calls = [];
+  return { calls, addForCell(cell) { calls.push(cell); } };
+};
+
+await runTest('NFAConstraint memoized calls match a fresh handler', () => {
+  const rng = makeRng(12345);
+  const numValues = 6;
+  const allValues = (1 << numValues) - 1;
+  let callsCompared = 0;
+  let successes = 0;
+
+  for (let trial = 0; trial < 150; trial++) {
+    const multiSegment = rng() < 0.3;
+    const cnfa = compressNFA(javascriptSpecToNFA(
+      randomSpec(rng, numValues, multiSegment), numValues, { multiSegment }));
+
+    // Split cells 0..numCells-1 into segments. Some lines revisit a cell.
+    const numCells = 2 + Math.floor(rng() * 12);
+    const segments = [[0]];
+    for (let c = 1; c < numCells; c++) {
+      if (multiSegment && rng() < 0.3) segments.push([]);
+      segments[segments.length - 1].push(c);
+    }
+    if (rng() < 0.2) segments[segments.length - 1].push(0);
+    const makeHandler = () => {
+      const handler = new NFAConstraint(segments, cnfa);
+      handler.initialize(null, null, geometry(numValues), null);
+      return handler;
+    };
+    const memoHandler = makeHandler();
+
+    // Simulate a search: narrow cells, re-run, and sometimes jump back to an
+    // earlier grid (widening) or an unrelated one.
+    const history = [new Array(numCells).fill(allValues)];
+    let grid = history[0].slice();
+    for (let step = 0; step < 60; step++) {
+      const r = rng();
+      if (r < 0.15 && history.length) {
+        grid = history[Math.floor(rng() * history.length)].slice();
+      } else if (r < 0.2) {
+        grid = grid.map(() => randomSubset(rng, allValues) || allValues);
+      } else if (r < 0.9) {
+        // Narrow a few cells, so some calls see several separate changes.
+        const numNarrowed = 1 + Math.floor(rng() * 3);
+        for (let k = 0; k < numNarrowed; k++) {
+          const cell = Math.floor(rng() * numCells);
+          grid[cell] = randomSubset(rng, grid[cell]) || grid[cell];
+        }
+      }
+      // Otherwise re-run on an identical grid.
+
+      const expectedGrid = grid.slice();
+      const expectedAcc = recordingAccumulator();
+      const expected = makeHandler().enforceConsistency(expectedGrid, expectedAcc);
+
+      const actualAcc = recordingAccumulator();
+      const actual = memoHandler.enforceConsistency(grid, actualAcc);
+
+      const context = `trial ${trial}, step ${step}`;
+      assert.equal(actual, expected, context);
+      assert.deepEqual(actualAcc.calls, expectedAcc.calls, context);
+      if (expected) {
+        assert.deepEqual(grid, expectedGrid, context);
+        history.push(grid.slice());
+        successes++;
+      } else {
+        grid = history[Math.floor(rng() * history.length)].slice();
+      }
+      callsCompared++;
+    }
+  }
+  // Guard against a generator that only produces failing grids.
+  assert.ok(successes > callsCompared / 4,
+    `only ${successes} of ${callsCompared} calls succeeded`);
+});
+
+await runTest('NFAConstraint recomputes after a cell regains values', () => {
+  // `(12|34)`: fixing cell 1 to 2 forces cell 0 to 1. Widening cell 1 again
+  // must restore cell 0's support for 3, even though the memo says otherwise.
+  const cnfa = compressNFA(regexToNFA('(12|34)', 4));
+  const handler = new NFAConstraint([[0, 1]], cnfa);
+  const allValues = valueMask(1, 2, 3, 4);
+
+  const grid1 = [allValues, valueMask(2)];
+  assert.equal(handler.enforceConsistency(grid1, createAccumulator()), true);
+  assert.deepEqual(grid1, [valueMask(1), valueMask(2)]);
+
+  const grid2 = [allValues, valueMask(2, 4)];
+  assert.equal(handler.enforceConsistency(grid2, createAccumulator()), true);
+  assert.deepEqual(grid2, [valueMask(1, 3), valueMask(2, 4)]);
 });
 
 // =============================================================================

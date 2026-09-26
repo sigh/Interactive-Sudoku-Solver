@@ -111,9 +111,18 @@ export class NFAConstraint extends SudokuConstraintHandler {
 
     const stateCapacity = this._cnfa.numStates;
     const slots = steps.length + 1;
-    const { bitsets, words } = BitSet.allocatePool(stateCapacity, slots);
-    this._stateWords = words;
+    // One extra slot is scratch for the forward pass.
+    const { bitsets } = BitSet.allocatePool(stateCapacity, slots + 1);
+    this._scratchWords = bitsets.pop().words;
     this._statesList = bitsets;
+
+    // Memo of the last successful call (handler_docs/nfa.md §8): each step's
+    // values on return, for which `_statesList` holds the filtered layers.
+    // Segment-break entries are never read, so 16 bits suffice. Lines that
+    // visit a cell twice have no memo, as a pass there isn't idempotent.
+    this._memoValues = new Set(this.cells).size === this.cells.length
+      ? new Uint16Array(steps.length) : null;
+    this._memoValid = false;
   }
 
   initialize(initialGridCells, cellExclusions, geometry, stateAllocator) {
@@ -140,20 +149,36 @@ export class NFAConstraint extends SudokuConstraintHandler {
     const cnfa = this._cnfa;
     const transitionLists = cnfa.transitionLists;
     const statesList = this._statesList;
+    const memoValues = this._memoValues;
+    const scratchWords = this._scratchWords;
 
-    // Clear all the states so we can reuse the bitsets without reallocating.
-    this._stateWords.fill(0);
+    // The memo is reusable if no cell gained a value since (e.g. by a
+    // backtrack). Otherwise, do a full pass.
+    let reuse = this._memoValid;
+    for (let i = 0; reuse && i < numSteps; i++) {
+      if (steps[i] >= 0 && (grid[steps[i]] & ~memoValues[i])) reuse = false;
+    }
+    if (!reuse) statesList[0].copyFrom(cnfa.startingStates);
+    this._memoValid = false;
 
     // Forward pass: Find all states reachable from the start state.
-    statesList[0].copyFrom(cnfa.startingStates);
-
+    // A step whose values and incoming layer are unchanged since the memo
+    // leaves its outgoing layer unchanged, so it's skipped. Recomputed layers
+    // are intersected with the stored ones, which can't lose a state on an
+    // accepted path while the line only narrows.
+    let start = -1;  // The first and one past the last recomputed step.
+    let end = 0;
+    let layerChanged = false;
     for (let i = 0; i < numSteps; i++) {
-      const nextStates = statesList[i + 1];
-      const nextWords = nextStates.words;
-      const currentStatesWords = statesList[i].words;
       const step = steps[i];
       const values = step < 0 ? segmentBreakMask : grid[step];
-      let nextIsEmpty = true;
+      if (reuse && !layerChanged && (step < 0 || values === memoValues[i])) continue;
+      if (start < 0) start = i;
+      end = i + 1;
+
+      // Cheaper than `fill` for the typical one or two words.
+      for (let w = 0; w < scratchWords.length; w++) scratchWords[w] = 0;
+      const currentStatesWords = statesList[i].words;
 
       // Note: We operate directly on the bitset words for performance.
       // Encapsulating this in methods caused significant overhead, so the bit
@@ -169,14 +194,30 @@ export class NFAConstraint extends SudokuConstraintHandler {
           for (let j = 0; j < len; j++) {
             const entry = transitionList[j];
             if (values & entry) {
-              nextWords[entry >>> 21] |= 1 << (entry >>> 16);
-              nextIsEmpty = false;
+              scratchWords[entry >>> 21] |= 1 << (entry >>> 16);
             }
           }
         }
       }
 
-      if (nextIsEmpty) return false;
+      // Store the new layer, intersected with the stored one if reusing it.
+      const nextWords = statesList[i + 1].words;
+      let anyState = 0;
+      layerChanged = false;
+      for (let w = 0; w < nextWords.length; w++) {
+        const word = reuse ? nextWords[w] & scratchWords[w] : scratchWords[w];
+        if (word !== nextWords[w]) {
+          nextWords[w] = word;
+          layerChanged = true;
+        }
+        anyState |= word;
+      }
+      if (!anyState) return false;
+    }
+
+    if (start < 0) {  // Unchanged: already at a fixpoint.
+      this._memoValid = true;
+      return true;
     }
 
     // Backward pass: Filter down to only the states that can reach an accepting
@@ -185,12 +226,14 @@ export class NFAConstraint extends SudokuConstraintHandler {
     finalStates.intersect(cnfa.acceptingStates);
     if (finalStates.isEmpty()) return false;
 
-    for (let i = numSteps - 1; i >= 0; i--) {
+    // Steps from `end` on are unchanged, so they filter to themselves.
+    for (let i = end - 1; i >= 0; i--) {
       const currentStatesWords = statesList[i].words;
       const nextWords = statesList[i + 1].words;
       const step = steps[i];
       const values = step < 0 ? segmentBreakMask : grid[step];
       let supportedValues = 0;
+      layerChanged = false;
 
       // Note: We operate directly on the bitset words for performance.
       // Encapsulating this in methods caused significant overhead, so the bit
@@ -221,6 +264,7 @@ export class NFAConstraint extends SudokuConstraintHandler {
             supportedValues |= stateSupportedValues;
           }
         }
+        if (keptWord !== currentStatesWords[wordIndex]) layerChanged = true;
         currentStatesWords[wordIndex] = keptWord;
       }
 
@@ -230,8 +274,14 @@ export class NFAConstraint extends SudokuConstraintHandler {
         grid[step] = supportedValues;
         pQueue.addForCell(step);
       }
+      if (memoValues) memoValues[i] = supportedValues;
+
+      // Left of `start`, the steps are unchanged: once a layer is too, every
+      // layer further left is.
+      if (i < start && !layerChanged) break;
     }
 
+    this._memoValid = memoValues !== null;
     return true;
   }
 }
