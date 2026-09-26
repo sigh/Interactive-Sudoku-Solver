@@ -658,6 +658,7 @@ export class NFA {
 
     // Prune dominated transitions: if A simulates B (but not vice versa),
     // remove B from target sets. For mutual simulation, keep the smaller index.
+    // Reverse in-place pruning also keeps one target from each equivalent group.
     this._pruneDominatedTargets(
       (a, b) => sim[a].has(b) && (a < b || !sim[b].has(a)));
 

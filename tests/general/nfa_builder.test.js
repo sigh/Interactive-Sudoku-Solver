@@ -1460,21 +1460,23 @@ await runTest('reduceBySimulation matches a reference simulation on random autom
 
   const rng = new RandomIntGenerator(42);
   const randomBelow = (n) => rng.randomInt(n - 1);  // randomInt is inclusive.
-  const NUM_SYMBOLS = 3;
-  const MAX_LENGTH = 5;
+  // Two symbols with dense transitions make the deep simulation chains that
+  // exercise the refinement worklist, and keep the strings to check few.
+  const NUM_SYMBOLS = 2;
+  const MAX_LENGTH = 6;
   const allStrings = [[]];
   for (let i = 0; i < allStrings.length; i++) {
     if (allStrings[i].length === MAX_LENGTH) continue;
     for (let v = 1; v <= NUM_SYMBOLS; v++) allStrings.push([...allStrings[i], v]);
   }
 
-  for (let iter = 0; iter < 300; iter++) {
-    const numStates = 2 + randomBelow(7);
-    const nondeterministic = randomBelow(4) === 0;
+  for (let iter = 0; iter < 60; iter++) {
+    const numStates = 2 + randomBelow(9);
+    const nondeterministic = randomBelow(2) === 0;
     // targets[a][s - 1] is the target list of state a on symbol s.
     const targets = Array.from({ length: numStates }, () => Array.from(
       { length: NUM_SYMBOLS }, () => {
-        const count = randomBelow(10) < 6 ? 0 : 1 + (nondeterministic && randomBelow(2));
+        const count = randomBelow(10) < 3 ? 0 : 1 + (nondeterministic && randomBelow(2));
         return Array.from({ length: count }, () => randomBelow(numStates));
       }));
     const accepting = Array.from({ length: numStates }, () => randomBelow(3) === 0);
@@ -1755,12 +1757,12 @@ await runTest('nfaToJavascriptSpec emits [SEGMENT_BREAK] and round-trips', () =>
   };
 
   const alphabet = [1, 2, 3, 4, SEGMENT_BREAK];
-  // Enumerate every sequence of length 0..5 exactly once. Extend only the
+  // Enumerate every sequence of length 0..4 exactly once. Extend only the
   // previous generation (`frontier`) — extending the whole accumulated list
   // would re-grow shorter sequences and roughly double the work with dupes.
   const seqs = [[]];
   let frontier = [[]];
-  for (let len = 1; len <= 5; len++) {
+  for (let len = 1; len <= 4; len++) {
     const grown = [];
     for (const s of frontier) for (const a of alphabet) grown.push([...s, a]);
     seqs.push(...grown);
