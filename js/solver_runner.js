@@ -496,7 +496,9 @@ export class SolverRunner {
     this._candidateSupportThreshold = 1;
 
     // Iteration state
+    // _index is the position shown; _requestedIndex the position last fetched.
     this._index = 0;
+    this._requestedIndex = 0;
     this._follow = false;
     this._currentResult = null;
   }
@@ -544,6 +546,7 @@ export class SolverRunner {
 
     // Reset iteration state
     this._index = 0;
+    this._requestedIndex = 0;
     this._follow = false;
     this._currentResult = null;
 
@@ -661,9 +664,9 @@ export class SolverRunner {
 
   // --- Internal ---
 
-  // Show the result at index (default: refresh the current one). _index only
-  // changes once the result is shown, so it always matches the display.
-  _update(index = this._index) {
+  // Show the result at index. By default, refresh the position last requested,
+  // which may still be in flight.
+  _update(index = this._requestedIndex) {
     this._uncheckUpdate(index).catch((e) => { this._handleException(e); });
   }
 
@@ -682,6 +685,7 @@ export class SolverRunner {
 
     // Fetch and show the result. Report the fetch starting and finishing
     // (whether it succeeded or failed).
+    this._requestedIndex = index;
     session.fetchesInFlight++;
     if (handler.ITERATION_CONTROLS) this._onFetchStart(this._follow);
     try {
@@ -693,6 +697,9 @@ export class SolverRunner {
       if (this._follow && index >= handler.maxIndex() && handler.isDone()) {
         this._follow = false;
       }
+    } catch (e) {
+      this._requestedIndex = this._index;
+      throw e;
     } finally {
       session.fetchesInFlight--;
       this._notifyIterationChange();

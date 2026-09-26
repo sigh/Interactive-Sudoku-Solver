@@ -427,30 +427,16 @@ await runTest('solve should abort previous solve when called again', async () =>
 // Iteration control
 // ============================================================================
 
+// LocalSolverProxy answers at once, so the solutions that each move prefetches
+// arrive, and refresh the display, while the move is still in flight.
 await runTest('next, previous and toStart move from the displayed solution', async () => {
-  // The worker answers in a later task, so a background solution can't arrive
-  // in the middle of a move. LocalSolverProxy answers at once; model the worker.
-  const savedMakeSolver = SolverProxy.makeSolver;
-  SolverProxy.makeSolver = async (...args) => {
-    const proxy = await savedMakeSolver(...args);
-    const nthSolution = proxy.nthSolution.bind(proxy);
-    proxy.nthSolution = async (n) => {
-      await waitForSettle();
-      return nthSolution(n);
-    };
-    return proxy;
-  };
-  const settle = async () => {
-    for (let i = 0; i < 5; i++) await waitForSettle();
-  };
-
   const iterations = [];
   const runner = new SolverRunner({
     onIterationChange: (state) => iterations.push(state),
   });
   // An empty grid has many solutions to move between.
   await runner.solve(new SudokuConstraint.Container([]), { mode: 'solutions' });
-  await settle();
+  await waitForSettle();
 
   const shown = () => {
     const s = iterations.at(-1);
@@ -465,14 +451,10 @@ await runTest('next, previous and toStart move from the displayed solution', asy
     ['toStart', [0, 'Solution 1', true]],
     ['previous', [0, 'Solution 1', true]],
   ];
-  try {
-    for (const [move, expected] of moves) {
-      runner[move]();
-      await settle();
-      assert.deepEqual(shown(), expected, move);
-    }
-  } finally {
-    SolverProxy.makeSolver = savedMakeSolver;
+  for (const [move, expected] of moves) {
+    runner[move]();
+    await waitForSettle();
+    assert.deepEqual(shown(), expected, move);
   }
 });
 

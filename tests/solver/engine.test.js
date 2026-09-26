@@ -7,7 +7,6 @@ ensureGlobalEnvironment();
 
 const { SudokuBuilder } = await import('../../js/solver/sudoku_builder.js');
 const { SudokuConstraint } = await import('../../js/sudoku_constraint.js');
-const { SudokuParser } = await import('../../js/sudoku_parser.js');
 const { CellGeometry } = await import('../../js/cell_geometry.js');
 const { SudokuSolver, HandlerSet } = await import('../../js/solver/engine.js');
 const { SamplingCandidateSelector } = await import('../../js/solver/candidate_selector.js');
@@ -545,53 +544,113 @@ await runTest('nthStep returns null for contradictory puzzle', () => {
   }
 });
 
-const KILLER_HARD =
-  'S<J<<O<<KJ^<<^<^>^^<N<<<J^Q^S^O>>^^^>^W^<<^>^^O^<<^T^J^^^>>>^>^>^ML<S<<^^>^<^<<^<';
-const GERMAN_WHISPERS =
-  '.Whisper~R8C1~R7C1~R7C2~R8C3~R9C3~R9C2.Whisper~R9C6~R8C7~R7C7~R7C8~R6C9~R5C8.Whisper~R6C3~R5C2~R4C3~R3C4~R2C5~R1C6~R1C7~R2C8~R3C8~R4C7~R5C6~R6C6~R7C6~R8C5~R7C4.Whisper~R4C5~R4C6~R3C7.~R1C5_1~R2C2_5~R5C1_6~R5C9_9~R7C3_3~R8C8_3~R9C1_5~R9C5_3';
-const makeStepSolver = (input = KILLER_HARD) => SudokuBuilder.build(
-  SudokuBuilder.resolveConstraint(SudokuParser.parseText(input)));
+// Rejects the lowest value in one cell. That value is in some solutions of an
+// empty grid, so a complete search must reach it and backtrack: the search has
+// conflict steps whatever order it takes.
+class RejectLowestValueHandler extends SudokuConstraintHandler {
+  constructor(cell) {
+    super([cell]);
+    this._cell = cell;
+  }
 
-await runTestCases('nthStep in any order matches a fresh solver', [
-  ['killer', KILLER_HARD],
-  ['german whispers', GERMAN_WHISPERS],
-], (input) => {
-  const solver = makeStepSolver(input);
-  const guides = new Map();
-  const check = (n) => {
-    const step = solver.nthStep(n, guides);
-    assert.deepEqual(step, makeStepSolver(input).nthStep(n, guides), `step ${n}`);
-    return step;
-  };
+  dedupId() {
+    return `RejectLowestValue-${this._cell}`;
+  }
 
-  for (let n = 0; n <= 60; n++) check(n);
-  // Guide the displayed step, as alt-clicking a cell does, then move on
-  // without refetching it.
-  const step = check(60);
-  const cell = step.pencilmarks.findIndex(v => v instanceof Set);
-  guides.set(60, { cell, depth: step.branchCells.length - 1 });
-  for (let n = 61; n <= 100; n++) check(n);
-  check(60);
+  enforceConsistency(grid) {
+    return grid[this._cell] !== 1;
+  }
+}
 
-  check(400);
-  check(50);
-  check(51);
-  assert.equal(solver.nthStep(1e6, guides), null);
-  check(120);
+// A small search with guess, conflict and solution steps.
+const makeStepSolver = () => {
+  const { geometry, constraintMap } = SudokuBuilder.buildGeometry(
+    makeEmptyGridConstraint('4x4'));
+  return new SudokuSolver([
+    ...SudokuBuilder._handlers(constraintMap, geometry),
+    new RejectLowestValueHandler(0),
+  ], geometry);
+};
+
+const stepKind = (step) =>
+  step.isSolution ? 'solution' : step.hasConflict ? 'conflict' : 'guess';
+
+const countResets = (solver) => {
+  const counter = { resets: 0 };
+  const internal = solver._internalSolver;
+  const reset = internal.reset.bind(internal);
+  internal.reset = () => { counter.resets++; reset(); };
+  return counter;
+};
+
+await runTest('nthStep continuing forward matches a replay at every kind of step', () => {
+  const solver = makeStepSolver();
+  const reference = makeStepSolver();
+  const kinds = new Set();
+  for (let n = 0; n < 30; n++) {
+    const step = solver.nthStep(n, new Map());
+    reference._reset();
+    assert.deepEqual(step, reference.nthStep(n, new Map()), `step ${n}`);
+    kinds.add(stepKind(step));
+  }
+  assert.deepEqual([...kinds].sort(), ['conflict', 'guess', 'solution'],
+    'the walk must continue from each kind of step');
 });
 
-await runTest('nthStep continues forward instead of restarting', () => {
+await runTest('nthStep continues forward, including skipping ahead', () => {
   const solver = makeStepSolver();
-  let resets = 0;
-  const reset = solver._internalSolver.reset.bind(solver._internalSolver);
-  solver._internalSolver.reset = () => { resets++; reset(); };
+  const counter = countResets(solver);
+  for (let n = 0; n < 10; n++) solver.nthStep(n, new Map());
+  solver.nthStep(20, new Map());
+  assert.equal(counter.resets, 1);
+});
 
-  for (let n = 0; n <= 100; n++) solver.nthStep(n, new Map());
-  solver.nthStep(500, new Map());
-  assert.equal(resets, 1);
+await runTestCases('nthStep restarts, and matches a replay', [
+  ['going back', (solver) => solver.nthStep(5, new Map())],
+  ['same step again', (solver) => solver.nthStep(10, new Map())],
+  ['a changed guide', (solver, step) => {
+    const cell = step.pencilmarks.findIndex(v => v instanceof Set);
+    const guides = new Map([[10, { cell, depth: step.branchCells.length - 1 }]]);
+    return solver.nthStep(11, guides);
+  }],
+  ['after the search ended', (solver) => {
+    assert.equal(solver.nthStep(1e6, new Map()), null);
+    return solver.nthStep(12, new Map());
+  }],
+], (move) => {
+  const solver = makeStepSolver();
+  const step10 = solver.nthStep(10, new Map());
+  const counter = countResets(solver);
 
-  solver.nthStep(50, new Map());
-  assert.equal(resets, 2, 'going back restarts');
+  const step = move(solver, step10);
+
+  assert.equal(counter.resets, 1);
+  const reference = makeStepSolver();
+  const guides = solver._internalSolver._stepState.stepGuides;
+  const n = solver._internalSolver._stepState.stepTarget - 1;
+  assert.deepEqual(step, reference.nthStep(n, guides));
+});
+
+await runTest('a guess step continues with the selection it already made', () => {
+  const solver = makeStepSolver();
+  const internal = solver._internalSolver;
+  let n = 0;
+  while (stepKind(solver.nthStep(n, new Map())) !== 'guess') n++;
+  const { recDepth, selection } = internal._resumePosition;
+  assert.ok(selection, 'a guess stop saves its selection');
+  const pausedDepth = internal._recStack[recDepth - 1].cellDepth;
+
+  const selector = internal._candidateSelector;
+  const calls = [];
+  const select = selector.selectNextCandidate.bind(selector);
+  selector.selectNextCandidate = (cellDepth, gridState, stepState, isNewNode) => {
+    calls.push({ cellDepth, isNewNode });
+    return select(cellDepth, gridState, stepState, isNewNode);
+  };
+  solver.nthStep(n + 1, new Map());
+
+  assert.ok(!calls.some(c => c.cellDepth === pausedDepth && c.isNewNode),
+    'the paused node must not be selected again');
 });
 
 await runTest('nthStep debug logs support extra solver state', () => {
