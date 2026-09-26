@@ -6,8 +6,8 @@ import { FakeElement, makeFakeDocument } from '../helpers/mock_dom.js';
 
 ensureGlobalEnvironment({ needWindow: true, documentValue: makeFakeDocument() });
 
-const { Chaos, CustomLine, ConstraintDisplay } = await import('../../js/constraint_display.js');
-const { DisplayContainer, DisplayItem } = await import('../../js/display.js');
+const { Chaos, CustomLine, ConstraintDisplay } = await import('../../js/ui/constraint_display.js');
+const { DisplayContainer, DisplayItem } = await import('../../js/ui/display.js');
 const { CellGeometry } = await import('../../js/cell_geometry.js');
 const { SudokuConstraint } = await import('../../js/sudoku_constraint.js');
 const { SudokuParser } = await import('../../js/sudoku_parser.js');

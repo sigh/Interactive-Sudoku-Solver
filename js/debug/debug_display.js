@@ -9,7 +9,7 @@ await dynamicCSSFileLoader('css/debug.css' + self.VERSION_PARAM)();
 const {
   InfoTextDisplay,
   CellValueDisplay,
-} = await import('../display.js' + self.VERSION_PARAM);
+} = await import('../ui/display.js' + self.VERSION_PARAM);
 
 export class DebugManager {
   constructor(displayContainer, constraintManager, bottomDrawer) {

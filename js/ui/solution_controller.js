@@ -5,7 +5,7 @@ const {
   localTimestamp,
   copyToClipboard,
   isKeyEventFromEditableElement,
-} = await import('./util.js' + self.VERSION_PARAM);
+} = await import('../util.js' + self.VERSION_PARAM);
 const { LazyDrawerManager } = await import('./bottom_drawer.js' + self.VERSION_PARAM);
 const {
   HighlightDisplay,
@@ -14,7 +14,7 @@ const {
   YinYangShadingDisplay,
   CellValueDisplay,
 } = await import('./display.js' + self.VERSION_PARAM);
-const { toShortSolution } = await import('./sudoku_parser.js' + self.VERSION_PARAM);
+const { toShortSolution } = await import('../sudoku_parser.js' + self.VERSION_PARAM);
 const { SolverStateDisplay } = await import('./solver_state_display.js' + self.VERSION_PARAM);
 const {
   SolverRunner,
@@ -165,7 +165,7 @@ export class SolutionController {
 
     this._debugManager = new LazyDrawerManager({
       tabId: 'debug',
-      modulePath: './debug/debug_display.js',
+      modulePath: '../debug/debug_display.js',
       factory: (module, _container) => new module.DebugManager(
         displayContainer, constraintManager, bottomDrawer),
     }, bottomDrawer);
@@ -174,7 +174,7 @@ export class SolutionController {
 
     this._flameGraphManager = new LazyDrawerManager({
       tabId: 'flame-graph',
-      modulePath: './debug/flame_graph.js',
+      modulePath: '../debug/flame_graph.js',
       factory: (module, container) => new module.FlameGraphManager(
         container, displayContainer),
     }, bottomDrawer);

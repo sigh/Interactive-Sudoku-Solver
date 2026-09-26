@@ -16,7 +16,7 @@ globalThis.sessionStorage = {
   setItem: (k, v) => storage.set(k, String(v)),
 };
 
-const { SolverStateDisplay } = await import('../../js/solver_state_display.js');
+const { SolverStateDisplay } = await import('../../js/ui/solver_state_display.js');
 
 // A display with the stats charts closed, so no chart library loads.
 const makeDisplay = () => new SolverStateDisplay(null, {

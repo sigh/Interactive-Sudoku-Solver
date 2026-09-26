@@ -20,9 +20,9 @@ const makeStorage = () => {
 globalThis.sessionStorage = makeStorage();
 globalThis.localStorage = makeStorage();
 
-const { SolutionController } = await import('../../js/solution_controller.js');
+const { SolutionController } = await import('../../js/ui/solution_controller.js');
 const { SolverProxy, DEFAULT_MODE, Modes, getModeDescription } =
-  await import('../../js/solver_runner.js');
+  await import('../../js/ui/solver_runner.js');
 const { CellGeometry } = await import('../../js/cell_geometry.js');
 
 const settle = () => new Promise(resolve => setImmediate(resolve));

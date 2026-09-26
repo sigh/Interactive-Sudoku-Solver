@@ -48,7 +48,7 @@ const realFormData = globalThis.FormData;
 globalThis.FormData = FakeFormData;
 
 const { CollapsibleContainer, ConstraintCategoryInput } =
-  await import('../../js/constraint_input.js');
+  await import('../../js/ui/constraint_input.js');
 const { CellGeometry } = await import('../../js/cell_geometry.js');
 const { SudokuConstraint } = await import('../../js/sudoku_constraint.js');
 const { SudokuParser } = await import('../../js/sudoku_parser.js');

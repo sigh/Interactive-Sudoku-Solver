@@ -5,10 +5,10 @@ const {
   ColorPicker,
   CellValueDisplay,
 } = await import('./display.js' + self.VERSION_PARAM);
-const { LineOptions, CellArgs } = await import('./sudoku_constraint.js' + self.VERSION_PARAM);
-const { createSvgElement, clearDOMNode } = await import('./util.js' + self.VERSION_PARAM);
-const { SudokuConstraint, SudokuConstraintBase, OutsideConstraintBase } = await import('./sudoku_constraint.js' + self.VERSION_PARAM);
-const { CellGeometry, CellGraph } = await import('./cell_geometry.js' + self.VERSION_PARAM);
+const { LineOptions, CellArgs } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
+const { createSvgElement, clearDOMNode } = await import('../util.js' + self.VERSION_PARAM);
+const { SudokuConstraint, SudokuConstraintBase, OutsideConstraintBase } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
+const { CellGeometry, CellGraph } = await import('../cell_geometry.js' + self.VERSION_PARAM);
 
 const constraintDisplayOrder = () => [
   DefaultRegions,

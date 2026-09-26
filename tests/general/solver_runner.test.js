@@ -23,7 +23,7 @@ const {
   Modes,
   DEFAULT_MODE,
   getHandlerClass,
-} = await import('../../js/solver_runner.js');
+} = await import('../../js/ui/solver_runner.js');
 
 // ============================================================================
 // Test Helpers

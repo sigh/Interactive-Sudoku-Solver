@@ -6,15 +6,15 @@ const {
   toggleDisabled,
   MultiMap,
   isIterable
-} = await import('./util.js' + self.VERSION_PARAM);
+} = await import('../util.js' + self.VERSION_PARAM);
 const {
   SudokuConstraint,
   SudokuConstraintBase,
   OutsideConstraintBase,
   binaryKeyToFnString,
   encodedNFAToJsSpec
-} = await import('./sudoku_constraint.js' + self.VERSION_PARAM);
-const { CellGeometry } = await import('./cell_geometry.js' + self.VERSION_PARAM);
+} = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
+const { CellGeometry } = await import('../cell_geometry.js' + self.VERSION_PARAM);
 
 export class CollapsibleContainer {
   constructor(element, defaultOpen) {

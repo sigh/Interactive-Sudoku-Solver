@@ -18,7 +18,7 @@ The debug system connects to the solver through two mechanisms:
 1. **Debug options** — `DebugManager.getOptions()` returns a config object passed to the solver via `SudokuBuilder.build()`. This controls what data the solver collects during execution.
 2. **Update callback** — `DebugManager.getCallback()` returns a function that receives solver state updates (counters, logs, cell info) during and after solving.
 
-Both are wired up in [../solution_controller.js](../solution_controller.js).
+Both are wired up in [../ui/solution_controller.js](../ui/solution_controller.js).
 
 ## Puzzle Loading
 

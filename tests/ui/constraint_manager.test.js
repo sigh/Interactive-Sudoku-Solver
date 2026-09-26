@@ -37,9 +37,9 @@ Object.defineProperty(navigator, 'clipboard', {
   configurable: true,
 });
 
-const { ConstraintManager } = await import('../../js/render_page.js');
-const { GridInputManager } = await import('../../js/grid_input.js');
-const { DisplayContainer } = await import('../../js/display.js');
+const { ConstraintManager } = await import('../../js/ui/render_page.js');
+const { GridInputManager } = await import('../../js/ui/grid_input.js');
+const { DisplayContainer } = await import('../../js/ui/display.js');
 
 // A ConstraintManager on a new page, built as initPage builds it.
 const makeManager = ({ keepStorage = false } = {}) => {

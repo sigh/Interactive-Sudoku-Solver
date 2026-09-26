@@ -5,7 +5,7 @@ import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 
 ensureGlobalEnvironment({ needWindow: true });
 
-const { CellPositioner, DisplayItem } = await import('../../js/display.js');
+const { CellPositioner, DisplayItem } = await import('../../js/ui/display.js');
 const { CellGeometry } = await import('../../js/cell_geometry.js');
 
 const CELL_SIZE = DisplayItem.CELL_SIZE;

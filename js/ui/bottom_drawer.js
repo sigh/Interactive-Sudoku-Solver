@@ -1,4 +1,4 @@
-const { autoSaveField } = await import('./util.js' + self.VERSION_PARAM);
+const { autoSaveField } = await import('../util.js' + self.VERSION_PARAM);
 
 // A tabbed bottom drawer component.
 export class BottomDrawer {

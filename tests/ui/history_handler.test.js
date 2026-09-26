@@ -18,7 +18,7 @@ globalThis.history = {
 const windowListeners = new Map();
 globalThis.addEventListener = (type, fn) => windowListeners.set(type, fn);
 
-const { HistoryHandler } = await import('../../js/solution_controller.js');
+const { HistoryHandler } = await import('../../js/ui/solution_controller.js');
 
 const BASE = 'https://example.test/iss/';
 

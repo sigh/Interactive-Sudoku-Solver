@@ -1,5 +1,5 @@
 // Cell selection on the grid, and typing into it.
-const { isKeyEventFromEditableElement } = await import('./util.js' + self.VERSION_PARAM);
+const { isKeyEventFromEditableElement } = await import('../util.js' + self.VERSION_PARAM);
 const { DisplayItem } = await import('./display.js' + self.VERSION_PARAM);
 
 export class Selection {

@@ -6,7 +6,7 @@ const {
   camelCaseToWords,
   clearDOMNode,
   autoSaveField,
-} = await import('./util.js' + self.VERSION_PARAM);
+} = await import('../util.js' + self.VERSION_PARAM);
 
 export class SolverStateDisplay {
   constructor(solutionDisplay, bottomDrawer) {

@@ -26,7 +26,7 @@ const {
   GridDisplay, BorderDisplay, VarCellDisplay, YinYangShadingDisplay, CellPositioner,
   CellValueDisplay, SolutionDisplay, ColorPicker, DisplayContainer, InfoTextDisplay,
   ChaosRegionBorderDisplay, DisplayItem,
-} = await import('../../js/display.js');
+} = await import('../../js/ui/display.js');
 const { CellGeometry } = await import('../../js/cell_geometry.js');
 const { SudokuConstraint } = await import('../../js/sudoku_constraint.js');
 

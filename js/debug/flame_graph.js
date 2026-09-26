@@ -7,7 +7,7 @@ const {
   memoize,
   dynamicCSSFileLoader,
 } = await import('../util.js' + self.VERSION_PARAM);
-const { CellValueDisplay } = await import('../display.js' + self.VERSION_PARAM);
+const { CellValueDisplay } = await import('../ui/display.js' + self.VERSION_PARAM);
 
 await dynamicCSSFileLoader('css/flame_graph.css' + self.VERSION_PARAM)();
 

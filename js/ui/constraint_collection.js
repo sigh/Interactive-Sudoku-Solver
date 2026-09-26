@@ -4,8 +4,8 @@ const {
   createSvgElement,
   arraysAreEqual,
   MultiMap,
-} = await import('./util.js' + self.VERSION_PARAM);
-const { SudokuConstraint, CompositeConstraintBase } = await import('./sudoku_constraint.js' + self.VERSION_PARAM);
+} = await import('../util.js' + self.VERSION_PARAM);
+const { SudokuConstraint, CompositeConstraintBase } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
 const { DisplayItem } = await import('./display.js' + self.VERSION_PARAM);
 
 class ConstraintCollectionBase {

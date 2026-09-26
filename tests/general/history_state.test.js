@@ -5,7 +5,7 @@ import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 
 ensureGlobalEnvironment();
 
-const { HistoryState } = await import('../../js/solution_controller.js');
+const { HistoryState } = await import('../../js/ui/solution_controller.js');
 
 // ============================================================================
 // add / dedup / forward-truncation

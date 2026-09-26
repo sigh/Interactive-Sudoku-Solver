@@ -7,11 +7,11 @@ const {
   dynamicJSFileLoader,
   dynamicCSSFileLoader,
   createSourceLinkIcon,
-} = await import('./util.js' + self.VERSION_PARAM);
-const { SudokuConstraint, UserScriptExecutor } = await import('./sudoku_constraint.js' + self.VERSION_PARAM);
+} = await import('../util.js' + self.VERSION_PARAM);
+const { SudokuConstraint, UserScriptExecutor } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
 const { DisplayContainer } = await import('./display.js' + self.VERSION_PARAM);
-const { SudokuParser } = await import('./sudoku_parser.js' + self.VERSION_PARAM);
-const { CellGeometry } = await import('./cell_geometry.js' + self.VERSION_PARAM);
+const { SudokuParser } = await import('../sudoku_parser.js' + self.VERSION_PARAM);
+const { CellGeometry } = await import('../cell_geometry.js' + self.VERSION_PARAM);
 const { ConstraintDisplay } = await import('./constraint_display.js' + self.VERSION_PARAM);
 const { SolutionController } = await import('./solution_controller.js' + self.VERSION_PARAM);
 const { CollapsibleContainer, ConstraintCategoryInput } = await import('./constraint_input.js' + self.VERSION_PARAM);
@@ -55,14 +55,14 @@ export const initPage = () => {
 
   new LazyDrawerManager({
     tabId: 'raw-strings',
-    modulePath: './debug/raw_strings_panel.js',
+    modulePath: '../debug/raw_strings_panel.js',
     factory: (module, bodyElement) => new module.RawStringsPanel(
       constraintManager, displayContainer, bodyElement),
   }, bottomDrawer);
 
   const puzzleSelectorManager = new LazyDrawerManager({
     tabId: 'puzzle-selector',
-    modulePath: './debug/puzzle_selector_panel.js',
+    modulePath: '../debug/puzzle_selector_panel.js',
     factory: (module, bodyElement) => new module.PuzzleSelectorPanel(
       constraintManager, bodyElement,
       (path) => sandboxHandler.openWithScript(path)),
@@ -309,7 +309,7 @@ class ExampleHandler {
   }
 
   async _populateExampleSelect(exampleSelect) {
-    const { DISPLAYED_EXAMPLE_GROUPS, PUZZLE_INDEX } = await import('../data/example_puzzles.js' + self.VERSION_PARAM);
+    const { DISPLAYED_EXAMPLE_GROUPS, PUZZLE_INDEX } = await import('../../data/example_puzzles.js' + self.VERSION_PARAM);
 
     for (const group of DISPLAYED_EXAMPLE_GROUPS) {
       const optGroup = document.createElement('optgroup');
@@ -810,7 +810,7 @@ class SandboxHandler {
       await dynamicJSFileLoader('lib/prism.min.js')();
       await dynamicJSFileLoader('lib/prism-javascript.min.js')();
 
-      const { EmbeddedSandbox } = await import('./sandbox/embedded_sandbox.js' + self.VERSION_PARAM);
+      const { EmbeddedSandbox } = await import('../sandbox/embedded_sandbox.js' + self.VERSION_PARAM);
 
       this._sandbox = new EmbeddedSandbox(
         this._container,
