@@ -184,26 +184,6 @@ export class SolutionController {
     constraintManager.addReshapeListener(this._chaosRegionBorderDisplay);
     constraintManager.addReshapeListener(this._yinYangShadingDisplay);
 
-    // Create the SolverRunner with callbacks for UI updates
-    this._solverRunner = new SolverRunner({
-      stateHandler: (state) => {
-        this._searchComplete = state.done;
-        this._stateDisplay.setState(state);
-      },
-      statusHandler: (isSolving, method) => this._solveStatusChanged(isSolving, method),
-      onError: (error) => {
-        this._elements.error.textContent = error;
-        this._stateDisplay.setSolveStatus(false, 'terminate');
-      },
-      onUpdate: (result) => this._handleResultUpdate(result),
-      onFetchStart: (following) => this._lockIterationControls(following),
-      onIterationChange: (state) => this._handleIterationChange(state),
-    });
-
-    // Add reshape listener after the SolverRunner has been created, so that we
-    // don't try to abort a non-existent solver.
-    constraintManager.addReshapeListener(this);
-
     this._elements = {
       start: document.getElementById('solution-start'),
       end: document.getElementById('solution-end'),
@@ -222,39 +202,23 @@ export class SolutionController {
       copyUrl: document.getElementById('copy-url-button'),
     }
 
-    this._pauseIcon = document.createElement('span');
-    this._pauseIcon.className = 'pause-icon';
+    this._setUpPlayback();
 
-    this._elements.copyUrl.onclick = () => {
-      copyToClipboard(this._shareUrlToString(), this._elements.copyUrl);
-    };
+    // Add reshape listener after the SolverRunner has been created, so that we
+    // don't try to abort a non-existent solver.
+    constraintManager.addReshapeListener(this);
 
-    this._elements.mode.onchange = () => {
-      this._updateValueCountLimitUrl();
-      this._update();
-    };
-    const thresholdInput = this._elements.candidateSupportThreshold;
-    const thresholdValue = thresholdInput.nextElementSibling;
-    thresholdInput.oninput = () => {
-      thresholdValue.textContent = thresholdInput.value;
-      this._handleThresholdChange();
-    };
-    this._elements.stop.onclick = () => {
-      this._solverRunner.abort();
-      this._lockIterationControls();
-    };
-    this._elements.solve.onclick = () => this._solve();
-
-    this._setUpAutoSolve();
+    this._setUpInputs();
     this._setUpKeyBindings(displayContainer);
-    this._setUpIterationControls();
 
     this._historyHandler = new HistoryHandler((params) => {
       const mode = params.get('mode');
       if (mode) this._elements.mode.value = mode;
 
       const valueCountLimit = params.get('valueCountLimit');
-      if (valueCountLimit) thresholdInput.value = valueCountLimit;
+      if (valueCountLimit) {
+        this._elements.candidateSupportThreshold.value = valueCountLimit;
+      }
 
       const constraintsText = params.get('q') || '.';
       this._constraintManager.loadUnsafeFromText(constraintsText);
@@ -264,7 +228,7 @@ export class SolutionController {
     constraintManager.addUpdateListener((_, options) => this._update(options));
 
     // This can trigger an update, so do it last.
-    thresholdInput.oninput();
+    this._elements.candidateSupportThreshold.oninput();
 
     this._update();
   }
@@ -305,6 +269,27 @@ export class SolutionController {
         this._debugManager.toggle();
       }
     });
+  }
+
+  // The inputs that choose what to solve, and how.
+  _setUpInputs() {
+    this._elements.copyUrl.onclick = () => {
+      copyToClipboard(this._shareUrlToString(), this._elements.copyUrl);
+    };
+
+    this._elements.mode.onchange = () => {
+      this._updateValueCountLimitUrl();
+      this._update();
+    };
+    const thresholdInput = this._elements.candidateSupportThreshold;
+    const thresholdValue = thresholdInput.nextElementSibling;
+    thresholdInput.oninput = () => {
+      thresholdValue.textContent = thresholdInput.value;
+      this._handleThresholdChange();
+    };
+    this._elements.solve.onclick = () => this._solve();
+
+    this._setUpAutoSolve();
   }
 
   _setUpAutoSolve() {
@@ -398,11 +383,35 @@ export class SolutionController {
     });
   }
 
-  _setUpIterationControls() {
+  // Create the solver runner, and connect it to the display and the playback
+  // controls.
+  _setUpPlayback() {
+    this._pauseIcon = document.createElement('span');
+    this._pauseIcon.className = 'pause-icon';
+
+    this._solverRunner = new SolverRunner({
+      stateHandler: (state) => {
+        this._searchComplete = state.done;
+        this._stateDisplay.setState(state);
+      },
+      statusHandler: (isSolving, method) => this._solveStatusChanged(isSolving, method),
+      onError: (error) => {
+        this._elements.error.textContent = error;
+        this._stateDisplay.setSolveStatus(false, 'terminate');
+      },
+      onUpdate: (result) => this._handleResultUpdate(result),
+      onFetchStart: (following) => this._lockIterationControls(following),
+      onIterationChange: (state) => this._handleIterationChange(state),
+    });
+
     this._elements.forward.onclick = () => this._solverRunner.next();
     this._elements.back.onclick = () => this._solverRunner.previous();
     this._elements.start.onclick = () => this._solverRunner.toStart();
     this._elements.end.onclick = () => this._solverRunner.toggleFollowing();
+    this._elements.stop.onclick = () => {
+      this._solverRunner.abort();
+      this._lockIterationControls();
+    };
   }
 
   _showIterationControls(show) {
