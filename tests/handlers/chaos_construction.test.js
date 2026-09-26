@@ -775,15 +775,17 @@ await runTest('ChaosConstruction does not reject completable 2x2 partial grids',
   const masks = [valueMask(1), valueMask(2), valueMask(1, 2)];
   let checked = 0;
   let completable = 0;
+  const context = makeChaosContext('2x2');
+  const { grid, regionCells, geometry } = context;
+  const initialGrid = grid.slice();
 
   for (const v0 of masks) for (const v1 of masks) for (const v2 of masks) for (const v3 of masks) {
     for (const r1 of masks) for (const r2 of masks) for (const r3 of masks) {
-      const context = makeChaosContext('2x2');
-      const { grid, regionCells, geometry } = context;
       const partialValues = [v0, v1, v2, v3];
       const partialRegions = [valueMask(1), r1, r2, r3];
       checked++;
 
+      for (let i = 0; i < grid.length; i++) grid[i] = initialGrid[i];
       for (let cell = 0; cell < geometry.numGridCells; cell++) {
         grid[cell] = partialValues[cell];
         grid[regionCells[cell]] = partialRegions[cell];

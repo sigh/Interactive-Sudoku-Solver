@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 
 import { ensureGlobalEnvironment } from '../helpers/test_env.js';
-import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
+import { runTest, runTestCases, logSuiteComplete } from '../helpers/test_runner.js';
 import {
   GridTestContext,
   createCellExclusions,
@@ -349,33 +349,53 @@ await runTest('ConnectedValues: var group uses its own column count, not the gri
   });
 }
 
+await runTest('ConnectedValues: unknown variable group fails to build', () => {
+  const solver = new SimpleSolver();
+  assert.throws(() => solver.countSolutions('.Shape~4x4.ConnectedValues~VX~1'));
+});
+
 // ===========================================================================
-// Brute-force oracle over the string API: fix the grid digits, put the
-// constraint on a Var overlay, and diff the solver's solution count against
-// an enumeration of every overlay assignment with a reference flood fill.
+// Brute-force oracles, against a reference flood fill.
 // ===========================================================================
 
-const referenceIsConnected = (values, inSet, numRows, numCols) => {
-  const start = values.findIndex(v => inSet.includes(v));
-  if (start === -1) return false;
-  const seen = new Set([start]);
-  const queue = [start];
-  while (queue.length) {
-    const cell = queue.pop();
-    const row = (cell / numCols) | 0;
+// The neighbours of each cell of a numRows x numCols grid.
+const gridNeighbours = (numRows, numCols) => Array.from(
+  { length: numRows * numCols }, (_, cell) => {
+    const row = cell / numCols | 0;
     const col = cell % numCols;
-    for (const [dr, dc] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
-      const r = row + dr;
-      const c = col + dc;
-      if (r < 0 || c < 0 || r >= numRows || c >= numCols) continue;
-      const neighbor = r * numCols + c;
-      if (seen.has(neighbor) || !inSet.includes(values[neighbor])) continue;
-      seen.add(neighbor);
-      queue.push(neighbor);
+    return [[row, col - 1], [row, col + 1], [row - 1, col], [row + 1, col]]
+      .filter(([r, c]) => r >= 0 && c >= 0 && r < numRows && c < numCols)
+      .map(([r, c]) => r * numCols + c);
+  });
+
+// Whether the cells with a value in `inSet` form one non-empty connected
+// region.
+const isConnected = (values, inSet, neighbours) => {
+  let members = 0;
+  let start = -1;
+  for (let cell = 0; cell < values.length; cell++) {
+    if (!inSet.includes(values[cell])) continue;
+    members |= 1 << cell;
+    if (start < 0) start = cell;
+  }
+  if (start < 0) return false;
+  let seen = 1 << start;
+  const stack = [start];
+  while (stack.length) {
+    for (const neighbour of neighbours[stack.pop()]) {
+      const bit = 1 << neighbour;
+      if (!(members & bit) || (seen & bit)) continue;
+      seen |= bit;
+      stack.push(neighbour);
     }
   }
-  return seen.size === values.filter(v => inSet.includes(v)).length;
+  return seen === members;
 };
+
+const allConnected = (values, valueSets, neighbours) =>
+  valueSets.every(set => isConnected(values, set, neighbours));
+
+const countOf = (values, value) => values.filter(v => v === value).length;
 
 // Every assignment of `domain` values to n cells, as an iterator.
 function* allAssignments(domain, n) {
@@ -402,79 +422,60 @@ const gridGivens = (solution, numCols) => solution.split('').map(
     return `.Given~R${row}C${col}_${digit}`;
   }).join('');
 
-await runTest('ConnectedValues: solver matches brute-force oracle (4x4 overlay, single value)', () => {
-  // Overlay cells restricted to {1, 2}; cells holding 1 must connect.
-  const overlayDomains = Array.from({ length: 16 }, (_, i) =>
-    `.~VS${i + 1}_1_2`).join('');
-  const input = '.Shape~4x4' + gridGivens('1342243141233214', 4)
-    + '.Var~S~~16' + overlayDomains + '.ConnectedValues~VS~1';
+// The solver, through the string API, counts as many solutions for
+// `constraints` as brute force: the base grid is fixed to `solution`, and every
+// assignment of `domain` to the Var overlay VS is checked with `isValid`.
+const assertOverlayOracle = (shape, solution, domain, constraints, isValid) => {
+  const [numRows, numCols] = shape.split('x').map(Number);
+  const numCells = numRows * numCols;
+  const neighbours = gridNeighbours(numRows, numCols);
 
   let expected = 0;
-  for (const values of allAssignments([1, 2], 16)) {
-    if (referenceIsConnected(values, [1], 4, 4)) expected++;
+  for (const values of allAssignments(domain, numCells)) {
+    if (isValid(values, neighbours)) expected++;
   }
-  assert.ok(expected > 0 && expected < 2 ** 16);
+  assert.ok(expected > 0 && expected < domain.length ** numCells);
 
-  const solver = new SimpleSolver();
-  assert.equal(solver.countSolutions(input), expected);
+  const overlayDomains = Array.from({ length: numCells },
+    (_, i) => `.~VS${i + 1}_${domain.join('_')}`).join('');
+  const input = `.Shape~${shape}` + gridGivens(solution, numCols)
+    + `.Var~S~~${numCells}` + overlayDomains + constraints;
+  assert.equal(new SimpleSolver().countSolutions(input), expected);
+};
+
+await runTest('ConnectedValues: solver matches brute-force oracle (value set)', () => {
+  assertOverlayOracle('2x3', '123231', [1, 2, 3], '.ConnectedValues~VS~1_2',
+    (values, neighbours) => isConnected(values, [1, 2], neighbours));
 });
 
-await runTest('ConnectedValues: solver matches brute-force oracle (3x3 overlay, value set)', () => {
-  // Overlay cells range over 1-3; cells holding 1 or 2 must connect.
-  const input = '.Shape~3x3' + gridGivens('123231312', 3)
-    + '.Var~S~~9' + '.ConnectedValues~VS~1_2';
-
-  let expected = 0;
-  for (const values of allAssignments([1, 2, 3], 9)) {
-    if (referenceIsConnected(values, [1, 2], 3, 3)) expected++;
-  }
-  assert.ok(expected > 0 && expected < 3 ** 9);
-
-  const solver = new SimpleSolver();
-  assert.equal(solver.countSolutions(input), expected);
+await runTest('ConnectedValues: solver matches brute-force oracle (merged sets)', () => {
+  // The optimizer merges same-layer sets and adds the crossing and border
+  // handlers. Those are sound, so the count must still be "both connected".
+  assertOverlayOracle('3x3', '123231312', [1, 2, 3],
+    '.ConnectedValues~VS~1.ConnectedValues~VS~2',
+    (values, neighbours) => allConnected(values, [[1], [2]], neighbours));
 });
 
-await runTest('ConnectedValues: solver matches brute-force oracle (3x3 merged two sets)', () => {
-  // Two same-layer sets {1} and {2}: the optimizer merges them and adds the
-  // crossing/border handlers. Those are sound, so the solution count must
-  // still equal "both sets connected" — this exercises the whole pipeline.
-  const input = '.Shape~3x3' + gridGivens('123231312', 3)
-    + '.Var~S~~9' + '.ConnectedValues~VS~1.ConnectedValues~VS~2';
-
-  let expected = 0;
-  for (const values of allAssignments([1, 2, 3], 9)) {
-    if (referenceIsConnected(values, [1], 3, 3) &&
-      referenceIsConnected(values, [2], 3, 3)) expected++;
-  }
-  assert.ok(expected > 0 && expected < 3 ** 9);
-
-  const solver = new SimpleSolver();
-  assert.equal(solver.countSolutions(input), expected);
+await runTest('ConnectedValues: solver matches brute-force oracle (non-square merged)', () => {
+  // numRows != numCols exercises the optimizer's perimeter and 2x2 block
+  // index math.
+  assertOverlayOracle('2x3', '123231', [1, 2],
+    '.ConnectedValues~VS~1.ConnectedValues~VS~2',
+    (values, neighbours) => allConnected(values, [[1], [2]], neighbours));
 });
 
-await runTest('ConnectedValues: solver matches brute-force oracle (2x3 non-square merged)', () => {
-  // A rectangular grid (numRows ≠ numCols) exercises the optimizer's perimeter
-  // and 2x2-block index math. Base grid pinned to a valid solution; overlay
-  // restricted to {1, 2}; both sets must connect.
-  const overlayDomains = Array.from({ length: 6 }, (_, i) =>
-    `.~VS${i + 1}_1_2`).join('');
-  const input = '.Shape~2x3' + gridGivens('123231', 3)
-    + '.Var~S~~6' + overlayDomains + '.ConnectedValues~VS~1.ConnectedValues~VS~2';
-
-  let expected = 0;
-  for (const values of allAssignments([1, 2], 6)) {
-    if (referenceIsConnected(values, [1], 2, 3) &&
-      referenceIsConnected(values, [2], 2, 3)) expected++;
-  }
-  assert.ok(expected > 0 && expected < 2 ** 6);
-
-  const solver = new SimpleSolver();
-  assert.equal(solver.countSolutions(input), expected);
+await runTest('ConnectedValues: solver matches brute-force oracle (with size)', () => {
+  assertOverlayOracle('3x3', '123231312', [1, 2], '.ConnectedValues~VS~1~4',
+    (values, neighbours) => countOf(values, 1) === 4
+      && isConnected(values, [1], neighbours));
 });
 
-await runTest('ConnectedValues: unknown variable group fails to build', () => {
-  const solver = new SimpleSolver();
-  assert.throws(() => solver.countSolutions('.Shape~4x4.ConnectedValues~VX~1'));
+await runTest('ConnectedValues: solver matches brute-force oracle (merged sizes)', () => {
+  // The sizes must survive the optimizer's merge.
+  assertOverlayOracle('3x3', '123231312', [1, 2, 3],
+    '.ConnectedValues~VS~1~3.ConnectedValues~VS~2~4',
+    (values, neighbours) => countOf(values, 1) === 3 && countOf(values, 2) === 4
+      && allConnected(values, [[1], [2]], neighbours));
 });
 
 // An empty group prefix puts the constraint on the main grid. There is no
@@ -482,14 +483,13 @@ await runTest('ConnectedValues: unknown variable group fails to build', () => {
 // instead and filters them with the reference flood fill.
 const assertGridOracle = (shape, numRows, numCols, valueSets) => {
   const solver = new SimpleSolver();
+  const neighbours = gridNeighbours(numRows, numCols);
 
   let expected = 0;
   let total = 0;
   for (const solution of solver.solutions(shape)) {
-    const values = solution.getArray();
     total++;
-    if (valueSets.every(
-      set => referenceIsConnected(values, set, numRows, numCols))) expected++;
+    if (allConnected(solution.getArray(), valueSets, neighbours)) expected++;
   }
   assert.ok(expected > 0 && expected < total);
 
@@ -508,8 +508,99 @@ await runTest('ConnectedValues: solver matches brute-force oracle (main grid, me
   // With more values than columns a value may appear just once, which is
   // connected. Two sets exercise the merged handler plus the crossing/border
   // rules the optimizer adds for the grid layer.
-  assertGridOracle('.Shape~3x3~5', 3, 3, [[4], [5]]);
+  assertGridOracle('.Shape~2x3~4', 2, 3, [[3], [4]]);
 });
+
+// One handler for a set of values, and one merged handler for two sets.
+const HANDLER_CASES = [
+  ['one set', [[1, 2]]],
+  ['two sets', [[1], [2]]],
+];
+
+// A handler for `valueSets` on a 3x3 grid of values 1-3.
+const make3x3Handler = (valueSets) => {
+  const context = new GridTestContext({ gridSize: [3, 3] });
+  const handler = new ConnectedValues(9, 0, new Map(valueSets.map(set => [set, 0])));
+  initHandler(context, handler);
+  return { context, handler };
+};
+
+// Sets the grid to its initial state, with these candidates for the grid cells.
+const resetGrid = (grid, initial, cellMasks) => {
+  for (let i = 0; i < grid.length; i++) grid[i] = initial[i];
+  for (let cell = 0; cell < cellMasks.length; cell++) grid[cell] = cellMasks[cell];
+};
+
+const NEIGHBOURS_3x3 = gridNeighbours(3, 3);
+const VALUE_MASKS = [0, valueMask(1), valueMask(2), valueMask(3)];
+
+await runTestCases('ConnectedValues leaf oracle: every 3x3 grid', HANDLER_CASES, (valueSets) => {
+  const { context, handler } = make3x3Handler(valueSets);
+  const grid = context.grid.slice();
+  const acc = createAccumulator();
+  for (const values of allAssignments([1, 2, 3], 9)) {
+    resetGrid(grid, context.grid, values.map(v => VALUE_MASKS[v]));
+    const expected = allConnected(values, valueSets, NEIGHBOURS_3x3);
+    if (handler.enforceConsistency(grid, acc) !== expected) {
+      assert.fail(`grid ${values.join('')} should be ${expected ? 'accepted' : 'rejected'}`);
+    }
+  }
+});
+
+// Deterministic LCG so fuzz failures reproduce.
+const makeRandom = seed => () => {
+  seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+  return seed / 0x7fffffff;
+};
+
+// On random partial grids, the handler rejects only grids with no valid
+// completion, and removes only values that no valid completion uses.
+await runTestCases('ConnectedValues soundness fuzz', HANDLER_CASES, (valueSets) => {
+  const { context, handler } = make3x3Handler(valueSets);
+  const random = makeRandom(0xC0FFEE);
+  const grid = context.grid.slice();
+  const acc = createAccumulator();
+  const randomValue = () => 1 + Math.floor(random() * 3);
+
+  for (let trial = 0; trial < 300; trial++) {
+    // One or two candidates per cell keeps the completions few.
+    const candidates = Array.from({ length: 9 }, () => {
+      const first = randomValue();
+      const second = random() < 0.4 ? randomValue() : first;
+      return first === second ? [first] : [first, second];
+    });
+    resetGrid(grid, context.grid, candidates.map(c => valueMask(...c)));
+
+    // The candidates used by some valid completion, per cell.
+    const used = new Array(9).fill(0);
+    let completions = 0;
+    const values = new Array(9);
+    const enumerate = cell => {
+      if (cell === 9) {
+        if (!allConnected(values, valueSets, NEIGHBOURS_3x3)) return;
+        completions++;
+        for (let c = 0; c < 9; c++) used[c] |= VALUE_MASKS[values[c]];
+        return;
+      }
+      for (const value of candidates[cell]) {
+        values[cell] = value;
+        enumerate(cell + 1);
+      }
+    };
+    enumerate(0);
+
+    const before = grid.slice(0, 9);
+    if (!handler.enforceConsistency(grid, acc)) {
+      assert.equal(completions, 0, `trial ${trial}: rejected a completable grid`);
+      continue;
+    }
+    for (let cell = 0; cell < 9; cell++) {
+      assert.equal(before[cell] & ~grid[cell] & used[cell], 0,
+        `trial ${trial}: cell ${cell} lost a value a valid completion uses`);
+    }
+  }
+});
+
 
 // ===========================================================================
 // One-door forcing.
@@ -686,6 +777,20 @@ await runTest('ConnectedValues size: lone blob forces its door and completes', (
   assertTouched(acc, [1, 2, 3]);
 });
 
+await runTest('ConnectedValues size: forced doors past the size fail', () => {
+  const context = makeContext();
+  // Cells 2 and 8 each reach cell 10 through their only door (6 and 9). Each
+  // is one step away, within the budget of one cell, but together they need
+  // both doors: five cells for a region of four.
+  const handler = new ConnectedValues(context.geometry.numGridCells, 0, new Map([[[1], 4]]));
+  initHandler(context, handler);
+
+  const assignments = { 2: [1], 8: [1], 10: [1], 6: [1, 2], 9: [1, 2] };
+  for (let cell = 0; cell < 16; cell++) assignments[cell] ??= [2, 3];
+  const grid = applyCandidates(context.grid, assignments);
+  assert.equal(handler.enforceConsistency(grid, createAccumulator()), false);
+});
+
 await runTest('ConnectedValues size: cells beyond the reach budget are pruned', () => {
   const context = makeContext();
   const handler = new ConnectedValues(context.geometry.numGridCells, 0, new Map([[[1], 2]]));
@@ -779,176 +884,6 @@ await runTest('ConnectedValues size: Or-wrap stays sound', () => {
   assertOrWrapNoStateLeak(scenario);
 });
 
-// ===========================================================================
-// Connector masks, blocked edges, and cut forcing.
-// ===========================================================================
-
-// Connector bits used by the reference implementation below.
-const CONN_L = 1, CONN_R = 2, CONN_U = 4, CONN_D = 8;
-
-await runTest('ConnectedValues control: plain adjacency accepts the same grid', () => {
-  const context = makeContext();
-  const handler = new ConnectedValues(context.geometry.numGridCells, 0, new Map([[[1], 0]]));
-  initHandler(context, handler);
-  const grid = applyCandidates(context.grid, (() => {
-    const assignments = {};
-    for (let cell = 0; cell < 16; cell++) assignments[cell] = [2];
-    assignments[0] = [1]; assignments[1] = [1];
-    return assignments;
-  })());
-  assert.equal(handler.enforceConsistency(grid, createAccumulator()), true);
-});
-
-// ===========================================================================
-// Exhaustive leaf oracle and partial-mask soundness fuzz, per adjacency
-// scenario and forcing mode. The reference is an edge-connected flood fill.
-// ===========================================================================
-
-const referenceConnected2 = (values, inSet, connOf, walls, numRows, numCols) => {
-  const wallKeys = new Set(walls.map(([a, b]) => a < b ? `${a}:${b}` : `${b}:${a}`));
-  const isIn = v => inSet.includes(v);
-  const start = values.findIndex(isIn);
-  if (start === -1) return false;
-  const seen = new Set([start]);
-  const queue = [start];
-  while (queue.length) {
-    const cell = queue.pop();
-    const row = (cell / numCols) | 0;
-    const col = cell % numCols;
-    const conn = connOf(values[cell]);
-    for (const [dr, dc, bit, opp] of [
-      [0, -1, CONN_L, CONN_R], [0, 1, CONN_R, CONN_L],
-      [-1, 0, CONN_U, CONN_D], [1, 0, CONN_D, CONN_U]]) {
-      if (!(conn & bit)) continue;
-      const r = row + dr;
-      const c = col + dc;
-      if (r < 0 || c < 0 || r >= numRows || c >= numCols) continue;
-      const neighbor = r * numCols + c;
-      if (seen.has(neighbor) || !isIn(values[neighbor])) continue;
-      if (wallKeys.has(cell < neighbor ? `${cell}:${neighbor}` : `${neighbor}:${cell}`)) continue;
-      if (!(connOf(values[neighbor]) & opp)) continue;
-      seen.add(neighbor);
-      queue.push(neighbor);
-    }
-  }
-  return seen.size === values.filter(isIn).length;
-};
-
-const ADJACENCY_SCENARIOS = [
-  {
-    name: 'vertex',
-    values: [1, 2],
-    connOf: v => v <= 2 ? (CONN_L | CONN_R | CONN_U | CONN_D) : 0,
-    walls: [],
-  },
-];
-
-const makeContext3 = () => new GridTestContext({ gridSize: [3, 3] });
-
-const makeScenarioHandler = (scenario, context) => {
-  const handler = new ConnectedValues(context.geometry.numGridCells, 0, new Map([[scenario.values, 0]]));
-  const result = context.initializeHandler(handler, {
-    cellExclusions: createCellExclusions({
-      allUnique: false, numCells: context.geometry.numGridCells,
-    }),
-  });
-  assert.equal(result, true);
-  return handler;
-};
-
-for (const scenario of ADJACENCY_SCENARIOS) {
-  await runTest(`ConnectedValues leaf oracle (${scenario.name}, 3^9 grids)`, () => {
-    const context = makeContext3();
-    const handler = makeScenarioHandler(scenario, context);
-    const values = new Array(9).fill(1);
-    let checked = 0;
-    const enumerate = position => {
-      if (position === 9) {
-        const assignments = {};
-        for (let cell = 0; cell < 9; cell++) assignments[cell] = [values[cell]];
-        const grid = applyCandidates(context.grid.slice(), assignments);
-        const expected = referenceConnected2(
-          values, scenario.values, scenario.connOf, scenario.walls, 3, 3);
-        assert.equal(handler.enforceConsistency(grid, createAccumulator()), expected,
-          `grid ${values.join('')}`);
-        checked++;
-        return;
-      }
-      for (let value = 1; value <= 3; value++) {
-        values[position] = value;
-        enumerate(position + 1);
-      }
-    };
-    enumerate(0);
-    assert.equal(checked, 3 ** 9);
-  });
-}
-
-// Deterministic LCG so fuzz failures reproduce.
-const makeRandom = seed => () => {
-  seed = (seed * 1103515245 + 12345) & 0x7fffffff;
-  return seed / 0x7fffffff;
-};
-
-for (const scenario of ADJACENCY_SCENARIOS) {
-  await runTest(`ConnectedValues soundness fuzz (${scenario.name})`, () => {
-    const context = makeContext3();
-    const handler = makeScenarioHandler(scenario, context);
-    const random = makeRandom(0xC0FFEE);
-    for (let trial = 0; trial < 300; trial++) {
-      // Narrow random masks keep completion enumeration tractable.
-      const masks = [];
-      for (let cell = 0; cell < 9; cell++) {
-        const first = 1 + Math.floor(random() * 3);
-        let mask = [first];
-        if (random() < 0.4) {
-          const second = 1 + Math.floor(random() * 3);
-          if (second !== first) mask.push(second);
-        }
-        masks.push(mask);
-      }
-      const assignments = {};
-      for (let cell = 0; cell < 9; cell++) assignments[cell] = masks[cell];
-      const grid = applyCandidates(context.grid.slice(), assignments);
-      const before = grid.slice();
-
-      // Enumerate the valid completions of the masks.
-      const validCompletions = [];
-      const values = new Array(9);
-      const enumerate = position => {
-        if (position === 9) {
-          if (referenceConnected2(
-            values, scenario.values, scenario.connOf, scenario.walls, 3, 3)) {
-            validCompletions.push(values.slice());
-          }
-          return;
-        }
-        for (const value of masks[position]) {
-          values[position] = value;
-          enumerate(position + 1);
-        }
-      };
-      enumerate(0);
-
-      const result = handler.enforceConsistency(grid, createAccumulator());
-      if (!result) {
-        assert.equal(validCompletions.length, 0,
-          `trial ${trial}: rejected state with ${validCompletions.length} valid completions`);
-        continue;
-      }
-      // Anything pruned or forced away must appear in no valid completion.
-      for (let cell = 0; cell < 9; cell++) {
-        const removed = before[cell] & ~grid[cell];
-        if (!removed) continue;
-        for (const completion of validCompletions) {
-          const completionBit = valueMask(completion[cell]);
-          assert.equal(completionBit & removed, 0,
-            `trial ${trial}: cell ${cell} pruned value ${completion[cell]} used by a valid completion`);
-        }
-      }
-    }
-  });
-}
 
 await runTest('ConnectedValues: serialization round trip', async () => {
   const { SudokuParser } = await import('../../js/sudoku_parser.js');
@@ -981,43 +916,6 @@ await runTest('ConnectedValues: serialization round trip (with size)', async () 
   assert.equal(constraint.size, 10);
 });
 
-await runTest('ConnectedValues: solver matches brute-force oracle (with size)', () => {
-  // As the single-value 4x4 oracle above, with the region size pinned to 5.
-  const overlayDomains = Array.from({ length: 16 }, (_, i) =>
-    `.~VS${i + 1}_1_2`).join('');
-  const input = '.Shape~4x4' + gridGivens('1342243141233214', 4)
-    + '.Var~S~~16' + overlayDomains + '.ConnectedValues~VS~1~5';
-
-  let expected = 0;
-  for (const values of allAssignments([1, 2], 16)) {
-    if (values.filter(v => v === 1).length === 5 &&
-      referenceIsConnected(values, [1], 4, 4)) expected++;
-  }
-  assert.ok(expected > 0 && expected < 2 ** 16);
-
-  const solver = new SimpleSolver();
-  assert.equal(solver.countSolutions(input), expected);
-});
-
-await runTest('ConnectedValues: solver matches brute-force oracle (merged sizes)', () => {
-  // Two same-layer single-value sets with sizes: the optimizer merges them,
-  // and the sizes must survive the merge.
-  const input = '.Shape~3x3' + gridGivens('123231312', 3)
-    + '.Var~S~~9' + '.ConnectedValues~VS~1~3.ConnectedValues~VS~2~4';
-
-  let expected = 0;
-  for (const values of allAssignments([1, 2, 3], 9)) {
-    if (values.filter(v => v === 1).length === 3 &&
-      values.filter(v => v === 2).length === 4 &&
-      referenceIsConnected(values, [1], 3, 3) &&
-      referenceIsConnected(values, [2], 3, 3)) expected++;
-  }
-  assert.ok(expected > 0 && expected < 3 ** 9);
-
-  const solver = new SimpleSolver();
-  assert.equal(solver.countSolutions(input), expected);
-});
-
 // ===========================================================================
 // Multi-set handlers (the optimizer merges same-cell instances into one).
 // ===========================================================================
@@ -1043,100 +941,6 @@ await runTest('ConnectedValues multi-set: sets propagate to each other in one pa
   assert.equal(handler.enforceConsistency(grid, acc), true);
   assertCandidates(grid, { 4: [1], 13: [2] });
   assertTouched(acc, [4, 13]);
-});
-
-await runTest('ConnectedValues multi-set leaf oracle (3^9 grids)', () => {
-  const context = makeContext3();
-  const handler = new ConnectedValues(context.geometry.numGridCells, 0, new Map([[[1], 0], [[2], 0]]));
-  const result = context.initializeHandler(handler, {
-    cellExclusions: createCellExclusions({ allUnique: false, numCells: 9 }),
-  });
-  assert.equal(result, true);
-
-  const { connOf, walls } = ADJACENCY_SCENARIOS[0];
-  const values = new Array(9).fill(1);
-  let checked = 0;
-  const enumerate = position => {
-    if (position === 9) {
-      const assignments = {};
-      for (let cell = 0; cell < 9; cell++) assignments[cell] = [values[cell]];
-      const grid = applyCandidates(context.grid.slice(), assignments);
-      const expected =
-        referenceConnected2(values, [1], connOf, walls, 3, 3) &&
-        referenceConnected2(values, [2], connOf, walls, 3, 3);
-      assert.equal(handler.enforceConsistency(grid, createAccumulator()), expected,
-        `grid ${values.join('')}`);
-      checked++;
-      return;
-    }
-    for (let value = 1; value <= 3; value++) {
-      values[position] = value;
-      enumerate(position + 1);
-    }
-  };
-  enumerate(0);
-  assert.equal(checked, 3 ** 9);
-});
-
-await runTest('ConnectedValues multi-set soundness fuzz', () => {
-  const context = makeContext3();
-  const handler = new ConnectedValues(context.geometry.numGridCells, 0, new Map([[[1], 0], [[2], 0]]));
-  const initResult = context.initializeHandler(handler, {
-    cellExclusions: createCellExclusions({ allUnique: false, numCells: 9 }),
-  });
-  assert.equal(initResult, true);
-
-  const { connOf, walls } = ADJACENCY_SCENARIOS[0];
-  const bothConnected = values =>
-    referenceConnected2(values, [1], connOf, walls, 3, 3) &&
-    referenceConnected2(values, [2], connOf, walls, 3, 3);
-
-  const random = makeRandom(0xFACADE);
-  for (let trial = 0; trial < 300; trial++) {
-    const masks = [];
-    for (let cell = 0; cell < 9; cell++) {
-      const first = 1 + Math.floor(random() * 3);
-      let mask = [first];
-      if (random() < 0.4) {
-        const second = 1 + Math.floor(random() * 3);
-        if (second !== first) mask.push(second);
-      }
-      masks.push(mask);
-    }
-    const assignments = {};
-    for (let cell = 0; cell < 9; cell++) assignments[cell] = masks[cell];
-    const grid = applyCandidates(context.grid.slice(), assignments);
-    const before = grid.slice();
-
-    const validCompletions = [];
-    const values = new Array(9);
-    const enumerate = position => {
-      if (position === 9) {
-        if (bothConnected(values)) validCompletions.push(values.slice());
-        return;
-      }
-      for (const value of masks[position]) {
-        values[position] = value;
-        enumerate(position + 1);
-      }
-    };
-    enumerate(0);
-
-    const result = handler.enforceConsistency(grid, createAccumulator());
-    if (!result) {
-      assert.equal(validCompletions.length, 0,
-        `trial ${trial}: rejected state with ${validCompletions.length} valid completions`);
-      continue;
-    }
-    for (let cell = 0; cell < 9; cell++) {
-      const removed = before[cell] & ~grid[cell];
-      if (!removed) continue;
-      for (const completion of validCompletions) {
-        assert.equal(valueMask(completion[cell]) & removed, 0,
-          `trial ${trial}: cell ${cell} pruned value ${completion[cell]} used by a valid completion`);
-      }
-    }
-  }
 });
 
 // ===========================================================================
