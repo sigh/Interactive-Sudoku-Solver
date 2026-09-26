@@ -3,6 +3,11 @@ import assert from 'node:assert/strict';
 import { ensureGlobalEnvironment } from '../helpers/test_env.js';
 import { runTest, runTestCases, logSuiteComplete } from '../helpers/test_runner.js';
 import { FakeFormData, h, makeFakeDocument } from '../helpers/mock_dom.js';
+import {
+  cellGroupPanel, compositeForm, customConstraintForm, globalCheckboxes,
+  layoutCheckboxes, multiCellForm, multiValueForm, outsideClueOptions,
+  outsideClues, regionPanel, shapePanel,
+} from '../helpers/page_markup.js';
 
 ensureGlobalEnvironment({ needWindow: true, documentValue: makeFakeDocument() });
 
@@ -210,14 +215,6 @@ await runTest('a panel is highlighted while it has a constraint set', () => {
 // Checkboxes
 // ============================================================================
 
-const layoutCheckboxes = () => h('div', { id: 'layout-constraint-checkboxes' },
-  h('div', { id: 'layout-constraint-checkboxes-error', class: 'notice notice-error' }));
-
-const globalCheckboxes = () => h('div', { id: 'global-constraints-container' },
-  h('h2', {}, 'Global constraints'),
-  h('div', { id: 'global-constraint-checkboxes' },
-    h('div', { id: 'global-constraint-checkboxes-error', class: 'notice notice-error' })));
-
 const setUpLayoutCheckboxes = (geometry) => setUp(layoutCheckboxes,
   ({ collection }) => new ConstraintCategoryInput.LayoutCheckbox(collection), geometry);
 
@@ -307,20 +304,6 @@ await runTest('a checkbox is found for its constraint type', () => {
 // ============================================================================
 // Lines & Sets
 // ============================================================================
-
-// The Lines & Sets and Chaos Construction forms.
-const multiCellForm = (id) => () => h('form', { id },
-  h('fieldset', {},
-    h('h2', {}, 'Constraints'),
-    h('div', {}, h('div', {},
-      h('span', { class: 'description' }, 'Select cells.'),
-      h('select', { id: `${id}-select`, name: 'constraint-type' }),
-      h('div', { class: 'description' }),
-      h('div', { class: 'constraint-loop' },
-        h('input', { type: 'checkbox', name: 'is-loop' })),
-      h('div', { class: 'constraint-value' }),
-      h('button', { type: 'submit', name: 'add-constraint', disabled: true }),
-      h('div', { class: 'notice notice-error' })))));
 
 const setUpLinesAndSets = (geometry) => {
   const page = setUp(multiCellForm('lines-and-sets-input'),
@@ -596,15 +579,6 @@ await runTest('a chaos constraint on grid cells counts their region cells', () =
 // Composite constraints
 // ============================================================================
 
-const compositeForm = () => h('form', { id: 'composite-constraint-input' },
-  h('fieldset', {},
-    h('h2', {}, 'Composite constraints'),
-    h('div', {},
-      h('button', { type: 'button', name: 'add-or' }),
-      h('button', { type: 'button', name: 'add-and' }),
-      h('button', { type: 'button', name: 'add-replicate' }),
-      h('div', { class: 'chip-view' }))));
-
 const setUpComposite = () => {
   const page = setUp(compositeForm,
     ({ collection, inputManager, addUpdateListener }) =>
@@ -636,11 +610,6 @@ await runTest('+ Replicate targets the selected cells', () => {
 // ============================================================================
 // Regions
 // ============================================================================
-
-const regionPanel = () => h('div', {},
-  h('div', {}, h('select', { id: 'region-size-select' })),
-  h('div', {}, h('input', { type: 'checkbox', id: 'region-same-values-checkbox' })),
-  h('div', {}, h('button', { id: 'add-jigsaw-button' })));
 
 const setUpRegion = (geometry) => setUp(regionPanel,
   ({ collection, inputManager }) =>
@@ -720,17 +689,6 @@ await runTest('the region size and same values inputs follow the constraints', (
 // Outside clues
 // ============================================================================
 
-const outsideClues = () => h('div', { id: 'outside-clue-container' },
-  h('h2', {}, 'Outside clues'),
-  h('div', {},
-    h('form', { id: 'outside-clue-input' },
-      h('fieldset', { disabled: true },
-        h('input', { type: 'hidden', name: 'id' }),
-        h('div', { class: 'outside-arrow-clue-types' }),
-        h('input', { type: 'number', name: 'value' }),
-        h('button', { type: 'submit' }),
-        h('button', { type: 'button', id: 'outside-arrow-clear' })))));
-
 const setUpOutsideClues = () => {
   const page = setUp(outsideClues, ({ collection, inputManager }) =>
     new ConstraintCategoryInput.OutsideClue(collection, inputManager));
@@ -800,9 +758,6 @@ await runTest('a clue type input is found for its constraint type, and chosen', 
   assert.equal(form.type.value, 'Skyscraper');
 });
 
-const outsideClueOptions = () => h('div', { id: 'outside-clue-options' },
-  h('div', { id: 'outside-clue-options-error', class: 'notice notice-error' }));
-
 const setUpOutsideClueOptions = (geometry) => setUp(outsideClueOptions,
   ({ collection }) => new ConstraintCategoryInput.OutsideClueOption(collection), geometry);
 
@@ -853,11 +808,6 @@ await runTest('an option is disabled where it does not apply', () => {
 // ============================================================================
 // Multiple values
 // ============================================================================
-
-const multiValueForm = () => h('form', { id: 'multi-value-cell-input' },
-  h('fieldset', { disabled: true },
-    h('h2', {}, 'Multiple values'),
-    h('div')));
 
 const setUpMultiValues = (geometry) => {
   const page = setUp(multiValueForm, ({ collection, inputManager }) =>
@@ -950,32 +900,6 @@ await runTest('changing the values with nothing selected does nothing', () => {
 // ============================================================================
 // Custom JavaScript constraints
 // ============================================================================
-
-const customConstraintForm = () => h('form', { id: 'custom-constraint-input' },
-  h('fieldset', { id: 'custom-constraint-panel' },
-    h('h2', {}, 'Custom JavaScript constraints'),
-    h('div', {},
-      h('button', { type: 'button', 'data-tab': 'custom-pairwise-tab' }),
-      h('button', { type: 'button', 'data-tab': 'state-machine-tab' }),
-      h('div', { id: 'custom-pairwise-tab', class: 'tab-content active' },
-        h('input', { type: 'text', name: 'pairwise-name' }),
-        h('select', { name: 'chain-mode' },
-          h('option', { value: 'Pair' }), h('option', { value: 'PairX' })),
-        h('textarea', { name: 'function' }),
-        h('div', { id: 'custom-pairwise-input-error' }),
-        h('button', { type: 'button', name: 'add-pairwise-constraint' },
-          h('span', { class: 'spinner' }))),
-      h('div', { id: 'state-machine-tab', class: 'tab-content' },
-        h('input', { type: 'text', name: 'state-machine-name' }),
-        h('input', { id: 'unified-mode-input', type: 'checkbox', name: 'unified-mode' }),
-        h('div', { id: 'state-machine-split-input' },
-          ...['start-state', 'transition-body', 'accept-body', 'max-depth']
-            .map(name => h('textarea', { name }))),
-        h('div', { id: 'state-machine-unified-input' },
-          h('textarea', { name: 'unified-code' })),
-        h('div', { id: 'state-machine-input-error' }),
-        h('button', { type: 'button', name: 'add-state-machine-constraint' },
-          h('span', { class: 'spinner' }))))));
 
 // The user script executor, which compiles in a worker: each call waits until
 // it is resolved or rejected with finish().
@@ -1167,22 +1091,6 @@ await runTest('a state machine error is shown with its help link', async () => {
 // Shape
 // ============================================================================
 
-const shapePanel = () => h('div', {},
-  h('div', { id: 'shape-panel' },
-    h('h2', {}, 'Shape'),
-    h('div', {},
-      h('input', { type: 'text', id: 'shape-input' }),
-      h('div', { id: 'shape-dropdown' }, h('div', { id: 'shape-dropdown-items' })),
-      h('select', { id: 'grid-type-input' }),
-      h('select', { id: 'value-range-min' }),
-      h('select', { id: 'value-range-max' }),
-      h('form', { id: 'var-constraint-input' },
-        h('input', { type: 'text', name: 'var-prefix' }),
-        h('input', { type: 'text', name: 'var-count' }),
-        h('input', { type: 'text', name: 'var-label' }),
-        h('button', { type: 'submit', name: 'add-var' })),
-      h('div', { id: 'var-constraint-input-error' }))));
-
 const setUpShape = () => {
   const page = setUp(shapePanel,
     ({ collection }) => new ConstraintCategoryInput.Shape(collection));
@@ -1361,17 +1269,6 @@ await runTest('a bad var prefix is shown as an error until it is edited', () => 
 // ============================================================================
 // Cell groups
 // ============================================================================
-
-const cellGroupPanel = () => h('div', { id: 'cell-group-constraint-container' },
-  h('h2', {}, 'Cell group constraints'),
-  h('div', {},
-    h('form', { id: 'connected-values-input' },
-      h('span', { id: 'connected-values-tooltip' }),
-      h('select', { name: 'cell-group' }),
-      h('input', { type: 'text', name: 'values' }),
-      h('input', { type: 'text', name: 'size' }),
-      h('button', { type: 'submit', name: 'add-connected-values' })),
-    h('div', { id: 'cell-group-constraint-error', class: 'notice notice-error' })));
 
 const setUpCellGroup = (geometry) => {
   const page = setUp(cellGroupPanel,

@@ -25,7 +25,7 @@ const { SolverProxy, DEFAULT_MODE, Modes, getModeDescription } =
   await import('../../js/solver_runner.js');
 const { CellGeometry } = await import('../../js/cell_geometry.js');
 
-const settle = () => new Promise(resolve => setTimeout(resolve, 0));
+const settle = () => new Promise(resolve => setImmediate(resolve));
 
 const runFrames = (n) => {
   for (let i = 0; i < n; i++) {
@@ -614,7 +614,8 @@ await runTest('download saves the solutions found, one per line', async () => {
     try {
       download.click();
       assert.deepEqual(revoked, [], 'not released before the download starts');
-      await settle();
+      // The page releases it on a timer.
+      await new Promise(resolve => setTimeout(resolve, 0));
     } finally {
       Object.assign(URL, { createObjectURL, revokeObjectURL });
       document.createElement = createElement;

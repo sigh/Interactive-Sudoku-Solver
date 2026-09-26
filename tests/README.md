@@ -39,7 +39,7 @@ node tests/run_all_tests.js --fail-fast # stop after the first failing file
 | [solver/](solver/) | Solver internals. Candidate selection, exclusion groups, conflict scores, lookup tables, optimizer, and builder. |
 | [ui/](ui/) | UI component tests with a mock DOM. Constraint input and display, the solution controller (playback, solving, inputs), and undo/redo history. |
 | [e2e/](e2e/) | End-to-end tests. Solves full puzzle collections and checks solutions. Runs last. |
-| [helpers/](helpers/) | Test utilities (not tests). `test_runner.js` provides `runTest`/`logSuiteComplete`. `test_env.js` sets up globals. `grid_test_utils.js` provides grid/handler helpers. `scripted_step_solver.js` is a step solver whose results the test releases. `mock_dom.js` is the fake DOM the ui/ tests share. |
+| [helpers/](helpers/) | Test utilities (not tests). `test_runner.js` provides `runTest`/`logSuiteComplete`. `test_env.js` sets up globals. `grid_test_utils.js` provides grid/handler helpers. `scripted_step_solver.js` is a step solver whose results the test releases. `mock_dom.js` is the fake DOM the ui/ tests share, and `page_markup.js` the page's constraint panels built on it. |
 
 Developer CLIs (solve, verify, benchmark, profile, step-analysis, bisect, …) live
 in [`../tools/`](../tools/), not here. `tools.test.js` (a smoke test that drives

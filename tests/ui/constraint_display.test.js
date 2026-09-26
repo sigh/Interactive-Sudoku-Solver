@@ -155,10 +155,12 @@ for (const sample of SAMPLES) {
     const constraints = parse(sample);
     geometry.addVarCellsForConstraints(constraints);
     const groupElems = svg.children.filter(g => g.className.includes('-group'));
-    const groups = () => groupElems.map(render);
-    // The groups which differ from `before`.
-    const changedSince = (before) => {
-      const now = groups();
+    // Each group in full for the constraint's own group, and otherwise its
+    // attributes and size (enough to see it drawn in).
+    const snapshot = (groupClass) => groupElems.map(g => g.classList.contains(groupClass)
+      ? render(g) : `${JSON.stringify(g.attrs)} ${g.descendants().length}`);
+    const changedSince = (before, groupClass) => {
+      const now = snapshot(groupClass);
       return groupElems.filter((_, i) => now[i] !== before[i])
         .map(g => g.className.split(' ')[0]);
     };
@@ -167,16 +169,16 @@ for (const sample of SAMPLES) {
       const config = constraint.constructor.DISPLAY_CONFIG;
       if (!config) continue;
       const groupClass = `${config.displayClass.toLowerCase()}-group`;
-      const before = groups();
+      const before = snapshot(groupClass);
 
       const item = display.drawConstraint(constraint);
-      assert.deepEqual(changedSince(before), [groupClass]);
+      assert.deepEqual(changedSince(before, groupClass), [groupClass]);
 
       display.removeConstraint(constraint, item);
-      assert.deepEqual(changedSince(before), [], 'removing restores the grid');
+      assert.deepEqual(changedSince(before, groupClass), [], 'removing restores the grid');
 
       display.makeConstraintIcon(constraint);
-      assert.deepEqual(changedSince(before), [], 'an icon is not drawn on the grid');
+      assert.deepEqual(changedSince(before, groupClass), [], 'an icon is not drawn on the grid');
     }
   });
 }

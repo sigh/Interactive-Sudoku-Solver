@@ -2,14 +2,106 @@
 // builds (tree, attributes, classes, styles, listeners) and supports the few
 // behaviours tests rely on, such as click() being ignored while disabled.
 
-// Simple selectors only: a tag, classes and [attr="value"]s, e.g.
-// 'input[type="checkbox"]' or 'div.description'.
-const SELECTOR_RE = /^([a-zA-Z]*)((?:\.[\w-]+)*)((?:\[[\w-]+="[^"]*"\])*)$/;
+// Selectors are lists of compound selectors joined by ' ' or '>', e.g.
+// 'input[type="checkbox"]' or ':scope > .chip-label > .chip-icon, .icon'.
+// A compound selector is ':scope' (the element queried from), or a tag,
+// classes and [attr="value"]s (with no spaces in the value).
+const COMPOUND_RE = /^([a-zA-Z]*)((?:\.[\w-]+)*)((?:\[[\w-]+="[^"]*"\])*)$/;
+
+const parseCompound = (compound) => {
+  if (compound === ':scope') return { scope: true };
+  const match = compound.match(COMPOUND_RE);
+  if (!match) throw new Error(`Unsupported selector: ${compound}`);
+  const [, tag, classes, attrs] = match;
+  return {
+    tag: tag.toUpperCase(),
+    classes: classes.split('.').slice(1),
+    attrs: [...attrs.matchAll(/\[([\w-]+)="([^"]*)"\]/g)].map(([, k, v]) => [k, v]),
+  };
+};
+
+// A selector without commas, as parsed compound selectors and the
+// combinators between them.
+const parseComplex = (selector) => {
+  const parts = [];
+  for (const token of selector.trim().split(/\s*(>)\s*|\s+/)) {
+    if (!token) continue;
+    if (token !== '>' && parts.length && parts.at(-1) !== '>') parts.push(' ');
+    parts.push(token === '>' ? token : parseCompound(token));
+  }
+  return parts;
+};
+
+// Each selector, parsed once.
+const parsedSelectors = new Map();
+const parseSelector = (selector) => {
+  let parsed = parsedSelectors.get(selector);
+  if (!parsed) {
+    parsed = selector.split(',').map(parseComplex);
+    parsedSelectors.set(selector, parsed);
+  }
+  return parsed;
+};
+
+const matchesCompound = (elem, compound, scope) => {
+  if (compound.scope) return elem === scope;
+  return (!compound.tag || elem.tagName.toUpperCase() === compound.tag)
+    && compound.classes.every(c => elem._classes.has(c))
+    && compound.attrs.every(([k, v]) => String(elem.getAttribute(k)) === v);
+};
+
+// Counts changes to the tree and attributes, to know when caches are stale.
+let domVersion = 0;
+
+// The elements with each id, oldest first, in any document or none.
+const elementsById = new Map();
+const trackId = (elem, oldId, newId) => {
+  if (oldId === newId) return;
+  if (oldId != null) {
+    const elems = elementsById.get(oldId);
+    elems?.splice(elems.indexOf(elem) >>> 0, 1);
+  }
+  if (newId == null) return;
+  if (!elementsById.has(newId)) elementsById.set(newId, []);
+  elementsById.get(newId).push(elem);
+};
+
+const rootOf = (elem) => {
+  while (elem.parentElement) elem = elem.parentElement;
+  return elem;
+};
+
+// Whether `elem` matches parts[0..i], with parts[i] matching `elem` itself.
+const matchesParts = (elem, parts, i, scope) => {
+  if (!(elem instanceof FakeElement) || !matchesCompound(elem, parts[i], scope)) {
+    return false;
+  }
+  if (i === 0) return true;
+  if (parts[i - 1] === '>') {
+    return !!elem.parentElement && matchesParts(elem.parentElement, parts, i - 2, scope);
+  }
+  for (let a = elem.parentElement; a; a = a.parentElement) {
+    if (matchesParts(a, parts, i - 2, scope)) return true;
+  }
+  return false;
+};
+
+class FakeClassList {
+  constructor(classes) { this._classes = classes; }
+  add(c) { this._classes.add(c); }
+  remove(c) { this._classes.delete(c); }
+  toggle(c, force = !this._classes.has(c)) {
+    if (force) this._classes.add(c); else this._classes.delete(c);
+    return force;
+  }
+  contains(c) { return this._classes.has(c); }
+}
 
 export class FakeElement {
   constructor(tagName, attrs = {}) {
     this.tagName = tagName;
     this.attrs = { ...attrs };
+    trackId(this, null, this.attrs.id);
     this.children = [];
     this.parentElement = null;
     this.listeners = new Map();
@@ -20,29 +112,35 @@ export class FakeElement {
     this.onclick = null;
     this.onchange = null;
 
-    const classes = this._classes = new Set();
-    this.classList = {
-      add: (c) => classes.add(c),
-      remove: (c) => classes.delete(c),
-      toggle: (c, force = !classes.has(c)) => {
-        if (force) classes.add(c); else classes.delete(c);
-        return force;
-      },
-      contains: (c) => classes.has(c),
-    };
+    this._classes = new Set();
+  }
 
-    this.style = {
+  // Made on first use: most elements never use them.
+  get classList() {
+    return this._classList ??= new FakeClassList(this._classes);
+  }
+
+  get style() {
+    return this._style ??= {
       display: '',
       setProperty(k, v) { this[k] = v; },
     };
   }
 
   get id() { return this.attrs.id ?? ''; }
-  set id(v) { this.attrs.id = v; }
+  set id(v) { this.setAttribute('id', v); }
   get name() { return this.attrs.name ?? ''; }
-  set name(v) { this.attrs.name = v; }
+  set name(v) { this.setAttribute('name', v); }
   get type() { return this.attrs.type ?? ''; }
   set type(v) { this.attrs.type = v; }
+
+  // The data-* attributes, by camel-cased name.
+  get dataset() {
+    return new Proxy({}, {
+      get: (_, key) => this.getAttribute(
+        'data-' + String(key).replace(/[A-Z]/g, c => '-' + c.toLowerCase())) ?? undefined,
+    });
+  }
 
   get className() { return [...this._classes].join(' '); }
   set className(v) {
@@ -71,10 +169,16 @@ export class FakeElement {
   getAttribute(k) { return k in this.attrs ? this.attrs[k] : null; }
   // As in browsers, the value attribute is the value of an untouched input.
   setAttribute(k, v) {
+    domVersion++;
+    if (k === 'id') trackId(this, this.attrs.id, v);
     this.attrs[k] = v;
     if (k === 'value') this.value = v;
   }
-  removeAttribute(k) { delete this.attrs[k]; }
+  removeAttribute(k) {
+    domVersion++;
+    if (k === 'id') trackId(this, this.attrs.id, null);
+    delete this.attrs[k];
+  }
 
   appendChild(child) {
     this.append(child);
@@ -82,6 +186,7 @@ export class FakeElement {
   }
 
   append(...nodes) {
+    domVersion++;
     for (const node of nodes) {
       const child = typeof node === 'string' ? { textContent: node } : node;
       child.parentElement = this;
@@ -95,6 +200,7 @@ export class FakeElement {
   }
 
   insertBefore(node, ref) {
+    domVersion++;
     const index = this.children.indexOf(ref);
     node.parentElement = this;
     this.children.splice(index < 0 ? this.children.length : index, 0, node);
@@ -102,6 +208,7 @@ export class FakeElement {
   }
 
   removeChild(node) {
+    domVersion++;
     this.children.splice(this.children.indexOf(node), 1);
     node.parentElement = null;
     return node;
@@ -109,6 +216,25 @@ export class FakeElement {
 
   remove() {
     this.parentElement?.removeChild(this);
+  }
+
+  replaceWith(node) {
+    this.parentElement.insertBefore(node, this);
+    this.remove();
+  }
+
+  contains(node) {
+    for (let e = node; e; e = e.parentElement) {
+      if (e === this) return true;
+    }
+    return false;
+  }
+
+  // Whether the element is in the document.
+  get isConnected() {
+    let e = this;
+    while (e.parentElement) e = e.parentElement;
+    return e === globalThis.document?.body;
   }
 
   // A shallow copy: tag, attributes and classes, without children.
@@ -122,22 +248,41 @@ export class FakeElement {
 
   // All nodes below this one, in document order.
   descendants() {
-    return this.children.flatMap(c => [c, ...(c.descendants?.() ?? [])]);
+    const nodes = [];
+    const visit = (node) => {
+      for (const child of node.children) {
+        nodes.push(child);
+        if (child.children) visit(child);
+      }
+    };
+    visit(this);
+    return nodes;
   }
 
-  matches(selector) {
-    const [, tag, classes, attrs] = selector.match(SELECTOR_RE);
-    return (!tag || this.tagName.toLowerCase() === tag.toLowerCase())
-      && classes.split('.').slice(1).every(c => this._classes.has(c))
-      && [...attrs.matchAll(/\[([\w-]+)="([^"]*)"\]/g)].every(
-        ([, k, v]) => String(this.getAttribute(k)) === v);
+  // The first element below this one, in document order, for which `pred` is
+  // true.
+  findDescendant(pred) {
+    for (const child of this.children) {
+      if (!(child instanceof FakeElement)) continue;
+      if (pred(child)) return child;
+      const found = child.findDescendant(pred);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  matches(selector, scope) {
+    return parseSelector(selector).some(
+      parts => matchesParts(this, parts, parts.length - 1, scope));
   }
 
   querySelectorAll(selector) {
     return this.descendants().filter(
-      n => n instanceof FakeElement && n.matches(selector));
+      n => n instanceof FakeElement && n.matches(selector, this));
   }
-  querySelector(selector) { return this.querySelectorAll(selector)[0] ?? null; }
+  querySelector(selector) {
+    return this.findDescendant(n => n.matches(selector, this));
+  }
   getElementsByClassName(c) { return this.querySelectorAll(`.${c}`); }
 
   closest(selector) {
@@ -147,16 +292,41 @@ export class FakeElement {
     return null;
   }
 
-  addEventListener(type, fn) {
+  addEventListener(type, fn, options) {
     if (!this.listeners.has(type)) this.listeners.set(type, []);
-    this.listeners.get(type).push(fn);
+    const capture = options === true || !!options?.capture;
+    this.listeners.get(type).push({ fn, capture });
   }
 
-  // Calls the listeners and the on<type> handler, then the ancestors' if the
-  // event bubbles.
+  removeEventListener(type, fn) {
+    const listeners = this.listeners.get(type) ?? [];
+    const index = listeners.findIndex(l => l.fn === fn);
+    if (index >= 0) listeners.splice(index, 1);
+  }
+
+  // As in browsers: the ancestors' capture listeners (outermost first), then
+  // this element's listeners and on<type> handler, then, if the event bubbles,
+  // the ancestors' other listeners and handlers (innermost first). Stopping
+  // propagation skips the elements after the current one.
   dispatch(type, event = {}) {
-    for (let e = this; e; e = event.bubbles ? e.parentElement : null) {
-      for (const fn of e.listeners.get(type) ?? []) fn(event);
+    const ancestors = [];
+    for (let e = this.parentElement; e; e = e.parentElement) ancestors.push(e);
+    const run = (e, capture) => {
+      for (const l of [...e.listeners.get(type) ?? []]) {
+        if (capture === undefined || l.capture === capture) l.fn(event);
+      }
+    };
+
+    for (const e of ancestors.toReversed()) {
+      run(e, true);
+      if (event.cancelBubble) return;
+    }
+    run(this);
+    this[`on${type}`]?.(event);
+    if (!event.bubbles) return;
+    for (const e of ancestors) {
+      if (event.cancelBubble) return;
+      run(e, false);
       e[`on${type}`]?.(event);
     }
   }
@@ -176,7 +346,13 @@ export class FakeElement {
   reportValidity() { return !this.validationMessage; }
 
   click() {
-    if (!this.disabled) this.dispatch('click', { preventDefault() { } });
+    if (this.disabled) return;
+    this.dispatch('click', {
+      target: this,
+      bubbles: true,
+      preventDefault() { },
+      stopPropagation() { this.cancelBubble = true; },
+    });
   }
 }
 
@@ -213,14 +389,29 @@ export class FakeForm extends FakeElement {
   constructor(...args) {
     super(...args);
     return new Proxy(this, {
-      get: (target, prop, receiver) => (typeof prop === 'string'
-        && target.namedControl(prop)) || Reflect.get(target, prop, receiver),
+      get: (target, prop, receiver) => {
+        const own = Reflect.get(target, prop, receiver);
+        // No control is named after a method.
+        if (typeof own === 'function' || typeof prop !== 'string') return own;
+        return target.namedControl(prop) || own;
+      },
     });
   }
 
   namedControl(name) {
-    const controls = this.descendants().filter(n => n instanceof FakeElement
-      && (n.name === name || n.getAttribute('id') === name));
+    if (this._controlsVersion !== domVersion) {
+      this._controls = new Map();
+      for (const n of this.descendants()) {
+        if (!(n instanceof FakeElement)) continue;
+        for (const key of new Set([n.attrs.name, n.attrs.id])) {
+          if (key == null) continue;
+          if (!this._controls.has(key)) this._controls.set(key, []);
+          this._controls.get(key).push(n);
+        }
+      }
+      this._controlsVersion = domVersion;
+    }
+    const controls = this._controls.get(name) ?? [];
     if (controls.length > 1) return FakeRadioNodeList.from(controls);
     return controls[0];
   }
@@ -265,8 +456,17 @@ const TAG_CLASSES = { FORM: FakeForm, SELECT: FakeSelect };
 export const makeFakeDocument = () => {
   const listeners = new Map();
   const body = new FakeElement('BODY');
-  const findById = (id) => body.descendants().find(
-    n => n instanceof FakeElement && n.getAttribute('id') === id);
+  // Newest first, since tests make a new document for each page. Elements in
+  // another document's body are dropped: that document has been replaced.
+  const findById = (id) => {
+    const elems = elementsById.get(id) ?? [];
+    for (let i = elems.length - 1; i >= 0; i--) {
+      const root = rootOf(elems[i]);
+      if (root === body) return elems[i];
+      if (root.tagName === 'BODY') elems.splice(i, 1);
+    }
+    return null;
+  };
   return {
     body,
     activeElement: null,
@@ -276,6 +476,8 @@ export const makeFakeDocument = () => {
     createElementNS: (_ns, tag) => new FakeElement(tag),
     createTextNode: (text) => ({ textContent: text }),
     getElementById: (id) => findById(id) ?? new FakeElement('DIV', { id }),
+    querySelector: (selector) => body.querySelector(selector),
+    querySelectorAll: (selector) => body.querySelectorAll(selector),
     addEventListener: (type, fn) => {
       if (!listeners.has(type)) listeners.set(type, []);
       listeners.get(type).push(fn);

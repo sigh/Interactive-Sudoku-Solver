@@ -385,7 +385,7 @@ class ConstraintCollectionBase {
 
 
 // Allows `addConstraint` calls to be redirected to a different collection.
-class SelectedConstraintCollection extends ConstraintCollectionBase {
+export class SelectedConstraintCollection extends ConstraintCollectionBase {
   constructor(rootCollection) {
     super();
     this._rootCollection = rootCollection;
@@ -429,7 +429,7 @@ class SelectedConstraintCollection extends ConstraintCollectionBase {
   }
 }
 
-class RootConstraintCollection extends ConstraintCollectionBase {
+export class RootConstraintCollection extends ConstraintCollectionBase {
   constructor(display, chipViews, constraintCategoryInputs, collectionFactor, reshapeListener, updateListener) {
     super();
     this._uniquenessKeySet = new UniquenessKeySet();
@@ -644,7 +644,7 @@ class RootConstraintCollection extends ConstraintCollectionBase {
   }
 }
 
-class CompositeConstraintCollection extends ConstraintCollectionBase {
+export class CompositeConstraintCollection extends ConstraintCollectionBase {
   constructor(parentConstraint, parentCollection, chipView, display, constraintSelector, collectionFactory) {
     super();
     this._display = display;
@@ -723,7 +723,7 @@ class CompositeConstraintCollection extends ConstraintCollectionBase {
   }
 }
 
-class ConstraintManager {
+export class ConstraintManager {
   constructor(inputManager, displayContainer) {
     this._geometry = CellGeometry.newDefault();
     this._reshapeListeners = [];
@@ -1086,7 +1086,7 @@ class ConstraintManager {
   }
 }
 
-class UniquenessKeySet {
+export class UniquenessKeySet {
   constructor() {
     this._uniquenessKeys = new MultiMap();
   }
@@ -1128,7 +1128,7 @@ class UniquenessKeySet {
   }
 }
 
-class ConstraintChipView {
+export class ConstraintChipView {
   constructor(chipViewElement, display, chipHighlighter, constraintSelector, onUpdate, chipActionCallback) {
     this._chipViewElement = chipViewElement;
     this._chipHighlighter = chipHighlighter;
@@ -1291,7 +1291,7 @@ class ConstraintChipView {
   }
 }
 
-class ConstraintHighlighter {
+export class ConstraintHighlighter {
   constructor(displayContainer, display, cssClass) {
     this._highlighter = displayContainer.createCellHighlighter(cssClass);
     this._cssClass = cssClass;
@@ -1373,7 +1373,7 @@ class ConstraintHighlighter {
   }
 }
 
-class ConstraintSelector {
+export class ConstraintSelector {
   constructor(displayContainer, display, onCollectionSelectCallback) {
     this._selectionHighlighter = new ConstraintHighlighter(
       displayContainer, display, 'selected-constraint');
@@ -1414,9 +1414,10 @@ class ConstraintSelector {
     this._latestHighlighter.clear();
 
     if (!this._escapeListener) {
-      this._escapeListener = window.addEventListener('keydown', (e) => {
+      this._escapeListener = (e) => {
         if (e.key === 'Escape') this.clear();
-      });
+      };
+      window.addEventListener('keydown', this._escapeListener);
     }
   }
 
@@ -1439,7 +1440,7 @@ class ConstraintSelector {
   }
 }
 
-class Selection {
+export class Selection {
   // Committed segments in a multi-segment selection are all drawn with the same
   // bordered style, to distinguish them from the active selection.
   static COMMITTED_SEGMENT_CLASS = 'committed-segment';
@@ -1679,7 +1680,7 @@ class Selection {
   }
 }
 
-class GridInputManager {
+export class GridInputManager {
   constructor(displayContainer) {
     this._geometry = null;
 
