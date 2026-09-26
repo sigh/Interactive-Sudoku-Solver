@@ -16,7 +16,7 @@ export class FakeElement {
     this.onclick = null;
     this.onchange = null;
 
-    const classes = new Set();
+    const classes = this._classes = new Set();
     this.classList = {
       add: (c) => classes.add(c),
       remove: (c) => classes.delete(c),
@@ -38,6 +38,7 @@ export class FakeElement {
 
   get childNodes() { return this.children; }
   get parentNode() { return this.parentElement; }
+  get firstChild() { return this.children[0] ?? null; }
   get firstElementChild() { return this.children[0] ?? null; }
   get nextElementSibling() {
     const siblings = this.parentElement?.children ?? [];
@@ -71,6 +72,26 @@ export class FakeElement {
   replaceChildren(...nodes) {
     this.children = [];
     this.append(...nodes);
+  }
+
+  insertBefore(node, ref) {
+    const index = this.children.indexOf(ref);
+    node.parentElement = this;
+    this.children.splice(index < 0 ? this.children.length : index, 0, node);
+    return node;
+  }
+
+  removeChild(node) {
+    this.children.splice(this.children.indexOf(node), 1);
+    node.parentElement = null;
+    return node;
+  }
+
+  // A shallow copy: tag, attributes and classes, without children.
+  cloneNode() {
+    const copy = new this.constructor(this.tagName, this.attrs);
+    for (const c of this._classes) copy.classList.add(c);
+    return copy;
   }
 
   hasChildNodes() { return this.children.length > 0; }
@@ -118,6 +139,7 @@ export const makeFakeDocument = ({ Element = FakeElement, byId = {} } = {}) => {
   return {
     byId,
     activeElement: null,
+    body: new Element('BODY'),
     createElement: (tag) => new Element(tag.toUpperCase()),
     createElementNS: (_ns, tag) => new Element(tag),
     createTextNode: (text) => ({ textContent: text }),

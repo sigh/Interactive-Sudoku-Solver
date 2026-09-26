@@ -54,7 +54,7 @@ export class HistoryState {
   redo() { return this.canRedo() ? this._entries[++this._cursor] : null; }
 }
 
-class HistoryHandler {
+export class HistoryHandler {
   constructor(onUpdate) {
     this._blockHistoryUpdates = false;
     this._onUpdate = params => {
@@ -91,7 +91,7 @@ class HistoryHandler {
     let q = '' + (params.q || '');
 
     if (this._state.add(q)) this._updateButtons();
-    this._updateUrl(params);
+    this.setUrlParams(params);
   }
 
   // Apply the result of an undo/redo. A null entry means the move was a no-op.
@@ -99,7 +99,7 @@ class HistoryHandler {
     if (q === null) return;
     this._updateButtons();
 
-    this._updateUrl({ q: q });
+    this.setUrlParams({ q: q });
     this._onUpdate(new URLSearchParams({ q: q }));
   }
 
@@ -108,7 +108,8 @@ class HistoryHandler {
     this._redoButton.disabled = !this._state.canRedo();
   }
 
-  _updateUrl(params) {
+  // Set URL parameters (undefined removes one) without adding an undo entry.
+  setUrlParams(params) {
     let url = new URL(window.location.href);
 
     for (const [key, value] of Object.entries(params)) {
@@ -499,7 +500,7 @@ export class SolutionController {
         this._elements.candidateSupportThreshold.value, 10) || 0;
       if (parsedLimit > 0) valueCountLimit = parsedLimit;
     }
-    this._historyHandler._updateUrl({ valueCountLimit });
+    this._historyHandler.setUrlParams({ valueCountLimit });
   }
 
   async _solve(constraints) {

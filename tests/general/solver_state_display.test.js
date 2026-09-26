@@ -2,42 +2,50 @@ import assert from 'node:assert/strict';
 
 import { ensureGlobalEnvironment } from '../helpers/test_env.js';
 import { runTest, runTestCases, logSuiteComplete } from '../helpers/test_runner.js';
+import { makeFakeDocument } from '../helpers/mock_dom.js';
 
-ensureGlobalEnvironment({ needWindow: true, documentValue: undefined });
+ensureGlobalEnvironment({ needWindow: true, documentValue: makeFakeDocument() });
+
+const frames = [];
+window.requestAnimationFrame = (cb) => frames.push(cb);
+const runFrames = () => { for (const cb of frames.splice(0)) cb(); };
+
+const storage = new Map();
+globalThis.sessionStorage = {
+  getItem: (k) => storage.get(k) ?? null,
+  setItem: (k, v) => storage.set(k, String(v)),
+};
 
 const { SolverStateDisplay } = await import('../../js/solver_state_display.js');
-const { deferUntilAnimationFrame } = await import('../../js/util.js');
 
-// setSolveStatus only touches a few DOM elements, so exercise it on a bare
-// instance with stub elements rather than standing up the whole display (which
-// needs a full document). _METHOD_TO_STATUS is a per-instance field, so it is
-// absent on the bare prototype object; supply the real mapping here.
-const makeDisplay = () => {
-  const display = Object.create(SolverStateDisplay.prototype);
-  const classes = new Set();
-  display._isEstimateMode = false;
-  display._METHOD_TO_STATUS = {
-    solveAllPossibilities: 'Solving',
-    nthSolution: 'Solving',
-    nthStep: '',
-    countSolutions: 'Counting',
-    validateLayout: 'Validating',
-    terminate: 'Aborted',
-    estimatedCountSolutions: 'Estimating',
-  };
-  display._elements = {
-    solveStatus: { textContent: 'stale' },
-    progressPercentage: { style: {} },
-    progressContainer: {
-      classList: {
-        add: (c) => classes.add(c),
-        remove: (c) => classes.delete(c),
-        contains: (c) => classes.has(c),
-      },
-    },
-  };
-  return display;
+// A display with the stats charts closed, so no chart library loads.
+const makeDisplay = () => new SolverStateDisplay(null, {
+  openTab() { }, closeTab() { }, onTabClose() { },
+});
+
+// A solver state, as the worker sends it.
+const makeState = ({ counters = {}, ...rest } = {}) => ({
+  counters: {
+    solutions: 0, guesses: 0, valuesTried: 0, constraintsProcessed: 0,
+    progressRatio: 0, branchesIgnored: 0, ...counters,
+  },
+  timeMs: 0,
+  ...rest,
+});
+
+const show = (display, state) => {
+  display.setState(state);
+  runFrames();
 };
+
+// The row of the state output with this label, and the value it shows.
+const row = (display, label) => display._elements.stateOutput.children
+  .find(r => r.children[1].textContent === label);
+const value = (display, label) => row(display, label).children[0].textContent;
+
+// ============================================================================
+// Solve status
+// ============================================================================
 
 await runTest('setSolveStatus shows the method label while solving', () => {
   const display = makeDisplay();
@@ -81,55 +89,114 @@ await runTest('setSolveStatus clears the error class when solving resumes', () =
   assert.ok(!display._elements.progressContainer.classList.contains('solver-status-error'));
 });
 
-// A minimal DOM for the estimate renderers: text nodes, elements with
-// children, and the handful of methods the renderers call.
-const makeFakeDom = () => {
-  class Node {
-    constructor(tag, text) { this.tag = tag; this.text = text ?? ''; this.childNodes = []; }
-    appendChild(n) { this.childNodes.push(n); return n; }
-    insertBefore(n, ref) {
-      const i = this.childNodes.indexOf(ref);
-      this.childNodes.splice(i < 0 ? this.childNodes.length : i, 0, n);
-      return n;
-    }
-    replaceChildren() { this.childNodes = []; }
-    cloneNode() { return new Node(this.tag, this.text); }
-    get firstChild() { return this.childNodes[0] ?? null; }
-    get textContent() { return this.text + this.childNodes.map(c => c.textContent).join(''); }
-    set textContent(t) { this.childNodes = [new Node('#text', t)]; }
-    get classList() { return { add: () => {} }; }
-  }
-  return {
-    createTextNode: (t) => new Node('#text', t),
-    createElement: (tag) => new Node(tag),
-  };
-};
+// ============================================================================
+// State output
+// ============================================================================
 
-const withFakeDom = (fn) => {
-  const saved = globalThis.document;
-  globalThis.document = makeFakeDom();
-  try {
-    const display = Object.create(SolverStateDisplay.prototype);
-    display._TEMPLATE_GAP_SPAN = document.createElement('span');
-    return fn(display, document.createElement('span'));
-  } finally {
-    globalThis.document = saved;
-  }
-};
+await runTest('counters are shown in groups of three digits', () => {
+  const display = makeDisplay();
+  show(display, makeState({ counters: { guesses: 1234567, valuesTried: 12 } }));
+
+  assert.equal(value(display, 'Guesses'), '1234567');
+  const gaps = row(display, 'Guesses').children[0].children
+    .filter(n => n.classList?.contains('number-gap'));
+  assert.equal(gaps.length, 2);
+  assert.equal(value(display, 'Values tried'), '12');
+});
+
+await runTest('the solution count has + until the search is complete', () => {
+  const display = makeDisplay();
+  show(display, makeState({ counters: { solutions: 3 } }));
+  assert.equal(value(display, 'Solutions'), '3+');
+
+  show(display, makeState({ counters: { solutions: 3, branchesIgnored: 0.5 }, done: true }));
+  assert.equal(value(display, 'Solutions'), '3+', 'parts of the search were skipped');
+
+  show(display, makeState({ counters: { solutions: 3 }, done: true }));
+  assert.equal(value(display, 'Solutions'), '3');
+});
+
+await runTest('the search explored is a percentage, 100% once complete', () => {
+  const display = makeDisplay();
+  show(display, makeState({ counters: { progressRatio: 0.123456 } }));
+  assert.equal(value(display, 'Search space explored'), '12.3%');
+
+  show(display, makeState({ counters: { progressRatio: 0.99 }, done: true }));
+  assert.equal(value(display, 'Search space explored'), '100%');
+});
+
+await runTest('setup time and runtime are formatted', () => {
+  const display = makeDisplay();
+  show(display, makeState({ timeMs: 1500 }));
+  assert.equal(value(display, 'Puzzle setup time'), '?');
+  assert.equal(value(display, 'Runtime'), '1.50 s');
+
+  show(display, makeState({ puzzleSetupTime: 12 }));
+  assert.equal(value(display, 'Puzzle setup time'), '12.0 ms');
+});
+
+await runTest('the progress bar counts skipped branches, and is full when done', () => {
+  const display = makeDisplay();
+  const { progressBar, progressPercentage } = display._elements;
+
+  show(display, makeState({ counters: { progressRatio: 0.2, branchesIgnored: 0.1 } }));
+  assert.equal(progressBar.getAttribute('value'), 0.2 + 0.1);
+  assert.equal(progressPercentage.textContent, '30%');
+
+  show(display, makeState({ counters: { progressRatio: 0.2 }, done: true }));
+  assert.equal(progressBar.getAttribute('value'), 1);
+  assert.equal(progressPercentage.textContent, '100%');
+});
+
+await runTest('estimate mode shows the estimate rows instead of the search rows', () => {
+  const display = makeDisplay();
+  const shown = (label) => row(display, label).style.display;
+
+  display.setEstimateMode(true);
+  assert.deepEqual(
+    ['Estimated solutions', 'Estimate samples', 'Solutions', 'Search space explored'].map(shown),
+    ['block', 'block', 'none', 'none']);
+  assert.equal(display._elements.progressPercentage.style.display, 'none');
+
+  // The progress bar is left alone while estimating.
+  show(display, makeState({ counters: { progressRatio: 0.5 } }));
+  assert.equal(display._elements.progressPercentage.textContent, '');
+
+  display.setEstimateMode(false);
+  assert.deepEqual(
+    ['Estimated solutions', 'Estimate samples', 'Solutions', 'Search space explored'].map(shown),
+    ['none', 'none', 'block', 'block']);
+});
+
+await runTest('clear empties the output and the progress', () => {
+  const display = makeDisplay();
+  show(display, makeState({ counters: { guesses: 5, progressRatio: 0.5 } }));
+  display.setSolveStatus(true, 'countSolutions');
+
+  display.clear();
+  assert.equal(value(display, 'Guesses'), '');
+  assert.equal(display._elements.progressBar.getAttribute('value'), 0);
+  assert.equal(display._elements.progressPercentage.textContent, '');
+  assert.equal(display._elements.solveStatus.textContent, '');
+});
+
+// ============================================================================
+// Estimates
+// ============================================================================
 
 await runTest('estimate renders with ~ and scientific notation when sampled', () => {
-  withFakeDom((display, container) => {
-    display._renderSolutionEstimate(container, { solutions: 3.2e9, exact: false });
-    assert.equal(container.textContent, '~3.200×109');
-    assert.equal(container.childNodes.at(-1).tag, 'sup');
-  });
+  const display = makeDisplay();
+  const container = document.createElement('span');
+  display._renderSolutionEstimate(container, { solutions: 3.2e9, exact: false });
+  assert.equal(container.textContent, '~3.200×109');
+  assert.equal(container.children.at(-1).tagName, 'SUP');
 });
 
 await runTest('estimate renders as a plain count when exact', () => {
-  withFakeDom((display, container) => {
-    display._renderSolutionEstimate(container, { solutions: 28200, exact: true });
-    assert.equal(container.textContent, '28200');
-  });
+  const display = makeDisplay();
+  const container = document.createElement('span');
+  display._renderSolutionEstimate(container, { solutions: 28200, exact: true });
+  assert.equal(container.textContent, '28200');
 });
 
 await runTestCases('estimate display respects known solutions', [
@@ -141,60 +208,35 @@ await runTestCases('estimate display respects known solutions', [
   ['exact zero stays exact', 0, true, 0, '0'],
   ['exact one stays exact', 1, true, 100, '1'],
 ], (solutions, exact, discoveries, expected) => {
-  withFakeDom((display, container) => {
-    const estimate = { solutions, exact };
-    display._stateVars = { estimatedSolutions: container };
-    display._displayStateVariables({
-      counters: { solutions: discoveries },
-      estimate,
-    });
-    assert.equal(container.textContent, expected);
-    assert.equal(estimate.solutions, solutions, 'rendering must not change the raw estimate');
-  });
+  const display = makeDisplay();
+  const estimate = { solutions, exact, samples: 1 };
+  show(display, makeState({ counters: { solutions: discoveries }, estimate }));
+  assert.equal(value(display, 'Estimated solutions'), expected);
+  assert.equal(estimate.solutions, solutions, 'rendering must not change the raw estimate');
 });
 
 await runTest('batched state snapshots render the final exact estimate', () => {
-  withFakeDom((display, container) => {
-    const savedRequestAnimationFrame = window.requestAnimationFrame;
-    const frames = [];
-    window.requestAnimationFrame = callback => frames.push(callback);
-    try {
-      display._stateVars = { estimatedSolutions: container };
-      display._stateHistory = { add() {}, clear() {} };
-      display._updateProgressBar = () => {};
-      display.setSolveStatus = () => {};
-      display._elements = {
-        progressBar: { setAttribute() {} },
-        progressPercentage: {},
-        solveStatus: {},
-      };
-      display._lazyUpdateState = deferUntilAnimationFrame(
-        SolverStateDisplay.prototype._lazyUpdateState.bind(display));
+  const display = makeDisplay();
+  const estimated = () => value(display, 'Estimated solutions');
 
-      display.setState({ counters: {},
-        estimate: { solutions: 0, samples: 1, exact: false },
-      });
-      frames.shift()();
-      assert.equal(container.textContent, '~0');
+  show(display, makeState({ estimate: { solutions: 0, samples: 1, exact: false } }));
+  assert.equal(estimated(), '~0');
 
-      const finalStatus = { counters: {}, done: true,
-        estimate: { solutions: 1, samples: 258, exact: true },
-      };
-      display.setState({ ...finalStatus, extra: { solutions: [[1]] } });
-      display.setState(finalStatus);
-      assert.equal(frames.length, 1, 'final updates share one animation frame');
-      frames.shift()();
-      assert.equal(container.textContent, '1');
-      assert.equal(finalStatus.extra, undefined, 'incoming state is not mutated');
-
-      display.clear();
-      display.setState({ counters: {} });
-      frames.shift()();
-      assert.equal(container.textContent, '', 'the next run must not reuse the estimate');
-    } finally {
-      window.requestAnimationFrame = savedRequestAnimationFrame;
-    }
+  const finalStatus = makeState({
+    done: true, estimate: { solutions: 1, samples: 258, exact: true },
   });
+  display.setState({ ...finalStatus, extra: { solutions: [[1]] } });
+  const queued = frames.length;
+  display.setState(finalStatus);
+  assert.equal(frames.length, queued, 'final updates share one animation frame');
+  assert.equal(estimated(), '~0', 'nothing renders until the frame');
+  runFrames();
+  assert.equal(estimated(), '1');
+  assert.equal(finalStatus.extra, undefined, 'incoming state is not mutated');
+
+  display.clear();
+  show(display, makeState());
+  assert.equal(estimated(), '', 'the next run must not reuse the estimate');
 });
 
 logSuiteComplete('SolverStateDisplay');

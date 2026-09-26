@@ -23,6 +23,7 @@ globalThis.localStorage = makeStorage();
 const { SolutionController } = await import('../../js/solution_controller.js');
 const { SolverProxy, DEFAULT_MODE, getModeDescription } =
   await import('../../js/solver_runner.js');
+const { CellGeometry } = await import('../../js/cell_geometry.js');
 
 const settle = () => new Promise(resolve => setTimeout(resolve, 0));
 
@@ -93,7 +94,7 @@ const makeController = () => {
   controller.historyCalls = historyCalls;
   controller._historyHandler = {
     update: recorder(historyCalls, 'update'),
-    _updateUrl: recorder(historyCalls, 'url'),
+    setUrlParams: recorder(historyCalls, 'url'),
   };
 
   controller._setUpPlayback();
@@ -112,6 +113,8 @@ const withController = async (fn) => {
     Object.assign(worker, { stateHandler, statusHandler });
     return solver;
   };
+  // A fresh document, so key listeners from earlier tests are gone.
+  globalThis.document = makeFakeDocument();
   try {
     const controller = makeController();
     await controller._solverRunner.solve(null, { mode: 'step-by-step' });
@@ -296,6 +299,48 @@ await runTest('following ends at the end of the search', async () => {
   });
 });
 
+await runTest('‹ and « move back, and so do the p and s keys', async () => {
+  await withController(async (controller, solver) => {
+    controller._setUpKeyBindings({
+      getClickInterceptor: () => ({ getSvg: () => ({ addEventListener() { } }) }),
+    });
+    const { forward, back, start, iterationState } = controller._elements;
+    const step = () => Number(iterationState.textContent.match(/Step (\d+)/)[1]);
+    const move = async (act) => {
+      act();
+      solver.resolveNext();
+      await settle();
+    };
+    const press = (key) => () => {
+      pressKey('keydown', key);
+      pressKey('keyup', key);
+    };
+
+    for (let i = 0; i < 3; i++) await move(() => forward.click());
+    assert.equal(step(), 3);
+
+    await move(() => back.click());
+    assert.equal(step(), 2);
+    await move(() => start.click());
+    assert.equal(step(), 0);
+
+    for (let i = 0; i < 2; i++) await move(() => forward.click());
+    await move(press('p'));
+    assert.equal(step(), 1);
+    await move(press('s'));
+    assert.equal(step(), 0);
+  });
+});
+
+await runTest('a new grid shape aborts the solve', async () => {
+  await withController(async (controller, solver) => {
+    const geometry = { numGridCells: 16 };
+    controller.reshape(geometry);
+    assert.ok(solver.terminated);
+    assert.equal(controller._geometry, geometry);
+  });
+});
+
 // ============================================================================
 // Wiring to the rest of the page
 // ============================================================================
@@ -451,12 +496,13 @@ await runTest('the page follows the mode', () => {
 const withSolverBuilds = async (fn) => {
   const builds = [];
   const savedMakeSolver = SolverProxy.makeSolver;
-  SolverProxy.makeSolver = () => new Promise((resolve) => {
-    builds.push(() => resolve({
+  // Each build can also send state, as the worker would.
+  SolverProxy.makeSolver = (constraints, stateHandler) => new Promise((resolve) => {
+    builds.push(Object.assign(() => resolve({
       solveAllPossibilities: () => new Promise(() => { }),
       countSolutions: () => new Promise(() => { }),
       terminate() { },
-    }));
+    }), { stateHandler }));
   });
   try {
     await fn(builds);
@@ -524,6 +570,53 @@ await runTest('a solve replaced before it starts leaves the page set up for the 
     await Promise.all([replaced, current]);
     assert.equal(download.disabled, true);
     assert.equal(buttonPanel.style.visibility, 'hidden');
+  });
+});
+
+await runTest('download saves the solutions found, one per line', async () => {
+  await withSolverBuilds(async (builds) => {
+    const controller = makeController();
+    controller._geometry = CellGeometry.fromGridSize(4);
+    const { mode, download } = controller._elements;
+
+    mode.value = 'all-possibilities';
+    const solve = controller._solve();
+    await settle();
+    const build = builds.shift();
+    build();
+    await solve;
+    const solutions = [
+      [1, 2, 3, 4, 3, 4, 1, 2, 2, 1, 4, 3, 4, 3, 2, 1],
+      [1, 2, 3, 4, 3, 4, 1, 2, 2, 3, 4, 1, 4, 1, 2, 3],
+    ];
+    build.stateHandler({ counters: {}, extra: { solutions } });
+
+    // Capture the file, and the link that downloads it.
+    let file = null;
+    const savedCreateObjectURL = URL.createObjectURL;
+    URL.createObjectURL = (blob) => { file = blob; return 'blob:solutions'; };
+    const links = [];
+    const createElement = document.createElement;
+    document.createElement = (tag) => {
+      const element = createElement(tag);
+      if (tag === 'a') {
+        element.onclick = () => links.push({ href: element.href, name: element.download });
+      }
+      return element;
+    };
+    try {
+      download.click();
+    } finally {
+      URL.createObjectURL = savedCreateObjectURL;
+      document.createElement = createElement;
+    }
+
+    assert.equal(await file.text(),
+      '1234341221434321\n1234341223414123');
+    assert.equal(links.length, 1);
+    assert.equal(links[0].href, 'blob:solutions');
+    assert.match(links[0].name, /^sudoku-iss-solutions-.*\.txt$/);
+    assert.deepEqual(document.body.children, [], 'the link is removed');
   });
 });
 
