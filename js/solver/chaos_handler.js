@@ -195,8 +195,7 @@ export class ChaosConstruction extends SudokuConstraintHandler {
     // === Branch state (saved/restored across backtracking by stateAllocator) ===
     // NOTE: the two allocate() calls must keep this relative order — offsets are
     // assigned by call sequence.
-    // Per-region cache of the last stable possible weight; a label is dirty for
-    // connectivity when its possible weight changes from this.
+    // Per-region possible weight at the last connectivity check.
     this._possibleCountCacheOffset = stateAllocator.allocate(
       new Uint16Array(this._numRegions).fill(NO_CELL));
     // Union-find over cells known to share a region (the shard forest), seeded
@@ -687,7 +686,7 @@ export class ChaosConstruction extends SudokuConstraintHandler {
   }
 
   // Accumulates per-region fixed weight, possible weight, and value mask into _regionScanData;
-  // marks dirty regions where possible weight changed since the last stable scan.
+  // marks dirty regions where possible weight changed since the last connectivity check.
   _scanRegionCandidates(grid, shards, regions) {
     const regionScanData = regions.scanData;
     const fixedValueMasks = regions.fixedValueMasks;
@@ -749,7 +748,6 @@ export class ChaosConstruction extends SudokuConstraintHandler {
       if (grid[possibleCountCacheOffset + region] !== possibleCount) {
         connectivityDirtyRegionsMask |= 1 << region;
       }
-      grid[possibleCountCacheOffset + region] = possibleCount;
     }
     if (!hasPossibleRegionCells) {
       connectivityDirtyRegionsMask |= this._regionMask;
@@ -816,6 +814,8 @@ export class ChaosConstruction extends SudokuConstraintHandler {
       const regionBit = 1 << region;
       if (!(dirtyRegionsMask & regionBit)) continue;
 
+      grid[this._possibleCountCacheOffset + region] =
+        regionScanData[region] & REGION_POSSIBLE_COUNT_MASK;
       const visitId = this._nextVisitId();
       // Fixed weight reflects both the scan and any shards fixed earlier in this
       // pass; the seed root is a shard currently fixed to the region.

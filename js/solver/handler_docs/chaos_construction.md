@@ -505,10 +505,12 @@ Three mechanisms keep the cost proportional to what actually changed:
 - **Branch-state union-find.** Shard merges live in saved/restored state, so the
   same merges are not recomputed after backtracking.
 - **Dirty-region tracking.** Connectivity is skipped for regions whose
-  *possible weight* `P(region)` is unchanged since the last completed scan. The
+  *possible weight* `P(region)` is unchanged since its last connectivity check. The
   previous value is cached per region in branch state; `scanRegionCandidates`
-  marks a region dirty when its weight differs. Only dirty regions (plus
-  half-fixed regions for the bottleneck check) are traversed in §7.
+  marks a region dirty when its weight differs. Connectivity updates the cache
+  when it checks the region, so deferral leaves the pending change visible.
+  Only dirty regions (plus half-fixed regions for the bottleneck check) are
+  traversed in §7.
 - **Carried-over fixed weights.** The per-region fixed weight `F(region)` and a
   seed root (the lowest-index fixed shard) are produced by the region scan (§6.1)
   and reused as the §7.1 starting point, instead of rescanning all shards per

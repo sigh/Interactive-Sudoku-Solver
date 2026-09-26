@@ -722,6 +722,27 @@ await runTest('ChaosConstruction connectivity cache tracks possible region candi
   assert.notEqual(handler._connectivityDirtyRegionsMask & valueMask(1), 0);
 });
 
+await runTest('ChaosConstruction checks connectivity after deferring for a hidden single', () => {
+  const context = makeChaosContext('4x4');
+  const { grid, regionCells } = context;
+  // Region 1 cannot connect opposite corners using only four cells.
+  const possibleCells = [0, 1, 4, 10, 11, 14, 15];
+  for (const cell of context.gridCells) {
+    grid[regionCells[cell]] = valueMask(2, 3, 4);
+  }
+  for (const cell of possibleCells) {
+    grid[regionCells[cell]] |= valueMask(1);
+    grid[cell] = valueMask(1, 2, 3);
+  }
+  grid[regionCells[0]] = grid[regionCells[15]] = valueMask(1);
+  grid[0] = valueMask(1, 2, 3, 4);
+
+  // The unique place for 4 is processed before connectivity.
+  assert.equal(enforce(context).result, true);
+  assert.equal(grid[0], valueMask(4));
+  assert.equal(enforce(context).result, false);
+});
+
 await runTest('ChaosConstruction rejects duplicate fixed values in fixed regions', () => {
   const context = makeChaosContext('2x2');
   const { grid, regionCells } = context;
