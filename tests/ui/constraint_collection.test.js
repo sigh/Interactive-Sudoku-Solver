@@ -21,7 +21,7 @@ const pressEscape = () => {
 const {
   RootConstraintCollection, CompositeConstraintCollection,
   SelectedConstraintCollection, ConstraintChipView, ConstraintSelector,
-} = await import('../../js/render_page.js');
+} = await import('../../js/constraint_collection.js');
 const { DisplayContainer } = await import('../../js/display.js');
 const { ConstraintDisplay } = await import('../../js/constraint_display.js');
 const { CellGeometry } = await import('../../js/cell_geometry.js');

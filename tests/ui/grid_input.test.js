@@ -14,7 +14,7 @@ const pressKey = (key, props = {}) => {
   }
 };
 
-const { GridInputManager } = await import('../../js/render_page.js');
+const { GridInputManager } = await import('../../js/grid_input.js');
 const { DisplayContainer } = await import('../../js/display.js');
 const { CellGeometry } = await import('../../js/cell_geometry.js');
 

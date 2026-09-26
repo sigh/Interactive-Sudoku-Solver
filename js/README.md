@@ -8,7 +8,7 @@ The application runs entirely in the browser with no server-side component.
 The code is organized around a few key areas:
 
 - **Constraint model** ([sudoku_constraint.js](sudoku_constraint.js)) — constraint types with serialization, parsing, and display metadata. This is the shared vocabulary used by the UI, parser, display, and solver.
-- **UI** ([constraint_input.js](constraint_input.js), [constraint_display.js](constraint_display.js), [display.js](display.js)) — SVG grid rendering, constraint visualization, and input controls.
+- **UI** ([constraint_input.js](constraint_input.js), [constraint_display.js](constraint_display.js), [display.js](display.js), [constraint_collection.js](constraint_collection.js), [grid_input.js](grid_input.js)) — SVG grid rendering, constraint visualization, input controls, constraint chips, and grid selection.
 - **Solver** ([solver/](solver/)) — A constraint-satisfaction engine that runs in a Web Worker. See [solver/README.md](solver/README.md).
 - **Orchestration** ([render_page.js](render_page.js), [solution_controller.js](solution_controller.js), [solver_runner.js](solver_runner.js)) — Wires everything together: manages state, coordinates solving, and handles URL-based history.
 
@@ -50,6 +50,8 @@ The `ConstraintManager` (defined in [render_page.js](render_page.js)) is the cen
 | File | Purpose |
 |------|---------|
 | [render_page.js](render_page.js) | **Entry point.** Initializes all components, wires up event listeners, configures the bottom drawer. Also defines `ConstraintManager`, which holds the active constraint tree and notifies listeners on changes. |
+| [constraint_collection.js](constraint_collection.js) | The constraint collections `ConstraintManager` adds to: the root, composites (Or/And/Replicate), and the redirect to a selected composite. Also the chips (`ConstraintChipView`) and constraint selection (`ConstraintSelector`). |
+| [grid_input.js](grid_input.js) | `GridInputManager`: cell selection on the grid (drag, shift, rectangle, segments) and typing into cells. |
 | [display.js](display.js) | SVG rendering system. `DisplayContainer` manages layered SVG groups. Key classes: `CellValueDisplay`, `SolutionDisplay`, `HighlightDisplay`, `GridDisplay`, `BorderDisplay`, `ColorPicker`. |
 | [constraint_display.js](constraint_display.js) | Renders constraints as SVG overlays (lines, regions, shading, arrows, dots, etc.). Display item subclasses inherit from `BaseConstraintDisplayItem`. |
 | [constraint_input.js](constraint_input.js) | UI controls for adding/configuring constraints. `CollapsibleContainer` for grouped inputs. Auto-saves configuration state. |
