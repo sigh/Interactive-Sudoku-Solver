@@ -12,6 +12,7 @@ Canonical terms used throughout the solver. Where legacy synonyms exist
 | --- | --- | --- |
 | **value** | A displayed integer (e.g. 5). `valueOffset` maps displayed values to internal 1-based values. | — |
 | **candidate** | A still-possible value for a cell. Each cell's candidates are stored as a 16-bit **mask** (one bit per value). | possibility |
+| **domain** | The candidate values remaining for one cell, represented by its mask. | — |
 | **mask** | A bitset over values (single- or multi-bit). | — |
 | **cell** | In the solver, always a cell *index*: an integer offset into the grid state. Strings are always **cellIds**. | — |
 | **cellId** | An "R1C1"-style string (or a var-cell id). `displayCellId` renders var cells in their `$`-prefixed display form. | — |
@@ -25,9 +26,11 @@ Canonical terms used throughout the solver. Where legacy synonyms exist
 | **grid** (in `enforceConsistency`) | The per-frame `Uint16Array` holding candidate masks for all search cells *plus* handler state lanes. Also called grid state. | — |
 | **handler** (`SudokuConstraintHandler`) | A constraint-enforcement object; the CSP-literature term is *propagator*. | — |
 | **`enforceConsistency`** | A handler's propagation step: prune candidates, return `false` on conflict. | enforce |
-| **`PropagationQueue`** (`pQueue`) | The work-queue of handlers to run until fixpoint; drained by the propagation loop. | HandlerAccumulator, agenda |
-| **conflict** | A dead end: a cell with no candidates or a handler returning `false` (`hasConflict`, `lastConflictCell`). | contradiction, backtrack trigger |
-| **conflict scores** | The cell-weighting search heuristic (decayed conflict counts, normalized by candidate count). **value scores** are its value-ordering component. | backtrack triggers |
+| **`PropagationQueue`** (`pQueue`) | The queue of handlers run until it is empty or a conflict is found. | HandlerAccumulator, agenda |
+| **queue exhaustion / propagation fixed point** | An empty queue means no handlers are scheduled. At a fixed point, another pass would make no further deductions or find a conflict. Queue exhaustion does not guarantee a fixed point. | — |
+| **conflict** | A dead end: a cell with no candidates or a handler returning `false`. | contradiction, backtrack trigger |
+| **`lastConflictCell`** | The first cell assigned in a failed attempt, remembered in the parent frame. On retry, its ordinary handlers are added to the queue. It need not have caused the conflict. | — |
+| **conflict scores** | The cell-weighting search heuristic (decayed conflict counts, normalized by candidate count). **value scores** also influence branch selection. | backtrack triggers |
 | **branch candidate** | The selector's unit of branching — a (cells, values) choice proposed by `CandidateSelector`/`candidateFinders`. Distinct from *candidate* (a value). | — |
 | **essential** | `essential = false` marks optimizer-derived handlers: redundant for correctness, present for speed, skippable in some paths. | — |
 | **aux handlers** | Handlers enqueued only when one of their cells becomes fixed (not on ordinary candidate changes). | — |
@@ -45,7 +48,7 @@ The solver is a constraint-satisfaction problem (CSP) engine. It combines
 **backtracking search** with **constraint propagation**: at each step it picks
 a cell, tries a candidate value, and propagates the consequences through all
 affected constraints until either a conflict is found (triggering
-backtracking) or a fixed point is reached (and the next cell is picked).
+backtracking) or the propagation queue is empty (and selection continues).
 
 All solving happens inside a Web Worker to avoid blocking the UI.
 
@@ -266,9 +269,9 @@ times. Follow these rules:
 ## Constraint Propagation
 
 `PropagationQueue` (in [engine.js](engine.js)) is a linked-list queue of
-handlers that need to run. When a cell's candidates change, the queue
-enqueues all handlers that touch that cell. The propagation loop drains the
-queue until it is empty (fixed point) or a handler returns `false`
+handlers scheduled to run. Handlers notify the queue of candidate changes
+through `addForCell`, which enqueues the affected ordinary handlers. The
+propagation loop drains the queue until it is empty or a handler returns `false`
 (conflict):
 
 ```
@@ -284,7 +287,8 @@ the cell's singleton handler (e.g., `UniqueValueExclusion`) to the **front**
 of the queue, then enqueues aux and ordinary handlers to the back. During
 propagation itself, handlers call `addForCell`, which only enqueues ordinary
 handlers — singleton and aux handlers are not triggered by mid-propagation
-changes.
+changes. Already queued handlers are not added again, and `addForCell` excludes
+the currently active handler.
 
 ## Search Loop
 
@@ -293,18 +297,18 @@ records:
 
 - **`cellDepth`** — how many cells have been fixed so far.
 - **`gridState`** — the `Uint16Array` view for this depth.
-- **`lastConflictCell`** — which cell caused a backtrack from a deeper
-  frame (used as a hint by the candidate selector).
+- **`lastConflictCell`** — the first assigned cell from the failed child attempt;
+  `addForCell` adds its ordinary handlers on retry.
 - **`newNode`** — whether this is a fresh node or a retry after backtracking.
 
 The loop:
 
-1. `CandidateSelector.selectNextCandidate()` picks the next cell and value
-   to try. Cells are ranked by conflict score divided by candidate count;
+1. `CandidateSelector.selectNextCandidate()` chooses the next assignment or
+   assignments. Cells are ranked by conflict score divided by candidate count;
    when all scores are zero it falls back to minimum remaining values (MRV).
-2. The value is set in the grid, and the `PropagationQueue` is seeded with
-   all handlers touching that cell.
-3. Constraint propagation runs to a fixed point.
+2. The values are set in the grid, and the `PropagationQueue` is seeded with
+   handlers for the assigned cells.
+3. Constraint propagation runs until a conflict or an empty queue.
 4. If a conflict is found, `ConflictScores` records it (for future
    ordering), and the loop continues at the same stack depth to try the next
    value. If no values remain, the stack depth is decremented (backtrack).
