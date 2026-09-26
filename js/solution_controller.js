@@ -672,6 +672,8 @@ export class SolutionController {
     document.body.appendChild(elem);
     elem.click();
     document.body.removeChild(elem);
+    // Release the file once the download has started.
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
   }
 
   // Build a DOM element for step-by-step status display.

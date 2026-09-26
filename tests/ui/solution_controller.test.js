@@ -593,8 +593,10 @@ await runTest('download saves the solutions found, one per line', async () => {
 
     // Capture the file, and the link that downloads it.
     let file = null;
-    const savedCreateObjectURL = URL.createObjectURL;
+    const revoked = [];
+    const { createObjectURL, revokeObjectURL } = URL;
     URL.createObjectURL = (blob) => { file = blob; return 'blob:solutions'; };
+    URL.revokeObjectURL = (url) => revoked.push(url);
     const links = [];
     const createElement = document.createElement;
     document.createElement = (tag) => {
@@ -606,10 +608,13 @@ await runTest('download saves the solutions found, one per line', async () => {
     };
     try {
       download.click();
+      assert.deepEqual(revoked, [], 'not released before the download starts');
+      await settle();
     } finally {
-      URL.createObjectURL = savedCreateObjectURL;
+      Object.assign(URL, { createObjectURL, revokeObjectURL });
       document.createElement = createElement;
     }
+    assert.deepEqual(revoked, ['blob:solutions'], 'the file is released');
 
     assert.equal(await file.text(),
       '1234341221434321\n1234341223414123');
