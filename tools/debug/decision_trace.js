@@ -43,6 +43,7 @@
 //   # B-frozen-order: does an ablation change the tree, or just prune less?
 //   node tools/debug/decision_trace.js --max-backtracks none --puzzle X --ablate demote-off --replay /tmp/a.ndjson
 
+import { observeSolver } from '../lib/search_observer.js';
 import { readFileSync, writeFileSync } from 'node:fs';
 
 import { ensureGlobalEnvironment } from '../../tests/helpers/test_env.js';
@@ -100,43 +101,34 @@ Options:
   --top <n>             Replay: divergences to list. Default 10.
   -h, --help            Print this help and exit.`);
 
-// Export (D1): record every branch decision via the decision hook, and the
-// candidates each guess propagated away via an enforce wrapper (before−after
-// population, à la search_hotspots).
+// Record plain branches and their propagation eliminations.
 const runExport = (puzzle, budgets, out) => {
   const trace = [];
   let geometry = null;
 
   const onSolver = (solver) => {
-    const internal = solver._internalSolver;
     geometry = solver._geometry;
-    const numSearch = internal._numSearchCells;
     const offset = geometry.valueOffset;
 
     let pending = null;
-    internal._candidateSelector.setDecisionHook((d) => {
-      // Only plain single-cell branches are representable as (cell, value).
-      if (d.isCustom) return null;
-      pending = {
-        n: trace.length, depth: d.cellDepth, cell: d.cell,
-        cellId: geometry.makeCellIdFromIndex(d.cell),
-        value: d.value, digit: LookupTables.toOffsetValue(d.value, offset),
-        count: d.count, elims: 0,
-      };
-      trace.push(pending);
-      return null;  // observe only
-    });
-
-    const popSum = (gs) => { let s = 0; for (let i = 0; i < numSearch; i++) s += popcount(gs[i]); return s; };
-    const origEnforce = internal._enforceConstraints.bind(internal);
-    internal._enforceConstraints = function (gridState, pQueue) {
-      const p = pending; pending = null;
-      if (!p) return origEnforce(gridState, pQueue);
-      const before = popSum(gridState);
-      const ok = origEnforce(gridState, pQueue);
-      p.elims = before - popSum(gridState);
-      return ok;
-    };
+    return observeSolver(solver, () => ({
+      branch(d) {
+        // Flat traces represent plain cell branches only.
+        if (d.isCustom) return;
+        pending = {
+          n: trace.length, depth: d.cellDepth, cell: d.cell,
+          cellId: geometry.makeCellIdFromIndex(d.cell),
+          value: d.value, digit: LookupTables.toOffsetValue(d.value, offset),
+          count: d.count, elims: 0,
+        };
+        trace.push(pending);
+      },
+      beforePropagation: () => pending ? { eliminated: true } : null,
+      afterPropagation(event) {
+        if (pending) pending.elims = event.eliminated;
+        pending = null;
+      },
+    }));
   };
 
   const result = runSolve(puzzle, budgets, onSolver);
@@ -170,7 +162,7 @@ const runReplay = (puzzle, budgets, tracePath, top) => {
 
   const onSolver = (solver) => {
     geometry = solver._geometry;
-    solver._internalSolver._candidateSelector.setDecisionHook((d) => {
+    return observeSolver(solver, () => ({}), { branch(d) {
       // Custom multi-cell branches aren't traced/forced; skip without consuming
       // the guide (export skipped them too, so the cursor stays aligned).
       if (d.isCustom) return null;
@@ -187,7 +179,7 @@ const runReplay = (puzzle, budgets, tracePath, top) => {
         }
       }
       return { cell: g.cell, value: g.value };
-    });
+    } });
   };
 
   const result = runSolve(puzzle, budgets, onSolver);

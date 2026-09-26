@@ -19,6 +19,7 @@
 //   node tools/debug/step_analysis.js --puzzle "Fountain" --steps 1 --explain --guide 1:R7C9=5
 //   node tools/debug/step_analysis.js --list
 
+import { scoreCell } from '../lib/search_observer.js';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -35,7 +36,7 @@ const { SudokuParser } = await import('../../js/sudoku_parser.js' + self.VERSION
 const { SudokuBuilder } = await import('../../js/solver/sudoku_builder.js' + self.VERSION_PARAM);
 const { LookupTables } = await import('../../js/solver/lookup_tables.js' + self.VERSION_PARAM);
 const { countOnes16bit } = await import('../../js/util.js' + self.VERSION_PARAM);
-const { CandidateFinders, NO_LINKED_CELL } =
+const { CandidateFinders } =
   await import('../../js/solver/candidate_selector.js' + self.VERSION_PARAM);
 const { applyAblations, validateAblations } =
   await import('../lib/solver_analysis.js' + self.VERSION_PARAM);
@@ -306,27 +307,6 @@ const runStep = (solver, stepIndex, guides, wantSnapshot = false) => {
   const step = solver.nthStep(stepIndex, guides);
   capture.wantSnapshot = false;
   return { step, decision: capture.last };
-};
-
-// Replicates _selectBestCell scoring so we can rank competing cells.
-const scoreCell = (cell, grid, conflictScores, linkedCells, maxValueInfo) => {
-  const count = countOnes16bit(grid[cell]);
-  if (count <= 1) return null;
-  let raw = conflictScores[cell];
-  let linkBoost = false;
-  if (linkedCells) {
-    const linked = linkedCells[cell];
-    if (linked !== NO_LINKED_CELL) {
-      const lv = grid[linked];
-      if ((lv & (lv - 1)) === 0) { raw <<= 2; linkBoost = true; }
-    }
-  }
-  let valueBoost = 0;
-  if (maxValueInfo.value && (grid[cell] & maxValueInfo.value)) {
-    valueBoost = maxValueInfo.score * 0.2;
-    raw += valueBoost;
-  }
-  return { cell, count, conflictScore: conflictScores[cell], linkBoost, valueBoost, score: raw / count };
 };
 
 // ============================================================================

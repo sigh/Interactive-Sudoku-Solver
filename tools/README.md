@@ -23,6 +23,7 @@ it stays there and the tools import it back.
 | See the solution grid + var-cell groups | [`debug/solve.js`](debug/README.md) |
 | Check an encoding accepts a known answer (`ACCEPTED`/`REJECTED`) | [`debug/verify_solution.js`](debug/README.md) |
 | Walk the search step by step (why it branched, what pruned) | [`debug/step_analysis.js`](debug/README.md) |
+| Find where a code change first alters search | [`debug/search_divergence.js`](debug/README.md) |
 | See where the search concentrates (conflict/churn/branch heatmaps) | [`debug/search_hotspots.js`](debug/README.md) |
 | Run a sandbox script headless → constraint string | [`debug/run_sandbox.js`](debug/README.md) |
 | Measure search cost (guesses/backtracks/nodes) + in-build A/B | [`perf/benchmark_puzzles.js`](perf/README.md) |

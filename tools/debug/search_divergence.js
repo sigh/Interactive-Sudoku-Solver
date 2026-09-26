@@ -2,28 +2,26 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { runAsCli } from '../lib/cli_entry.js';
-import { materializePuzzles, resolvePuzzles, parseBacktrackLimit } from '../lib/solver_analysis.js';
-import { compareSearches, runDecisionExperiment } from '../lib/search_experiment.js';
+import { materializePuzzles, resolvePuzzles, parseBacktrackLimit, applyAblations, validateAblations } from '../lib/solver_analysis.js';
+import { compareSearches } from '../lib/search_divergence.js';
 
 export const main = async (argv) => {
-  const args = { at: 1, index: 0, choices: 'same,mrv,runner-up,max-value', learning: 'live' };
-  const options = new Set(['puzzle', 'index', 'input-file', 'max-backtracks', 'at',
-    'choices', 'learning', 'compare-module', 'out']);
+  const args = { index: 0, 'max-events': 100000 };
+  const options = new Set(['puzzle', 'index', 'input-file', 'max-backtracks', 'max-events', 'ablate', 'compare-module', 'out']);
   for (let i = 2; i < argv.length; i++) {
     if (argv[i] === '--help') {
-      console.log(`Usage: search_experiment.js --puzzle <name or collection> --max-backtracks <n|none>
+      console.log(`Usage: search_divergence.js --puzzle <name> --ablate <name> --max-backtracks <n|none>
   --index <n>              Zero-based collection index (default 0)
   --input-file <path>      Raw ISS constraints instead of --puzzle
-  --at <n>                One-based fresh branch index (default 1)
-  --choices <list>         same,mrv,runner-up,max-value (default); plain also available
-  --learning <mode>        live, frozen, last-guess (starts at --at)
-  --compare-module <path>  Compare complete searches; module exports apply() -> restore()
+  --ablate <a,b,...>       Compare with named optimizations disabled
+  --compare-module <path>  Instead of --ablate: module exports apply() -> restore()
+  --max-events <n>         Maximum events compared (default 100000)
   --out <path>             Write JSON (otherwise stdout)
 
-Re-executes the original history for each intervention and checks its fingerprint.
-Overrides branch on a cell's full domain, replacing any custom placement branch.
-Caps apply to the whole run, including the prefix. Instrumented counters, not timing.
-Defaults to uniqueness proof; use the library API for exhaustive small-puzzle studies.`);
+Reports the first differing selection, propagation outcome, conflict or solution.
+Matching events do not establish equal domains or scores. Alignment ends at the
+first difference. Capped solves and observation limits remain inconclusive.
+Counters describe instrumented search work; use benchmark_puzzles.js for timing.`);
       return;
     }
     const key = argv[i].replace(/^--/, '');
@@ -40,15 +38,20 @@ Defaults to uniqueness proof; use the library API for exhaustive small-puzzle st
   const index = Number(args.index);
   if (!Number.isInteger(index) || !puzzles[index]) throw new Error('Invalid puzzle index');
   const puzzle = puzzles[index];
-  let report;
-  if (args['compare-module']) {
+  if (Boolean(args.ablate) === Boolean(args['compare-module'])) {
+    throw new Error('Specify exactly one of --ablate or --compare-module');
+  }
+  let apply;
+  if (args.ablate) {
+    const names = args.ablate.split(',');
+    validateAblations(names);
+    apply = () => applyAblations(names);
+  } else {
     const module = await import(pathToFileURL(resolve(args['compare-module'])).href);
     if (typeof module.apply !== 'function') throw new Error('Comparison module must export apply()');
-    report = compareSearches(puzzle, budgets, module.apply);
-  } else {
-    report = runDecisionExperiment(puzzle, budgets, { at: Number(args.at),
-      choices: args.choices.split(','), learning: args.learning });
+    apply = module.apply;
   }
+  const report = compareSearches(puzzle, budgets, apply, { maxEvents: Number(args['max-events']) });
   const output = JSON.stringify({ puzzle: puzzle.name, budgets, ...report }, null, 2) + '\n';
   if (args.out) writeFileSync(args.out, output);
   else process.stdout.write(output);

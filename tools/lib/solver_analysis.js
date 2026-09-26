@@ -245,7 +245,8 @@ const solutionString = (grid, geometry) => {
 // counters, wall time, and a status. `maxBacktracks`/`maxSolutions` of 0 mean
 // unlimited. The solver is built fresh, so prototype patches (ablations) applied
 // beforehand take effect. The optional `onSolver` hook (used by the profiler)
-// runs after build but before search, e.g. to install method wrappers.
+// runs after build but before search; it may return a cleanup function, called
+// even if search throws.
 // With `collectSolutions`, the result gains `solutionSet`: every solution found,
 // as sorted digit strings — sorted because two runs that explore the tree in a
 // different order enumerate the same solutions in a different order.
@@ -261,7 +262,7 @@ export const runSolve = (puzzle, { maxBacktracks, maxSolutions, collectSolutions
   const resolved = SudokuBuilder.resolveConstraint(constraint);
   const solver = SudokuBuilder.build(resolved);
   const internal = solver._internalSolver;
-  if (onSolver) onSolver(solver);
+  const cleanup = onSolver?.(solver);
 
   const mode = {};
   if (maxBacktracks) mode.maxBacktracks = maxBacktracks;
@@ -270,10 +271,12 @@ export const runSolve = (puzzle, { maxBacktracks, maxSolutions, collectSolutions
   let firstGrid = null;
   const solutionSet = collectSolutions ? [] : null;
   const start = performance.now();
-  internal.run(Object.keys(mode).length ? mode : null, (grid) => {
-    if (!firstGrid) firstGrid = grid.slice(0, solutionGroup ? undefined : geometry.numGridCells);
-    if (solutionSet) solutionSet.push(solutionString(grid, geometry));
-  });
+  try {
+    internal.run(Object.keys(mode).length ? mode : null, (grid) => {
+      if (!firstGrid) firstGrid = grid.slice(0, solutionGroup ? undefined : geometry.numGridCells);
+      if (solutionSet) solutionSet.push(solutionString(grid, geometry));
+    });
+  } finally { cleanup?.(); }
   const elapsedMs = performance.now() - start;
   solutionSet?.sort();
 

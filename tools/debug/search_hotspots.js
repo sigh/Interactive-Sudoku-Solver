@@ -35,6 +35,7 @@
 //   node tools/debug/search_hotspots.js --max-backtracks none --puzzle "Chaos Construction"
 //   node tools/debug/search_hotspots.js --max-backtracks 50000 --input ".Cage~10~R1C1~R1C2"
 
+import { observeSolver } from '../lib/search_observer.js';
 import { ensureGlobalEnvironment } from '../../tests/helpers/test_env.js';
 import { runAsCli } from '../lib/cli_entry.js';
 
@@ -106,59 +107,40 @@ export const main = async (argv) => {
     geometry = solver._geometry;
     const numGridCells = geometry.numGridCells;
     const numSearch = internal._numSearchCells;
-    const sel = internal._candidateSelector;
-
-    // The selector wrapper records the branch decision and stashes a `pending`
-    // descriptor; the matching _enforceConstraints call (next in the loop)
-    // measures how many candidates that guess propagated away.
     let pending = null;
-    const orig = sel._selectBestCandidate.bind(sel);
-    sel._selectBestCandidate = function (g, co, cd, nn) {
-      const res = orig(g, co, cd, nn);
-      if (nn && res.count > 1) {
-        const cell = co[res.cellOffset];
+    return observeSolver(solver, context => ({
+      branch(d) {
+        const { cell, count, value } = d;
         const isVar = cell >= numGridCells;
         branches++;
         if (isVar) varBranches++;
-        (isVar ? bfVar : bfGrid).set(res.count, ((isVar ? bfVar : bfGrid).get(res.count) ?? 0) + 1);
+        const histogram = isVar ? bfVar : bfGrid;
+        histogram.set(count, (histogram.get(count) ?? 0) + 1);
         let set = churn.get(cell); if (!set) churn.set(cell, set = new Set());
-        set.add(res.value);
-        // Minimum branch factor available at this node (the MRV the heuristic could have taken).
-        let minBf = res.count;
-        for (let i = cd; i < numSearch; i++) {
-          const c = popcount(g[co[i]]);
-          if (c >= 2 && c < minBf) minBf = c;
+        set.add(value);
+        let minBf = count;
+        for (let i = d.cellDepth; i < numSearch; i++) {
+          const n = popcount(d.gridState[context.cellOrder[i]]);
+          if (n >= 2 && n < minBf) minBf = n;
         }
-        sumChosen += res.count;
+        sumChosen += count;
         sumMin += minBf;
-        pending = { count: res.count, isVar };
-      } else {
+        pending = { count, isVar };
+      },
+      beforePropagation: () => pending ? { eliminated: true } : null,
+      afterPropagation({ eliminated, conflict }) {
+        if (!pending) return;
+        const { count, isVar } = pending;
         pending = null;
-      }
-      return res;
-    };
-
-    const popSum = (gs) => { let s = 0; for (let i = 0; i < numSearch; i++) s += popcount(gs[i]); return s; };
-    const origEnforce = internal._enforceConstraints.bind(internal);
-    internal._enforceConstraints = function (gridState, acc) {
-      const p = pending; pending = null;
-      if (!p) return origEnforce(gridState, acc);
-      // The guess cell is already a single value here, so any population drop is
-      // propagation into OTHER cells. before − after = candidates eliminated.
-      const before = popSum(gridState);
-      const ok = origEnforce(gridState, acc);
-      const elim = before - popSum(gridState);
-      const b = p.isVar ? yld.var : yld.grid;
-      b.n++;
-      if (elim === 0) {
-        b.inert++;
-        if (!ok) b.inertContra++;
-        b.inertBf.set(p.count, (b.inertBf.get(p.count) ?? 0) + 1);
-      } else if (elim <= 2) {
-        b.few++;
-      }
-      return ok;
-    };
+        const b = isVar ? yld.var : yld.grid;
+        b.n++;
+        if (eliminated === 0) {
+          b.inert++;
+          if (conflict) b.inertContra++;
+          b.inertBf.set(count, (b.inertBf.get(count) ?? 0) + 1);
+        } else if (eliminated <= 2) b.few++;
+      },
+    }));
   };
 
   const result = runSolve(puzzle, { maxBacktracks, maxSolutions }, onSolver);
