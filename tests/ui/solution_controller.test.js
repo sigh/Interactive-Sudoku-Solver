@@ -21,7 +21,7 @@ globalThis.sessionStorage = makeStorage();
 globalThis.localStorage = makeStorage();
 
 const { SolutionController } = await import('../../js/solution_controller.js');
-const { SolverProxy, DEFAULT_MODE, getModeDescription } =
+const { SolverProxy, DEFAULT_MODE, Modes, getModeDescription } =
   await import('../../js/solver_runner.js');
 const { CellGeometry } = await import('../../js/cell_geometry.js');
 
@@ -58,6 +58,11 @@ const makeController = () => {
     elements[name] = document.createElement('div');
   }
   elements.mode = document.createElement('select');
+  for (const { NAME } of Object.values(Modes)) {
+    const option = document.createElement('option');
+    option.value = NAME;
+    elements.mode.append(option);
+  }
   elements.autoSolve = document.createElement('input');
   // The threshold input sits two wrappers deep, next to its value label.
   elements.candidateSupportThreshold = document.createElement('input');

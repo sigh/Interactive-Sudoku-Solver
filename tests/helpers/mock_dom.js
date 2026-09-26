@@ -2,6 +2,10 @@
 // builds (tree, attributes, classes, styles, listeners) and supports the few
 // behaviours tests rely on, such as click() being ignored while disabled.
 
+// Simple selectors only: a tag, classes and [attr="value"]s, e.g.
+// 'input[type="checkbox"]' or 'div.description'.
+const SELECTOR_RE = /^([a-zA-Z]*)((?:\.[\w-]+)*)((?:\[[\w-]+="[^"]*"\])*)$/;
+
 export class FakeElement {
   constructor(tagName, attrs = {}) {
     this.tagName = tagName;
@@ -35,10 +39,21 @@ export class FakeElement {
 
   get id() { return this.attrs.id ?? ''; }
   set id(v) { this.attrs.id = v; }
+  get name() { return this.attrs.name ?? ''; }
+  set name(v) { this.attrs.name = v; }
+  get type() { return this.attrs.type ?? ''; }
+  set type(v) { this.attrs.type = v; }
+
+  get className() { return [...this._classes].join(' '); }
+  set className(v) {
+    this._classes.clear();
+    for (const c of String(v).split(/\s+/)) if (c) this._classes.add(c);
+  }
 
   get childNodes() { return this.children; }
   get parentNode() { return this.parentElement; }
   get firstChild() { return this.children[0] ?? null; }
+  get lastChild() { return this.children.at(-1) ?? null; }
   get firstElementChild() { return this.children[0] ?? null; }
   get nextElementSibling() {
     const siblings = this.parentElement?.children ?? [];
@@ -50,11 +65,16 @@ export class FakeElement {
   }
 
   set textContent(text) {
-    this.replaceChildren(...(text ? [String(text)] : []));
+    this.replaceChildren(...(text || text === 0 ? [String(text)] : []));
   }
 
   getAttribute(k) { return k in this.attrs ? this.attrs[k] : null; }
-  setAttribute(k, v) { this.attrs[k] = v; }
+  // As in browsers, the value attribute is the value of an untouched input.
+  setAttribute(k, v) {
+    this.attrs[k] = v;
+    if (k === 'value') this.value = v;
+  }
+  removeAttribute(k) { delete this.attrs[k]; }
 
   appendChild(child) {
     this.append(child);
@@ -87,6 +107,10 @@ export class FakeElement {
     return node;
   }
 
+  remove() {
+    this.parentElement?.removeChild(this);
+  }
+
   // A shallow copy: tag, attributes and classes, without children.
   cloneNode() {
     const copy = new this.constructor(this.tagName, this.attrs);
@@ -101,49 +125,157 @@ export class FakeElement {
     return this.children.flatMap(c => [c, ...(c.descendants?.() ?? [])]);
   }
 
-  querySelector() { return null; }
-  querySelectorAll() { return []; }
+  matches(selector) {
+    const [, tag, classes, attrs] = selector.match(SELECTOR_RE);
+    return (!tag || this.tagName.toLowerCase() === tag.toLowerCase())
+      && classes.split('.').slice(1).every(c => this._classes.has(c))
+      && [...attrs.matchAll(/\[([\w-]+)="([^"]*)"\]/g)].every(
+        ([, k, v]) => String(this.getAttribute(k)) === v);
+  }
+
+  querySelectorAll(selector) {
+    return this.descendants().filter(
+      n => n instanceof FakeElement && n.matches(selector));
+  }
+  querySelector(selector) { return this.querySelectorAll(selector)[0] ?? null; }
+  getElementsByClassName(c) { return this.querySelectorAll(`.${c}`); }
+
+  closest(selector) {
+    for (let e = this; e; e = e.parentElement) {
+      if (e.matches(selector)) return e;
+    }
+    return null;
+  }
 
   addEventListener(type, fn) {
     if (!this.listeners.has(type)) this.listeners.set(type, []);
     this.listeners.get(type).push(fn);
   }
 
+  // Calls the listeners and the on<type> handler, then the ancestors' if the
+  // event bubbles.
   dispatch(type, event = {}) {
-    for (const fn of this.listeners.get(type) ?? []) fn(event);
+    for (let e = this; e; e = event.bubbles ? e.parentElement : null) {
+      for (const fn of e.listeners.get(type) ?? []) fn(event);
+      e[`on${type}`]?.(event);
+    }
   }
 
-  dispatchEvent() { }
+  dispatchEvent(event) {
+    this.dispatch(event.type, event);
+    return true;
+  }
+
   focus() { }
   blur() { }
-  select() { }
+  select() {
+    this.selectionStart = 0;
+    this.selectionEnd = String(this.value).length;
+  }
+  setCustomValidity(message) { this.validationMessage = message; }
+  reportValidity() { return !this.validationMessage; }
 
   click() {
-    if (!this.disabled) this.onclick?.();
+    if (!this.disabled) this.dispatch('click', { preventDefault() { } });
   }
 }
 
-// For tests of code that navigates to elements the test didn't build: missing
-// parents, first children and siblings are stand-ins instead of null.
-export class StubElement extends FakeElement {
-  get parentElement() { return this._parent ?? new StubElement('div'); }
-  set parentElement(v) { this._parent = v; }
-  get firstElementChild() { return super.firstElementChild ?? new StubElement('div'); }
-  get nextElementSibling() { return super.nextElementSibling ?? new StubElement('div'); }
+// A select, whose value is its selected option's. The first option is
+// selected until a value is set; a value with no option selects none.
+export class FakeSelect extends FakeElement {
+  get options() {
+    return this.descendants().filter(n => n.tagName === 'OPTION');
+  }
+
+  get value() {
+    const options = this.options;
+    const selected = options.find(o => o.selected)
+      ?? (this._noneSelected ? null : options[0]);
+    return String(selected?.value ?? '');
+  }
+
+  set value(v) {
+    const options = this.options;
+    for (const o of options) o.selected = String(o.value) === String(v);
+    this._noneSelected = options.length > 0 && !options.some(o => o.selected);
+  }
 }
 
-// A document whose elements are `Element`s. getElementById returns `byId[id]`,
-// else a new element with that id.
-export const makeFakeDocument = ({ Element = FakeElement, byId = {} } = {}) => {
+// The radio buttons of a form which share a name.
+class FakeRadioNodeList extends Array {
+  get value() { return this.find(r => r.checked)?.value ?? ''; }
+  set value(v) { for (const r of this) r.checked = r.value === v; }
+}
+
+// A form, whose controls are also its properties, by name or id. As in
+// browsers, they take precedence over the element's own properties.
+export class FakeForm extends FakeElement {
+  constructor(...args) {
+    super(...args);
+    return new Proxy(this, {
+      get: (target, prop, receiver) => (typeof prop === 'string'
+        && target.namedControl(prop)) || Reflect.get(target, prop, receiver),
+    });
+  }
+
+  namedControl(name) {
+    const controls = this.descendants().filter(n => n instanceof FakeElement
+      && (n.name === name || n.getAttribute('id') === name));
+    if (controls.length > 1) return FakeRadioNodeList.from(controls);
+    return controls[0];
+  }
+
+  requestSubmit() {
+    this.dispatch('submit', { preventDefault() { } });
+  }
+}
+
+// FormData for a FakeForm: enabled controls, checkboxes and radios only when
+// checked.
+export class FakeFormData {
+  constructor(form) { this._form = form; }
+
+  get(name) {
+    const control = this._form.descendants().find(n =>
+      n instanceof FakeElement && n.name === name && !n.disabled
+      && (!['checkbox', 'radio'].includes(n.type) || n.checked));
+    if (!control) return null;
+    return control.type === 'checkbox' ? (control.value || 'on') : control.value;
+  }
+}
+
+// Builds an element: h('select', { name: 'x' }, ...children). Boolean values
+// set properties (e.g. disabled), `class` sets the classes, and the rest are
+// attributes.
+export const h = (tag, attrs = {}, ...children) => {
+  const elem = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (typeof v === 'boolean') elem[k] = v;
+    else if (k === 'class') elem.className = v;
+    else elem.setAttribute(k, v);
+  }
+  elem.append(...children);
+  return elem;
+};
+
+const TAG_CLASSES = { FORM: FakeForm, SELECT: FakeSelect };
+
+// A document of FakeElements. A lookup by id finds an element under the body,
+// else makes a new element with that id.
+export const makeFakeDocument = () => {
   const listeners = new Map();
+  const body = new FakeElement('BODY');
+  const findById = (id) => body.descendants().find(
+    n => n instanceof FakeElement && n.getAttribute('id') === id);
   return {
-    byId,
+    body,
     activeElement: null,
-    body: new Element('BODY'),
-    createElement: (tag) => new Element(tag.toUpperCase()),
-    createElementNS: (_ns, tag) => new Element(tag),
+    forms: new Proxy({}, { get: (_, id) => findById(id) }),
+    createElement: (tag) => new (TAG_CLASSES[tag.toUpperCase()] ?? FakeElement)(
+      tag.toUpperCase()),
+    createElementNS: (_ns, tag) => new FakeElement(tag),
     createTextNode: (text) => ({ textContent: text }),
-    getElementById: (id) => byId[id] ?? new Element('DIV', { id }),
+    getElementById: (id) => findById(id) ?? new FakeElement('DIV', { id }),
     addEventListener: (type, fn) => {
       if (!listeners.has(type)) listeners.set(type, []);
       listeners.get(type).push(fn);

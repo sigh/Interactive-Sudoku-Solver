@@ -1287,6 +1287,7 @@ class OutsideClue extends BaseConstraintDisplayItem {
       // If there are no values, set it inactive and stop.
       if (!tspans.length) {
         elem.classList.remove('active-arrow');
+        textNode.removeAttribute('style');
         return;
       }
 
