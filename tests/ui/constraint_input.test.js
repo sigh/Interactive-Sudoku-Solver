@@ -2,82 +2,21 @@ import assert from 'node:assert/strict';
 
 import { ensureGlobalEnvironment } from '../helpers/test_env.js';
 import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
-
-// Set up a minimal DOM environment for the modules that need it.
-const createMockElement = (tag = 'div', attrs = {}) => {
-  const children = [];
-  const classList = new Set();
-  const styles = {};
-  const element = {
-    tagName: tag,
-    children,
-    childNodes: children,
-    style: { setProperty: (k, v) => styles[k] = v, display: '' },
-    classList: {
-      add: (c) => classList.add(c),
-      remove: (c) => classList.delete(c),
-      toggle: (c, force) => {
-        if (force === undefined) force = !classList.has(c);
-        if (force) classList.add(c); else classList.delete(c);
-        return force;
-      },
-      has: (c) => classList.has(c),
-      contains: (c) => classList.has(c),
-    },
-    getAttribute: (k) => attrs[k] || null,
-    setAttribute: (k, v) => attrs[k] = v,
-    hasChildNodes: () => children.length > 0,
-    appendChild: (child) => children.push(child),
-    append: (...items) => children.push(...items),
-    querySelectorAll: () => [],
-    querySelector: () => null,
-    get firstElementChild() { return children[0] || createMockElement(); },
-    get nextElementSibling() { return createMockElement(); },
-    get parentNode() { return createMockElement('div', { id: 'mock-parent' }); },
-    get parentElement() { return createMockElement('div', { id: 'mock-parent' }); },
-    get id() { return attrs.id || 'mock-elem'; },
-    set id(v) { attrs.id = v; },
-    textContent: '',
-    onclick: null,
-    onchange: null,
-    disabled: false,
-    checked: false,
-    value: '',
-    dispatchEvent: () => { },
-    focus: () => { },
-    blur: () => { },
-    select: () => { },
-    addEventListener: () => { },
-    replaceChildren: function () { children.length = 0; },
-  };
-  return element;
-};
+import { StubElement, makeFakeDocument } from '../helpers/mock_dom.js';
 
 const elementsById = {
   'multi-value-cell-input': (() => {
-    const anchor = createMockElement('div', { id: 'mv-anchor' });
-    const body = createMockElement('div', { id: 'mv-body' });
-    // Override the getter to return the real body.
-    Object.defineProperty(anchor, 'nextElementSibling', { value: body, configurable: true });
-
-    const form = createMockElement('form', { id: 'multi-value-cell-input' });
-    form.children.push(anchor);
-    // Override the getter to return the real anchor.
-    Object.defineProperty(form, 'firstElementChild', { value: anchor, configurable: true });
+    const form = new StubElement('form', { id: 'multi-value-cell-input' });
+    form.append(
+      new StubElement('div', { id: 'mv-anchor' }),
+      new StubElement('div', { id: 'mv-body' }));
     return form;
   })(),
 };
 
-const mockStorage = new Map();
-
 ensureGlobalEnvironment({
   needWindow: true,
-  documentValue: {
-    createElement: (tag) => createMockElement(tag),
-    createTextNode: (text) => ({ textContent: text }),
-    getElementById: (id) => elementsById[id] || createMockElement('div', { id }),
-    activeElement: null,
-  },
+  documentValue: makeFakeDocument({ Element: StubElement, byId: elementsById }),
 });
 
 // Mock requestAnimationFrame so deferUntilAnimationFrame works.
@@ -562,25 +501,25 @@ await runTest('_handleSelection: valid selection adds constraint and clears stal
 // The Shape panel reads its elements at construction; give it real mocks for
 // the ones the tests inspect.
 const createShapeInput = () => {
-  const shapeSpecInput = createMockElement('input');
+  const shapeSpecInput = new StubElement('input');
   shapeSpecInput.setCustomValidity = () => { };
   shapeSpecInput.reportValidity = () => { };
   elementsById['shape-input'] = shapeSpecInput;
-  const gridTypeSelect = createMockElement('select');
+  const gridTypeSelect = new StubElement('select');
   gridTypeSelect.setCustomValidity = () => { };
   gridTypeSelect.reportValidity = () => { };
   elementsById['grid-type-input'] = gridTypeSelect;
-  const minSelect = createMockElement('select');
-  const maxSelect = createMockElement('select');
+  const minSelect = new StubElement('select');
+  const maxSelect = new StubElement('select');
   elementsById['value-range-min'] = minSelect;
   elementsById['value-range-max'] = maxSelect;
 
-  const varForm = createMockElement('form', { id: 'var-constraint-input' });
+  const varForm = new StubElement('form', { id: 'var-constraint-input' });
   for (const field of ['var-prefix', 'var-count', 'var-label']) {
-    varForm[field] = createMockElement('input');
+    varForm[field] = new StubElement('input');
   }
   globalThis.document.forms = { 'var-constraint-input': varForm };
-  const dropdownItems = createMockElement('div');
+  const dropdownItems = new StubElement('div');
   elementsById['shape-dropdown-items'] = dropdownItems;
 
   const collection = {
@@ -758,13 +697,13 @@ logSuiteComplete('ConstraintCategoryInput.GivenCandidates');
 // ============================================================================
 
 const createCellGroupInput = () => {
-  const panel = createMockElement(
+  const panel = new StubElement(
     'div', { id: 'cell-group-constraint-container' });
   elementsById['cell-group-constraint-container'] = panel;
 
-  const form = createMockElement('form', { id: 'connected-values-input' });
+  const form = new StubElement('form', { id: 'connected-values-input' });
   for (const field of ['cell-group', 'values', 'size']) {
-    form[field] = createMockElement('input');
+    form[field] = new StubElement('input');
   }
   globalThis.document.forms = {
     ...globalThis.document.forms,

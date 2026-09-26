@@ -35,11 +35,11 @@ node tests/run_all_tests.js --fail-fast # stop after the first failing file
 | Directory | Purpose |
 | --- | --- |
 | [handlers/](handlers/) | Per-handler tests. Each file tests one constraint handler in isolation. |
-| [general/](general/) | Application-level tests. Utilities, NFA builder, parser, solver runner, grid shapes, sandbox environment, and the simple solver API. |
+| [general/](general/) | Application-level tests. Utilities, NFA builder, parser, solver runner and worker, grid shapes, sandbox environment, and the simple solver API. |
 | [solver/](solver/) | Solver internals. Candidate selection, exclusion groups, conflict scores, lookup tables, optimizer, and builder. |
 | [ui/](ui/) | UI component tests with a mock DOM. Constraint input, and the solution playback controls. |
 | [e2e/](e2e/) | End-to-end tests. Solves full puzzle collections and checks solutions. Runs last. |
-| [helpers/](helpers/) | Test utilities (not tests). `test_runner.js` provides `runTest`/`logSuiteComplete`. `test_env.js` sets up globals. `grid_test_utils.js` provides grid/handler helpers. `scripted_step_solver.js` is a step solver whose results the test releases. |
+| [helpers/](helpers/) | Test utilities (not tests). `test_runner.js` provides `runTest`/`logSuiteComplete`. `test_env.js` sets up globals. `grid_test_utils.js` provides grid/handler helpers. `scripted_step_solver.js` is a step solver whose results the test releases. `mock_dom.js` is the fake DOM the ui/ tests share. |
 
 Developer CLIs (solve, verify, benchmark, profile, step-analysis, bisect, …) live
 in [`../tools/`](../tools/), not here. `tools.test.js` (a smoke test that drives

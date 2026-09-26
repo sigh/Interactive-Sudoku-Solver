@@ -3,70 +3,11 @@ import assert from 'node:assert/strict';
 import { ensureGlobalEnvironment } from '../helpers/test_env.js';
 import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 import { ScriptedStepSolver } from '../helpers/scripted_step_solver.js';
+import { makeFakeDocument } from '../helpers/mock_dom.js';
 
-// Just enough DOM for the playback controls. click() does nothing while the
-// element is disabled, as for a real button.
-class FakeElement {
-  constructor(tagName) {
-    this.tagName = tagName.toUpperCase();
-    this.children = [];
-    this.disabled = false;
-    this.title = '';
-    this.className = '';
-    this.onclick = null;
-    const classes = new Set();
-    this.classList = {
-      add: (c) => classes.add(c),
-      remove: (c) => classes.delete(c),
-      toggle: (c, force) => force ? classes.add(c) : classes.delete(c),
-      contains: (c) => classes.has(c),
-    };
-  }
-
-  get textContent() {
-    return this.children.map(c => c.textContent).join('');
-  }
-
-  set textContent(text) {
-    this.children = text ? [{ textContent: text }] : [];
-  }
-
-  appendChild(child) {
-    this.children.push(child);
-    return child;
-  }
-
-  replaceChildren(...nodes) {
-    this.children = nodes.map(n => typeof n === 'string' ? { textContent: n } : n);
-  }
-
-  click() {
-    if (!this.disabled) this.onclick?.();
-  }
-
-  links() {
-    const found = [];
-    const visit = (node) => {
-      if (node.tagName === 'A') found.push(node);
-      for (const child of node.children ?? []) visit(child);
-    };
-    visit(this);
-    return found;
-  }
-}
-
-const documentListeners = new Map();
 const frames = [];
 
-ensureGlobalEnvironment({
-  needWindow: true,
-  documentValue: {
-    createElement: (tag) => new FakeElement(tag),
-    createTextNode: (text) => ({ textContent: text }),
-    addEventListener: (type, fn) => documentListeners.set(type, fn),
-    activeElement: null,
-  },
-});
+ensureGlobalEnvironment({ needWindow: true, documentValue: makeFakeDocument() });
 globalThis.window.requestAnimationFrame = (cb) => frames.push(cb);
 
 const { SolutionController } = await import('../../js/solution_controller.js');
@@ -80,7 +21,7 @@ const runFrames = (n) => {
   }
 };
 
-const pressKey = (type, key) => documentListeners.get(type)({
+const pressKey = (type, key) => document.dispatch(type, {
   key, target: null, preventDefault() { },
 });
 
@@ -89,11 +30,11 @@ const pressKey = (type, key) => documentListeners.get(type)({
 const makeController = (solverRunner) => {
   const controller = Object.create(SolutionController.prototype);
   controller._elements = {
-    start: new FakeElement('button'),
-    back: new FakeElement('button'),
-    forward: new FakeElement('button'),
-    end: new FakeElement('button'),
-    iterationState: new FakeElement('div'),
+    start: document.createElement('button'),
+    back: document.createElement('button'),
+    forward: document.createElement('button'),
+    end: document.createElement('button'),
+    iterationState: document.createElement('div'),
   };
   // As in the constructor.
   controller._pauseIcon = document.createElement('span');
@@ -201,7 +142,7 @@ await runTest('value links select that value on the runner', () => {
   const iterationState = controller._elements.iterationState;
   assert.equal(iterationState.textContent, 'Step 1 {3,5} [Conflict]');
 
-  const links = iterationState.links();
+  const links = iterationState.descendants().filter(n => n.tagName === 'A');
   assert.deepEqual(links.map(a => a.textContent), ['3', '5']);
   links[1].click();
   assert.deepEqual(selected, [5]);

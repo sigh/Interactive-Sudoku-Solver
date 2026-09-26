@@ -360,6 +360,55 @@ await runTest('SolverProxy rejects concurrent calls until delayed result resolve
   assert.equal(worker.released, true);
 });
 
+await runTest('SolverProxy terminate during a call kills the worker and rejects the call', async () => {
+  const worker = new DelayedWorker();
+  const states = [];
+  const statusCalls = [];
+  const proxy = new SolverProxy(
+    worker,
+    state => states.push(state),
+    (isSolving, method) => statusCalls.push({ isSolving, method }),
+  );
+  proxy._initialized = true;
+
+  const call = proxy.countSolutions();
+  proxy.terminate();
+
+  // A worker mid-call can't be reused, so it is killed rather than released.
+  assert.equal(worker.terminated, true);
+  assert.equal(worker.released, false);
+  await assert.rejects(call, { name: 'AbortedError' });
+  assert.deepEqual(statusCalls.at(-1), { isSolving: false, method: 'terminate' });
+  assert.equal(proxy.isTerminated(), true);
+
+  // Nothing more from the worker reaches the handlers, and the proxy can't be
+  // used again.
+  worker.emit({ type: 'state', state: { done: true } });
+  assert.deepEqual(states, []);
+  await assert.rejects(() => proxy.countSolutions(), /terminated/);
+});
+
+await runTest('SolverProxy rejects with the worker exception, keeping its name', async () => {
+  const worker = new DelayedWorker();
+  const statusCalls = [];
+  const proxy = new SolverProxy(
+    worker, null, (isSolving, method) => statusCalls.push({ isSolving, method }));
+  proxy._initialized = true;
+
+  const call = proxy.nthStep(3, new Map());
+  worker.emit({
+    type: 'exception',
+    method: 'nthStep',
+    error: { name: 'InvalidConstraintError', message: 'bad cage', stack: 'at x' },
+  });
+
+  await assert.rejects(call, {
+    name: 'InvalidConstraintError', message: 'bad cage', workerMethod: 'nthStep',
+  });
+  assert.deepEqual(statusCalls.at(-1), { isSolving: false, method: 'nthStep' });
+  assert.equal(proxy._waiting, null, 'the proxy is free for the next call');
+});
+
 await runTest('SolverProxy forwards state and debug worker messages without a pending call', () => {
   const worker = new DelayedWorker();
   const states = [];

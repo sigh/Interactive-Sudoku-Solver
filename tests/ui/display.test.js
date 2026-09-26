@@ -2,29 +2,9 @@ import assert from 'node:assert/strict';
 
 import { ensureGlobalEnvironment } from '../helpers/test_env.js';
 import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
+import { FakeElement, makeFakeDocument } from '../helpers/mock_dom.js';
 
-// A recording SVG element, enough for the display code to build and query.
-const mockEl = (tag) => {
-  const attrs = {};
-  const children = [];
-  return {
-    tagName: tag,
-    attrs,
-    children,
-    setAttribute: (k, v) => { attrs[k] = v; },
-    getAttribute: (k) => (k in attrs ? attrs[k] : null),
-    append: (...c) => children.push(...c),
-    appendChild: (c) => { children.push(c); return c; },
-    replaceChildren: () => { children.length = 0; },
-    addEventListener: (type, fn) => { attrs['on' + type] = fn; },
-    textContent: '',
-  };
-};
-
-ensureGlobalEnvironment({
-  needWindow: true,
-  documentValue: { createElementNS: (_ns, tag) => mockEl(tag) },
-});
+ensureGlobalEnvironment({ needWindow: true, documentValue: makeFakeDocument() });
 
 const { GridDisplay, BorderDisplay, VarCellDisplay, YinYangShadingDisplay, CellPositioner } =
   await import('../../js/display.js');
@@ -33,7 +13,7 @@ const { CellGeometry } = await import('../../js/cell_geometry.js');
 const GRID_4x4 = CellGeometry.fromGridSize(4);
 
 await runTest('GridDisplay draws the cell lines in its style', () => {
-  const svg = mockEl('g');
+  const svg = new FakeElement('g');
   const display = new GridDisplay(svg);
   assert.equal(svg.getAttribute('stroke'), GridDisplay.STYLE['stroke']);
 
@@ -45,12 +25,12 @@ await runTest('GridDisplay draws the cell lines in its style', () => {
 });
 
 await runTest('BorderDisplay draws the border, with an optional fill', () => {
-  const svg = mockEl('g');
+  const svg = new FakeElement('g');
   new BorderDisplay(svg).reshape(GRID_4x4);
   assert.equal(svg.children[0].getAttribute('d'), 'M0,0h208v156h0v52h-208Z');
   assert.equal(svg.children[0].getAttribute('fill'), 'none');
 
-  const filled = mockEl('g');
+  const filled = new FakeElement('g');
   new BorderDisplay(filled, 'red').reshape(GRID_4x4);
   assert.equal(filled.children[0].getAttribute('fill'), 'red');
 });
@@ -62,7 +42,7 @@ const layoutEntry = (over = {}) => ({
 
 await runTest('VarCellDisplay renders groups lightly with a close button', () => {
   const removed = [];
-  const svg = mockEl('g');
+  const svg = new FakeElement('g');
   new VarCellDisplay(svg, (prefix) => removed.push(prefix)).render(
     [layoutEntry({ group: { prefix: 'VB', label: 'over', cells: [0, 1, 2] } })]);
 
@@ -76,7 +56,7 @@ await runTest('VarCellDisplay renders groups lightly with a close button', () =>
 
   // A count-only size shows the count; the close button removes the group.
   assert.equal(label.textContent, '$B [3]: over');
-  close.attrs.onclick();
+  close.dispatch('click');
   assert.deepEqual(removed, ['VB']);
 });
 
@@ -84,7 +64,7 @@ await runTest('YinYangShadingDisplay fills decided shaded grid cells', () => {
   const geometry = CellGeometry.fromShapeSpec('2x2~2~YinYang');
   const positioner = new CellPositioner();
   positioner.reshape(geometry);
-  const display = new YinYangShadingDisplay(mockEl('g'), positioner);
+  const display = new YinYangShadingDisplay(new FakeElement('g'), positioner);
   display.reshape(geometry);
 
   // Full fills for the decided shaded (1) cells, a half fill (closed
@@ -105,7 +85,7 @@ await runTest('YinYangShadingDisplay fills the YY overlay and its grid cells', (
   const positioner = new CellPositioner();
   positioner.reshape(geometry);
   positioner.setVarCellGroups(geometry.varCellGroups());
-  const display = new YinYangShadingDisplay(mockEl('g'), positioner);
+  const display = new YinYangShadingDisplay(new FakeElement('g'), positioner);
   display.reshape(geometry);
 
   // YY cells (indices 4-7) shade cells 0 and 3: each fills its grid cell too.

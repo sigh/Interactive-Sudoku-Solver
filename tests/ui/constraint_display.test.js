@@ -2,26 +2,9 @@ import assert from 'node:assert/strict';
 
 import { ensureGlobalEnvironment } from '../helpers/test_env.js';
 import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
+import { FakeElement, makeFakeDocument } from '../helpers/mock_dom.js';
 
-// A recording SVG element, enough for the display code to build and query.
-const mockEl = (tag) => {
-  const attrs = {};
-  const children = [];
-  return {
-    tagName: tag,
-    children,
-    setAttribute: (k, v) => { attrs[k] = v; },
-    getAttribute: (k) => (k in attrs ? attrs[k] : null),
-    append: (...c) => children.push(...c),
-    appendChild: (c) => { children.push(c); return c; },
-    classList: { add: () => { } },
-  };
-};
-
-ensureGlobalEnvironment({
-  needWindow: true,
-  documentValue: { createElementNS: (_ns, tag) => mockEl(tag) },
-});
+ensureGlobalEnvironment({ needWindow: true, documentValue: makeFakeDocument() });
 
 const { Chaos, CustomLine } = await import('../../js/constraint_display.js');
 const { CellGeometry } = await import('../../js/cell_geometry.js');
@@ -43,7 +26,7 @@ const cellPositioner = {
 };
 
 const makeDisplay = (geometry) => {
-  const display = new Chaos(mockEl('g'), cellPositioner);
+  const display = new Chaos(new FakeElement('g'), cellPositioner);
   display.reshape(geometry);
   return display;
 };
@@ -99,7 +82,7 @@ const linePaths = (el, out = []) => {
 // An NFA segment may be empty (its separator is still a symbol consumed by the
 // automaton); a zero-point group draws nothing rather than throwing.
 await runTest('CustomLine.makeIcon: an empty NFA segment draws nothing', () => {
-  const display = new CustomLine(mockEl('g'), cellPositioner);
+  const display = new CustomLine(new FakeElement('g'), cellPositioner);
   display.reshape(CellGeometry.fromGridSize(9));
   const constraint = new SudokuConstraint.NFA('ENC', 'n', [], ['R1C1', 'R1C2']);
 
