@@ -165,6 +165,18 @@ await runTest('parseGridLayout should parse double-digit values', () => {
   assert.deepEqual(r1c13.values, [16]);
 });
 
+await runTest('parseGridLayout should treat 0 as empty (not a given)', () => {
+  // 0 is the conventional empty-cell marker; it must not produce a Given.
+  const row = '0 1 0 0 0 0 0 0 0 \n';
+  const result = SudokuParser.parseGridLayout(row.repeat(9));
+
+  assert.ok(result);
+  assertShape(result, '9x9');
+  assertConstraintCount(result, 'Given', 9); // only the nine 1s
+  const givens = findConstraints(result, 'Given');
+  assert.ok(givens.every(g => g.values[0] !== 0), 'no Given should carry value 0');
+});
+
 await runTest('parseGridLayout should reject letters', () => {
   const input = ('1 2 3 4 5 6 7 8 . ').repeat(8) + '1 2 3 4 5 6 7 8 a';
   assert.equal(SudokuParser.parseGridLayout(input), null);

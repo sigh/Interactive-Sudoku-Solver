@@ -332,11 +332,16 @@ export class SudokuParser {
     const geometry = gridFromNumCells(numParts);
     if (!geometry) return null;
 
+    const minValue = geometry.minValue();
+    const maxValue = geometry.maxValue();
+
     let fixedValues = [];
     for (let i = 0; i < numParts; i++) {
       const value = parts[i][0];
       if (value === '.') continue;
-      fixedValues.push(geometry.makeValueId(i, value));
+      const numValue = parseInt(value, 10);
+      if (!(numValue >= minValue && numValue <= maxValue)) continue;
+      fixedValues.push(geometry.makeValueId(i, numValue));
     }
 
     return AstNode.makeRoot(
