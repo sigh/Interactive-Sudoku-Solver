@@ -1166,6 +1166,7 @@ export class SudokuBuilder {
 
         case 'And':
           yield* this._constraintHandlers(constraint.constraints, context);
+          break;
 
         case 'NoBoxes':
         case 'Shape':
