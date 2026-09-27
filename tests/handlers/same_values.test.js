@@ -6,6 +6,7 @@ import {
   GridTestContext,
   createCellExclusions,
   createAccumulator,
+  assertTouched,
   valueMask,
   applyCandidates,
 } from '../helpers/grid_test_utils.js';
@@ -59,8 +60,7 @@ await runTest('SameValues should enforce shared value intersection', () => {
   assert.equal(grid[1], valueMask(2, 3));
   assert.equal(grid[2], valueMask(2, 3));
   assert.equal(grid[3], valueMask(2));
-  assert.ok(acc.touched.has(0));
-  assert.ok(acc.touched.has(3));
+  assertTouched(acc, [0, 3]);
 });
 
 await runTest('SameValues should be idempotent when no changes are needed', () => {
@@ -83,7 +83,7 @@ await runTest('SameValues should be idempotent when no changes are needed', () =
   assert.equal(grid[1], valueMask(2, 3));
   assert.equal(grid[2], valueMask(2, 3));
   assert.equal(grid[3], valueMask(2, 3));
-  assert.equal(acc.touched.size, 0);
+  assertTouched(acc, []);
 });
 
 await runTest('SameValues should fail when intersection is too small', () => {
@@ -137,7 +137,7 @@ await runTest('SameValues should prune non-fixed values when counts exceed requi
 
   assert.equal(result, true);
   assert.equal(grid[3], valueMask(2));
-  assert.ok(acc.touched.has(3));
+  assertTouched(acc, [3]);
 });
 
 await runTest('SameValues should fix values when count matches required limit', () => {
@@ -157,7 +157,7 @@ await runTest('SameValues should fix values when count matches required limit', 
 
   assert.equal(result, true);
   assert.equal(grid[2], valueMask(1));
-  assert.ok(acc.touched.has(2));
+  assertTouched(acc, [2]);
 });
 
 await runTest('SameValues should fail when minTotals cannot fill the set', () => {
@@ -203,7 +203,7 @@ await runTest('SameValues should enforce intersection across three sets', () => 
   for (let i = 0; i < 6; i++) {
     assert.equal(grid[i], valueMask(2));
   }
-  assert.equal(acc.touched.size, 6);
+  assertTouched(acc, [0, 1, 2, 3, 4, 5]);
 });
 
 await runTest('SameValues should fail when intersection is smaller than max exclusion size for unique cells', () => {
@@ -245,7 +245,7 @@ await runTest('SameValues should allow intersection size equal to max exclusion 
   for (let i = 0; i < 4; i++) {
     assert.equal(grid[i], valueMask(2, 3));
   }
-  assert.equal(acc.touched.size, 0);
+  assertTouched(acc, []);
 });
 
 await runTest('SameValues should force values when counts are required', () => {
@@ -264,10 +264,10 @@ await runTest('SameValues should force values when counts are required', () => {
   const result = handler.enforceConsistency(grid, acc);
 
   assert.equal(result, true);
+  assert.equal(grid[1], valueMask(2));
   assert.equal(grid[2], valueMask(1));
   assert.equal(grid[3], valueMask(2));
-  assert.ok(acc.touched.has(2));
-  assert.ok(acc.touched.has(3));
+  assertTouched(acc, [1, 2, 3]);
 });
 
 await runTest('SameValues should short-circuit after all values are fixed', () => {
@@ -305,7 +305,7 @@ await runTest('SameValues should short-circuit after all values are fixed', () =
   const secondAcc = createAccumulator();
   const secondResult = handler.enforceConsistency(grid, secondAcc);
   assert.equal(secondResult, true);
-  assert.equal(secondAcc.touched.size, 0);
+  assertTouched(secondAcc, []);
 });
 
 await runTest('SameValues should be reusable across multiple calls', () => {

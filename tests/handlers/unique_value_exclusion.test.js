@@ -5,6 +5,7 @@ import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 import {
   GridTestContext,
   createAccumulator,
+  assertTouched,
   createCellExclusions,
   valueMask,
 } from '../helpers/grid_test_utils.js';
@@ -36,6 +37,7 @@ await runTest('UniqueValueExclusion should remove fixed value from exclusion nei
   assert.equal(grid[3] & valueMask(5), 0, 'cell 3 should not contain 5');
   // Cell 4 should be unchanged.
   assert.equal(grid[4], valueMask(1, 2, 3, 4, 5, 6, 7, 8, 9));
+  assertTouched(acc, [1, 2, 3]);
 });
 
 await runTest('UniqueValueExclusion should not prune when cell is not fixed', () => {

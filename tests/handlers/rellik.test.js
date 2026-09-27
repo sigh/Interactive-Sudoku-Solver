@@ -5,6 +5,7 @@ import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 import {
   GridTestContext,
   createAccumulator,
+  assertTouched,
   valueMask,
 } from '../helpers/grid_test_utils.js';
 
@@ -29,6 +30,7 @@ await runTest('Rellik should remove forbidden sum value from unfixed cells', () 
   // 2+3=5 (forbidden), so value 3 removed from unfixed cells.
   assert.equal(grid[1] & valueMask(3), 0, 'value 3 should be removed from cell 1');
   assert.equal(grid[2] & valueMask(3), 0, 'value 3 should be removed from cell 2');
+  assertTouched(acc, [1, 2]);
 });
 
 await runTest('Rellik should pass when no dangerous values exist', () => {

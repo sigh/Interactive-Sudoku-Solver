@@ -5,6 +5,7 @@ import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 import {
   GridTestContext,
   createAccumulator,
+  assertTouched,
   valueMask,
 } from '../helpers/grid_test_utils.js';
 
@@ -96,6 +97,7 @@ await runTest('HiddenSkyscraper should remove target from cells after first vali
   assert.equal(result, true);
   assert.equal(grid[2] & valueMask(2), 0, 'cell 2 should not contain 2 after first hidden found');
   assert.equal(grid[3] & valueMask(2), 0, 'cell 3 should not contain 2 after first hidden found');
+  assertTouched(acc, [2, 3]);
 });
 
 // =============================================================================

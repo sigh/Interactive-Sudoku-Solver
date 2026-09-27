@@ -6,6 +6,7 @@ import {
   GridTestContext,
   createCellExclusions,
   createAccumulator,
+  assertTouched,
   valueMask,
   applyCandidates,
 } from '../helpers/grid_test_utils.js';
@@ -141,7 +142,7 @@ await runTest('Sum removes required triple digits from the correct common peers'
   assert.equal(grid[9], valueMask(1, 6));
   assert.equal(arrows[1].enforceConsistency(grid, queue), true);
   assert.equal(grid[9], valueMask(6));
-  assert.ok(queue.touched.has(8) && queue.touched.has(9));
+  assertTouched(queue, [8, 9]);
 });
 
 await runTest('Sum excludes a required triple digit using only its possible locations', () => {
@@ -156,7 +157,7 @@ await runTest('Sum excludes a required triple digit using only its possible loca
   const queue = createAccumulator();
   assert.equal(handler.enforceConsistency(grid, queue), true);
   assert.equal(grid[3], valueMask(6));
-  assert.ok(queue.touched.has(3));
+  assertTouched(queue, [3]);
 });
 
 await runTest('Sum does not remove peer candidates using reflected pair values', () => {
@@ -173,7 +174,7 @@ await runTest('Sum does not remove peer candidates using reflected pair values',
   assert.equal(grid[0], valueMask(1, 4));
   assert.equal(grid[1], valueMask(6, 9), 'restore original values');
   assert.equal(grid[2], valueMask(1, 4, 5), 'keep valid peer candidates');
-  assert.equal(queue.touched.size, 0);
+  assertTouched(queue, []);
 });
 
 await runTest('Sum required triple digits apply to ordinary cages but require distinct cells', () => {

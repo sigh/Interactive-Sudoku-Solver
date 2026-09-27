@@ -4,6 +4,7 @@ import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 import {
   GridTestContext,
   createAccumulator,
+  assertTouched,
   createCellExclusions,
   valueMask,
   valueMask0,
@@ -52,6 +53,7 @@ await runTest('fixed counted cells determine the exact distinct count', () => {
   assert.equal(handler.enforceConsistency(grid, acc), true);
   // Distinct values = {1, 2} → control must be 2.
   assert.equal(grid[0], valueMask(2));
+  assertTouched(acc, [0]);
 });
 
 await runTest('disjoint candidate masks raise the minimum distinct count', () => {

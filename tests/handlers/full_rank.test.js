@@ -9,6 +9,7 @@ const { SimpleSolver } = await import('../../js/sandbox/simple_solver.js' + self
 import {
   GridTestContext,
   createAccumulator,
+  assertTouched,
   valueMask,
 } from '../helpers/grid_test_utils.js';
 
@@ -161,7 +162,7 @@ await runTest('FullRank enforceConsistency should prune based on clued rank orde
 
   // Ordering should prune Row0[1] down to value 2.
   assert.equal(grid[1], valueMask(2));
-  assert.equal(acc.touched.has(1), true);
+  assertTouched(acc, [1]);
 });
 
 await runTest('FullRank enforceConsistency should reject forced tie between consecutive clued ranks', () => {

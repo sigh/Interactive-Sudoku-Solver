@@ -5,6 +5,7 @@ import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 import {
   GridTestContext,
   createAccumulator,
+  assertTouched,
   createCellExclusions,
   valueMask,
 } from '../helpers/grid_test_utils.js';
@@ -90,20 +91,20 @@ await runTest('not-equal: should prune same values from both cells', () => {
 await runTest('not-equal: should prune when one cell is fixed', () => {
   const context = new GridTestContext({ gridSize: [1, 4] });
   const key = binaryKey((a, b) => a !== b, 4);
-  const handler = new BinaryConstraint(0, 1, key);
+  const handler = new BinaryConstraint(2, 3, key);
   context.initializeHandler(handler);
 
   const grid = context.grid;
-  grid[0] = valueMask(2);  // Fixed to 2
-  grid[1] = valueMask(1, 2, 3);
+  grid[2] = valueMask(2);  // Fixed to 2
+  grid[3] = valueMask(1, 2, 3);
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
 
   assert.equal(result, true);
-  assert.equal(grid[0], valueMask(2));
-  assert.equal(grid[1], valueMask(1, 3), 'should remove 2 from cell 1');
-  assert.ok(acc.touched.has(1));
+  assert.equal(grid[2], valueMask(2));
+  assert.equal(grid[3], valueMask(1, 3), 'should remove 2 from cell 3');
+  assertTouched(acc, [3]);
 });
 
 await runTest('not-equal: should fail when both cells forced to same value', () => {
@@ -142,7 +143,7 @@ await runTest('less-than: should prune high values from first cell', () => {
   assert.equal(result, true);
   assert.equal(grid[0], valueMask(1, 2), 'only 1 and 2 are less than 3');
   assert.equal(grid[1], valueMask(3));
-  assert.ok(acc.touched.has(0));
+  assertTouched(acc, [0]);
 });
 
 await runTest('less-than: should prune low values from second cell', () => {
@@ -161,7 +162,7 @@ await runTest('less-than: should prune low values from second cell', () => {
   assert.equal(result, true);
   assert.equal(grid[0], valueMask(2));
   assert.equal(grid[1], valueMask(3, 4), 'only 3 and 4 are greater than 2');
-  assert.ok(acc.touched.has(1));
+  assertTouched(acc, [1]);
 });
 
 await runTest('less-than: should prune both cells', () => {
@@ -221,8 +222,7 @@ await runTest('equals: should intersect candidates', () => {
   assert.equal(result, true);
   assert.equal(grid[0], valueMask(2, 3), 'intersection of {1,2,3} and {2,3,4}');
   assert.equal(grid[1], valueMask(2, 3));
-  assert.ok(acc.touched.has(0));
-  assert.ok(acc.touched.has(1));
+  assertTouched(acc, [0, 1]);
 });
 
 await runTest('equals: should fail when no common values', () => {
@@ -297,7 +297,7 @@ await runTest('should not report cells when values unchanged', () => {
   const result = handler.enforceConsistency(grid, acc);
 
   assert.equal(result, true);
-  assert.equal(acc.touched.size, 0, 'no cells should be touched');
+  assertTouched(acc, []);
 });
 
 await runTest('should report only changed cells', () => {
@@ -313,7 +313,7 @@ await runTest('should report only changed cells', () => {
 
   handler.enforceConsistency(grid, acc);
 
-  assert.deepEqual([...acc.touched], [1], 'only cell 1 should be touched');
+  assertTouched(acc, [1]);
 });
 
 // =============================================================================
@@ -366,8 +366,7 @@ await runTest('should work with non-contiguous cell indices', () => {
 
   assert.equal(result, true);
   assert.equal(grid[5], valueMask(1), 'only 1 is less than 2');
-  assert.ok(acc.touched.has(5));
-  assert.ok(!acc.touched.has(15));
+  assertTouched(acc, [5]);
 });
 
 // =============================================================================
@@ -441,7 +440,7 @@ await runTest('required values: should remove required values from pair exclusio
   assert.equal(grid[0], valueMask(1, 2));
   assert.equal(grid[1], valueMask(1, 2));
   assert.equal(grid[2], valueMask(3), 'values required in (0,1) should be excluded from cell 2');
-  assert.ok(acc.touched.has(2), 'exclusion cell should be marked touched');
+  assertTouched(acc, [2]);
 });
 
 await runTest('required values: should not run required-value exclusions for transitive key (a === b)', () => {
@@ -469,7 +468,7 @@ await runTest('required values: should not run required-value exclusions for tra
 
   assert.equal(result, true);
   assert.equal(grid[2], valueMask(1, 2, 3), 'transitive keys should skip required-value exclusions');
-  assert.equal(acc.touched.size, 0, 'no cells should be touched');
+  assertTouched(acc, []);
 });
 
 // =============================================================================

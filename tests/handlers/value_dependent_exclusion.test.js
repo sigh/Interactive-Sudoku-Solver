@@ -5,6 +5,7 @@ import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 import {
   GridTestContext,
   createAccumulator,
+  assertTouched,
   createCellExclusions,
   valueMask,
 } from '../helpers/grid_test_utils.js';
@@ -36,6 +37,7 @@ await runTest('ValueDependentExclusion should remove fixed value from mapped nei
   assert.equal(grid[1] & valueMask(2), 0, 'cell 1 should not have value 2');
   assert.equal(grid[2] & valueMask(2), 0, 'cell 2 should not have value 2');
   assert.ok(grid[3] & valueMask(2), 'cell 3 should still have value 2');
+  assertTouched(acc, [1, 2]);
 });
 
 await runTest('ValueDependentExclusion should fail when removal empties a neighbor', () => {
@@ -138,7 +140,7 @@ await runTest('ValueDependentExclusion excludes a mapped cell at index > 255', (
   const acc = createAccumulator();
   assert.equal(handler.enforceConsistency(grid, acc), true);
   assert.equal(grid[300], valueMask(3), 'value 2 removed from the high-index cell');
-  assert.ok(acc.touched.has(300), 'the high-index cell is reported as touched');
+  assertTouched(acc, [300]);
 });
 
 logSuiteComplete('value_dependent_exclusion.test.js');

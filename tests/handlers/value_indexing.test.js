@@ -5,6 +5,7 @@ import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 import {
   GridTestContext,
   createAccumulator,
+  assertTouched,
   valueMask,
 } from '../helpers/grid_test_utils.js';
 
@@ -99,7 +100,7 @@ await runTest('ValueIndexing should prune control cell based on value compatibil
   assert.equal(result, true);
   // Only indexed[1] (control=2) can have value 3
   assert.equal(grid[1], valueMask(2), 'control should only be 2');
-  assert.ok(acc.touched.has(1));
+  assertTouched(acc, [1]);
 });
 
 await runTest('ValueIndexing should constrain indexed cell when control is fixed', () => {

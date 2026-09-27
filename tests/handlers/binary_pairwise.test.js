@@ -27,6 +27,7 @@ await runTest('prefix suffix prunes values', () => {
   // Cell 1 and cell 2 should lose value 1.
   assert.equal(grid[1] & valueMask(1), 0);
   assert.equal(grid[2] & valueMask(1), 0);
+  assertTouched(acc, [1, 2]);
 });
 
 await runTest('notifies grid cells changed by the pairwise pass', () => {
@@ -52,6 +53,7 @@ await runTest('all different filters combinations', () => {
   assert.equal(handler.enforceConsistency(grid, acc), true);
   // With 3 cells and 3 values all-different, all values remain.
   assert.equal(grid[0], valueMask(1, 2, 3));
+  assertTouched(acc, []);
 });
 
 await runTest('fail when no valid assignment', () => {

@@ -4,6 +4,7 @@ import { ensureGlobalEnvironment } from '../helpers/test_env.js';
 import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 import {
   createAccumulator,
+  assertTouched,
   createCellExclusions,
   createStateAllocator,
   valueMask,
@@ -301,8 +302,10 @@ await runTest('ChaosCount prunes control candidates to feasible match counts', (
   grid[regionCells[1]] = valueMask(2);
   grid[regionCells[2]] = valueMask(3);
 
-  assert.equal(handler.enforceConsistency(grid, createAccumulator()), true);
+  const acc = createAccumulator();
+  assert.equal(handler.enforceConsistency(grid, acc), true);
   assert.equal(grid[0], valueMask(2));
+  assertTouched(acc, [0]);
 });
 
 const makeEnclosedCount = (geometry, runCells) => {
@@ -845,7 +848,7 @@ await runTest('ChaosFixedValueRegionExclusion removes fixed pair region from mat
 
   assert.equal(handler.enforceConsistency(grid, acc), true);
   assert.equal(grid[regionCells[1]], valueMask(2));
-  assert.deepEqual([...acc.touched], [regionCells[1]]);
+  assertTouched(acc, [regionCells[1]]);
 });
 
 await runTest('ChaosFixedValueRegionExclusion removes fixed pair value from matching regions', () => {
@@ -863,7 +866,7 @@ await runTest('ChaosFixedValueRegionExclusion removes fixed pair value from matc
 
   assert.equal(handler.enforceConsistency(grid, acc), true);
   assert.equal(grid[1], valueMask(2));
-  assert.deepEqual([...acc.touched], [1]);
+  assertTouched(acc, [1]);
 });
 
 await runTest('ChaosFixedValueRegionExclusion rejects duplicate fixed pairs', () => {

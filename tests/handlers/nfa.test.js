@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 
 import { ensureGlobalEnvironment } from '../helpers/test_env.js';
 import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
-import { createAccumulator, valueMask } from '../helpers/grid_test_utils.js';
+import { createAccumulator, assertTouched, valueMask } from '../helpers/grid_test_utils.js';
 
 ensureGlobalEnvironment();
 
@@ -116,17 +116,17 @@ await runTest('compressNFA should use compact transition entry format', () => {
 await runTest('NFAConstraint should prune cells to supported values', () => {
   const nfa = regexToNFA('12', 4);
   const cnfa = compressNFA(nfa);
-  const handler = new NFAConstraint([[0, 1]], cnfa);
+  const handler = new NFAConstraint([[4, 7]], cnfa);
 
   const allValues = valueMask(1, 2, 3, 4);
-  const grid = [allValues, allValues];
+  const grid = Array(8).fill(allValues);
   const accumulator = createAccumulator();
 
   const result = handler.enforceConsistency(grid, accumulator);
   assert.equal(result, true);
-  assert.equal(grid[0], valueMask(1), 'first cell forced to 1');
-  assert.equal(grid[1], valueMask(2), 'second cell forced to 2');
-  assert.deepEqual([...accumulator.touched].sort((a, b) => a - b), [0, 1]);
+  assert.equal(grid[4], valueMask(1), 'first cell forced to 1');
+  assert.equal(grid[7], valueMask(2), 'second cell forced to 2');
+  assertTouched(accumulator, [4, 7]);
 });
 
 await runTest('NFAConstraint should return false when no valid path exists', () => {
@@ -155,7 +155,7 @@ await runTest('NFAConstraint should not touch cells already at supported values'
 
   const result = handler.enforceConsistency(grid, accumulator);
   assert.equal(result, true);
-  assert.equal(accumulator.touched.size, 0, 'no cells should be touched');
+  assertTouched(accumulator, []);
 });
 
 await runTest('NFAConstraint should report only changed cells', () => {
@@ -169,7 +169,7 @@ await runTest('NFAConstraint should report only changed cells', () => {
   const accumulator = createAccumulator();
 
   handler.enforceConsistency(grid, accumulator);
-  assert.deepEqual([...accumulator.touched], [1], 'only second cell reported');
+  assertTouched(accumulator, [1]);
 });
 
 // =============================================================================

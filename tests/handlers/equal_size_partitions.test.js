@@ -5,6 +5,7 @@ import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 import {
   GridTestContext,
   createAccumulator,
+  assertTouched,
   valueMask,
 } from '../helpers/grid_test_utils.js';
 
@@ -45,6 +46,7 @@ await runTest('EqualSizePartitions should force remaining cells when one partiti
   assert.equal(result, true);
   assert.equal(grid[2], valueMask(3, 4));
   assert.equal(grid[3], valueMask(3, 4));
+  assertTouched(acc, [2, 3]);
 });
 
 await runTest('EqualSizePartitions should pass when both partitions satisfied', () => {

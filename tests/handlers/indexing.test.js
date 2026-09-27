@@ -5,6 +5,7 @@ import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 import {
   GridTestContext,
   createAccumulator,
+  assertTouched,
   valueMask,
   valueMask0,
 } from '../helpers/grid_test_utils.js';
@@ -109,7 +110,7 @@ await runTest('Indexing should prune control cell when indexed cell cannot have 
   assert.equal(result, true);
   // Only indexed[1] (control=2) and indexed[3] (control=4) can have 3
   assert.equal(grid[0], valueMask(2, 4), 'control should only allow 2 and 4');
-  assert.ok(acc.touched.has(0));
+  assertTouched(acc, [0]);
 });
 
 await runTest('Indexing should remove indexed value from cells that cannot be selected', () => {
