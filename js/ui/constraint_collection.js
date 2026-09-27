@@ -5,7 +5,7 @@ const {
   arraysAreEqual,
   MultiMap,
 } = await import('../util.js' + self.VERSION_PARAM);
-const { SudokuConstraint, CompositeConstraintBase } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
+const { SudokuConstraint } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
 const { DisplayItem } = await import('./display.js' + self.VERSION_PARAM);
 
 class ConstraintCollectionBase {
@@ -16,6 +16,9 @@ class ConstraintCollectionBase {
 
   getConstraintsByKey(key) { return []; }
   getConstraintsByType(type) { return []; }
+
+  // The collection which constraints of `constraintClass` are added to.
+  collectionFor(constraintClass) { return this; }
 
   setShape(geometry) { throw Error('Not implemented'); }
 
@@ -41,12 +44,16 @@ export class SelectedConstraintCollection extends ConstraintCollectionBase {
     return this._currentCollection !== this._rootCollection;
   }
 
-  addConstraint(constraint) {
-    if (this.isSelected() && CompositeConstraintBase.allowedConstraintClass(constraint.constructor)) {
-      this._currentCollection.addConstraint(constraint);
-    } else {
-      this._rootCollection.addConstraint(constraint);
+  collectionFor(constraintClass) {
+    if (this.isSelected() &&
+      this._currentCollection.allowsConstraintClass(constraintClass)) {
+      return this._currentCollection;
     }
+    return this._rootCollection;
+  }
+
+  addConstraint(constraint) {
+    this.collectionFor(constraint.constructor).addConstraint(constraint);
   }
 
   removeConstraint(constraint) {
@@ -313,6 +320,15 @@ export class CompositeConstraintCollection extends ConstraintCollectionBase {
         c, chip, this);
     }
     return constraintState;
+  }
+
+  allowsConstraintClass(constraintClass) {
+    return this._parentConstraint.constructor.allowedConstraintClass(
+      constraintClass);
+  }
+
+  getConstraintsByKey(key) {
+    return this._uniquenessKeySet.getKey(key);
   }
 
   addConstraint(c) {
@@ -597,6 +613,9 @@ export class ConstraintHighlighter {
   }
 
   _drawConstraint(constraint) {
+    // Nested (or empty) composites are safe here: they render via
+    // BorderedRegion over their recursive getCells(), which is the same path
+    // makeIcon already exercises when their chip is created.
     const item = this._display.drawConstraint(constraint);
     item.classList.add(this._cssClass);
     return item;

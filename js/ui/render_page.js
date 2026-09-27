@@ -636,6 +636,8 @@ export class ConstraintManager {
     const constraints = [];
     constraint.forEachTopLevel(c => constraints.push(c));
     this._rootCollection.addConstraints(constraints);
+    // Adding an empty composite selects it; that's only wanted for user adds.
+    this._constraintSelector.clear();
 
     this.runUpdateCallback();
 

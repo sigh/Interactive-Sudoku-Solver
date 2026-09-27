@@ -373,13 +373,16 @@ export class GridInputManager {
     };
 
     const updateActiveCellValue = (value) => {
-      const cell = getActiveCell();
-      if (!cell) return;
-
+      // Clearing applies to every selected cell; typing needs a single cell.
       if (value === '') {
-        this._runCallbacks(this._callbacks.onNewDigit, cell, null);
+        for (const cell of this._selection.getCells()) {
+          this._runCallbacks(this._callbacks.onNewDigit, cell, null);
+        }
         return;
       }
+
+      const cell = getActiveCell();
+      if (!cell) return;
 
       const digit = parseInt(value);
       if (!Number.isNaN(digit)) {

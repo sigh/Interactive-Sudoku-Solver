@@ -156,6 +156,12 @@ await runTest('regex count quantifier error on invalid syntax', () => {
   assert.throws(() => regexToNFA('1{3,2}', 9), /max.*<.*min/i, 'max < min should throw');
   assert.throws(() => regexToNFA('1{', 9), /Expected number/, 'unclosed brace should throw');
   assert.throws(() => regexToNFA('1{}', 9), /Expected number/, 'empty braces should throw');
+  assert.throws(() => regexToNFA('1{2,x}', 9), /Expected number or '}'/, 'non-numeric max should throw');
+});
+
+await runTest('regex character range error on invalid syntax', () => {
+  assert.throws(() => regexToNFA('[1-', 16), /Unterminated character range/);
+  assert.throws(() => regexToNFA('[1-]', 16), /Unterminated character range/);
 });
 
 await runTest('NFA serialization should round-trip plain format', () => {

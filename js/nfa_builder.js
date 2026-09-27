@@ -1235,8 +1235,9 @@ export class RegexParser {
     let max = min;
     if (this._peek() === ',') {
       this._next();
-      max = this._peek() === '}' ? null : this._parseNumber();
-      if (max === undefined) {
+      const isUnbounded = this._peek() === '}';
+      max = isUnbounded ? null : this._parseNumber();
+      if (max === null && !isUnbounded) {
         throw new Error(`Expected number or '}' after ',' at position ${this.pos}`);
       }
       if (max !== null && max < min) {
@@ -1298,6 +1299,9 @@ export class RegexParser {
       if (this._peek() === '-') {
         this._next();
         const end = this._next();
+        if (end === undefined || end === ']') {
+          throw new Error('Unterminated character range in class');
+        }
         const startCode = start.charCodeAt(0);
         const endCode = end.charCodeAt(0);
         if (endCode < startCode) {

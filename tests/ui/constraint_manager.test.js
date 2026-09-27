@@ -208,6 +208,17 @@ await runTest('a new composite is selected, so new constraints go into it', () =
   assert.equal(page.puzzle(), '.Shape~4x4.Or.Cage~3~R1C1~R1C2.End');
 });
 
+await runTest('loading a puzzle with empty composites selects none of them', () => {
+  const page = makeManager();
+  page.load('.Shape~4x4.And.End.Or.And.End.End');
+  assert.equal(document.querySelector('.selected-constraint'), null);
+  assert.ok(!page.byId('constraint-panel-container')
+    .classList.contains('composite-constraint-selected'));
+
+  page.addLinesAndSets('Cage', ['R1C1', 'R1C2'], '3');
+  assert.equal(page.puzzle(), '.Shape~4x4.And.End.Or.And.End.End.Cage~3~R1C1~R1C2');
+});
+
 await runTest("a pairwise chip's action shows its function for editing", () => {
   const page = makeManager();
   page.load('.Pair~8H_xf8H_xf8H_B~_a~R1C1~R1C2');

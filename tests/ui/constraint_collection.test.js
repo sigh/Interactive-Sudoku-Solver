@@ -298,6 +298,35 @@ await runTest('while a composite is selected, what it can hold is added to it', 
   assert.equal(page.strings().at(-1), '.Cage~5~R7C7~R7C8');
 });
 
+await runTest("a selected composite's own allow-list decides what it holds", () => {
+  const page = makePage();
+  const [replicate] = parse('.Replicate~AwDiQEiwD.SameValues~2~R1C1~R3C3.End');
+  page.root.addConstraint(replicate);
+  page.chips('composite')[0].querySelector(':scope > .chip-label').click();
+
+  // Outside clues are allowed in composites generally, but not in Replicate.
+  const clue = new SudokuConstraint.LittleKiller('R1C1', 5);
+  page.selected.addConstraint(clue);
+  assert.equal(replicate.constraints.length, 1);
+  assert.equal(page.strings().at(-1), String(clue));
+});
+
+await runTest('while a composite is selected, its constraints are looked up in it', () => {
+  const page = makePage();
+  page.root.addConstraints(parse('.~R1C1_5.And.~R1C1_3.End'));
+  const [and] = page.root.getConstraintsByType('And');
+  page.chips('composite')[0].querySelector(':scope > .chip-label').click();
+
+  const givens = page.selected.collectionFor(SudokuConstraint.Given);
+  assert.deepEqual(givens.getConstraintsByKey('R1C1').map(String), ['.~R1C1_3']);
+  givens.removeConstraint(givens.getConstraintsByKey('R1C1')[0]);
+  assert.equal(and.constraints.length, 0);
+  assert.deepEqual(page.root.getConstraintsByKey('R1C1').map(String), ['.~R1C1_5']);
+
+  // Classes the composite can't hold still resolve to the root.
+  assert.equal(page.selected.collectionFor(SudokuConstraint.Windoku), page.root);
+});
+
 // ============================================================================
 // Chips
 // ============================================================================

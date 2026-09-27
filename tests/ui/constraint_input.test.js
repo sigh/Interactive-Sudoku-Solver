@@ -89,6 +89,7 @@ const makeCollection = (geometry, updateListeners) => ({
   getConstraintsByType(type) {
     return this.constraints.filter(c => c.type === type);
   },
+  collectionFor() { return this; },
   setShape(geometry) {
     this.shaped = this.geometry = geometry;
     for (const input of this.inputs.values()) input.reshape(geometry);

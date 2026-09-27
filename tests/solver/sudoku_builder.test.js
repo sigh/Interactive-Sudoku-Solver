@@ -944,7 +944,10 @@ await runTest('Replicate throws when shifted cell is out of bounds', () => {
   const constraint = new SudokuConstraint.Container([
     new SudokuConstraint.Replicate([new SudokuConstraint.Given('R3C3', 5)], bitset),
   ]);
-  assert.throws(() => buildHandlers(constraint), { message: /out of bounds/ });
+  assert.throws(() => buildHandlers(constraint), {
+    name: 'InvalidConstraintError',
+    message: 'Replicate: R3C3 is out of bounds when shifted to target R8C8.',
+  });
 });
 
 await runTest('Replicate throws when a target is in a different subgraph', () => {
@@ -960,7 +963,7 @@ await runTest('Replicate throws when a target is in a different subgraph', () =>
     new SudokuConstraint.Var('X', 'X', 2),
     new SudokuConstraint.Replicate([new SudokuConstraint.Given('R1C1', 5)], bitset),
   ]);
-  assert.throws(() => buildHandlers(constraint), { message: /same/ });
+  assert.throws(() => buildHandlers(constraint), { name: 'InvalidConstraintError', message: /same/ });
 });
 
 await runTest('Replicate throws when a child constraint cell is in a different subgraph', () => {
@@ -971,7 +974,7 @@ await runTest('Replicate throws when a child constraint cell is in a different s
     new SudokuConstraint.Var('X', 'X', 2),
     new SudokuConstraint.Replicate([new SudokuConstraint.Given('VX1', 5)], bitset),
   ]);
-  assert.throws(() => buildHandlers(constraint), { message: /same/ });
+  assert.throws(() => buildHandlers(constraint), { name: 'InvalidConstraintError', message: /same/ });
 });
 
 await runTest('Replicate works with var cells in the same subgraph', () => {

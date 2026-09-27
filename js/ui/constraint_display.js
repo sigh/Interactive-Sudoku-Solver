@@ -560,16 +560,16 @@ export class CustomLine extends GenericLine {
   }
 
   makeIcon(constraint, options) {
-    return this._makeItem(constraint, options);
+    return this._makeItem(constraint, options, true);
   }
 
   drawItem(constraint, options) {
-    const item = this._makeItem(constraint, options);
+    const item = this._makeItem(constraint, options, false);
     this._svg.append(item);
     return item;
   }
 
-  _makeItem(constraint, options) {
+  _makeItem(constraint, options, isIcon) {
     const groups = options.splitFn
       ? options.splitFn(constraint)
       : [constraint.cells];
@@ -595,7 +595,10 @@ export class CustomLine extends GenericLine {
       }
     }
 
-    this._colorPicker.addItem(elem, color, colorKey);
+    // Icons are never passed to removeItem, so register them under the
+    // colorKey itself rather than the element. This keeps the color reserved
+    // without accumulating an entry per icon.
+    this._colorPicker.addItem(isIcon ? colorKey : elem, color, colorKey);
 
     return elem;
   }

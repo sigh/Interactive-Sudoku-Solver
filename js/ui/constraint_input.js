@@ -1110,8 +1110,14 @@ ConstraintCategoryInput.GivenCandidates = class GivenCandidates extends Constrai
       (cell) => this._getCellValues(cell));
   }
 
+  // Givens go into the selected composite if there is one, so they must also
+  // be read and removed there.
+  _targetCollection() {
+    return this.collection.collectionFor(SudokuConstraint.Given);
+  }
+
   _getCellConstraints(cell) {
-    return this.collection.getConstraintsByKey(cell).filter(
+    return this._targetCollection().getConstraintsByKey(cell).filter(
       c => c.constructor.CATEGORY === this.constructor.name);
   }
 
@@ -1155,7 +1161,7 @@ ConstraintCategoryInput.GivenCandidates = class GivenCandidates extends Constrai
           new SudokuConstraint.Given(cell, ...values));
       } else {
         for (const c of this._getCellConstraints(cell)) {
-          this.collection.removeConstraint(c);
+          this._targetCollection().removeConstraint(c);
         }
       }
     }
@@ -1377,10 +1383,11 @@ ConstraintCategoryInput.OutsideClue = class OutsideClue extends ConstraintCatego
       let formData = new FormData(outsideClueForm);
       const arrowId = formData.get('id');
       const type = formData.get('type');
-      const constraints = this.collection.getConstraintsByKey(arrowId).filter(
+      const collection = this._targetCollection();
+      const constraints = collection.getConstraintsByKey(arrowId).filter(
         c => c.type === type);
       for (const constraint of constraints) {
-        this.collection.removeConstraint(constraint);
+        collection.removeConstraint(constraint);
       }
       inputManager.setSelection([]);
     };
@@ -1411,6 +1418,14 @@ ConstraintCategoryInput.OutsideClue = class OutsideClue extends ConstraintCatego
     document.getElementById('outside-arrow-clear').onclick = clearOutsideClue;
   }
 
+  // Clues go into the selected composite if it allows them, so they must also
+  // be read and removed there. All clue types share a category, so any one
+  // decides this.
+  _targetCollection() {
+    return this.collection.collectionFor(
+      this.constructor.constraintClasses()[0]);
+  }
+
   _handleOutsideArrowSelection(arrowId) {
     const form = this._outsideClueForm;
     if (arrowId === null) {
@@ -1433,7 +1448,7 @@ ConstraintCategoryInput.OutsideClue = class OutsideClue extends ConstraintCatego
     }
 
     // Find all existing constraints for this arrow.
-    const constraintsForArrow = this.collection.getConstraintsByKey(arrowId).filter(
+    const constraintsForArrow = this._targetCollection().getConstraintsByKey(arrowId).filter(
       c => c.constructor.CATEGORY === this.constructor.name);
 
     // Ensure that the selected type is valid for this arrow.

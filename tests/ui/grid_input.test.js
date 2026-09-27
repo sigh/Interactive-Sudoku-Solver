@@ -190,9 +190,12 @@ await runTest('a digit typed goes to the selected cell, when there is one', () =
   assert.deepEqual(digits, [['R1C1', 5], ['R1C1', null]]);
   assert.equal(fakeInput.value, 'x', 'a backspace can still be seen');
 
+  // A digit needs a single cell, but a backspace clears every selected cell.
   drag(['R1C1', 'R1C2']);
   type('5');
   assert.equal(digits.length, 2);
+  type('');
+  assert.deepEqual(digits.slice(2), [['R1C1', null], ['R1C2', null]]);
 });
 
 await runTest('arrow keys move the selected cell, wrapping around', () => {

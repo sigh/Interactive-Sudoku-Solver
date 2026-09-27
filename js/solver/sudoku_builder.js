@@ -1140,19 +1140,23 @@ export class SudokuBuilder {
 
             for (const targetCell of targets) {
               if (graph.cellPosition(targetCell)[2] !== originSubgraph) {
-                throw new Error('All Replicate cells must be in the same cell group.');
+                throw new InvalidConstraintError('All Replicate cells must be in the same cell group.');
               }
               const shiftFn = cellId => {
                 const cell = geometry.parseCellId(cellId).cellIndex;
                 const cellPos = graph.cellPosition(cell);
                 if (cellPos[2] !== originSubgraph) {
-                  throw new Error('All Replicate constraints must be in the same cell group.');
+                  throw new InvalidConstraintError('All Replicate constraints must be in the same cell group.');
                 }
                 const newCell = graph.traverse(
                   targetCell,
                   cellPos[0] - originPos[0],
                   cellPos[1] - originPos[1]);
-                if (newCell === null) throw new Error('Shifted cell is out of bounds.');
+                if (newCell === null) {
+                  throw new InvalidConstraintError(
+                    `Replicate: ${cellId} is out of bounds when shifted to target ` +
+                    `${geometry.makeCellIdFromIndex(targetCell)}.`);
+                }
                 return geometry.makeCellIdFromIndex(newCell);
               };
               {
