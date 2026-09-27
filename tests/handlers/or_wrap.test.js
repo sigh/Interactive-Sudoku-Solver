@@ -70,7 +70,7 @@ for (const [name, scenario] of Object.entries(SCENARIOS)) {
     });
   }
 
-  await runTest(`${name} Or-wrap leaks no foreign state (liveDecoy)`, () => {
+  await runTest(`${name} Or-wrap leaks no non-persisted state (liveDecoy)`, () => {
     assertOrWrapNoStateLeak(scenario.leakScenario ?? scenario);
   });
 }

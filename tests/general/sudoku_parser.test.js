@@ -226,15 +226,28 @@ await runTest('parseShortKillerFormat should reject pointers across a row edge',
     /outside the grid at R1C9/);
 });
 
-await runTest('parseShortKillerFormat should follow diagonal pointers', () => {
-  // R2C2 '`' -> R1C1, R2C3 ',' -> R3C2, R3C2 '<' -> R3C1.
-  const text = ('A' + '5'.repeat(8)) + ('5' + '`' + ',' + '5'.repeat(6))
-    + ('B' + '<' + '5'.repeat(7)) + '5'.repeat(54);
+await runTest('parseShortKillerFormat should follow all eight pointer directions', () => {
+  // Every neighbour of R2C2 points at it, forming one 3x3 cage.
+  const text = '.v,' + '5'.repeat(6)
+    + '>A<' + '5'.repeat(6)
+    + '\'^`' + '5'.repeat(6)
+    + '5'.repeat(54);
   const cages = findConstraints(SudokuParser.parseShortKillerFormat(text), 'Cage');
 
-  assert.deepEqual(cages.find(c => c.sum === 10).cells.sort(), ['R1C1', 'R2C2']);
-  assert.deepEqual(cages.find(c => c.sum === 11).cells.sort(), ['R2C3', 'R3C1', 'R3C2']);
+  const cage = cages.find(c => c.sum === 10);
+  assert.deepEqual(cage.cells.sort(), [
+    'R1C1', 'R1C2', 'R1C3', 'R2C1', 'R2C2', 'R2C3', 'R3C1', 'R3C2', 'R3C3']);
   assert.equal(cages.reduce((n, c) => n + c.cells.length, 0), 81);
+});
+
+await runTest('parseShortKillerFormat should accept a chain longer than a row', () => {
+  // R1C9 -> ... -> R1C1 is 8 steps; R3C9 '^' -> R2C9 '^' -> R1C9 adds 2 more.
+  const text = 'A' + '<'.repeat(8)
+    + '5'.repeat(8) + '^'
+    + '5'.repeat(8) + '^'
+    + '5'.repeat(54);
+  const cages = findConstraints(SudokuParser.parseShortKillerFormat(text), 'Cage');
+  assert.equal(cages.find(c => c.sum === 10).cells.length, 11);
 });
 
 await runTest('parseShortKillerFormat should reject non-killer input', () => {
@@ -288,6 +301,62 @@ await runTest('parseJigsawLayout should parse valid layout', () => {
   assertShape(result, '9x9');
   assertConstraintCount(result, 'Jigsaw', 9);
   assertConstraintCount(result, 'NoBoxes', 1);
+});
+
+const SOLVED_9x9 =
+  '534678912672195348198342567859761423426853791713924856961537284287419635345286179';
+
+await runTest('parseText should read a solved grid as givens, not a jigsaw layout', () => {
+  const result = SudokuParser.parseText(SOLVED_9x9);
+
+  assert.ok(result);
+  assertConstraintCount(result, 'Jigsaw', 0);
+  assertConstraintCount(result, 'NoBoxes', 0);
+  assertConstraintCount(result, 'Given', 81);
+  const r1c1 = findConstraints(result, 'Given').find(g => g.cell === 'R1C1');
+  assert.deepEqual(r1c1.values, [5]);
+});
+
+await runTest('parseText should read a solved 6x6 grid as givens', () => {
+  const solved = '123456' + '456123' + '231564' + '564231' + '312645' + '645312';
+  const result = SudokuParser.parseText(solved);
+
+  assertShape(result, '6x6');
+  assertConstraintCount(result, 'Jigsaw', 0);
+  assertConstraintCount(result, 'Given', 36);
+});
+
+await runTest('parseText should still detect a jigsaw layout', () => {
+  const result = SudokuParser.parseText(JIGSAW_LAYOUT);
+  assertConstraintCount(result, 'Jigsaw', 9);
+  assertConstraintCount(result, 'NoBoxes', 1);
+});
+
+await runTest('parseText should still detect a disconnected jigsaw layout', () => {
+  // Swap R1C1 and R1C4: region 2's cell at R1C1 is cut off from the rest.
+  const layout = '211122333' + JIGSAW_LAYOUT.substring(9);
+  const result = SudokuParser.parseText(layout);
+  assertConstraintCount(result, 'Jigsaw', 9);
+});
+
+await runTest('parseText should keep layouts with distinct rows or columns as jigsaws', () => {
+  // Regions are the columns: every row is distinct, but no column is.
+  const columnRegions = '123456789'.repeat(9);
+  assertConstraintCount(SudokuParser.parseText(columnRegions), 'Jigsaw', 9);
+  // Regions are the rows: every column is distinct, but no row is.
+  const rowRegions = [...'123456789'].map(c => c.repeat(9)).join('');
+  assertConstraintCount(SudokuParser.parseText(rowRegions), 'Jigsaw', 9);
+});
+
+await runTest('parseText should read a solved grid with a jigsaw layout as a jigsaw', () => {
+  // 162 chars: the givens half is solved, the layout half is not.
+  const result = SudokuParser.parseText(SOLVED_9x9 + JIGSAW_LAYOUT);
+  assertConstraintCount(result, 'Jigsaw', 9);
+  assertConstraintCount(result, 'Given', 81);
+});
+
+await runTest('parseJigsawLayout should still accept a solved grid when called directly', () => {
+  assert.ok(SudokuParser.parseJigsawLayout(SOLVED_9x9));
 });
 
 await runTest('parseJigsawLayout should reject unbalanced regions', () => {

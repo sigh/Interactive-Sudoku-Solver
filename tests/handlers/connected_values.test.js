@@ -344,7 +344,7 @@ await runTest('ConnectedValues: var group uses its own column count, not the gri
       assertOrWrapEquivalent({ ...scenario, mode });
     });
   }
-  await runTest('ConnectedValues Or-wrap leaks no foreign state (liveDecoy)', () => {
+  await runTest('ConnectedValues Or-wrap leaks no non-persisted state (liveDecoy)', () => {
     assertOrWrapNoStateLeak(scenario);
   });
 }

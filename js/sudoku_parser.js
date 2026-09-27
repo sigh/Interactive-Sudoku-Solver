@@ -30,6 +30,25 @@ const gridFromNumCells = (numCells) =>
 const gridFromNumPencilmarks = (numPencilmarks) =>
   CellGeometry.fromGridSize(Math.cbrt(numPencilmarks));
 
+// A solved grid has distinct characters in every row and column. A jigsaw
+// layout only does if every region hits each row and column exactly once.
+const hasDistinctRowsAndCols = (text) => {
+  const geometry = gridFromNumCells(text.length);
+  if (!geometry) return false;
+  const { numRows, numCols } = geometry;
+  for (let r = 0; r < numRows; r++) {
+    const row = new Set();
+    for (let c = 0; c < numCols; c++) row.add(text[geometry.cellIndex(r, c)]);
+    if (row.size !== numCols) return false;
+  }
+  for (let c = 0; c < numCols; c++) {
+    const col = new Set();
+    for (let r = 0; r < numRows; r++) col.add(text[geometry.cellIndex(r, c)]);
+    if (col.size !== numRows) return false;
+  }
+  return true;
+};
+
 class AstNode {
   constructor(cls, args = null) {
     this.cls = cls;
@@ -297,6 +316,13 @@ export class SudokuParser {
     );
   }
 
+  // A solved grid also passes the jigsaw layout checks, so when guessing the
+  // format, leave it for the plain sudoku parser to read as givens.
+  static _parseGuessedJigsawLayoutToAst(text) {
+    const ast = this._parseJigsawLayoutToAst(text);
+    return ast && !hasDistinctRowsAndCols(text) ? ast : null;
+  }
+
   static _parseJigsawToAst(text) {
     if (text.length % 2 !== 0) return null;
 
@@ -428,7 +454,7 @@ export class SudokuParser {
       this._parseShortKillerFormatToAst(text)
       || this._parseLongKillerFormatToAst(text)
       || this._parseJigsawToAst(text)
-      || this._parseJigsawLayoutToAst(text)
+      || this._parseGuessedJigsawLayoutToAst(text)
       || this._parsePlainSudokuToAst(text)
       || this._parseGridLayoutToAst(rawText)
       || this._parsePencilmarksToAst(text)
