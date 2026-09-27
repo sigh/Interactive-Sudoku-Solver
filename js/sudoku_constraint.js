@@ -709,6 +709,19 @@ class ChaosConstraintBase extends SudokuConstraintBase {
   }
 }
 
+// A value-list argument (a number, a flat array, or the serialized '1_2'
+// string) as its serialized form. Throws unless every value is an integer.
+const valueListArg = (name, values) => {
+  if (Array.isArray(values) && values.some(v => Array.isArray(v))) {
+    throw Error(`${name} values must be a flat value set`);
+  }
+  const str = Array.isArray(values) ? values.join('_') : String(values);
+  if (!str.split('_').every(v => /^-?\d+$/.test(v))) {
+    throw Error(`${name} values must be integers: ${values}`);
+  }
+  return str;
+};
+
 export class SudokuConstraint {
 
   static Container = class Container extends SudokuConstraintBase {
@@ -2574,8 +2587,8 @@ export class SudokuConstraint {
     constructor(values, ...cells) {
       super(values, ...cells);
       this.cells = cells;
-      this.values = values;
-      this.valueStr = values.replace(/_/g, ',');
+      this.values = valueListArg(this.constructor.name, values);
+      this.valueStr = this.values.replace(/_/g, ',');
     }
 
     _compactValueStr() {
@@ -2646,10 +2659,7 @@ export class SudokuConstraint {
     constructor(groupPrefix, values, size) {
       super(groupPrefix, values, size);
       this.groupPrefix = groupPrefix || '';
-      if (Array.isArray(values) && values.some(v => Array.isArray(v))) {
-        throw Error('ConnectedValues values must be a flat value set');
-      }
-      this.values = String(values).replace(/,/g, '_');
+      this.values = valueListArg(this.constructor.name, values);
       this.size = size == null || size === '' ? null : +size;
       if (this.size !== null &&
         !(Number.isInteger(this.size) && this.size > 0)) {

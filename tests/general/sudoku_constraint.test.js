@@ -14,6 +14,25 @@ await runTest('RegionSize rejects excess constructor arguments', () => {
     /RegionSize accepts one argument: the region cell count; got 2/);
 });
 
+await runTest('value lists accept arrays and reject non-integers', () => {
+  // A non-integer used to reach the builder as NaN and match nothing, so
+  // ContainAtLeast('2,2', ...) accepted every grid.
+  const make = [
+    (v) => new SudokuConstraint.ContainAtLeast(v, 'R1C1', 'R1C2'),
+    (v) => new SudokuConstraint.ContainExact(v, 'R1C1', 'R1C2'),
+    (v) => new SudokuConstraint.ConnectedValues('', v),
+  ];
+  for (const fn of make) {
+    assert.throws(() => fn('2,2'), /must be integers/);
+    assert.equal(fn('2_2').values, '2_2');
+    assert.equal(fn(3).values, '3');
+    assert.equal(fn([1, 2]).values, '1_2');
+    assert.throws(() => fn(''), /must be integers/);
+    assert.throws(() => fn('1_x'), /must be integers/);
+    assert.throws(() => fn([[1], 2]), /flat value set/);
+  }
+});
+
 // ============================================================================
 // Region generation
 // ============================================================================
