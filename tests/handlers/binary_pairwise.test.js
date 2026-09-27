@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { ensureGlobalEnvironment } from '../helpers/test_env.js';
 import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
-import { GridTestContext, createAccumulator, valueMask } from '../helpers/grid_test_utils.js';
+import { GridTestContext, createAccumulator, assertTouched, valueMask } from '../helpers/grid_test_utils.js';
 
 ensureGlobalEnvironment();
 
@@ -27,6 +27,17 @@ await runTest('prefix suffix prunes values', () => {
   // Cell 1 and cell 2 should lose value 1.
   assert.equal(grid[1] & valueMask(1), 0);
   assert.equal(grid[2] & valueMask(1), 0);
+});
+
+await runTest('notifies grid cells changed by the pairwise pass', () => {
+  const context = new GridTestContext({ gridSize: [1, 9], numValues: 9 });
+  const handler = new BinaryPairwise(allDiffKey(9), 3, 5, 7);
+  context.initializeHandler(handler);
+  context.grid[3] = valueMask(1);
+
+  const acc = createAccumulator();
+  assert.equal(handler.enforceConsistency(context.grid, acc), true);
+  assertTouched(acc, [5, 7]);
 });
 
 await runTest('all different filters combinations', () => {

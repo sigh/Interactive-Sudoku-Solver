@@ -1259,7 +1259,7 @@ export class BinaryPairwise extends SudokuConstraintHandler {
           const word = i >>> 5;
           if ((bit & allChangedWords[word]) === 0) {
             allChangedWords[word] |= bit;
-            pQueue.addForCell(i);
+            pQueue.addForCell(cells[i]);
           }
         }
         suffix &= table[v];
