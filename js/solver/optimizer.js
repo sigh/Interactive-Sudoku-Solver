@@ -1664,6 +1664,8 @@ export class SudokuConstraintOptimizer {
                 cells: newHandler.cells,
               });
             }
+            // The puzzle is unsatisfiable, so there is nothing left to optimize.
+            return;
           }
         }
       }

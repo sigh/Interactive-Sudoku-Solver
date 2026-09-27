@@ -79,6 +79,14 @@ const SCENARIOS = [
     expect: { falseCells: [0, 1] },
   },
   {
+    // The groups are {0, 1}, {2}, {3}. Three 2s pin cells 2 and 3, but four 1s
+    // cannot fit in three groups. The handler must become False without the
+    // pinned 2s being applied to it afterwards.
+    name: 'stops at False even when other values were restricted',
+    input: { cells: [0, 1, 2, 3], values: [2, 2, 2, 1, 1, 1, 1], exclusions: [[0, 1]] },
+    expect: { falseCells: [0, 1, 2, 3] },
+  },
+  {
     // Without exclusions the two 2s can go anywhere, so no cell is restricted.
     name: 'leaves the handler alone when nothing is forced',
     input: { cells: [0, 1, 2], values: [2, 2] },
