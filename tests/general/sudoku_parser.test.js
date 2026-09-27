@@ -204,6 +204,39 @@ await runTest('parseShortKillerFormat should parse cage with direction character
   assert.equal(cages11.length, 78);
 });
 
+await runTest('parseShortKillerFormat should reject pointers off the grid', () => {
+  // '^' in R1C1 points above the grid; previously the cell was silently dropped.
+  assert.throws(
+    () => SudokuParser.parseShortKillerFormat('^' + '5'.repeat(80)),
+    /outside the grid at R1C1/);
+  // '.' in R9C9 points below-right of the grid. The 'v' is needed to get past
+  // the fast reject, which ignores '.'.
+  assert.throws(
+    () => SudokuParser.parseShortKillerFormat('v' + '5'.repeat(79) + '.'),
+    /outside the grid at R9C9/);
+});
+
+await runTest('parseShortKillerFormat should reject pointers across a row edge', () => {
+  // '<' in R2C1 used to wrap to R1C9; '>' in R1C9 used to wrap to R2C1.
+  assert.throws(
+    () => SudokuParser.parseShortKillerFormat('5'.repeat(9) + '<' + '5'.repeat(71)),
+    /outside the grid at R2C1/);
+  assert.throws(
+    () => SudokuParser.parseShortKillerFormat('5'.repeat(8) + '>' + '5'.repeat(72)),
+    /outside the grid at R1C9/);
+});
+
+await runTest('parseShortKillerFormat should follow diagonal pointers', () => {
+  // R2C2 '`' -> R1C1, R2C3 ',' -> R3C2, R3C2 '<' -> R3C1.
+  const text = ('A' + '5'.repeat(8)) + ('5' + '`' + ',' + '5'.repeat(6))
+    + ('B' + '<' + '5'.repeat(7)) + '5'.repeat(54);
+  const cages = findConstraints(SudokuParser.parseShortKillerFormat(text), 'Cage');
+
+  assert.deepEqual(cages.find(c => c.sum === 10).cells.sort(), ['R1C1', 'R2C2']);
+  assert.deepEqual(cages.find(c => c.sum === 11).cells.sort(), ['R2C3', 'R3C1', 'R3C2']);
+  assert.equal(cages.reduce((n, c) => n + c.cells.length, 0), 81);
+});
+
 await runTest('parseShortKillerFormat should reject non-killer input', () => {
   // No direction characters means not killer format
   assert.equal(SudokuParser.parseShortKillerFormat('123456789'.repeat(9)), null);

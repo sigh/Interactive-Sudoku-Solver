@@ -1,5 +1,5 @@
 const { SudokuConstraint } = await import('./sudoku_constraint.js' + self.VERSION_PARAM);
-const { CellGeometry, GEOMETRY_9x9 } = await import('./cell_geometry.js' + self.VERSION_PARAM);
+const { CellGeometry, CellGraph, GEOMETRY_9x9 } = await import('./cell_geometry.js' + self.VERSION_PARAM);
 
 const FIRST_LETTER_CODE = 'A'.charCodeAt(0);
 
@@ -9,6 +9,12 @@ export const valueToShortChar = (value, maxValue) => {
 
   return String.fromCharCode(FIRST_LETTER_CODE + value - 1);
 }
+
+// [rowDelta, colDelta] for each short killer pointer character.
+const SHORT_KILLER_DIRECTIONS = {
+  'v': [1, 0], '^': [-1, 0], '<': [0, -1], '>': [0, 1],
+  '`': [-1, -1], '\'': [-1, 1], ',': [1, -1], '.': [1, 1],
+};
 
 const shortCharToValue = (char, maxValue) => {
   if (maxValue < 10) return char >= '0' && char <= '9' ? +char : null;
@@ -131,44 +137,30 @@ export class SudokuParser {
 
     const geometry = GEOMETRY_9x9;
     const numCells = geometry.numGridCells;
-    const numCols = geometry.numCols;
 
     if (text.length !== numCells) return null;
+    // '.' (down-right) is deliberately excluded: plain sudoku strings use '.'
+    // for blanks and this parser runs first, so they must not match here.
     // Note: The second ` is just there so my syntax highlighter is happy.
     if (!text.match(/[<v>^`',`]/)) return null;
     if (!text.match(/^[0-9A-Za-j^<v>`'',.`]*$/)) return null;
 
     // Determine the cell directions.
+    const cellGraph = CellGraph.get(geometry);
     let cellDirections = [];
     for (let i = 0; i < numCells; i++) {
-      switch (text[i]) {
-        case 'v':
-          cellDirections.push(i + numCols);
-          break;
-        case '^':
-          cellDirections.push(i - numCols);
-          break;
-        case '<':
-          cellDirections.push(i - 1);
-          break;
-        case '>':
-          cellDirections.push(i + 1);
-          break;
-        case '`':
-          cellDirections.push(i - numCols - 1);
-          break;
-        case '\'':
-          cellDirections.push(i - numCols + 1);
-          break;
-        case ',':
-          cellDirections.push(i + numCols - 1);
-          break;
-        case '.':
-          cellDirections.push(i + numCols + 1);
-          break;
-        default:
-          cellDirections.push(i);
+      const offset = SHORT_KILLER_DIRECTIONS[text[i]];
+      if (!offset) {
+        cellDirections.push(i);
+        continue;
       }
+      const target = cellGraph.traverse(i, offset[0], offset[1]);
+      if (target === null) {
+        throw new Error(
+          'Killer Sudoku input points outside the grid at ' +
+          geometry.makeCellIdFromIndex(i) + '.');
+      }
+      cellDirections.push(target);
     }
 
     let cages = new Map();
@@ -178,7 +170,7 @@ export class SudokuParser {
       while (cellDirections[cageCell] !== cageCell) {
         cageCell = cellDirections[cageCell];
         count++;
-        if (count > numCols) {
+        if (count > numCells) {
           throw new Error('Loop in Killer Sudoku input.');
         }
       }
