@@ -1234,8 +1234,8 @@ export class BinaryPairwise extends SudokuConstraintHandler {
     const prefix = this._prefixCache;
 
     const allChangedWords = this._allChanged.words;
-
-    allChangedWords.fill(0);
+    // Cheaper than `fill` for the typical single word.
+    for (let w = 0; w < allChangedWords.length; w++) allChangedWords[w] = 0;
     let firstChanged = 0;
 
     while (firstChanged < numCells) {
@@ -3993,9 +3993,10 @@ export class Rellik extends SudokuConstraintHandler {
 
     // Combine the results of optionally subtracting each forced value from the
     // sum. The forced values are distinct, so each is subtracted at most once.
-    remainders.clear();
-    remainders.add(sum);
     const remainderWords = remainders.words;
+    // Cheaper than `fill` for the small word count.
+    for (let w = 0; w < remainderWords.length; w++) remainderWords[w] = 0;
+    remainders.add(sum);
 
     for (let v = forcedValues; v;) {
       const value = v & -v;
