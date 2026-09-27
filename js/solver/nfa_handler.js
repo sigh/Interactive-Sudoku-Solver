@@ -111,13 +111,16 @@ export class NFAConstraint extends SudokuConstraintHandler {
 
     const stateCapacity = this._cnfa.numStates;
     const slots = steps.length + 1;
-    // One extra slot is scratch for the forward pass.
-    const { bitsets } = BitSet.allocatePool(stateCapacity, slots + 1);
-    this._scratchWords = bitsets.pop().words;
-    this._statesList = bitsets;
+    // The pool's flat word array holds the layers: layer i (the set of states
+    // after i steps) is words [i * layerSize, (i + 1) * layerSize). One extra
+    // slot is scratch for the forward pass.
+    const { bitsets, words } = BitSet.allocatePool(stateCapacity, slots + 1);
+    this._layerWords = words;
+    this._layerSize = bitsets[0].words.length;
+    this._scratchWords = bitsets[slots].words;
 
     // Memo of the last successful call (handler_docs/nfa.md §8): each step's
-    // values on return, for which `_statesList` holds the filtered layers.
+    // values on return, for which `_layerWords` holds the filtered layers.
     // Segment-break entries are never read, so 16 bits suffice. Lines that
     // visit a cell twice have no memo, as a pass there isn't idempotent.
     this._memoValues = new Set(this.cells).size === this.cells.length
@@ -148,7 +151,8 @@ export class NFAConstraint extends SudokuConstraintHandler {
     const segmentBreakMask = this._segmentBreakMask;
     const cnfa = this._cnfa;
     const transitionLists = cnfa.transitionLists;
-    const statesList = this._statesList;
+    const layerWords = this._layerWords;
+    const layerSize = this._layerSize;
     const memoValues = this._memoValues;
     const scratchWords = this._scratchWords;
 
@@ -158,7 +162,10 @@ export class NFAConstraint extends SudokuConstraintHandler {
     for (let i = 0; reuse && i < numSteps; i++) {
       if (steps[i] >= 0 && (grid[steps[i]] & ~memoValues[i])) reuse = false;
     }
-    if (!reuse) statesList[0].copyFrom(cnfa.startingStates);
+    if (!reuse) {
+      const startWords = cnfa.startingStates.words;
+      for (let w = 0; w < layerSize; w++) layerWords[w] = startWords[w];
+    }
     this._memoValid = false;
 
     // Forward pass: Find all states reachable from the start state.
@@ -177,14 +184,15 @@ export class NFAConstraint extends SudokuConstraintHandler {
       end = i + 1;
 
       // Cheaper than `fill` for the typical one or two words.
-      for (let w = 0; w < scratchWords.length; w++) scratchWords[w] = 0;
-      const currentStatesWords = statesList[i].words;
+      for (let w = 0; w < layerSize; w++) scratchWords[w] = 0;
+      const base = i * layerSize;
+      const nextBase = base + layerSize;
 
       // Note: We operate directly on the bitset words for performance.
       // Encapsulating this in methods caused significant overhead, so the bit
       // iteration and the `add`/`bitIndex` calls are all inlined here.
-      for (let wordIndex = 0; wordIndex < currentStatesWords.length; wordIndex++) {
-        let word = currentStatesWords[wordIndex];
+      for (let wordIndex = 0; wordIndex < layerSize; wordIndex++) {
+        let word = layerWords[base + wordIndex];
         const stateIndexBase = (wordIndex << 5) + 31;
         while (word) {
           const clz = Math.clz32(word);
@@ -201,13 +209,13 @@ export class NFAConstraint extends SudokuConstraintHandler {
       }
 
       // Store the new layer, intersected with the stored one if reusing it.
-      const nextWords = statesList[i + 1].words;
       let anyState = 0;
       layerChanged = false;
-      for (let w = 0; w < nextWords.length; w++) {
-        const word = reuse ? nextWords[w] & scratchWords[w] : scratchWords[w];
-        if (word !== nextWords[w]) {
-          nextWords[w] = word;
+      for (let w = 0; w < layerSize; w++) {
+        const stored = layerWords[nextBase + w];
+        const word = reuse ? stored & scratchWords[w] : scratchWords[w];
+        if (word !== stored) {
+          layerWords[nextBase + w] = word;
           layerChanged = true;
         }
         anyState |= word;
@@ -222,14 +230,18 @@ export class NFAConstraint extends SudokuConstraintHandler {
 
     // Backward pass: Filter down to only the states that can reach an accepting
     // state. Prune any unsupported values from the grid.
-    const finalStates = statesList[numSteps];
-    finalStates.intersect(cnfa.acceptingStates);
-    if (finalStates.isEmpty()) return false;
+    const finalBase = numSteps * layerSize;
+    const acceptingWords = cnfa.acceptingStates.words;
+    let anyFinal = 0;
+    for (let w = 0; w < layerSize; w++) {
+      anyFinal |= (layerWords[finalBase + w] &= acceptingWords[w]);
+    }
+    if (!anyFinal) return false;
 
     // Steps from `end` on are unchanged, so they filter to themselves.
     for (let i = end - 1; i >= 0; i--) {
-      const currentStatesWords = statesList[i].words;
-      const nextWords = statesList[i + 1].words;
+      const base = i * layerSize;
+      const nextBase = base + layerSize;
       const step = steps[i];
       const values = step < 0 ? segmentBreakMask : grid[step];
       let supportedValues = 0;
@@ -238,8 +250,8 @@ export class NFAConstraint extends SudokuConstraintHandler {
       // Note: We operate directly on the bitset words for performance.
       // Encapsulating this in methods caused significant overhead, so the bit
       // iteration and the `has`/`bitIndex` calls are all inlined here.
-      for (let wordIndex = 0; wordIndex < currentStatesWords.length; wordIndex++) {
-        let word = currentStatesWords[wordIndex];
+      for (let wordIndex = 0; wordIndex < layerSize; wordIndex++) {
+        let word = layerWords[base + wordIndex];
         let keptWord = 0;
         const wordBase = wordIndex << 5;
         while (word) {
@@ -253,7 +265,7 @@ export class NFAConstraint extends SudokuConstraintHandler {
             const entry = transitionList[j];
             const maskedValues = values & entry;
             if (maskedValues) {
-              if (nextWords[entry >>> 21] & (1 << (entry >>> 16))) {
+              if (layerWords[nextBase + (entry >>> 21)] & (1 << (entry >>> 16))) {
                 stateSupportedValues |= maskedValues;
               }
             }
@@ -264,8 +276,8 @@ export class NFAConstraint extends SudokuConstraintHandler {
             supportedValues |= stateSupportedValues;
           }
         }
-        if (keptWord !== currentStatesWords[wordIndex]) layerChanged = true;
-        currentStatesWords[wordIndex] = keptWord;
+        if (keptWord !== layerWords[base + wordIndex]) layerChanged = true;
+        layerWords[base + wordIndex] = keptWord;
       }
 
       if (!supportedValues) return false;
