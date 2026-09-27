@@ -1,9 +1,41 @@
 // Instrument an existing solver. See SEARCH_OBSERVER.md for event timing and costs.
 import assert from 'node:assert/strict';
+import { isDeepStrictEqual } from 'node:util';
 import { ensureGlobalEnvironment } from '../../tests/helpers/test_env.js';
 ensureGlobalEnvironment();
 const { countOnes16bit } = await import('../../js/util.js' + self.VERSION_PARAM);
 const { NO_LINKED_CELL } = await import('../../js/solver/candidate_selector.js' + self.VERSION_PARAM);
+
+// Compare captured data only; this does not restore solver state.
+export const compareSnapshots = (baseline, variant, { maxDifferences = 50 } = {}) => {
+  if (!Number.isInteger(maxDifferences) || maxDifferences < 1) {
+    throw new Error('maxDifferences must be a positive integer');
+  }
+  const differences = [];
+  let truncated = false;
+  const container = value => value !== null && typeof value === 'object' &&
+    (Array.isArray(value) || Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null);
+  const visit = (a, b, path, aPresent = true, bPresent = true) => {
+    if (truncated || (aPresent === bPresent && isDeepStrictEqual(a, b))) return;
+    if (aPresent && bPresent && container(a) && container(b) && Array.isArray(a) === Array.isArray(b)) {
+      for (const key of Object.keys(a)) {
+        if (truncated) break;
+        visit(a[key], b[key], [...path, key], true, Object.hasOwn(b, key));
+      }
+      for (const key of Object.keys(b)) {
+        if (truncated) break;
+        if (!Object.hasOwn(a, key)) visit(undefined, b[key], [...path, key], false, true);
+      }
+      if (Array.isArray(a) && a.length !== b.length) visit(a.length, b.length, [...path, 'length']);
+      return;
+    }
+    if (differences.length === maxDifferences) { truncated = true; return; }
+    differences.push({ path, baseline: a, variant: b,
+      ...(aPresent && bPresent ? {} : { baselinePresent: aPresent, variantPresent: bPresent }) });
+  };
+  visit(baseline, variant, []);
+  return { differences, truncated };
+};
 
 export const scoreCell = (cell, grid, conflictScores, linkedCells, maxValueInfo) => {
   const count = countOnes16bit(grid[cell]);

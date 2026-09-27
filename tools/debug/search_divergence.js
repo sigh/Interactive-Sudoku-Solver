@@ -16,14 +16,17 @@ export const main = async (argv) => {
   --ablate <a,b,...>       Compare with named optimizations disabled
   --compare-module <path>  Instead of --ablate: module exports apply() -> restore()
   --max-events <n>         Maximum events compared (default 100000)
+  --compare-state         Also compare full grid state before/after propagation
   --out <path>             Write JSON (otherwise stdout)
 
 Reports the first differing selection, propagation outcome, conflict or solution.
-Matching events do not establish equal domains or scores. Alignment ends at the
-first difference. Capped solves and observation limits remain inconclusive.
+Without --compare-state, matching events do not establish equal domains. Even
+matching grid states do not establish equal scores. Alignment ends at the first
+difference. Capped solves and observation limits remain inconclusive.
 Counters describe instrumented search work; use benchmark_puzzles.js for timing.`);
       return;
     }
+    if (argv[i] === '--compare-state') { args.compareState = true; continue; }
     const key = argv[i].replace(/^--/, '');
     if (!options.has(key) || argv[i + 1] === undefined) throw new Error(`Invalid option: ${argv[i]}`);
     args[key] = argv[++i];
@@ -51,7 +54,9 @@ Counters describe instrumented search work; use benchmark_puzzles.js for timing.
     if (typeof module.apply !== 'function') throw new Error('Comparison module must export apply()');
     apply = module.apply;
   }
-  const report = compareSearches(puzzle, budgets, apply, { maxEvents: Number(args['max-events']) });
+  const report = compareSearches(puzzle, budgets, apply, {
+    maxEvents: Number(args['max-events']), compareState: !!args.compareState,
+  });
   const output = JSON.stringify({ puzzle: puzzle.name, budgets, ...report }, null, 2) + '\n';
   if (args.out) writeFileSync(args.out, output);
   else process.stdout.write(output);

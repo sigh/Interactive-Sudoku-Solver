@@ -44,9 +44,14 @@ step mode. A pre-existing decision hook is rejected instead of silently replaced
 Detailed explanations observe the actual selector; diagnostic rankings alone do
 not establish which placement branch wins.
 
+`compareSnapshots(baseline, variant, {maxDifferences: 50})` compares captured
+arrays/plain objects without modifying them. It returns `{differences, truncated}`;
+each difference has a key path, baseline and variant values. Missing keys include
+presence flags. It compares only the supplied data, not uncaptured handler state.
+
 # Comparing executions
 
-`search_divergence.js` exports `compareSearches(puzzle, budgets, apply, {maxEvents})`.
+`search_divergence.js` exports `compareSearches(puzzle, budgets, apply, {maxEvents, compareState})`.
 `apply()` installs a variant and returns its restoration function. Reports contain
 the first different selection, propagation outcome, conflict or solution event,
 search counters, and comparison status. Both solves retain their own completion
@@ -57,3 +62,11 @@ The event limit bounds retained comparison events, not solve duration. Matching
 events do not imply matching domains or scores. Alignment ends at divergence;
 subsequent event indexes are not corresponding nodes. Instrumented elapsed times
 are omitted; use the performance tools for runtime comparisons.
+
+`compareState: true` additionally compares full grid state (candidate masks and
+backtrackable handler storage) immediately before and after propagation. It adds
+input events and retains state only within `maxEvents`; divergence includes a
+bounded `stateDifference`. This is optional because storing grids costs memory.
+It does not compare scores, retained order or uncaptured private state.
+Completed solution comparisons require collected solution sets; incomplete searches
+remain inconclusive rather than silently comparing absent sets.

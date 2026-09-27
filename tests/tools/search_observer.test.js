@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 import { runSolve } from '../../tools/lib/solver_analysis.js';
-import { observeSolver } from '../../tools/lib/search_observer.js';
+import { observeSolver, compareSnapshots } from '../../tools/lib/search_observer.js';
 
 const puzzle = { name: '4x4', input: '.Shape~4x4' };
 // Chaos Construction adds region cells, searched by placement.
@@ -91,6 +91,23 @@ await runTest('Branch interventions use the selector validation and are cleaned 
     return observeSolver(solver, () => ({}), { branch: () => ({ cell: 999, value: 1 }) });
   }), /Decision override/);
   assert.equal(selector._decisionHook, null);
+});
+
+await runTest('Snapshot differences locate nested values, missing fields and truncation', () => {
+  const a = { grid: [3, 7], frames: [{ lastConflictCell: 2 }], optional: undefined };
+  const b = { grid: [3, 5], frames: [{ lastConflictCell: 4 }] };
+  const result = compareSnapshots(a, b);
+  assert.deepEqual(result.differences.map(d => d.path), [
+    ['grid', '1'], ['frames', '0', 'lastConflictCell'], ['optional'],
+  ]);
+  assert.equal(result.differences[2].variantPresent, false);
+  assert.equal(result.truncated, false);
+  assert.deepEqual(compareSnapshots(a, structuredClone(a)), { differences: [], truncated: false });
+  const limited = compareSnapshots(a, b, { maxDifferences: 1 });
+  assert.equal(limited.differences.length, 1);
+  assert.equal(limited.truncated, true);
+  assert(compareSnapshots([1], []).differences.some(d => d.path[0] === 'length'));
+  assert.throws(() => compareSnapshots(a, b, { maxDifferences: 0 }), /maxDifferences/);
 });
 
 logSuiteComplete('Search observation');

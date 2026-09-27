@@ -146,9 +146,10 @@ step_analysis.js --steps N --dump-state --puzzle "<name>" \
 The first command emits the state at step N as a constraint string (original
 puzzle + a `~Cell_v…` given per search-narrowed grid/var cell) on stdout, with
 all other output on stderr so it pipes cleanly. The second full-propagates from
-that state. If the result is narrower than the step-N state (or `--log` reports a
-`returned false`), full propagation found something the node's incremental pass
-missed; if it is identical, the node was already at the full-propagation fixpoint.
+that state. A narrower result (or `--log` reporting `returned false`) shows that
+reconstruction finds more than the captured domains express. This rebuilds handlers and their
+caches; it does not replay the original search state. Identical output does not
+prove that all pending checks ran in the original search.
 
 #### Debugging a custom NFA spec
 
@@ -288,9 +289,11 @@ node tools/debug/search_divergence.js --puzzle 'Chaos Construction: 6x6' \
   --ablate demote-off --max-backtracks 10000 --out /tmp/divergence.json
 ```
 
-Reports the first differing event and both runs' counters. Use `--compare-module`
-for a custom variant exporting `apply() -> restore()`. `--max-events` bounds the
-comparison independently of the solve budget. Matching events do not establish
-equal domains or scores; alignment stops at divergence. Use the performance tools
+Reports the first differing event and both runs' counters. Add `--compare-state`
+to compare candidate masks and handler storage before/after propagation as well.
+Use `--compare-module` for a custom variant exporting `apply() -> restore()`.
+`--max-events` bounds comparison independently of the solve budget. Without state
+comparison, matching events do not establish equal domains; neither mode establishes
+equal scores. Alignment stops at divergence. Use the performance tools
 for timing. Programmatic observation is documented in
 [Search observer](../lib/SEARCH_OBSERVER.md).
