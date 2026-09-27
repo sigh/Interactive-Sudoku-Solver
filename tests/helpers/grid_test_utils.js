@@ -224,7 +224,7 @@ export const OR_WRAP_MODES = {
   FAILING_DECOY: 'failingDecoy',
   // Decoy stays live forever => scratch path with a genuine union, so cell
   // lanes are widened back (pruning is NOT preserved). Used for the state-leak
-  // assertion: only the wrapped handler's own state lanes may change.
+  // assertion: only the wrapped handler's persistUnderOr lanes may change.
   LIVE_DECOY: 'liveDecoy',
 };
 
@@ -245,7 +245,7 @@ const makeOrDecoy = (mode) => {
 
 // Initialize any handler (typically an Or) on a typed, state-extended grid,
 // the way the engine does. Returns the grid plus the state slots each
-// allocate()/allocateBit() call claimed, in order.
+// allocate()/allocateBit() call claimed, in order, as [start, end, persistUnderOr].
 export const initTypedHandler = (
   context, handler, { cellExclusions, stateSlack = 256 } = {}) => {
   const geometry = context.geometry;
@@ -266,14 +266,14 @@ export const initTypedHandler = (
   let bitWordOffset = 0;
   let bitCursor = 16;
   const stateAllocator = {
-    allocate(state) {
+    allocate(state, persistUnderOr = false) {
       const offset = next;
       if (offset + state.length > grid.length) {
         throw new Error('Or-wrap grid too small; raise stateSlack');
       }
       grid.set(state, offset);
       next += state.length;
-      allocations.push([offset, next]);
+      allocations.push([offset, next, persistUnderOr]);
       return offset;
     },
     allocateBit() {
@@ -342,10 +342,12 @@ export const assertOrWrapEquivalent = (
   }
 };
 
-// Assert that a live-decoy scratch-path enforce leaks no foreign state: cell
-// lanes are unchanged (the True decoy makes the union vacuous) and every state
-// lane except the wrapped handler's own is byte-identical afterwards. This is
-// the direct regression net for the Or writeback loop.
+// Assert that a live-decoy scratch-path enforce leaks no state: cell lanes are
+// unchanged (the True decoy makes the union vacuous) and every state lane
+// except the wrapped handler's persistUnderOr lanes is byte-identical
+// afterwards. The wrapped handler's plain lanes are checked too: the Or must
+// leave them in the scratch. This is the direct regression net for the Or
+// writeback loop.
 export const assertOrWrapNoStateLeak = (
   { makeContext, makeHandler, cellExclusions, candidates }) => {
   const context = makeContext();
@@ -357,9 +359,10 @@ export const assertOrWrapNoStateLeak = (
     'no-leak scenario must survive init; pick candidates that do');
 
   const { grid, numSearchCells, stateEnd, wrappedSlots } = wrap;
-  const owned = new Uint8Array(grid.length);
-  for (const [start, end] of wrappedSlots) {
-    for (let i = start; i < end; i++) owned[i] = 1;
+  const persisted = new Uint8Array(grid.length);
+  for (const [start, end, persistUnderOr] of wrappedSlots) {
+    if (!persistUnderOr) continue;
+    for (let i = start; i < end; i++) persisted[i] = 1;
   }
 
   const before = grid.slice();
@@ -371,9 +374,9 @@ export const assertOrWrapNoStateLeak = (
       `live-decoy: cell ${i} changed (union should be vacuous)`);
   }
   for (let i = numSearchCells; i < stateEnd; i++) {
-    if (owned[i]) continue;
+    if (persisted[i]) continue;
     assert.equal(grid[i], before[i],
-      `live-decoy: foreign state lane ${i} leaked`);
+      `live-decoy: non-persisted state lane ${i} leaked`);
   }
 };
 
