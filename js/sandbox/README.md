@@ -58,17 +58,16 @@ helpers, or generating a very long constraint string without `Replicate`.
 
 ### What the engine always enforces
 
-Every grid has the same baseline, applied automatically:
+On the default `Sudoku` grid type:
 
 - Each row and each column is all-different.
 - Each box is all-different, unless you add `NoBoxes` (or change them with `RegionSize`).
 - Every cell draws from one value range (e.g. `1–9`), set by `Shape`.
 
 Everything else is built by adding constraints on top of this baseline.
-There is currently no switch to remove or replace the automatic row/column
-all-different groups on the main grid. Puzzles whose rows or columns intentionally
-contain repeated values need a different model or are not faithfully expressible as
-an ISS main grid today.
+For a puzzle whose rows or columns repeat values, use the `Raw` grid type
+(`new Shape('9x9', '0-9', 'Raw')`), which enforces nothing but the value range;
+state every rule explicitly.
 
 ### A rule with no dedicated constraint
 
