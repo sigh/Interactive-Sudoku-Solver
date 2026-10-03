@@ -903,4 +903,25 @@ await runTest('parseString should parse and round-trip a Raw grid shape', () => 
     SudokuParser.parseString('.Shape~9x9~~Raw.').toString(), '.Shape~9x9~~Raw');
 });
 
+await runTest('a conflicting repeat of a keyed constraint throws, naming both', () => {
+  assert.throws(
+    () => SudokuParser.parseString('.Var~K~a~12.Var~K~b~9x9'),
+    err => err.name === 'InvalidConstraintError'
+      && /\.Var~K~a~12/.test(err.message) && /\.Var~K~b~9x9/.test(err.message));
+  assert.throws(
+    () => SudokuParser.parseString('.Quad~R1C1~1~2.Quad~R1C1~3'),
+    { name: 'InvalidConstraintError' });
+});
+
+await runTest('an identical repeat of a keyed constraint is dropped', () => {
+  const result = SudokuParser.parseString('.Var~K~a~12.Var~K~a~12.NoBoxes.NoBoxes');
+  assertConstraintCount(result, 'Var', 1);
+  assertConstraintCount(result, 'NoBoxes', 1);
+});
+
+await runTest('repeated Givens on one cell still intersect', () => {
+  const result = SudokuParser.parseString('.~R1C1_1_2_3.~R1C1_2_3_4');
+  assert.deepEqual(findConstraint(result, 'Given').values, [2, 3]);
+});
+
 logSuiteComplete('SudokuParser');

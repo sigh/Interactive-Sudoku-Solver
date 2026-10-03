@@ -9,6 +9,15 @@ const {
 const { CellGeometry, CellGraph, GEOMETRY_9x9, GEOMETRY_MAX } = await import('./cell_geometry.js' + self.VERSION_PARAM);
 const { NFASerializer, javascriptSpecToNFA, nfaToJavascriptSpec } = await import('./nfa_builder.js' + self.VERSION_PARAM);
 
+// A constraint set that cannot be built as written. Thrown by the parser and by the
+// solver's handlers alike.
+export class InvalidConstraintError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'InvalidConstraintError';
+  }
+}
+
 export class CellArgs {
   constructor(args, type) {
     const numArgs = args.length;
@@ -158,11 +167,18 @@ export class SudokuConstraintBase {
     return Array.isArray(key) ? key : [key];
   }
 
-  // Merge two constraints with the same uniqueness key.
-  // Default: last one wins. Subclasses can override for custom behavior
-  // (e.g. intersection).
+  // Merge two constraints with the same uniqueness key. An identical repeat is
+  // dropped; a conflicting one throws, since keeping either silently discards a
+  // declaration (two Var groups with one prefix used to merge, and the givens
+  // meant for one pinned the other). Subclasses with a real merge override this
+  // (Given intersects).
   static mergeConstraints(existing, incoming) {
-    return incoming;
+    const before = this.serialize([existing]);
+    const after = this.serialize([incoming]);
+    if (before === after) return existing;
+    throw new InvalidConstraintError(
+      `${this.displayName()} ${this.UNIQUENESS_KEY_FIELD} ` +
+      `${existing[this.UNIQUENESS_KEY_FIELD]} declared twice: ${before} and ${after}`);
   }
 
   // Get the cells associated with this constraints.

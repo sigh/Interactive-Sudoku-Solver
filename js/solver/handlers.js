@@ -12,15 +12,10 @@ const {
 } = await import('../util.js' + self.VERSION_PARAM);
 const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM);
 const { GEOMETRY_MAX } = await import('../cell_geometry.js' + self.VERSION_PARAM);
-const { SudokuConstraintBase, fnToBinaryKey } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
+const { SudokuConstraintBase, fnToBinaryKey, InvalidConstraintError } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
 const { CandidateFinders } = await import('./candidate_selector.js' + self.VERSION_PARAM);
 
-export class InvalidConstraintError extends Error {
-  constructor(message) {
-    super(message);
-    this.name = 'InvalidConstraintError';
-  }
-}
+export { InvalidConstraintError };
 
 export class SudokuConstraintHandler {
   static SINGLETON_HANDLER = false;

@@ -548,32 +548,15 @@ await runTest('lint_constraints flags adjacency-paired clues that drop cells', (
   assert.doesNotMatch(report(diagonalWhisper), /adjacency-clue-drops-cells/);
 });
 
-await runTest('lint_constraints flags two clues collapsing onto one anchor', () => {
-  // eIYhjdAXqZw drew two digit circles at each corner, nudged apart only for
-  // rendering. Emitted as two Quads they key on the same topLeftCell and the
-  // later replaces the earlier -- four clues gone with no error. Clue coverage
-  // cannot see it either: both name the same four cells.
-  const collapsed = lintConstraintText(
-    '.Shape~9x9\n.Quad~R1C1~1~2\n.Quad~R1C1~3~4\n');
-  assert.match(report(collapsed),
-    /co-anchored-constraint-dropped.*Quad shares uniqueness key "R1C1".*line 2/);
-
-  // The merge the rule asks for.
-  assert.doesNotMatch(
-    report(lintConstraintText('.Shape~9x9\n.Quad~R1C1~1~2~3~4\n')),
-    /co-anchored-constraint-dropped/);
+await runTest('lint_constraints refuses two clues collapsing onto one anchor', () => {
+  // Two Quads keyed on one topLeftCell used to merge silently, the later replacing
+  // the earlier. The parser now rejects the pair, so the lint never sees a tree.
+  assert.throws(
+    () => lintConstraintText('.Shape~9x9\n.Quad~R1C1~1~2\n.Quad~R1C1~3~4\n'),
+    /Quad topLeftCell R1C1 declared twice/);
 
   // Two branches of an Or are one hypothesis each, not two clues on one anchor.
-  assert.doesNotMatch(
-    report(lintConstraintText(
-      '.Shape~9x9\n.Or\n.Quad~R1C1~1~2\n.Quad~R1C1~3~4\n.End\n')),
-    /co-anchored-constraint-dropped/);
-
-  // Given merges by intersection, so two on one cell narrow it rather than
-  // losing one. Only the default last-one-wins merge drops a clue.
-  assert.doesNotMatch(
-    report(lintConstraintText('.Shape~9x9\n.~R1C1_1_2\n.~R1C1_2_3\n')),
-    /co-anchored-constraint-dropped/);
+  lintConstraintText('.Shape~9x9\n.Or\n.Quad~R1C1~1~2\n.Quad~R1C1~3~4\n.End\n');
 });
 
 await runTest('lint_constraints --script runs inputs through the sandbox', async () => {
