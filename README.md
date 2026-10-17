@@ -31,6 +31,7 @@ jekyll serve --port=8080
 ## Tests
 
 ```bash
+npm ci
 npm test
 ```
 

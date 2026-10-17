@@ -82,6 +82,9 @@ non-zero, whatever the guidance policy is.
 
 ### `lint_sandbox_script.js` — surface sandbox authoring guidance
 
+This tool uses the Acorn JavaScript parser declared in `devDependencies`.
+Run `npm ci` from the repository root before using it.
+
 Sandbox scripts can often use helpers exposed by `js/sandbox/env.js` rather than
 rebuilding common geometry by hand. This tool lints source only and never
 executes the script — to check the generated constraints, pipe the run_sandbox

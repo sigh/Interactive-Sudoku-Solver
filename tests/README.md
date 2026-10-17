@@ -2,9 +2,13 @@
 
 Tests use Node.js with the native `assert/strict` module and a custom test runner. No external test framework.
 
+The full suite requires the development dependencies in `package.json`:
+the sandbox linter tests import Acorn, a JavaScript parser. Coverage uses c8.
+
 ## Running Tests
 
 ```sh
+npm ci                  # install development dependencies before the first run
 npm test                # default: per-file and per-suite summaries
 npm run test:quiet      # final summary only
 npm run test:coverage   # with c8 code coverage
