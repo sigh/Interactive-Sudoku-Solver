@@ -4264,6 +4264,7 @@ export class Or extends SudokuConstraintHandler {
     super(cells);
 
     this._scratchGrid = null;
+    this._scratchCells = null;
     this._resultGrid = null;
     this._handlers = handlers;
     this._initializations = [];
@@ -4394,6 +4395,7 @@ export class Or extends SudokuConstraintHandler {
     }
     this._scratchGrid = readonlyGridState.slice();
     this._resultGrid = readonlyGridState.slice(0, this._numSearchCells);
+    this._scratchCells = this._scratchGrid.subarray(0, this._numSearchCells);
   }
 
   enforceConsistency(grid, pQueue) {
@@ -4419,7 +4421,7 @@ export class Or extends SudokuConstraintHandler {
     const scratchGrid = this._scratchGrid;
     const nullPropagationQueue = this._nullPropagationQueue;
     const branchPersistedLanes = this._branchPersistedLanes;
-    resultGrid.fill(0);
+    let hasResult = false;
 
     for (let i = 0; i < this._handlers.length; i++) {
       if (this._isInvalid(grid, i)) continue;
@@ -4438,8 +4440,13 @@ export class Or extends SudokuConstraintHandler {
         continue;
       }
 
-      for (let j = 0; j < numSearchCells; j++) {
-        resultGrid[j] |= scratchGrid[j];
+      if (!hasResult) {
+        resultGrid.set(this._scratchCells);
+        hasResult = true;
+      } else {
+        for (let j = 0; j < numSearchCells; j++) {
+          resultGrid[j] |= scratchGrid[j];
+        }
       }
       // Write back only lanes the branch allocated with `persistUnderOr`
       // (nested Or live-branch words). Other handler state stays in the
@@ -4454,7 +4461,7 @@ export class Or extends SudokuConstraintHandler {
     }
 
     // Quickly check if there were no valid handlers.
-    if (resultGrid[0] === 0) return false;
+    if (!hasResult || resultGrid[0] === 0) return false;
 
     // Only copy the cells. The state has already been directly copied.
     grid.set(resultGrid);

@@ -54,6 +54,28 @@ await runTest('multiple valid handlers union', () => {
   assert.equal(handler.enforceConsistency(grid, acc), true);
 });
 
+await runTest('branch union is independent of earlier calls after restoration', () => {
+  const context = new GridTestContext({ gridSize: [1, 4], numValues: 4 });
+  const handler = new Or(
+    new GivenCandidates(new Map([[0, [1]]])),
+    new GivenCandidates(new Map([[0, [2]]])));
+  assert.equal(initOrHandler(context, handler), true);
+  const initial = context._grid.slice();
+
+  const live = initial.slice();
+  assert.equal(handler.enforceConsistency(live, createAccumulator()), true);
+  assert.equal(live[0], valueMask(1, 2));
+
+  const dead = initial.slice();
+  dead[0] = valueMask(4);
+  assert.equal(handler.enforceConsistency(dead, createAccumulator()), false);
+
+  const restored = initial.slice();
+  restored[0] = valueMask(2);
+  assert.equal(handler.enforceConsistency(restored, createAccumulator()), true);
+  assert.equal(restored[0], valueMask(2));
+});
+
 await runTest('init prunes infeasible handlers', () => {
   const context = new GridTestContext({ gridSize: [1, 4], numValues: 4 });
   const handler = new Or(new True(), new False([0]), new True());
