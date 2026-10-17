@@ -3094,7 +3094,7 @@ export class SudokuConstraint {
 
     static serialize(constraints) {
       const args = constraints.map(
-        c => `${c.cell}_${c.values.join('_')}`);
+        c => [c.cell, ...c.values].join('_'));
       return this._argsToString(...args);
     }
 

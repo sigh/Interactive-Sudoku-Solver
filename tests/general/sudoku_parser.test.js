@@ -851,6 +851,19 @@ await runTest('disjoint Givens for same cell intersect to empty', () => {
   assert.deepEqual(r1c1.values, []);
 });
 
+await runTest('empty Given candidates survive serialization and reparsing', () => {
+  const result = SudokuParser.parseString('.~R1C1_1.~R1C1_2.~R1C2_3_4');
+  const serialized = result.toString();
+  assert.equal(serialized, '.~R1C1~R1C2_3_4');
+
+  const reparsed = SudokuParser.parseString(serialized);
+  const givens = findConstraints(reparsed, 'Given');
+  assert.equal(givens.length, 2);
+  assert.deepEqual(givens.find(g => g.cell === 'R1C1').values, []);
+  assert.deepEqual(givens.find(g => g.cell === 'R1C2').values, [3, 4]);
+  assert.equal(reparsed.toString(), serialized);
+});
+
 await runTest('Givens for different cells are not merged', () => {
   const result = SudokuParser.parseString('.~R1C1_1_2_3.~R1C2_4_5_6');
 
