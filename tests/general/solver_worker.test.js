@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 
 import { ensureGlobalEnvironment } from '../helpers/test_env.js';
-import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
+import { runTest, runTestCases, logSuiteComplete } from '../helpers/test_runner.js';
 
 ensureGlobalEnvironment({ locationValue: { search: '' } });
 
@@ -50,6 +50,37 @@ await runTest('progress states are sent while the call runs', async () => {
   assert.ok(replies.length > 2, 'progress states precede the final state');
   assert.ok(replies.slice(0, -1).every(m => m.type === 'state'));
   assert.deepEqual(replies.at(-1), { type: 'result', result: 288 });
+});
+
+await runTestCases('reporting frequency preserves final worker results and stats', [
+  ['count', 'countSolutions'],
+  ['estimate', 'estimatedCountSolutions'],
+  ['possibilities', 'solveAllPossibilities', { candidateSupportThreshold: 2 }],
+  ['solutions', 'nthSolution', 2],
+  ['steps', 'nthStep', [5, new Map()]],
+  ['layout', 'validateLayout'],
+], async (method, payload) => {
+  const run = async (frequency) => {
+    const constraint = empty4x4();
+    constraint.constraints.push(new SudokuConstraint.Given('R1C1', 1));
+    await init(constraint, frequency);
+    const replies = await send(method, payload);
+    assert.equal(replies.at(-1).type, 'result');
+    assert.equal(replies.at(-2).type, 'state', 'the worker must send final stats before the result');
+    const state = replies.at(-2).state;
+    return {
+      result: replies.at(-1).result,
+      counters: state.counters,
+      estimate: state.estimate,
+      done: state.done,
+      updates: replies.filter(m => m.type === 'state').length,
+    };
+  };
+
+  const { updates: frequentUpdates, ...frequent } = await run(1);
+  const { updates: sparseUpdates, ...sparse } = await run(25);
+  assert.ok(frequentUpdates > sparseUpdates, 'periodic stats must still arrive during search');
+  assert.deepEqual(sparse, frequent);
 });
 
 await runTest('an error is sent as an exception with its name, message and stack', async () => {

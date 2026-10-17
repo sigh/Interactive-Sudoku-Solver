@@ -1118,6 +1118,8 @@ class InternalSolver {
 
     let weightedSum = 0;
     let weightSum = 0;
+    const progress = this._progress;
+    let nodesAtLastSampleReport = this.counters.nodesSearched;
 
     while (true) {
       const numSamples = estimationState.samples;
@@ -1153,7 +1155,13 @@ class InternalSolver {
         return estimationState.solutions;
       }
 
-      this._progress.callback?.();
+      // Report across short sampling runs that never reach the search loop's
+      // per-run interval. Longer searches retain their normal progress reports.
+      if (progress.frequencyMask >= 0 &&
+        this.counters.nodesSearched - nodesAtLastSampleReport > progress.frequencyMask) {
+        nodesAtLastSampleReport = this.counters.nodesSearched;
+        progress.callback();
+      }
     }
   }
 

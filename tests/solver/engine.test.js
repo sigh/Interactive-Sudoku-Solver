@@ -259,6 +259,59 @@ await runTest('estimatedCountSolutions returns 0 for a contradictory puzzle', ()
   assert.equal(estimate, 0);
 });
 
+await runTest('estimation throttles progress across short samples and always sends final state', () => {
+  const run = (solver, logFrequency) => {
+    const updates = [];
+    solver.setProgressCallback(() => updates.push(solver.state()), logFrequency);
+    const result = solver.estimatedCountSolutions(50);
+    assert.equal(solver.state().estimate.samples, 50);
+    assert.equal(solver.state().estimate.exact, false);
+    assert.deepEqual(updates.at(-1), solver.state());
+    return { result, updates };
+  };
+
+  const solver = buildSolver(makeEmptyGridConstraint('4x4'));
+  const frequent = run(solver, 8);
+  assert.ok(frequent.updates.length > 1, 'short samples must accumulate toward periodic updates');
+  assert.ok(frequent.updates[0].estimate.samples > 1, 'updates must not fire after every sample');
+
+  const sparse = run(solver, 25);
+  assert.equal(sparse.updates.length, 1, 'below the interval, only the final update is sent');
+  assert.equal(sparse.result, frequent.result, 'reporting frequency must not affect the estimate');
+
+  const disabled = run(solver, 0);
+  assert.equal(disabled.updates.length, 1, 'disabling periodic updates must still send final stats');
+  assert.equal(disabled.result, frequent.result);
+
+  const repeated = run(solver, 8);
+  assert.deepEqual(
+    repeated.updates.map(state => state.estimate.samples),
+    frequent.updates.map(state => state.estimate.samples),
+    'a new solve must reset the progress interval');
+});
+
+await runTestCases('estimation leaves the registered progress callback unchanged', [
+  ['after completion', false],
+  ['after a reporting error', true],
+], (throwOnReport) => {
+  const solver = buildSolver(makeEmptyGridConstraint('4x4'));
+  const internal = solver._internalSolver;
+  let callback;
+  solver.setProgressCallback(() => {
+    assert.equal(internal._progress.callback, callback);
+    if (throwOnReport) throw new Error('reporting failed');
+  }, 1);
+  callback = internal._progress.callback;
+
+  if (throwOnReport) {
+    assert.throws(() => solver.estimatedCountSolutions(50), /reporting failed/);
+  } else {
+    solver.estimatedCountSolutions(50);
+  }
+
+  assert.equal(internal._progress.callback, callback);
+});
+
 await runTestCases('estimation completion describes the whole puzzle', [
   ['solution without guesses', makeEasyClassicConstraint, 1, true, 1, false],
   ['contradiction without guesses', makeContradictoryConstraint, 1, true, 0, false],
@@ -597,6 +650,22 @@ await runTest('nthStep continuing forward matches a replay at every kind of step
     'the walk must continue from each kind of step');
 });
 
+await runTest('step pauses preserve the progress reporting interval', () => {
+  const run = (pause) => {
+    const solver = makeStepSolver();
+    const updates = [];
+    solver.setProgressCallback(() => updates.push(solver.state().counters), 3);
+    if (pause) {
+      for (let n = 0; n < 29; n++) solver.nthStep(n, new Map());
+    }
+    const result = solver.nthStep(29, new Map());
+    assert.ok(updates.length > 0);
+    return { result, updates, counters: solver.state().counters };
+  };
+
+  assert.deepEqual(run(true), run(false));
+});
+
 await runTest('nthStep continues forward, including skipping ahead', () => {
   const solver = makeStepSolver();
   const counter = countResets(solver);
@@ -763,6 +832,22 @@ await runTest('setProgressCallback is called during countSolutions', () => {
   solver.countSolutions();
   // Should have been called at least once (final send).
   assert.ok(callCount >= 1, `Expected callback calls, got ${callCount}`);
+});
+
+await runTest('solution pauses preserve the progress reporting interval', () => {
+  const run = (pause) => {
+    const solver = buildSolver(makeMultiSolutionConstraint());
+    const updates = [];
+    solver.setProgressCallback(() => updates.push(solver.state().counters), 3);
+    if (pause) {
+      for (let n = 0; n < 9; n++) solver.nthSolution(n);
+    }
+    const result = solver.nthSolution(9);
+    assert.ok(updates.length > 0);
+    return { result, updates, counters: solver.state().counters };
+  };
+
+  assert.deepEqual(run(true), run(false));
 });
 
 await runTest('setProgressCallback is called during solveAllPossibilities', () => {
