@@ -2755,7 +2755,7 @@ export class ValueIndexing extends SudokuConstraintHandler {
     const numCells = this._indexedCells.length;
     const shift = -geometry.valueOffset;
     const mask = ((1 << numCells) - 1) << shift;
-    initialGridCells[this._controlCell] &= mask;
+    if (!(initialGridCells[this._controlCell] &= mask)) return false;
 
     this._controlShift = shift;
     return !!initialGridCells[this._valueCell];
@@ -2763,7 +2763,7 @@ export class ValueIndexing extends SudokuConstraintHandler {
 
   enforceConsistency(grid, pQueue) {
     const cells = this._indexedCells;
-    const controlCell = this._controlCell
+    const controlCell = this._controlCell;
     const numCells = cells.length;
     const valueCell = this._valueCell;
 
@@ -2778,6 +2778,8 @@ export class ValueIndexing extends SudokuConstraintHandler {
         possibleControl |= v;
       }
     }
+
+    if (!possibleControl) return false;
 
     // If there is a single control value then we can constrain the indexed
     // cell.

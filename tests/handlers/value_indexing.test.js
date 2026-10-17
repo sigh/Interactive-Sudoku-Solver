@@ -41,6 +41,15 @@ await runTest('ValueIndexing should fail init if value cell is empty', () => {
   assert.equal(result, false);
 });
 
+await runTest('ValueIndexing should fail init when valid indices wipe out the control cell', () => {
+  const context = new GridTestContext({ gridSize: [1, 4] });
+  const handler = new ValueIndexing(0, 1, 2, 3);
+  context.grid[1] = valueMask(3, 4);
+
+  assert.equal(context.initializeHandler(handler), false);
+  assert.equal(context.grid[1], 0);
+});
+
 await runTest('ValueIndexing should pass init even with restricted control cell', () => {
   const context = new GridTestContext({ gridSize: [1, 4] });
   // valueCell=0, controlCell=1, indexedCells=[2,3] (2 cells)
@@ -139,6 +148,7 @@ await runTest('ValueIndexing should fail when no valid control-value pair exists
   const result = handler.enforceConsistency(grid, acc);
 
   assert.equal(result, false, 'should fail when value cannot be found in any indexed cell');
+  assert.equal(Object.hasOwn(grid, 'undefined'), false, 'conflict must not write outside the grid');
 });
 
 // =============================================================================
