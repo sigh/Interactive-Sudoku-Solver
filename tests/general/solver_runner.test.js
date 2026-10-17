@@ -747,6 +747,41 @@ await runTest('all-possibilities onUpdate returns solution data', async () => {
   assert.equal(updateResult.description, 'Unique solution');
 });
 
+await runTest('all-possibilities counts larger values arriving in later updates', async () => {
+  const Handler = getHandlerClass('all-possibilities');
+  const handler = new Handler(2);
+  handler.add([0, 1]);
+  handler.add([3, 1]);
+  handler.add([3, 2]);
+
+  const result = await handler.get(0);
+  assert.deepEqual(result.solution, [new Set([0, 3]), new Set([1, 2])]);
+  assert.equal(result.counts[0][0], 1);
+  assert.equal(result.counts[0][3], 2);
+  assert.equal(result.counts[1][1], 2);
+  assert.equal(result.counts[1][2], 1);
+});
+
+for (const valueRange of ['1-3', '0-2']) {
+  await runTest(`all-possibilities counts all values on a Raw grid with range ${valueRange}`, async () => {
+    const constraint = new SudokuConstraint.Container([
+      new SudokuConstraint.Shape('1x1', valueRange, 'Raw'),
+    ]);
+    const runner = new SolverRunner();
+    const handler = await runner.solve(constraint, { mode: 'all-possibilities' });
+    await waitForSettle();
+
+    const result = await handler.get(0);
+    const values = constraint.getGeometry().allValues();
+    assert.equal(handler.solutionCount(), values.length);
+    assert.deepEqual(result.solution, [new Set(values)]);
+    for (const value of values) {
+      assert.equal(result.counts[0][value], 1, `Count for value ${value}`);
+    }
+    runner.abort();
+  });
+}
+
 // ============================================================================
 // handleAltClick
 // ============================================================================
