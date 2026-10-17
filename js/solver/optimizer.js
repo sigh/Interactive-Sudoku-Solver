@@ -57,6 +57,9 @@ export class SudokuConstraintOptimizer {
     const boxRegionInfo = handlerSet.getAllofType(HandlerModule.BoxRegionInfo)[0];
     const boxRegions = boxRegionInfo?.boxRegions() || [];
 
+    // Generate FullRank equalities before sharing and caching exclusions.
+    this._optimizeFullRank(handlerSet, geometry);
+
     this._addExtraCellExclusions(handlerSet, cellExclusions, geometry);
 
     const effectiveValues = this._computeEffectiveValues(handlerSet, geometry);
@@ -78,8 +81,6 @@ export class SudokuConstraintOptimizer {
 
     this._optimizeJigsaw(
       handlerSet, boxRegions, geometry, effectiveValueInfo.count);
-
-    this._optimizeFullRank(handlerSet, geometry);
 
     this._optimizeChaosConstruction(handlerSet, geometry, effectiveValueInfo.mask);
 
@@ -1487,8 +1488,7 @@ export class SudokuConstraintOptimizer {
         const bEntry = HandlerModule.FullRank.entryFromClue(entries, existingClue);
         if (!aEntry || !bEntry) break;
 
-        // TODO: These don't benefit for sharing the same exclusion sets,
-        // which is optimized in _addExtraCellExclusions.
+        // These equalities also share exclusions in _addExtraCellExclusions.
         for (let j = 0; j < aEntry.length; j++) {
           const a = aEntry[j];
           const b = bEntry[j];
