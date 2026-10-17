@@ -323,6 +323,17 @@ export class SudokuBuilder {
     return pairs;
   }
 
+  // Outside clue IDs must resolve to a line on the current grid before the
+  // handler can use its cells.
+  static _outsideClueCellsOrThrow(constraint, geometry) {
+    const cells = constraint.getCells(geometry);
+    if (!cells) {
+      throw new InvalidConstraintError(
+        `Invalid ${constraint.constructor.displayName()} line: ${constraint.arrowId}`);
+    }
+    return cells.map(c => geometry.parseCellId(c).cellIndex);
+  }
+
   // Build the handlers for a list of constraints.
   static * _constraintHandlers(constraints, context) {
     const { spec, geometry } = context;
@@ -611,17 +622,14 @@ export class SudokuBuilder {
           break;
 
         case 'LittleKiller':
-          cells = constraint.getCells(geometry)?.map(
-            c => geometry.parseCellId(c).cellIndex);
-          if (!cells) throw new InvalidConstraintError('Invalid Little Killer line: ' + constraint.arrowId);
+          cells = this._outsideClueCellsOrThrow(constraint, geometry);
           yield new SumHandlerModule.Sum(
             cells, constraint.value);
           break;
 
         case 'XSum':
           {
-            const cells = constraint.getCells(geometry).map(
-              c => geometry.parseCellId(c).cellIndex);
+            const cells = this._outsideClueCellsOrThrow(constraint, geometry);
             const sum = constraint.value;
             const controlCell = cells[0];
 
@@ -645,8 +653,7 @@ export class SudokuBuilder {
           break;
 
         case 'Sandwich':
-          cells = constraint.getCells(geometry).map(
-            c => geometry.parseCellId(c).cellIndex);
+          cells = this._outsideClueCellsOrThrow(constraint, geometry);
           yield new HandlerModule.Lunchbox(cells, constraint.value);
           break;
 
@@ -656,22 +663,19 @@ export class SudokuBuilder {
           break;
 
         case 'Skyscraper':
-          cells = constraint.getCells(geometry).map(
-            c => geometry.parseCellId(c).cellIndex);
+          cells = this._outsideClueCellsOrThrow(constraint, geometry);
           yield new HandlerModule.Skyscraper(
             cells, constraint.value);
           break;
 
         case 'HiddenSkyscraper':
-          cells = constraint.getCells(geometry).map(
-            c => geometry.parseCellId(c).cellIndex);
+          cells = this._outsideClueCellsOrThrow(constraint, geometry);
           yield new HandlerModule.HiddenSkyscraper(
             cells, constraint.value);
           break;
 
         case 'NumberedRoom':
-          cells = constraint.getCells(geometry).map(
-            c => geometry.parseCellId(c).cellIndex);
+          cells = this._outsideClueCellsOrThrow(constraint, geometry);
           yield new HandlerModule.Indexing(
             cells[0], cells, constraint.value);
           break;
@@ -1082,8 +1086,7 @@ export class SudokuBuilder {
 
         case 'FullRank':
           {
-            const line = constraint.getCells(geometry).map(
-              c => geometry.parseCellId(c).cellIndex);
+            const line = this._outsideClueCellsOrThrow(constraint, geometry);
 
             yield new HandlerModule.FullRank(
               geometry.numGridCells,

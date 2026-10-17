@@ -595,6 +595,47 @@ await runTest('Given produces GivenCandidates handler', () => {
 // InvalidConstraintError
 // ============================================================================
 
+const OUTSIDE_LINE_TYPES = [
+  'XSum', 'Sandwich', 'Skyscraper', 'HiddenSkyscraper', 'NumberedRoom', 'FullRank',
+];
+
+await runTestCases('outside clue rejects unresolved geometry',
+  OUTSIDE_LINE_TYPES.map(type => [type, type]), (type) => {
+    for (const arrowId of ['R10,1', 'C10,1', 'R1,0', 'C1,2']) {
+      const constraint = new SudokuConstraint.Container([
+        new SudokuConstraint[type](arrowId, 3),
+      ]);
+      assert.throws(() => buildHandlers(constraint), {
+        name: 'InvalidConstraintError',
+        message: `Invalid ${SudokuConstraint[type].displayName()} line: ${arrowId}`,
+      });
+    }
+  });
+
+await runTestCases('outside clue validates against the selected grid',
+  OUTSIDE_LINE_TYPES.map(type => [type, type]), (type) => {
+    const constraint = new SudokuConstraint.Container([
+      new SudokuConstraint.Shape('4x4'),
+      new SudokuConstraint[type]('R5,1', 3),
+    ]);
+    assert.throws(() => buildHandlers(constraint), { name: 'InvalidConstraintError' });
+  });
+
+await runTest('outside clue geometry is checked inside composites', () => {
+  const constraint = SudokuParser.parseString(
+    '.Or.XSum~R10~10.XSum~R1~10.End');
+  assert.throws(() => buildHandlers(constraint), {
+    name: 'InvalidConstraintError', message: /Invalid X-Sum line: R10,1/,
+  });
+});
+
+await runTest('LittleKiller preserves its invalid-line error', () => {
+  const constraint = SudokuParser.parseString('.LittleKiller~10~R0C0');
+  assert.throws(() => buildHandlers(constraint), {
+    name: 'InvalidConstraintError', message: 'Invalid Little Killer line: R0C0',
+  });
+});
+
 // WhiteDot and BlackDot have been guarded for a while; X, V and GreaterThan pair
 // their cells the same way and were not, so a non-adjacent cell list built them into
 // zero handlers and the clue enforced nothing -- no error, and verify_solution would
