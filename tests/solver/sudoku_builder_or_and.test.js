@@ -219,4 +219,35 @@ await runTest('Or constraint: nested Or-in-And-in-Or is unnested', () => {
   }
 });
 
+for (const type of ['Cage', 'RellikCage']) {
+  await runTest(`${type} across houses inside Or preserves exactly the valid solutions`, () => {
+    const base = () => new SudokuConstraint.Shape('4x4');
+    const plain = SudokuBuilder.build(new SudokuConstraint.Container([base()]));
+    const expected = new Set();
+    for (let i = 0; ; i++) {
+      const solution = plain.nthSolution(i);
+      if (!solution) break;
+      const a = solution[0], b = solution[10]; // Different rows, columns and boxes.
+      const cageSatisfied = a !== b && (type === 'Cage'
+        ? a + b === 4 : a !== 3 && b !== 3 && a + b !== 3);
+      if (cageSatisfied || a === 4) expected.add(solution.join(','));
+    }
+    const solver = SudokuBuilder.build(new SudokuConstraint.Container([
+      base(),
+      new SudokuConstraint.Or([
+        new SudokuConstraint[type](type === 'Cage' ? 4 : 3, 'R1C1', 'R3C3'),
+        new SudokuConstraint.Given('R1C1', 4),
+      ]),
+    ]));
+    const actual = new Set();
+    for (let i = 0; ; i++) {
+      const solution = solver.nthSolution(i);
+      if (!solution) break;
+      actual.add(solution.join(','));
+    }
+    assert.ok(expected.size > 0);
+    assert.deepEqual(actual, expected);
+  });
+}
+
 logSuiteComplete('sudoku_builder_or_and.test.js');

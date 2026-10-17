@@ -278,6 +278,18 @@ await runTest('CellExclusions should allow modifications on clone if not sealed'
   assert.equal(exclusions.isMutuallyExclusive(1, 2), false);
 });
 
+await runTest('CellExclusions clone adds local exclusions without changing sealed source caches', () => {
+  const exclusions = new CellExclusions([], 4);
+  exclusions.addMutualExclusion(0, 1);
+  assert.deepEqual(exclusions.getArray(1), [0]);
+
+  const clone = exclusions.clone([new HandlerModule.AllDifferent([1, 2, 3])]);
+  assert.equal(clone.areMutuallyExclusive([1, 2, 3]), true);
+  assert.deepEqual(clone.getArray(1), [0, 2, 3]);
+  assert.deepEqual(exclusions.getArray(1), [0]);
+  assert.equal(exclusions.isMutuallyExclusive(1, 2), false);
+});
+
 await runTest('CellExclusions should merge sets when calling areSameValue', () => {
   const handlerSet = createHandlerSet();
   const exclusions = new CellExclusions(handlerSet, GEOMETRY_9x9.numGridCells);

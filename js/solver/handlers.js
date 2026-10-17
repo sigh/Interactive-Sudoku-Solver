@@ -158,6 +158,14 @@ export class And extends SudokuConstraintHandler {
   }
 
   initialize(initialGridCells, cellExclusions, geometry, stateAllocator) {
+    // Every child can rely on the exclusions declared by its siblings. Keep
+    // these local: an enclosing Or must not apply them to other branches.
+    // Reuse the incoming graph when it already contains every required pair.
+    if (this._handlers.some(h =>
+      !cellExclusions.areMutuallyExclusive(h.exclusionCells()))) {
+      cellExclusions = cellExclusions.clone(this._handlers);
+    }
+
     for (const h of this._handlers) {
       if (!h.initialize(initialGridCells, cellExclusions, geometry, stateAllocator)) return false;
     }

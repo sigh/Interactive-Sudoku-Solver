@@ -1432,9 +1432,14 @@ export class CellExclusions {
     this._sealed = false;
   }
 
-  clone() {
+  // Additional handler exclusions belong only to the clone. Its caches are
+  // fresh, so they can be added even when the source graph is sealed.
+  clone(additionalHandlers = null) {
     const clone = new CellExclusions(null, this._numSearchCells);
     clone._exclusionWords.set(this._exclusionWords);
+    if (additionalHandlers?.length) {
+      clone._addHandlerExclusions(additionalHandlers);
+    }
     clone._sealed = this._sealed;
     return clone;
   }
