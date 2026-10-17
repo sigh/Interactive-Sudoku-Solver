@@ -267,6 +267,9 @@ export class NFAConstraint extends SudokuConstraintHandler {
             if (maskedValues) {
               if (layerWords[nextBase + (entry >>> 21)] & (1 << (entry >>> 16))) {
                 stateSupportedValues |= maskedValues;
+                // Once all values have support, this state's remaining edges
+                // cannot change the value union or whether we keep the state.
+                if ((supportedValues | stateSupportedValues) === values) break;
               }
             }
           }

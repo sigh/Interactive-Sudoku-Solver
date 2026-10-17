@@ -6,7 +6,7 @@ import { createAccumulator, assertTouched, valueMask } from '../helpers/grid_tes
 
 ensureGlobalEnvironment();
 
-const { regexToNFA, javascriptSpecToNFA, SEGMENT_BREAK } = await import('../../js/nfa_builder.js');
+const { NFA, regexToNFA, javascriptSpecToNFA, SEGMENT_BREAK } = await import('../../js/nfa_builder.js');
 const { compressNFA, NFAConstraint } = await import('../../js/solver/nfa_handler.js');
 
 // A minimal geometry stub: initialize() only reads numValues.
@@ -284,6 +284,36 @@ await runTest('NFAConstraint backward pass should prune unreachable states', () 
   const result = handler.enforceConsistency(grid, accumulator);
   assert.equal(result, true);
   assert.equal(grid[0], valueMask(1));
+});
+
+await runTest('NFAConstraint keeps filtering states after all values have support', () => {
+  // Many first-cell paths support both final values. Later states, including
+  // ones in another bitset word, must still be kept or rejected individually.
+  // Build directly so automaton reduction does not merge the equivalent states.
+  const nfa = new NFA();
+  const symbols = [1, 2, 3, 4].map(v => new NFA.Symbol(v));
+  nfa.addStartId(0);
+  nfa.addAcceptId(43);
+  nfa.addAcceptId(44);
+  for (let state = 1; state <= 41; state++) {
+    nfa.addTransition(0, state, symbols[state === 41 ? 1 : 0]);
+    nfa.addTransition(state, 43, symbols[0], symbols[1]);
+    nfa.addTransition(state, 44, symbols[0], symbols[1]);
+  }
+  nfa.addTransition(0, 42, symbols[2]);
+  nfa.addTransition(42, 43, symbols[2], symbols[3]);
+  const cnfa = compressNFA(nfa);
+  assert.ok(cnfa.numStates > 32, 'exercise more than one state-set word');
+  const handler = new NFAConstraint([[0, 1]], cnfa);
+  const both = valueMask(1, 2);
+  const grid = [valueMask(1, 2, 3, 4), both];
+  assert.equal(handler.enforceConsistency(grid, createAccumulator()), true);
+  assert.deepEqual(grid, [both, both]);
+
+  // Reuse the filtered layers with only the later supported path left.
+  grid[0] = valueMask(2);
+  assert.equal(handler.enforceConsistency(grid, createAccumulator()), true);
+  assert.deepEqual(grid, [valueMask(2), both]);
 });
 
 // =============================================================================
