@@ -992,7 +992,7 @@ export class SudokuConstraint {
     }
 
     static serialize(parts) {
-      if (!parts.length) return [];
+      if (!parts.length) return '';
 
       // Get geometry from the first constraint's shapeSpec.
       const shapeSpec = parts[0].shapeSpec;

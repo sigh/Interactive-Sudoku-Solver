@@ -486,6 +486,10 @@ await runTest('Jigsaw.makeFromArgs parses rectangular grid with shapeSpec prefix
   }
 });
 
+await runTest('Jigsaw.serialize returns an empty string for no regions', () => {
+  assert.equal(SudokuConstraint.Jigsaw.serialize([]), '');
+});
+
 await runTest('Jigsaw.serialize omits shapeSpec for square grids', () => {
   const geometry9x9 = CellGeometry.fromGridSize(9);
   const jigsaws = [...SudokuConstraint.Jigsaw.makeFromArgs([JIGSAW_9x9_LAYOUT], geometry9x9)];
