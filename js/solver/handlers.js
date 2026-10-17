@@ -4383,7 +4383,7 @@ export class Or extends SudokuConstraintHandler {
       h.postInitialize(readonlyGridState);
     }
     this._scratchGrid = readonlyGridState.slice();
-    this._resultGrid = readonlyGridState.slice();
+    this._resultGrid = readonlyGridState.slice(0, this._numSearchCells);
   }
 
   enforceConsistency(grid, pQueue) {
@@ -4447,9 +4447,7 @@ export class Or extends SudokuConstraintHandler {
     if (resultGrid[0] === 0) return false;
 
     // Only copy the cells. The state has already been directly copied.
-    for (let j = 0; j < numSearchCells; j++) {
-      grid[j] = resultGrid[j];
-    }
+    grid.set(resultGrid);
     return true;
   }
 }
