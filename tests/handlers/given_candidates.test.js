@@ -105,4 +105,16 @@ await runTest('applyValues with non-zero valueOffset', () => {
   assert.equal(grid[0], expected);
 });
 
+await runTest('initialize releases only the handler reference to caller-owned values', () => {
+  const context = new GridTestContext({ gridSize: 9 });
+  const values = [2, 3];
+  const input = new Map([[0, values]]);
+  const handler = new GivenCandidates(input);
+  assert.equal(context.initializeHandler(handler), true);
+  assert.equal(handler._valueMap, null);
+  assert.equal(input.get(0), values);
+  assert.deepEqual(values, [2, 3]);
+  assert.equal(context.grid[0], valueMask(2, 3));
+});
+
 logSuiteComplete('given_candidates.test.js');

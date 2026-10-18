@@ -219,6 +219,49 @@ await runTest('Or constraint: nested Or-in-And-in-Or is unnested', () => {
   }
 });
 
+await runTest('released Given inputs preserve root and branch restrictions across solver resets', () => {
+  const plain = SudokuBuilder.build(new SudokuConstraint.Container([
+    new SudokuConstraint.Shape('4x4'),
+  ]));
+  const expected = new Set();
+  const expectedCounts = new Uint8Array(16 * 4);
+  for (let i = 0; ; i++) {
+    const solution = plain.nthSolution(i);
+    if (!solution) break;
+    if (solution[15] !== 4 || ![2, 3].includes(solution[0])) continue;
+    expected.add(solution.join(','));
+    solution.forEach((value, cell) => { expectedCounts[cell * 4 + value - 1] = 1; });
+  }
+  const constraint = new SudokuConstraint.Container([
+    new SudokuConstraint.Shape('4x4'),
+    new SudokuConstraint.Given('R4C4', 4),
+    new SudokuConstraint.Or([
+      new SudokuConstraint.And([
+        new SudokuConstraint.Given('R1C1', 1, 2),
+        new SudokuConstraint.Given('R1C1', 2, 3),
+      ]),
+      new SudokuConstraint.Given('R1C1', 3),
+    ]),
+  ]);
+  const original = constraint.toString();
+  const solver = SudokuBuilder.build(constraint);
+  const givens = [];
+  const visit = h => {
+    if (h instanceof GivenCandidates) givens.push(h);
+    for (const child of h._handlers ?? []) visit(child);
+  };
+  for (const h of solver._internalSolver._handlerSet.getAll()) visit(h);
+  assert.ok(givens.length >= 3);
+  assert.ok(givens.every(h => h._valueMap === null));
+  assert.equal(constraint.toString(), original);
+  assert.ok(expected.size > 0);
+  assert.equal(solver.countSolutions(), expected.size);
+  assert.deepEqual(solver.solveAllPossibilities(), expectedCounts);
+  assert.ok(expected.has(solver.nthSolution(0).join(',')));
+  assert.equal(solver.countSolutions(), expected.size);
+  assert.equal(SudokuBuilder.build(constraint).countSolutions(), expected.size);
+});
+
 for (const type of ['Cage', 'RellikCage']) {
   await runTest(`${type} across houses inside Or preserves exactly the valid solutions`, () => {
     const base = () => new SudokuConstraint.Shape('4x4');

@@ -216,6 +216,7 @@ export class GivenCandidates extends SudokuConstraintHandler {
 
   initialize(initialGridCells, cellExclusions, geometry) {
     this.applyValues(initialGridCells, geometry.valueOffset);
+    this._valueMap = null;
     return true;
   }
 }

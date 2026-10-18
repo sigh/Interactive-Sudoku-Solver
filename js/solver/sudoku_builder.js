@@ -688,9 +688,7 @@ export class SudokuBuilder {
         case 'Given':
           {
             const cell = geometry.parseCellId(constraint.cell).cellIndex;
-            const valueMap = new Map();
-            valueMap.set(cell, constraint.values);
-            yield new HandlerModule.GivenCandidates(valueMap);
+            yield new HandlerModule.GivenCandidates([[cell, constraint.values]]);
           }
           break;
 
