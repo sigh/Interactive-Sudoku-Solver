@@ -1920,7 +1920,10 @@ export class SameValues extends SudokuConstraintHandler {
         // It's only worth short-circuiting if we have more than 2 cells per set.
         // Also only on multiple sets, to avoid applying it to the default
         // SameValues constraints added.
-        if (set.length > 2 && this._cellSets.length > 2) {
+        // Every set must remain a permutation of the settled value mask.
+        // A set without exclusions could still repeat a value after narrowing.
+        if (set.length > 2 && this._cellSets.length > 2 &&
+          this._cellSets.every(s => cellExclusions.areMutuallyExclusive(s))) {
           this._stateOffset = stateAllocator.allocate([0]);
         }
         return true;

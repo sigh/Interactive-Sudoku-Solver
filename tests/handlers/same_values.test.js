@@ -18,6 +18,30 @@ const { SameValues, InvalidConstraintError } = await import('../../js/solver/han
 const uniqueCellExclusions = () => createCellExclusions({ allUnique: true });
 const nonUniqueCellExclusions = () => createCellExclusions({ allUnique: false });
 
+await runTest('settling one distinct set must not stop checking groups which can repeat', () => {
+  for (let distinctGroups = 1; distinctGroups < 7; distinctGroups++) {
+    const context = new GridTestContext({ gridSize: [3, 3], numValues: 3 });
+    const exclusions = createCellExclusions({ allUnique: false, numCells: 9 });
+    const sets = [[0, 1, 2], [3, 4, 5], [6, 7, 8]];
+    for (let group = 0; group < 3; group++) {
+      if (!(distinctGroups & (1 << group))) continue;
+      for (let i = 0; i < 3; i++) {
+        for (let j = i + 1; j < 3; j++) {
+          exclusions.addMutualExclusion(sets[group][i], sets[group][j]);
+        }
+      }
+    }
+    const handler = new SameValues(...sets);
+    assert.equal(context.initializeHandler(handler, { cellExclusions: exclusions }), true);
+    assert.equal(handler.enforceConsistency(context.grid, createAccumulator()), true);
+
+    const repeatGroup = sets.find((_, group) => !(distinctGroups & (1 << group)));
+    for (const cell of repeatGroup) context.grid[cell] = valueMask(1);
+    assert.equal(handler.enforceConsistency(context.grid, createAccumulator()), false,
+      `the repeated group is incompatible with distinctness pattern ${distinctGroups}`);
+  }
+});
+
 await runTest('SameValues should reject uneven set sizes', () => {
   assert.throws(
     () => new SameValues([0, 1], [2]),
