@@ -567,18 +567,16 @@ export class SudokuConstraintOptimizer {
   }
 
   _optimizeSums(handlerSet, cellExclusions, boxRegions, geometry, effectiveValueInfo) {
-    // TODO: Consider how this interacts with fixed cells.
+    // Keep fixed cells in region coverage; propagation accounts for their values.
     const allSumHandlers = handlerSet.getAllofType(SumHandlerModule.Sum);
     if (allSumHandlers.length === 0) return;
-    // Exclude any handlers with duplicate cells from any of the optimizations.
-    // TODO: Check which optimizations are still valid.
-    // Also exclude 0-cell handlers (e.g. from cancelled makeEqual) as they
-    // have no cells to optimize over.
-    const safeSumHandlers = allSumHandlers.filter(
+
+    // Set-based deductions require each cell to contribute exactly once.
+    const unitSumHandlers = allSumHandlers.filter(
       h => h.onlyUnitCoeffs() && h.cells.length > 0);
 
     const filteredSumHandlers =
-      this._findNonOverlappingSubset(safeSumHandlers, handlerSet);
+      this._findNonOverlappingSubset(unitSumHandlers, handlerSet);
 
     handlerSet.addNonEssential(
       ...this._fillInSumGap(filteredSumHandlers, geometry));
@@ -589,10 +587,10 @@ export class SudokuConstraintOptimizer {
         effectiveValueInfo.count, effectiveValueInfo.sum));
 
     handlerSet.addNonEssential(
-      ...this._makeHiddenCageHandlers(handlerSet, safeSumHandlers, cellExclusions, geometry));
+      ...this._makeHiddenCageHandlers(handlerSet, unitSumHandlers, cellExclusions, geometry));
 
     handlerSet.addNonEssential(
-      ...this._makeCombinedSumHandlers(safeSumHandlers, cellExclusions, geometry));
+      ...this._makeCombinedSumHandlers(unitSumHandlers, cellExclusions, geometry));
 
     this._replaceSizeSpecificSumHandlers(handlerSet, cellExclusions, geometry);
 
