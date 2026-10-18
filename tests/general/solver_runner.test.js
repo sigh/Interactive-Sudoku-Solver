@@ -1274,6 +1274,229 @@ await runTest('a replaced solve\'s build failure is not reported', async () => {
   });
 });
 
+// Exercise the real asynchronous worker factory with a controllable transport.
+const withFactoryWorkers = async (fn) => {
+  const savedWorker = globalThis.Worker;
+  const hadWorker = Object.hasOwn(globalThis, 'Worker');
+  const savedPool = SolverProxy._unusedWorkers;
+  const savedFactory = SolverProxy.makeSolver;
+  const workers = [];
+  globalThis.Worker = class extends DelayedWorker {
+    constructor() { super(); workers.push(this); }
+  };
+  SolverProxy._unusedWorkers = [];
+  SolverProxy.makeSolver = originalMakeSolver;
+  try {
+    await fn(workers);
+  } finally {
+    for (const worker of workers) worker.terminate();
+    if (hadWorker) globalThis.Worker = savedWorker;
+    else delete globalThis.Worker;
+    SolverProxy._unusedWorkers = savedPool;
+    SolverProxy.makeSolver = savedFactory;
+  }
+};
+
+await runTest('an already aborted factory request does not create a worker', async () => {
+  await withFactoryWorkers(async (workers) => {
+    const controller = new AbortController();
+    const request = originalMakeSolver(makeSimpleConstraint(), null, null, null, controller.signal);
+    controller.abort();
+    await assert.rejects(request, { name: 'AbortedError' });
+    assert.equal(workers.length, 0);
+  });
+});
+
+await runTest('replacing pending initialization kills it before any reply and the next solve works', async () => {
+  await withFactoryWorkers(async (workers) => {
+    const states = [], errors = [];
+    const runner = new SolverRunner({ stateHandler: s => states.push(s), onError: e => errors.push(e) });
+    let firstSettled = false;
+    const first = runner.solve(makeSimpleConstraint()).then(() => { firstSettled = true; });
+    await waitForSettle();
+    assert.equal(workers[0].messages[0].method, 'init');
+    const second = runner.solve(makeSimpleConstraint(), { mode: Modes.COUNT_SOLUTIONS.NAME });
+    await waitForSettle();
+    assert.equal(firstSettled, true, 'cancellation must settle without an init result');
+    assert.equal(workers[0].terminated, true);
+    assert.equal(SolverProxy._unusedWorkers.includes(workers[0]), false);
+    assert.equal(SolverProxy._unusedWorkers.length, 0);
+    workers[0].emit({ type: 'state', state: { done: true } });
+    workers[0].emit({ type: 'result', result: true });
+    assert.deepEqual(states, []);
+    workers[1].emit({ type: 'result', result: true });
+    const handler = await second;
+    await waitForSettle();
+    assert.equal(workers[1].messages.at(-1).method, 'countSolutions');
+    workers[1].emit({ type: 'state', state: { done: true } });
+    workers[1].emit({ type: 'result', result: 1 });
+    await waitForSettle();
+    assert.equal(handler.isDone(), true);
+    runner.abort();
+    assert.equal(SolverProxy._unusedWorkers.includes(workers[1]), true);
+    assert.equal(workers[1].terminated, false);
+    assert.equal(SolverProxy._unusedWorkers.length, 1);
+    assert.deepEqual(errors, []);
+    await first;
+  });
+});
+
+await runTest('the factory signal stops owning cancellation once initialization completes', async () => {
+  await withFactoryWorkers(async (workers) => {
+    const controller = new AbortController();
+    const request = originalMakeSolver(makeSimpleConstraint(), null, null, null, controller.signal);
+    await waitForSettle();
+    workers[0].emit({ type: 'result', result: true });
+    const proxy = await request;
+    controller.abort();
+    assert.equal(proxy.isTerminated(), false, 'the caller owns the initialized proxy');
+    proxy.terminate();
+    assert.equal(SolverProxy._unusedWorkers.includes(workers[0]), true);
+  });
+});
+
+await runTest('initialization errors preserve their details and remove the abort listener', async () => {
+  await withFactoryWorkers(async (workers) => {
+    const controller = new AbortController();
+    let added = 0, removed = 0;
+    const signal = {
+      get aborted() { return controller.signal.aborted; },
+      addEventListener(...args) { added++; controller.signal.addEventListener(...args); },
+      removeEventListener(...args) { removed++; controller.signal.removeEventListener(...args); },
+    };
+    const request = originalMakeSolver(makeSimpleConstraint(), null, null, null, signal);
+    await waitForSettle();
+    workers[0].emit({ type: 'exception', method: 'init', error: {
+      name: 'InvalidConstraintError', message: 'invalid region', stack: 'worker initialization stack',
+    } });
+    await assert.rejects(request, { name: 'InvalidConstraintError', message: 'invalid region', workerMethod: 'init' });
+    assert.equal(added, 1);
+    assert.equal(removed, 1);
+  });
+});
+
+await runTest('abort from an initialization status callback does not post to a terminated proxy', async () => {
+  await withFactoryWorkers(async (workers) => {
+    const controller = new AbortController();
+    const request = originalMakeSolver(makeSimpleConstraint(), null,
+      (active, method) => { if (active && method === 'init') controller.abort(); },
+      null, controller.signal);
+    await assert.rejects(request, { name: 'AbortedError' });
+    assert.equal(workers[0].messages.length, 0);
+    assert.equal(SolverProxy._unusedWorkers.includes(workers[0]), true);
+  });
+});
+
+await runTest('failed factory builds release one worker for retries and a later successful request', async () => {
+  await withFactoryWorkers(async (workers) => {
+    for (let i = 0; i < 2; i++) {
+      const request = originalMakeSolver(makeSimpleConstraint());
+      await waitForSettle();
+      assert.equal(workers.length, 1);
+      workers[0].emit({ type: 'exception', method: 'init', error: {
+        name: 'InvalidConstraintError', message: 'invalid region', stack: 'worker stack',
+      } });
+      await assert.rejects(request, { name: 'InvalidConstraintError', message: 'invalid region',
+        stack: 'worker stack', workerMethod: 'init' });
+      assert.deepEqual(SolverProxy._unusedWorkers, [workers[0]]);
+      assert.equal(workers[0]._listeners.size, 0);
+      workers[0].emit({ type: 'state', state: { done: true } });
+    }
+    const request = originalMakeSolver(makeSimpleConstraint());
+    await waitForSettle();
+    assert.equal(workers.length, 1);
+    workers[0].emit({ type: 'result', result: true });
+    const proxy = await request;
+    const count = proxy.countSolutions();
+    workers[0].emit({ type: 'result', result: 288 });
+    assert.equal(await count, 288);
+    proxy.terminate();
+    assert.deepEqual(SolverProxy._unusedWorkers, [workers[0]]);
+    assert.equal(workers[0]._listeners.size, 0);
+  });
+});
+
+await runTest('a failed send rejects its request and permits the next request', async () => {
+  const worker = new DelayedWorker();
+  const statuses = [];
+  const proxy = new SolverProxy(worker, null, (active, method) => statuses.push([active, method]));
+  proxy._initialized = true;
+  const postMessage = worker.postMessage;
+  const error = new DOMException('uncloneable data', 'DataCloneError');
+  worker.postMessage = () => { throw error; };
+  await assert.rejects(proxy.countSolutions(), actual => actual === error);
+  assert.deepEqual(statuses, [[true, 'countSolutions'], [false, 'countSolutions']]);
+  worker.postMessage = postMessage;
+  const request = proxy.countSolutions(2);
+  assert.deepEqual(worker.messages, [{ method: 'countSolutions', payload: 2 }]);
+  worker.emit({ type: 'result', result: 1 });
+  assert.equal(await request, 1);
+  proxy.terminate();
+  assert.equal(worker.released, true);
+});
+
+await runTest('a factory send failure returns its worker and allows reinitialization', async () => {
+  await withFactoryWorkers(async (workers) => {
+    const error = new DOMException('uncloneable data', 'DataCloneError');
+    const postMessage = globalThis.Worker.prototype.postMessage;
+    let fail = true;
+    globalThis.Worker.prototype.postMessage = function (message) {
+      if (fail) throw error;
+      return postMessage.call(this, message);
+    };
+    await assert.rejects(originalMakeSolver(makeSimpleConstraint()), actual => actual === error);
+    assert.equal(workers.length, 1);
+    assert.equal(workers[0]._listeners.size, 0);
+    assert.deepEqual(SolverProxy._unusedWorkers, [workers[0]]);
+    fail = false;
+    const request = originalMakeSolver(makeSimpleConstraint());
+    await waitForSettle();
+    assert.equal(workers.length, 1);
+    workers[0].emit({ type: 'result', result: true });
+    const proxy = await request;
+    proxy.terminate();
+    assert.deepEqual(SolverProxy._unusedWorkers, [workers[0]]);
+  });
+});
+
+for (const getter of ['getCallback', 'getOptions']) {
+  await runTest(`${getter} failure does not create or acquire a worker`, async () => {
+    await withFactoryWorkers(async (workers) => {
+      const error = new Error(`invalid debug ${getter}`);
+      const debugHandler = { getCallback: () => null, getOptions: () => ({}) };
+      debugHandler[getter] = () => { throw error; };
+      const request = () => originalMakeSolver(makeSimpleConstraint(), null, null, debugHandler);
+      await assert.rejects(request(), actual => actual === error);
+      assert.equal(workers.length, 0);
+      assert.deepEqual(SolverProxy._unusedWorkers, []);
+
+      const idle = new Worker();
+      SolverProxy._unusedWorkers.push(idle);
+      await assert.rejects(request(), actual => actual === error);
+      assert.equal(workers.length, 1);
+      assert.deepEqual(SolverProxy._unusedWorkers, [idle]);
+      assert.equal(idle.messages.length, 0);
+      assert.equal(idle._listeners.size, 0);
+      assert.equal(idle.terminated, false);
+    });
+  });
+}
+
+await runTest('abort during debug configuration does not acquire a worker', async () => {
+  await withFactoryWorkers(async (workers) => {
+    for (const getter of ['getCallback', 'getOptions']) {
+      const controller = new AbortController();
+      const debugHandler = { getCallback: () => null, getOptions: () => ({}) };
+      debugHandler[getter] = () => { controller.abort(); return null; };
+      await assert.rejects(
+        originalMakeSolver(makeSimpleConstraint(), null, null, debugHandler, controller.signal),
+        { name: 'AbortedError' });
+      assert.equal(workers.length, 0);
+      assert.deepEqual(SolverProxy._unusedWorkers, []);
+    }
+  });
+});
+
 // ============================================================================
 // Cleanup
 // ============================================================================

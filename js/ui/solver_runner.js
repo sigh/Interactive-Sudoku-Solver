@@ -23,6 +23,10 @@ class SolverSession {
     return this._abortController.signal.aborted;
   }
 
+  getAbortSignal() {
+    return this._abortController.signal;
+  }
+
   terminate() {
     this._abortController.abort();
     this._solver?.terminate();
@@ -567,7 +571,8 @@ export class SolverRunner {
           this._isSolving = isSolving;
           this._statusHandler(isSolving, method);
         },
-        debugHandler
+        debugHandler,
+        session.getAbortSignal()
       );
     } catch (e) {
       if (session.isAborted()) return;
@@ -739,9 +744,12 @@ export class SolverProxy {
 
   static _unusedWorkers = [];
 
-  static async makeSolver(constraints, stateHandler, statusHandler, debugHandler) {
+  static async makeSolver(constraints, stateHandler, statusHandler, debugHandler, abortSignal = null) {
     // Ensure any pending terminations are enacted.
     await new Promise(r => setTimeout(r, 0));
+    const debugCallback = debugHandler?.getCallback();
+    const debugOptions = debugHandler?.getOptions();
+    if (abortSignal?.aborted) throw new AbortedError('Aborted solver initialization');
 
     if (!this._unusedWorkers.length) {
       const worker = new Worker(
@@ -753,10 +761,21 @@ export class SolverProxy {
 
     const solverProxy = new SolverProxy(
       worker, stateHandler, statusHandler,
-      debugHandler?.getCallback());
-    await solverProxy.init(
-      constraints, this.LOG_UPDATE_FREQUENCY,
-      debugHandler?.getOptions());
+      debugCallback);
+    // During init the session has no proxy yet; its signal owns cancellation.
+    const onAbort = () => solverProxy.terminate();
+    abortSignal?.addEventListener('abort', onAbort, { once: true });
+    try {
+      await solverProxy.init(
+        constraints, this.LOG_UPDATE_FREQUENCY,
+        debugOptions);
+    } catch (error) {
+      solverProxy.terminate();
+      if (abortSignal?.aborted) throw new AbortedError('Aborted solver initialization');
+      throw error;
+    } finally {
+      abortSignal?.removeEventListener('abort', onAbort);
+    }
     return solverProxy;
   }
 
@@ -858,10 +877,16 @@ export class SolverProxy {
       }
     });
 
-    this._worker.postMessage({
-      method: method,
-      payload: payload,
-    });
+    try {
+      this._worker.postMessage({
+        method: method,
+        payload: payload,
+      });
+    } catch (error) {
+      this._waiting.reject(error);
+      this._waiting = null;
+      this._statusHandler(false, method);
+    }
 
     return promise;
   }
