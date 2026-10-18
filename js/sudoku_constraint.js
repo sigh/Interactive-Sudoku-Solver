@@ -82,6 +82,17 @@ export class SudokuConstraintBase {
     this.type = this.constructor.name;
   }
 
+  // Send only constructor inputs; the worker rebuilds derived instance fields.
+  toWorkerData() {
+    const data = { type: this.type, args: this.args };
+    if (this.constructor.IS_COMPOSITE) {
+      // resolveConstraint reads children separately and replaces args[0].
+      data.args = [null, ...this.args.slice(1)];
+      data.constraints = (this.constraints || []).map(c => c.toWorkerData());
+    }
+    return data;
+  }
+
   static *makeFromArgs(args, geometry) {
     yield new this(...args);
   }

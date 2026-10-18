@@ -7,6 +7,28 @@ ensureGlobalEnvironment();
 
 const { CellGeometry } = await import('../../js/cell_geometry.js');
 const { SudokuConstraintBase, SudokuConstraint } = await import('../../js/sudoku_constraint.js');
+const { SudokuBuilder } = await import('../../js/solver/sudoku_builder.js');
+
+await runTest('worker definitions rebuild the same ordered constraints without mutating inputs', () => {
+  const C = SudokuConstraint;
+  const and = new C.And([new C.Given('R1C1', 1)]);
+  // The live children are authoritative even if args still refers to an old array.
+  and.constraints = [new C.Given('R1C1', 1, 2), new C.Given('R1C1', 2, 3)];
+  const constraint = new C.Container([
+    new C.Shape('4x4'), new C.Var('A', 'extra . ~ cells', 2),
+    new C.Or([and, new C.Given('R1C1', 3)]),
+    new C.Replicate([new C.Thermo('R1C1', 'R1C2')], 'B', 'R2C1'),
+    new C.EqualSum(['R1C1', 'VA1'], ['R1C2', 'VA2']),
+    new C.Sum('0_=_1_-1', 'VA1', 'VA2'),
+    new C.Regex('[12]', 'R1C1'), new C.Regex('[23]', 'R1C1'),
+  ]);
+  const before = structuredClone(constraint);
+  const expected = SudokuBuilder.resolveConstraint(before);
+  const raw = constraint.toWorkerData();
+  assert.deepEqual(SudokuBuilder.resolveConstraint(structuredClone(raw)), expected);
+  assert.deepEqual(structuredClone(constraint), before);
+  assert.equal(constraint.constraints[2].constraints[0], and);
+});
 
 await runTest('RegionSize rejects excess constructor arguments', () => {
   assert.throws(

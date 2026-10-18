@@ -870,7 +870,7 @@ export class SolverProxy {
     this._initialized = true;
     await this._callWorker(
       'init',
-      { constraint, logUpdateFrequency, debugOptions });
+      { constraint: constraint.toWorkerData(), logUpdateFrequency, debugOptions });
   }
 
   terminate() {

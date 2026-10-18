@@ -330,6 +330,36 @@ await runTest('solve should call statusHandler when solving starts/ends', async 
 // SolverProxy worker protocol
 // ============================================================================
 
+await runTest('SolverProxy init sends reconstructable constructor data and preserves options', async () => {
+  const worker = new DelayedWorker();
+  const proxy = new SolverProxy(worker);
+  const constraint = new SudokuConstraint.Container([
+    new SudokuConstraint.Shape('4x4'),
+    new SudokuConstraint.Or([
+      new SudokuConstraint.And([
+        new SudokuConstraint.Given('R1C1', 1, 2),
+        new SudokuConstraint.Given('R1C1', 2, 3),
+      ]),
+      new SudokuConstraint.Given('R1C1', 3),
+    ]),
+  ]);
+  const before = structuredClone(constraint);
+  const options = { logLevel: 2 };
+  const call = proxy.init(constraint, 13, options);
+  const message = worker.messages[0];
+  assert.equal(message.method, 'init');
+  assert.equal(message.payload.logUpdateFrequency, 13);
+  assert.equal(message.payload.debugOptions, options);
+  assert.equal(Object.getPrototypeOf(message.payload.constraint), Object.prototype);
+  assert.deepEqual(
+    SudokuBuilder.resolveConstraint(structuredClone(message.payload.constraint)),
+    SudokuBuilder.resolveConstraint(before));
+  assert.deepEqual(structuredClone(constraint), before);
+  worker.emit({ type: 'result', result: true });
+  await call;
+  proxy.terminate();
+});
+
 await runTest('SolverProxy rejects concurrent calls until delayed result resolves', async () => {
   const worker = new DelayedWorker();
   const statusCalls = [];

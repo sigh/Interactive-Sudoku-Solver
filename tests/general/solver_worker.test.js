@@ -102,6 +102,53 @@ await runTest('an unknown method is sent as an exception', async () => {
   assert.match(reply.error.message, /Unknown method noSuchMethod/);
 });
 
+await runTest('minimal definitions preserve compound-rule counts, candidates and step output', async () => {
+  const C = SudokuConstraint;
+  const geometry = empty4x4().getGeometry();
+  const target = C.Replicate.encodeTargetCells(['R1C1', 'R2C1'], 'R1C1', geometry);
+  const constraint = new C.Container([
+    new C.Shape('4x4'),
+    new C.Or([
+      new C.And([new C.Given('R1C1', 1, 2), new C.Given('R1C1', 2, 3)]),
+      new C.Given('R1C1', 1),
+    ]),
+    new C.Replicate([new C.Thermo('R1C1', 'R1C2')], target, 'R1C1'),
+    new C.EqualSum(['R1C1', 'R1C2'], ['R2C1', 'R2C2']),
+    new C.Regex('[12]', 'R1C1'),
+  ]);
+  const run = async (definition, method, payload) => {
+    const replies = await init(definition, 2);
+    assert.equal(replies.at(-1).type, 'result');
+    const output = await send(method, payload);
+    assert.equal(output.at(-1).type, 'result');
+    return {
+      result: output.at(-1).result,
+      states: output.filter(m => m.type === 'state').map(m => ({
+        counters: m.state.counters, done: m.state.done, extra: m.state.extra,
+      })),
+    };
+  };
+  for (const [method, payload] of [
+    ['countSolutions'], ['solveAllPossibilities', { candidateSupportThreshold: 3 }],
+    ['nthStep', [3, new Map()]],
+  ]) {
+    const full = await run(constraint, method, payload);
+    const minimal = await run(constraint.toWorkerData(), method, payload);
+    assert.deepEqual(minimal, full);
+    if (method === 'countSolutions') assert.ok(full.result > 0 && full.result < 288);
+  }
+});
+
+await runTest('minimal definitions preserve worker errors and allow subsequent valid initialization', async () => {
+  const constraint = new SudokuConstraint.Jigsaw('R1C1', 'R1C2');
+  const full = (await init(constraint))[0];
+  const minimal = (await init(constraint.toWorkerData()))[0];
+  for (const key of ['type', 'method']) assert.equal(minimal[key], full[key]);
+  for (const key of ['name', 'message']) assert.equal(minimal.error[key], full.error[key]);
+  assert.equal((await init(empty4x4().toWorkerData())).at(-1).type, 'result');
+  assert.equal((await send('countSolutions')).at(-1).result, 288);
+});
+
 // Remove what the worker installed, so later test files don't see it.
 for (const name of ['onmessage', 'postMessage', 'debugCount', 'debugSet']) {
   delete globalThis[name];
