@@ -3493,10 +3493,11 @@ export class FullRank extends SudokuConstraintHandler {
 
     this._allEntries = entries;
 
-    // Buffers used by _rejectFixedTies(). Allocate once per geometry so they can
-    // be reused and sorting works naturally.
-    this._seenPairsBuffer = new Uint32Array(geometry.numValues * 4);
-    this._pairBitSetsBuffer = new Uint16Array(geometry.numValues);
+    // Reuse these buffers for the fixed-entry tie check in _enforceUniqueRanks().
+    if (this._tieMode === FullRank.TIE_MODE.NONE) {
+      this._seenPairsBuffer = new Uint32Array(geometry.numValues * 4);
+      this._pairBitSetsBuffer = new Uint16Array(geometry.numValues);
+    }
 
     // Group entries with the same initial values.
     // i.e. the same int((rank+3)/4)
@@ -3652,10 +3653,12 @@ export class FullRank extends SudokuConstraintHandler {
     const entryLength = entry.length;
 
     const flagsBuffer = this._flagsBuffer;
-    const IS_SET_FLAG = 1;
+    // The entry's first digit is fixed to this rank-set value.
+    const IS_IN_RANK_SET = 1;
     const IS_LESS_FLAG = 2;
     const IS_GREATER_FLAG = 4;
-    const IS_NOT_EQUAL = 8;
+    // Equality is ruled out by the domains or, after normalization, the tie mode.
+    const CANNOT_TIE = 8;
     const IS_EITHER_SIDE = IS_LESS_FLAG | IS_GREATER_FLAG;
 
     let maybeLessCount = 0;
@@ -3663,14 +3666,10 @@ export class FullRank extends SudokuConstraintHandler {
     let fixedLessCount = 0;
     let fixedGreaterCount = 0;
 
-    // Permissive clues need to explicitly track the not-equal state
-    // to determine if entries are strictly less/greater.
-    const fixedBaseFlags = IS_SET_FLAG | (permissiveClues ? IS_NOT_EQUAL : 0);
-
     for (let i = 0; i < numViableEntries; i++) {
       const e = entries[viableEntries[i]];
 
-      let flags = grid[e[0]] === initialV ? IS_SET_FLAG : 0;
+      let flags = grid[e[0]] === initialV ? IS_IN_RANK_SET : 0;
 
       // Mask out values which are assumed to be fixed (equal) in the preceding
       // cells. At each iteration, we are assuming that all previous values
@@ -3688,7 +3687,7 @@ export class FullRank extends SudokuConstraintHandler {
 
         if (maxE > minEntry) flags |= IS_GREATER_FLAG;
         if (minE < maxEntry) flags |= IS_LESS_FLAG;
-        if ((entryV & eV) === 0) flags |= IS_NOT_EQUAL;
+        if ((entryV & eV) === 0) flags |= CANNOT_TIE;
 
         // Break if we've:
         //  - found both possibilities;
@@ -3710,28 +3709,25 @@ export class FullRank extends SudokuConstraintHandler {
       // provably <, >, nor provably != the clued entry, then it is a forced
       // whole-entry tie candidate, which would imply the clued rank is tied.
       if (!permissiveClues) {
-        if (flags === IS_SET_FLAG) {
-          // (IS_LESS_FLAG | IS_GREATER_FLAG | IS_NOT_EQUAL) === 0
+        if (flags === IS_IN_RANK_SET) {
+          // (IS_LESS_FLAG | IS_GREATER_FLAG | CANNOT_TIE) === 0
           return false;
         }
 
-        // TODO: We can utilize IS_NOT_EQUAL better, but for now this is
-        // to ensure that the non-permissive clues work correctly.
-        flags |= IS_NOT_EQUAL;
+        // These modes forbid ties with clued entries even when the domains
+        // alone do not rule out equality.
+        flags |= CANNOT_TIE;
       }
 
       flagsBuffer[i] = flags;
 
-      const hasLess = (flags & IS_LESS_FLAG) !== 0;
-      const hasGreater = (flags & IS_GREATER_FLAG) !== 0;
-
-      if (hasGreater) {
+      if (flags & IS_GREATER_FLAG) {
         maybeGreaterCount++;
-        if (!hasLess && (~flags & fixedBaseFlags) === 0) fixedGreaterCount++;
+        if (flags === (IS_IN_RANK_SET | IS_GREATER_FLAG | CANNOT_TIE)) fixedGreaterCount++;
       }
-      if (hasLess) {
+      if (flags & IS_LESS_FLAG) {
         maybeLessCount++;
-        if (!hasGreater && (~flags & fixedBaseFlags) === 0) fixedLessCount++;
+        if (flags === (IS_IN_RANK_SET | IS_LESS_FLAG | CANNOT_TIE)) fixedLessCount++;
       }
     }
 
@@ -3752,12 +3748,12 @@ export class FullRank extends SudokuConstraintHandler {
       // If all viable set entries fill up the required slots, then any other
       // viable entries must be excluded.
       for (let i = 0; i < numViableEntries; i++) {
-        if (flagsBuffer[i] === (IS_LESS_FLAG | IS_NOT_EQUAL)) {
+        if (flagsBuffer[i] === (IS_LESS_FLAG | CANNOT_TIE)) {
           // This entry only had the invalid direction, so we can exclude it.
           const cell = entries[viableEntries[i]][0];
           grid[cell] &= ~initialV;
           pQueue.addForCell(cell);
-        } else if (flagsBuffer[i] === (IS_LESS_FLAG | IS_GREATER_FLAG | IS_SET_FLAG | IS_NOT_EQUAL)) {
+        } else if (flagsBuffer[i] === (IS_LESS_FLAG | IS_GREATER_FLAG | IS_IN_RANK_SET | CANNOT_TIE)) {
           // This entry must be included, but currently allows both directions.
           // Try to constraint it to just the valid direction.
           if (!this._enforceOrderedEntryPair(grid, pQueue,
@@ -3781,11 +3777,11 @@ export class FullRank extends SudokuConstraintHandler {
       }
     } else if (fixedGreaterCount === numRanksAbove && maybeGreaterCount > numRanksAbove) {
       for (let i = 0; i < numViableEntries; i++) {
-        if (flagsBuffer[i] === (IS_GREATER_FLAG | IS_NOT_EQUAL)) {
+        if (flagsBuffer[i] === (IS_GREATER_FLAG | CANNOT_TIE)) {
           const cell = entries[viableEntries[i]][0];
           grid[cell] &= ~initialV;
           pQueue.addForCell(cell);
-        } else if (flagsBuffer[i] === (IS_LESS_FLAG | IS_GREATER_FLAG | IS_SET_FLAG | IS_NOT_EQUAL)) {
+        } else if (flagsBuffer[i] === (IS_LESS_FLAG | IS_GREATER_FLAG | IS_IN_RANK_SET | CANNOT_TIE)) {
           if (!this._enforceOrderedEntryPair(grid, pQueue,
             entries[viableEntries[i]], entry)) {
             return false;
