@@ -253,7 +253,12 @@ const solutionString = (grid, geometry) => {
 // With `solutionGroup` (Var group prefixes), the result also gains `groupSolution`:
 // the first solution read off those groups, for an answer the main grid does not
 // hold (#2121).
-export const runSolve = (puzzle, { maxBacktracks, maxSolutions, collectSolutions, solutionGroup }, onSolver) => {
+export const runSolve = (puzzle, { maxBacktracks, maxSolutions, collectSolutions, solutionGroup, projectAnswer = false }, onSolver) => {
+  // Witness assignments are existential only when the caller explicitly opts
+  // in. Exhaust the original search: a prefix cannot prove projected uniqueness.
+  if (projectAnswer && maxSolutions !== 0) {
+    throw new Error('projectAnswer requires an all-solutions search');
+  }
   const constraint = SudokuParser.parseText(resolveInput(puzzle.input));
   const geometry = constraint.getGeometry();
   // Reconstruct constraint instances from their type+args, as the worker and
@@ -270,17 +275,23 @@ export const runSolve = (puzzle, { maxBacktracks, maxSolutions, collectSolutions
 
   let firstGrid = null;
   const solutionSet = collectSolutions ? [] : null;
+  const answers = projectAnswer ? new Set() : null;
   const start = performance.now();
   try {
     internal.run(Object.keys(mode).length ? mode : null, (grid) => {
       if (!firstGrid) firstGrid = grid.slice(0, solutionGroup ? undefined : geometry.numGridCells);
       if (solutionSet) solutionSet.push(solutionString(grid, geometry));
+      if (answers) answers.add(solutionGroup
+        ? groupSolutionString(grid, solver.geometry(), solutionGroup)
+        : solutionString(grid, geometry));
     });
   } finally { cleanup?.(); }
   const elapsedMs = performance.now() - start;
   solutionSet?.sort();
 
   const counters = { ...internal.counters };
+  const solutionAssignments = counters.solutions;
+  if (answers) counters.solutions = answers.size;
   const exhausted = internal.state === internal.constructor.STATE_EXHAUSTED;
   const capped = !exhausted && maxBacktracks > 0 && counters.backtracks >= maxBacktracks;
   const actual = solutionString(firstGrid, geometry);
@@ -299,6 +310,7 @@ export const runSolve = (puzzle, { maxBacktracks, maxSolutions, collectSolutions
     solution: actual,
   };
   if (solutionSet) result.solutionSet = solutionSet;
+  if (answers) result.solutionAssignments = solutionAssignments;
   // The solver's own geometry: the one its var cells were registered on, so the
   // indexes are the grid's.
   if (solutionGroup) result.groupSolution = groupSolutionString(firstGrid, solver.geometry(), solutionGroup);

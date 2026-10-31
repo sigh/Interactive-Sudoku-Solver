@@ -46,6 +46,9 @@
 //                         Also report each row's first solution read off these Var
 //                         groups (`groupSolution`), for an answer the main grid does
 //                         not hold. Same order and spelling verify_solution.js pins.
+//   --project-answer     Count distinct boards (or --solution-group answers),
+//                         retaining solutionAssignments for existential witnesses.
+//                         Requires --solutions all; caps and search are unchanged.
 //   --json                Emit a JSON array of result rows instead of TSV — a
 //                         stable, machine-readable contract for tooling (e.g.
 //                         bench_vs_ref.js). Each row: { puzzle, status, solutions,
@@ -83,7 +86,7 @@ const parseArgs = (argv) => {
   const args = {
     maxBacktracksRaw: undefined, puzzles: ['Chaos Construction'], solutionsRaw: undefined,
     ablate: [], compare: [], repeat: 1, help: false, listAblations: false, json: false,
-    requireSameSolutions: false, solutionGroup: null,
+    requireSameSolutions: false, solutionGroup: null, projectAnswer: false,
   };
   for (let i = 2; i < argv.length; i++) {
     const [key, inlineValue] = argv[i].split(/=(.*)/s);
@@ -100,6 +103,7 @@ const parseArgs = (argv) => {
       case '--input-file': args.puzzles = ['input:' + readFileSync(next(), 'utf8').trim()]; break;
       case '--ablate': args.ablate = parseList(next()); break;
       case '--solution-group': args.solutionGroup = parseList(next()); break;
+      case '--project-answer': args.projectAnswer = true; break;
       case '--compare': args.compare = parseList(next()); break;
       case '--require-same-solutions': args.requireSameSolutions = true; break;
       default: throw new Error(`unknown argument: ${argv[i]}`);
@@ -122,6 +126,7 @@ const usage = () => console.log(
   `                             sets are identical on every puzzle (soundness gate).\n` +
   `  --repeat <n>               Re-solve n times; report best (ms), median and max (default 1).\n` +
   `  --solution-group <p,...>   Also report the first solution read off these Var groups.\n` +
+  `  --project-answer          Count distinct answers, ignoring witness assignments; requires --solutions all.\n` +
   `  --json                     Emit JSON rows instead of TSV (machine-readable).\n` +
   `  --list-ablations           List available ablations.\n` +
   `\nLadders: ladder:<puzzle name>[@25-15-5] reveals solution givens to grade any solved puzzle.`);
@@ -172,6 +177,7 @@ const toRow = (r, variant, vsBase) => {
     solution: r.solution,
   };
   if (r.groupSolution !== undefined) row.groupSolution = r.groupSolution;
+  if (r.solutionAssignments !== undefined) row.solutionAssignments = r.solutionAssignments;
   const extra = extraCounters(r.counters);
   if (extra) row.extra = extra;
   if (variant !== undefined) row.variant = variant;
@@ -327,7 +333,7 @@ const main = async () => {
   const puzzles = await materializePuzzles(resolvePuzzles(args.puzzles));
   const budgets = {
     maxBacktracks, maxSolutions, collectSolutions: args.requireSameSolutions,
-    solutionGroup: args.solutionGroup,
+    solutionGroup: args.solutionGroup, projectAnswer: args.projectAnswer,
   };
 
   // Buffer rows; render the aligned table (or JSON) once the run completes.
