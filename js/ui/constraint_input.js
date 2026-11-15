@@ -4,7 +4,6 @@ const {
   deferUntilAnimationFrame,
   sessionAndLocalStorage,
   toggleDisabled,
-  MultiMap,
   isIterable
 } = await import('../util.js' + self.VERSION_PARAM);
 const {
@@ -734,7 +733,6 @@ class MultiCellInput extends ConstraintCategoryInput {
 
     this._constraintClasses = this.constructor.constraintClasses();
     this._typeMap = new Map();
-    this._validationFns = new MultiMap();
 
     this._selectionForm = form;
     this._setUp(form, this._constraintClasses, inputManager);
@@ -857,6 +855,7 @@ class MultiCellInput extends ConstraintCategoryInput {
       option.title = constraintClass.DESCRIPTION.replace(/\s+/g, ' ').replace(/^\s/, '');
       selectElem.appendChild(option);
       typeData.elem = option;
+      typeData.constraintClass = constraintClass;
 
       if (constraintClass.ARGUMENT_CONFIG) {
         const argConfig = constraintClass.ARGUMENT_CONFIG;
@@ -906,11 +905,6 @@ class MultiCellInput extends ConstraintCategoryInput {
         typeData.valueElem = input;
         valueElems.push(input);
       }
-
-      // Validation functions are grouped so that each only needs to be
-      // called once.
-      this._validationFns.add(
-        constraintClass.VALIDATE_CELLS_FN, option);
     }
 
     // Update the form based on the selected constraint.
@@ -990,15 +984,8 @@ class MultiCellInput extends ConstraintCategoryInput {
       return;
     }
 
-    const isSingleCell = selection.length === 1;
-
-    for (const [validationFn, elems] of this._validationFns) {
-      // Call the validation function, or by default disallow single cell
-      // selections.
-      const isValid = (
-        validationFn ? validationFn(selection, this._geometry) : !isSingleCell);
-
-      for (const elem of elems) elem.disabled = !isValid;
+    for (const { elem, constraintClass } of this._typeMap.values()) {
+      elem.disabled = !constraintClass.isValidCells(selection, this._geometry);
     }
 
     // Disable the add button if the current value is not valid.

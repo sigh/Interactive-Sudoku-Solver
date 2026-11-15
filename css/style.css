@@ -538,6 +538,21 @@ button.copy-to-clipboard-failed::after {
   fill: rgb(200, 250, 250);
 }
 
+.highlight-group>.cell-edit-added,
+.highlight-group>.cell-edit-removed {
+  opacity: 0.6;
+  stroke: rgba(0, 0, 0, 1);
+  stroke-width: 1px;
+}
+
+.highlight-group>.cell-edit-added {
+  fill: var(--color-highlight);
+}
+
+.highlight-group>.cell-edit-removed {
+  fill: var(--color-danger);
+}
+
 .highlight-group>.selected-constraint {
   fill: var(--color-selection);
   opacity: 0.7;
@@ -673,19 +688,24 @@ button.copy-to-clipboard-failed::after {
   color: var(--color-danger);
 }
 
-.chip>button.chip-load-button {
+.chip>button.chip-action-button {
   padding: 0;
   opacity: 0.6;
 }
 
-.chip>button.chip-load-button img {
+.chip>button.chip-action-button img {
   width: 16px;
   height: 16px;
   vertical-align: middle;
 }
 
-.chip>button.chip-load-button:hover {
+.chip>button.chip-action-button:hover {
   opacity: 1;
+}
+
+.chip>button.chip-action-button.inactive {
+  opacity: 0.2;
+  cursor: default;
 }
 
 .chip .chip-view {

@@ -25,6 +25,19 @@ class ConstraintCollectionBase {
   getCollectionForComposite(constraint) {
     throw Error('Not implemented');
   }
+
+  _chipFor(constraint) { throw Error('Not implemented'); }
+
+  // Remove a constraint and add its replacement, putting the replacement's
+  // chip where the old chip was.
+  replaceConstraint(oldConstraint, newConstraint) {
+    const oldChip = this._chipFor(oldConstraint);
+    const parent = oldChip.parentNode;
+    const next = oldChip.nextElementSibling;
+    this.removeConstraint(oldConstraint);
+    this.addConstraint(newConstraint);
+    parent.insertBefore(this._chipFor(newConstraint), next);
+  }
 }
 
 
@@ -248,6 +261,10 @@ export class RootConstraintCollection extends ConstraintCollectionBase {
     return this._constraintMap.get(c)?.collection;
   }
 
+  _chipFor(c) {
+    return this._constraintMap.get(c)?.chip;
+  }
+
   getConstraintsByKey(key) {
     return this._uniquenessKeySet.getKey(key);
   }
@@ -378,6 +395,10 @@ export class CompositeConstraintCollection extends ConstraintCollectionBase {
   getCollectionForComposite(c) {
     return this._constraintMap.get(c)?.collection;
   }
+
+  _chipFor(c) {
+    return this._constraintMap.get(c)?.chip;
+  }
 }
 
 export class UniquenessKeySet {
@@ -423,7 +444,7 @@ export class UniquenessKeySet {
 }
 
 export class ConstraintChipView {
-  constructor(chipViewElement, display, chipHighlighter, constraintSelector, onUpdate, chipActionCallback) {
+  constructor(chipViewElement, display, chipHighlighter, constraintSelector, onUpdate, chipActionCallback, cellEditor) {
     this._chipViewElement = chipViewElement;
     this._chipHighlighter = chipHighlighter;
     this._constraintSelector = constraintSelector;
@@ -431,6 +452,7 @@ export class ConstraintChipView {
     this._geometry = null;
     this._onUpdate = onUpdate;
     this._chipActionCallback = chipActionCallback;
+    this._cellEditor = cellEditor;
   }
 
   reshape(geometry) {
@@ -487,19 +509,13 @@ export class ConstraintChipView {
     // Add action button for constraints that declare one.
     const chipAction = constraint.constructor.CHIP_ACTION;
     if (chipAction) {
-      const actionButton = document.createElement('button');
-      actionButton.type = 'button';
-      actionButton.className = 'chip-load-button';
-      const icon = document.createElement('img');
-      icon.src = chipAction.icon;
-      icon.alt = chipAction.title;
-      actionButton.appendChild(icon);
-      actionButton.title = chipAction.title;
-      actionButton.addEventListener('click', (e) => {
-        e.stopPropagation();
-        this._chipActionCallback?.(constraint, collection);
-      });
-      chip.appendChild(actionButton);
+      chip.appendChild(this._makeActionButton(
+        'chip-load-button', chipAction,
+        () => this._chipActionCallback?.(constraint, collection)));
+    }
+
+    if (constraint.constructor.CELLS_EDITABLE && this._cellEditor) {
+      chip.appendChild(this._makeCellEditButton(constraint, collection));
     }
 
     chip.appendChild(chipLabel);
@@ -531,6 +547,37 @@ export class ConstraintChipView {
     });
 
     return chip;
+  }
+
+  _makeActionButton(className, { icon, title }, onClick) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `chip-action-button ${className}`;
+    button.title = title;
+    const img = document.createElement('img');
+    img.src = icon;
+    img.alt = title;
+    button.appendChild(img);
+    button.addEventListener('click', (e) => {
+      e.stopPropagation();
+      onClick();
+    });
+    return button;
+  }
+
+  // Hovering previews the edit (or marks the button inactive if there is
+  // no valid edit); clicking applies it.
+  _makeCellEditButton(constraint, collection) {
+    const editor = this._cellEditor;
+    const button = this._makeActionButton(
+      'chip-edit-cells-button',
+      { icon: 'img/input-48.png', title: 'Toggle selected cells' },
+      () => editor.apply(constraint, collection));
+    button.addEventListener('mouseenter', () => {
+      button.classList.toggle('inactive', !editor.preview(constraint));
+    });
+    button.addEventListener('mouseleave', () => editor.clearPreview());
+    return button;
   }
 
   static addSubChipView(chip) {
@@ -582,6 +629,67 @@ export class ConstraintChipView {
     svg.style.filter = 'saturate(100)';
 
     return svg;
+  }
+}
+
+// Edits a constraint's cells by toggling the current selection: selected cells
+// are removed if the constraint has them, and added otherwise. An edit is
+// valid if the new cells could be used to create the constraint, and applying
+// it replaces the constraint with the edited copy.
+export class SelectionCellEditor {
+  constructor(displayContainer, getSelection) {
+    this._getSelection = getSelection;
+    this._addedHighlighter = displayContainer.createCellHighlighter(
+      'cell-edit-added');
+    this._removedHighlighter = displayContainer.createCellHighlighter(
+      'cell-edit-removed');
+    this._geometry = null;
+  }
+
+  reshape(geometry) {
+    this._geometry = geometry;
+  }
+
+  // The edited constraint and the cells it adds and removes, or null if there
+  // is no valid edit.
+  _edit(constraint) {
+    const selection = this._getSelection();
+    if (!selection.length) return null;
+    const oldCells = constraint.getCells(this._geometry);
+    const oldSet = new Set(oldCells);
+    const selected = new Set(selection);
+    const added = selection.filter(c => !oldSet.has(c));
+    const removed = oldCells.filter(c => selected.has(c));
+    const cells = [...oldCells.filter(c => !selected.has(c)), ...added];
+    if (!constraint.constructor.isValidCells(cells, this._geometry)) return null;
+    try {
+      return { edited: constraint.withCells(cells, this._geometry), added, removed };
+    } catch {
+      return null;
+    }
+  }
+
+  // Highlight the cells which an edit would add and remove. Returns whether
+  // there is a valid edit.
+  preview(constraint) {
+    this.clearPreview();
+    const edit = this._edit(constraint);
+    if (!edit) return false;
+    this._addedHighlighter.setCells(edit.added);
+    this._removedHighlighter.setCells(edit.removed);
+    return true;
+  }
+
+  apply(constraint, collection) {
+    const edit = this._edit(constraint);
+    if (!edit) return;
+    collection.replaceConstraint(constraint, edit.edited);
+  }
+
+  // Also called on every constraint update, since that invalidates a preview.
+  clearPreview() {
+    this._addedHighlighter.clear();
+    this._removedHighlighter.clear();
   }
 }
 

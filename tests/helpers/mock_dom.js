@@ -200,6 +200,8 @@ export class FakeElement {
   }
 
   insertBefore(node, ref) {
+    // As in browsers, a node already in the tree is moved.
+    node.parentElement?.removeChild(node);
     domVersion++;
     const index = this.children.indexOf(ref);
     node.parentElement = this;

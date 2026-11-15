@@ -22,6 +22,7 @@ const {
   CompositeConstraintCollection,
   ConstraintChipView,
   ConstraintSelector,
+  SelectionCellEditor,
 } = await import('./constraint_collection.js' + self.VERSION_PARAM);
 const { GridInputManager } = await import('./grid_input.js' + self.VERSION_PARAM);
 
@@ -440,15 +441,14 @@ export class ConstraintManager {
 
     // Callback for chip action buttons.
     this._chipActionCallback = (constraint, collection) => {
-      if (constraint instanceof SudokuConstraint.Replicate) {
-        constraint.toggleTargetCells(inputManager.getSelection(), this._geometry);
-        collection.updateConstraint(constraint);
-        return;
-      }
       const categoryInput = this._constraintCategoryInputs.get(
         constraint.constructor.CATEGORY);
       categoryInput.populateForm?.(constraint, this._geometry.numValues, this._geometry.valueOffset);
     };
+
+    this._cellEditor = this.addReshapeListener(new SelectionCellEditor(
+      displayContainer, () => inputManager.getSelection()));
+    this.addUpdateListener(() => this._cellEditor.clearPreview());
 
     const chipViews = new Map();
     this._chipHighlighter = displayContainer.createCellHighlighter('chip-hover');
@@ -458,7 +458,8 @@ export class ConstraintManager {
           document.querySelector(`.chip-view[data-chip-view-type="${type}"]`),
           this._display, this._chipHighlighter, this._constraintSelector,
           this.runUpdateCallback.bind(this),
-          this._chipActionCallback));
+          this._chipActionCallback,
+          this._cellEditor));
       chipViews.set(type, chipView);
     };
     this._chipViews = chipViews;
@@ -563,7 +564,8 @@ export class ConstraintManager {
       subViewElem, this._display, this._chipHighlighter,
       this._constraintSelector,
       this.runUpdateCallback.bind(this),
-      this._chipActionCallback);
+      this._chipActionCallback,
+      this._cellEditor);
     // Shape is constant for composite constraints.
     subView.reshape(this._geometry);
     return subView;

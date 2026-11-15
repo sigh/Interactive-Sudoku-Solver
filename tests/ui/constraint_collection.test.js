@@ -21,6 +21,7 @@ const pressEscape = () => {
 const {
   RootConstraintCollection, CompositeConstraintCollection,
   SelectedConstraintCollection, ConstraintChipView, ConstraintSelector,
+  SelectionCellEditor,
 } = await import('../../js/ui/constraint_collection.js');
 const { DisplayContainer } = await import('../../js/ui/display.js');
 const { ConstraintDisplay } = await import('../../js/ui/constraint_display.js');
@@ -41,16 +42,18 @@ const makePage = (geometry = CellGeometry.fromGridSize(9)) => {
     type => [type, h('div', { class: 'chip-view', 'data-chip-view-type': type })]));
   document.body.append(grid, ...Object.values(chipElems));
 
-  const page = { geometry, events: [], updates: 0, actions: [] };
+  const page = { geometry, events: [], updates: 0, actions: [], selection: [] };
   const container = new DisplayContainer(grid);
   const display = new ConstraintDisplay(
     { addSelectionPreserver() { }, onSelection() { } }, container);
   const selector = new ConstraintSelector(
     container, display, (collection) => page.selected.setCollection(collection));
   const chipHighlighter = container.createCellHighlighter('chip-hover');
+  const cellEditor = new SelectionCellEditor(container, () => page.selection);
   const makeChipView = (elem) => new ConstraintChipView(
     elem, display, chipHighlighter, selector, () => { },
-    (constraint, collection) => page.actions.push([constraint, collection]));
+    (constraint, collection) => page.actions.push([constraint, collection]),
+    cellEditor);
   const chipViews = new Map(Object.entries(chipElems).map(
     ([type, elem]) => [type, makeChipView(elem)]));
 
@@ -69,7 +72,7 @@ const makePage = (geometry = CellGeometry.fromGridSize(9)) => {
 
   // A new shape, as ConstraintManager._reshape: clear, then reshape.
   const reshapeAll = (newGeometry) => {
-    for (const listener of [container, display, selector, ...chipViews.values(), root]) {
+    for (const listener of [container, display, selector, cellEditor, ...chipViews.values(), root]) {
       listener.reshape(newGeometry);
     }
   };
@@ -83,7 +86,10 @@ const makePage = (geometry = CellGeometry.fromGridSize(9)) => {
     reshapeAll(newGeometry);
   };
   const root = new RootConstraintCollection(
-    display, chipViews, inputs, makeComposite, newShape, () => page.updates++);
+    display, chipViews, inputs, makeComposite, newShape, () => {
+      page.updates++;
+      cellEditor.clearPreview();
+    });
   reshapeAll(geometry);
   page.selected = new SelectedConstraintCollection(root);
 
@@ -122,6 +128,15 @@ await runTest('adding a constraint draws it, adds its chip, and tells its input'
   assert.equal(page.chips('ordinary').length, 0);
   assert.equal(page.events.at(-1), '-LinesAndSets .Cage~10~R1C1~R1C2');
   assert.equal(page.updates, 2);
+});
+
+await runTest('extra cells can be added alongside a jigsaw', () => {
+  const page = makePage();
+  const [jigsaw, extraCells] = parse(`.Jigsaw~${'0'.repeat(9)}${'_'.repeat(72)}.Var~A~~4`);
+  page.root.addConstraint(jigsaw);
+  page.root.addConstraint(extraCells);
+  page.root.removeConstraint(extraCells);
+  assert.equal(page.chips('jigsaw').length, 1);
 });
 
 await runTest('a constraint replaces one of its type with the same key', () => {
@@ -369,6 +384,117 @@ await runTest("a chip's action button runs its action, without selecting it", ()
   chip.querySelector('.chip-load-button').click();
   assert.deepEqual(page.actions, [[pair, page.root]]);
   assert.ok(!chip.classList.contains('selected-constraint'));
+});
+
+// ============================================================================
+// Editing cells from the selection
+// ============================================================================
+
+const editButton = (chip) => chip.querySelector(':scope > .chip-edit-cells-button');
+
+await runTest('only set-like constraints have an edit cells button', () => {
+  const page = makePage();
+  page.root.addConstraints(parse('.CountingCircles~R1C1~R1C2.Thermo~R2C1~R2C2'));
+  assert.deepEqual(page.chips('ordinary').map(c => !!editButton(c)), [true, false]);
+});
+
+await runTest('editing cells replaces the constraint, keeping its chip in place', () => {
+  const page = makePage();
+  page.root.addConstraints(parse(
+    '.Cage~3~R9C8~R9C9.CountingCircles~R1C1~R1C2~R1C3.Thermo~R2C1~R2C2'));
+
+  page.selection = ['R1C2', 'R5C5'];
+  editButton(page.chips('ordinary')[1]).click();
+  assert.ok(page.strings().includes('.CountingCircles~R1C1~R1C3~R5C5'));
+  assert.deepEqual(page.chips('ordinary').map(label),
+    ['Cage (3)', 'Counting Circles (3)', 'Thermometer']);
+  assert.equal(page.group('CountingCircles').children.length, 1);
+});
+
+await runTest('editing cells keeps the non-cell arguments', () => {
+  const page = makePage();
+  page.root.addConstraint(parse('.Cage~10~R1C1~R1C2')[0]);
+
+  page.selection = ['R1C3'];
+  editButton(page.chips('ordinary')[0]).click();
+  assert.deepEqual(page.strings(), ['.Cage~10~R1C1~R1C2~R1C3']);
+  assert.deepEqual(page.chips('ordinary').map(label), ['Cage (10)']);
+});
+
+await runTest('a constraint update clears the edit preview', () => {
+  const page = makePage();
+  page.root.addConstraint(parse('.CountingCircles~R1C1~R1C2')[0]);
+  page.selection = ['R1C3'];
+  editButton(page.chips('ordinary')[0]).dispatch('mouseenter');
+  assert.equal(page.highlighted('cell-edit-added'), 1);
+
+  editButton(page.chips('ordinary')[0]).click();
+  assert.equal(page.highlighted('cell-edit-added'), 0);
+});
+
+await runTest('hovering the edit button previews the added and removed cells', () => {
+  const page = makePage();
+  page.root.addConstraint(parse('.CountingCircles~R1C1~R1C2')[0]);
+  const button = editButton(page.chips('ordinary')[0]);
+
+  page.selection = ['R1C1', 'R5C5', 'R6C6'];
+  button.dispatch('mouseenter');
+  assert.equal(page.highlighted('cell-edit-added'), 2);
+  assert.equal(page.highlighted('cell-edit-removed'), 1);
+  assert.ok(!button.classList.contains('inactive'));
+
+  button.dispatch('mouseleave');
+  assert.equal(page.highlighted('cell-edit-added'), 0);
+  assert.equal(page.highlighted('cell-edit-removed'), 0);
+});
+
+await runTest('an empty selection or invalid result leaves the constraint alone', () => {
+  const page = makePage();
+  page.root.addConstraint(parse('.Cage~10~R1C1~R1C2')[0]);
+  const button = editButton(page.chips('ordinary')[0]);
+
+  for (const selection of [[], ['R1C1']]) {
+    page.selection = selection;
+    button.dispatch('mouseenter');
+    assert.ok(button.classList.contains('inactive'));
+    assert.equal(page.highlighted('cell-edit-removed'), 0);
+    button.click();
+    assert.deepEqual(page.strings(), ['.Cage~10~R1C1~R1C2']);
+  }
+});
+
+await runTest('editing a Replicate edits its targets, which cannot precede the origin', () => {
+  const page = makePage();
+  page.root.addConstraint(new SudokuConstraint.Replicate(
+    parse('.Cage~3~R1C1~R1C2'), '', 'R2C1'));
+  const replicate = () => page.root.getConstraintsByType('Replicate')[0];
+
+  page.selection = ['R2C1', 'R3C3'];
+  editButton(page.chips('composite')[0]).click();
+  assert.deepEqual(replicate().getCells(page.geometry), ['R2C1', 'R3C3']);
+  assert.equal(subChips(page.chips('composite')[0]).length, 1);
+
+  page.selection = ['R1C1'];
+  editButton(page.chips('composite')[0]).click();
+  assert.deepEqual(replicate().getCells(page.geometry), ['R2C1', 'R3C3']);
+
+  // Unlike other constraints, its targets can all be removed.
+  page.selection = ['R2C1', 'R3C3'];
+  editButton(page.chips('composite')[0]).click();
+  assert.deepEqual(replicate().getCells(page.geometry), []);
+});
+
+await runTest('editing a constraint inside a composite updates the composite', () => {
+  const page = makePage();
+  page.root.addConstraints(parse('.And.CountingCircles~R1C1~R1C2.Cage~3~R9C8~R9C9.End'));
+  const [and] = page.root.getConstraintsByType('And');
+
+  page.selection = ['R1C3'];
+  editButton(subChips(page.chips('composite')[0])[0]).click();
+  assert.ok(String(and).includes('.CountingCircles~R1C1~R1C2~R1C3'));
+  assert.deepEqual(subChips(page.chips('composite')[0]).map(label),
+    ['Counting Circles (3)', 'Cage (3)']);
+  assert.equal(and.constraints.length, 2);
 });
 
 // ============================================================================

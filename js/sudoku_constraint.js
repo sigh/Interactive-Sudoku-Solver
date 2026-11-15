@@ -198,6 +198,27 @@ export class SudokuConstraintBase {
     return this.cells || [];
   }
 
+  // Whether `cells` can make up a constraint of this class.
+  static isValidCells(cells, geometry) {
+    return this.VALIDATE_CELLS_FN?.(cells, geometry) ?? cells.length > 1;
+  }
+
+  // Set-like constraints whose cells can be edited after creation (see
+  // withCells).
+  static CELLS_EDITABLE = false;
+
+  // A copy of this constraint with `cells` in place of its cells.
+  withCells(cells, geometry) {
+    const fixedArgs = this.args.slice(0, this.constructor._numFixedArgs());
+    return new this.constructor(...fixedArgs, ...cells);
+  }
+
+  // The number of leading non-cell arguments.
+  static _numFixedArgs() {
+    const config = this.ARGUMENT_CONFIG;
+    return config ? (config.numArgs ?? 1) : 0;
+  }
+
   // Whether constraints of this type can exist on the geometry.
   static isValidForShape(geometry) {
     if (this.REQUIRES_SUDOKU_GRID &&
@@ -267,9 +288,7 @@ export class SudokuConstraintBase {
 
   makeShifted(shiftFn) {
     const newArgs = this.args.slice();
-    const config = this.constructor.ARGUMENT_CONFIG;
-    const start = config ? (config.numArgs ?? 1) : 0;
-    for (let i = start; i < newArgs.length; i++) {
+    for (let i = this.constructor._numFixedArgs(); i < newArgs.length; i++) {
       newArgs[i] = shiftFn(newArgs[i]);
     }
     return new this.constructor(...newArgs);
@@ -834,10 +853,9 @@ export class SudokuConstraint {
     `);
     static _ALLOWED_CATEGORIES = new Set(
       [...super._ALLOWED_CATEGORIES].filter(c => c !== 'OutsideClue'));
-    static CHIP_ACTION = {
-      icon: 'img/input-48.png',
-      title: 'Update targets from selection'
-    };
+    static CELLS_EDITABLE = true;
+    // Any targets are valid, including none.
+    static VALIDATE_CELLS_FN = () => true;
 
     constructor(constraints, targetBitset, origin) {
       super(constraints || [], targetBitset, origin);
@@ -845,20 +863,11 @@ export class SudokuConstraint {
       this.origin = origin || 'R1C1';
     }
 
-    setTargetBitset(bitset) {
-      this.targetBitset = String(bitset || '');
-      this.args[1] = this.targetBitset;
-    }
-
-    toggleTargetCells(cellIds, geometry) {
-      const current = new Set(this.getCells(geometry));
-      const toggling = new Set(cellIds);
-      const result = [
-        ...this.getCells(geometry).filter(c => !toggling.has(c)),
-        ...cellIds.filter(c => !current.has(c)),
-      ];
-      this.setTargetBitset(
-        this.constructor.encodeTargetCells(result, this.origin, geometry));
+    withCells(cells, geometry) {
+      return new this.constructor(
+        [...this.constraints],
+        this.constructor.encodeTargetCells(cells, this.origin, geometry),
+        this.origin);
     }
 
     chipLabel() {
@@ -2278,6 +2287,7 @@ export class SudokuConstraint {
     static DESCRIPTION = (`
       Values must add up to the given sum. All values must be unique.`);
     static CATEGORY = 'LinesAndSets';
+    static CELLS_EDITABLE = true;
     static DISPLAY_CONFIG = {
       displayClass: 'ShadedRegion',
       labelField: 'sum',
@@ -2305,6 +2315,7 @@ export class SudokuConstraint {
     static DESCRIPTION = (
       `Any combination of one or more digits within the cage cannot sum to the given value.`);
     static CATEGORY = 'LinesAndSets';
+    static CELLS_EDITABLE = true;
     static DISPLAY_CONFIG = {
       displayClass: 'ShadedRegion',
       labelField: 'displayLabel',
@@ -2332,6 +2343,7 @@ export class SudokuConstraint {
       number of low and high digits. If the digit range is odd, then the
       middle digit cannot be included in the cage. All digits must be unique.`);
     static CATEGORY = 'LinesAndSets';
+    static CELLS_EDITABLE = true;
     static DISPLAY_CONFIG = {
       displayClass: 'ShadedRegion',
       pattern: ShadedRegionOptions.HORIZONTAL_LINE_PATTERN,
@@ -2585,6 +2597,7 @@ export class SudokuConstraint {
     static DESCRIPTION = (`
       Values must be unique.`);
     static CATEGORY = 'LinesAndSets';
+    static CELLS_EDITABLE = true;
     static DISPLAY_CONFIG = {
       displayClass: 'BorderedRegion',
       inset: 1.5,
@@ -2602,6 +2615,7 @@ export class SudokuConstraint {
       If value is must be contained at least as many times as is
       repeated in the list.`);
     static CATEGORY = 'LinesAndSets';
+    static CELLS_EDITABLE = true;
     static DISPLAY_CONFIG = {
       displayClass: 'ShadedRegion',
       pattern: ShadedRegionOptions.DIAGONAL_PATTERN,
@@ -3041,6 +3055,7 @@ export class SudokuConstraint {
       The value in a circles counts the number of circles with the same
       value. Each set of circles is independent.`);
     static CATEGORY = 'LinesAndSets';
+    static CELLS_EDITABLE = true;
     static DISPLAY_CONFIG = {
       displayClass: 'CountingCircles',
     };
