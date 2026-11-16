@@ -680,6 +680,22 @@ await runTest('a solve uses the value count limit loaded from the URL', async ()
   assert.deepEqual(solves, [3]);
 });
 
+await runTest('params missing from the URL reset their inputs to the default', () => {
+  const controller = makeController();
+  const { mode, candidateSupportThreshold: input } = controller._elements;
+  const loads = [];
+  controller._constraintManager.loadUnsafeFromText = (q) => loads.push(q);
+
+  controller._loadUrlParams(new URLSearchParams(
+    'q=.~R1C1_1&mode=solutions&valueCountLimit=2'));
+  assert.deepEqual([mode.value, input.value], ['solutions', '2']);
+
+  controller._loadUrlParams(new URLSearchParams(''));
+  assert.deepEqual([mode.value, input.value], [DEFAULT_MODE, '0']);
+  assert.equal(input.nextElementSibling.textContent, '0');
+  assert.deepEqual(loads, ['.~R1C1_1', '.']);
+});
+
 await runTest('the value count limit is only in the URL in all-possibilities mode', () => {
   const controller = makeController();
   const { mode, candidateSupportThreshold: input } = controller._elements;

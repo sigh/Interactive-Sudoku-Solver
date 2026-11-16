@@ -520,9 +520,11 @@ export class SolverRunner {
   }
 
   // Apply a new threshold to the current solve. Returns true if it was handled,
-  // false if a re-solve is needed. Later solves take theirs from solve().
+  // false if a re-solve is needed (including when there is no current solve).
+  // Later solves take theirs from solve().
   setCandidateSupportThreshold(candidateSupportThreshold) {
-    return this._handler?.setCandidateSupportThreshold(candidateSupportThreshold);
+    return this._handler?.setCandidateSupportThreshold(
+      candidateSupportThreshold) ?? false;
   }
 
   // --- Solver control ---

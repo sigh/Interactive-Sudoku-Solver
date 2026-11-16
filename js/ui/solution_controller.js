@@ -99,8 +99,9 @@ export class HistoryHandler {
     if (q === null) return;
     this._updateButtons();
 
+    // Only the puzzle changes; the rest of the page state is kept in the URL.
     this.setUrlParams({ q: q });
-    this._onUpdate(new URLSearchParams({ q: q }));
+    this._onUpdate(new URL(window.location.href).searchParams);
   }
 
   _updateButtons() {
@@ -466,21 +467,15 @@ export class SolutionController {
     clearDOMNode(this._elements.iterationState);
   }
 
-  // Load the page state from URL params, on load and on browser navigation.
-  // This only sets the inputs; the solve that loading the puzzle triggers reads
-  // them.
+  // Set every input from the URL, which holds the full page state; a missing
+  // param means its default. This only sets the inputs; the solve that loading
+  // the puzzle triggers reads them.
   _loadUrlParams(params) {
-    const mode = params.get('mode');
-    if (mode) this._elements.mode.value = mode;
-
-    const valueCountLimit = params.get('valueCountLimit');
-    if (valueCountLimit) {
-      this._elements.candidateSupportThreshold.value = valueCountLimit;
-      this._showValueCountLimit();
-    }
-
-    const constraintsText = params.get('q') || '.';
-    this._constraintManager.loadUnsafeFromText(constraintsText);
+    this._elements.mode.value = params.get('mode') || DEFAULT_MODE;
+    this._elements.candidateSupportThreshold.value =
+      params.get('valueCountLimit') || '0';
+    this._showValueCountLimit();
+    this._constraintManager.loadUnsafeFromText(params.get('q') || '.');
   }
 
   // Show the value count limit in the label next to its input.

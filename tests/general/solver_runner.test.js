@@ -901,7 +901,7 @@ await runTest('setCandidateSupportThreshold returns false when no handler', () =
   const runner = new SolverRunner();
   // No solve called, so no handler.
   const result = runner.setCandidateSupportThreshold(5);
-  assert.equal(result, undefined);
+  assert.equal(result, false);
 });
 
 // ============================================================================

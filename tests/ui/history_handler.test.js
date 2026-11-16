@@ -94,6 +94,19 @@ await runTest('undo and redo load the previous and next puzzles', () => {
   assert.equal(redo.disabled, true);
 });
 
+await runTest('undo loads the full URL, keeping the other params', () => {
+  const { handler, undo } = makeHandler();
+  const params = [];
+  handler._onUpdate = (p) => params.push(Object.fromEntries(p));
+  loaded(handler, undefined);
+  edit(handler, '.~R1C1_1', { mode: 'solutions', valueCountLimit: 2 });
+  edit(handler, '.~R1C1_2', { mode: 'solutions', valueCountLimit: 2 });
+
+  undo.click();
+  assert.deepEqual(params,
+    [{ q: '.~R1C1_1', mode: 'solutions', valueCountLimit: '2' }]);
+});
+
 await runTest('an edit after undo discards the redo history', () => {
   const { handler, undo, redo } = makeHandler();
   loaded(handler, undefined);
