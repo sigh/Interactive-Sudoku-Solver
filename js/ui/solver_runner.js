@@ -495,7 +495,6 @@ export class SolverRunner {
     this._session = null;
     this._handler = null;
     this._isSolving = false;
-    this._candidateSupportThreshold = 1;
 
     // Iteration state
     // _index is the position shown; _requestedIndex the position last fetched.
@@ -520,9 +519,9 @@ export class SolverRunner {
     return this._isSolving;
   }
 
-  // Returns true if the threshold change was handled, false if re-solve needed.
+  // Apply a new threshold to the current solve. Returns true if it was handled,
+  // false if a re-solve is needed. Later solves take theirs from solve().
   setCandidateSupportThreshold(candidateSupportThreshold) {
-    this._candidateSupportThreshold = candidateSupportThreshold;
     return this._handler?.setCandidateSupportThreshold(candidateSupportThreshold);
   }
 
@@ -543,7 +542,7 @@ export class SolverRunner {
       return;
     }
 
-    const handler = new handlerClass(this._candidateSupportThreshold);
+    const handler = new handlerClass(options.candidateSupportThreshold);
     this._handler = handler;
 
     // Reset iteration state

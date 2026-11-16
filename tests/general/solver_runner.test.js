@@ -554,6 +554,18 @@ await runTest('toEnd shows the last result', async () => {
     [0, 'Unique solution', true, false]);
 });
 
+await runTest('all-possibilities solves with the threshold it is given', async () => {
+  const runner = new SolverRunner();
+  const constraint = SudokuParser.parseString('.Shape~4x4.~R1C1_1.~R1C2_2.~R2C1_3');
+  const handler = await runner.solve(
+    constraint, { mode: 'all-possibilities', candidateSupportThreshold: 3 });
+  await waitForSettle();
+
+  const result = await handler.get(0);
+  assert.equal(result.candidateSupportThreshold, 3);
+  runner.abort();
+});
+
 // ============================================================================
 // onIterationChange callback
 // ============================================================================

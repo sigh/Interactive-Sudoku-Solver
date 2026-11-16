@@ -660,6 +660,26 @@ await runTest('the threshold input updates its label, the URL and the runner', (
   assert.deepEqual(updates, [['update']], 'the solve must be redone');
 });
 
+await runTest('a solve uses the value count limit loaded from the URL', async () => {
+  const controller = makeController();
+  const { candidateSupportThreshold: input } = controller._elements;
+  controller._constraintManager.loadUnsafeFromText = () => { };
+  controller._update = () => { };
+  const solves = [];
+  controller._solverRunner.solve = async (constraints, options) => {
+    solves.push(options.candidateSupportThreshold);
+  };
+  // The runner was told about a limit of 0 (e.g. the slider was moved there).
+  input.value = '0';
+  input.oninput();
+
+  // Browser navigation back to a URL with a limit of 2.
+  controller._loadUrlParams(new URLSearchParams('valueCountLimit=2'));
+  assert.equal(input.nextElementSibling.textContent, '2');
+  await controller._solve();
+  assert.deepEqual(solves, [3]);
+});
+
 await runTest('the value count limit is only in the URL in all-possibilities mode', () => {
   const controller = makeController();
   const { mode, candidateSupportThreshold: input } = controller._elements;

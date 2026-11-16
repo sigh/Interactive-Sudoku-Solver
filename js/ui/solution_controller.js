@@ -212,18 +212,8 @@ export class SolutionController {
     this._setUpInputs();
     this._setUpKeyBindings(displayContainer);
 
-    this._historyHandler = new HistoryHandler((params) => {
-      const mode = params.get('mode');
-      if (mode) this._elements.mode.value = mode;
-
-      const valueCountLimit = params.get('valueCountLimit');
-      if (valueCountLimit) {
-        this._elements.candidateSupportThreshold.value = valueCountLimit;
-      }
-
-      const constraintsText = params.get('q') || '.';
-      this._constraintManager.loadUnsafeFromText(constraintsText);
-    });
+    this._historyHandler = new HistoryHandler(
+      (params) => this._loadUrlParams(params));
 
     this._update = deferUntilAnimationFrame(this._update.bind(this));
     constraintManager.addUpdateListener((_, options) => this._update(options));
@@ -282,10 +272,8 @@ export class SolutionController {
       this._updateValueCountLimitUrl();
       this._update();
     };
-    const thresholdInput = this._elements.candidateSupportThreshold;
-    const thresholdValue = thresholdInput.nextElementSibling;
-    thresholdInput.oninput = () => {
-      thresholdValue.textContent = thresholdInput.value;
+    this._elements.candidateSupportThreshold.oninput = () => {
+      this._showValueCountLimit();
       this._handleThresholdChange();
     };
     this._elements.solve.onclick = () => this._solve();
@@ -478,16 +466,43 @@ export class SolutionController {
     clearDOMNode(this._elements.iterationState);
   }
 
+  // Load the page state from URL params, on load and on browser navigation.
+  // This only sets the inputs; the solve that loading the puzzle triggers reads
+  // them.
+  _loadUrlParams(params) {
+    const mode = params.get('mode');
+    if (mode) this._elements.mode.value = mode;
+
+    const valueCountLimit = params.get('valueCountLimit');
+    if (valueCountLimit) {
+      this._elements.candidateSupportThreshold.value = valueCountLimit;
+      this._showValueCountLimit();
+    }
+
+    const constraintsText = params.get('q') || '.';
+    this._constraintManager.loadUnsafeFromText(constraintsText);
+  }
+
+  // Show the value count limit in the label next to its input.
+  _showValueCountLimit() {
+    const input = this._elements.candidateSupportThreshold;
+    input.nextElementSibling.textContent = input.value;
+  }
+
+  // The candidate support threshold for the value count limit input.
+  // It is 1 more than the limit so that we can distinguish values at the limit
+  // from those above it.
+  _candidateSupportThreshold() {
+    return 1 + (parseInt(
+      this._elements.candidateSupportThreshold.value, 10) || 0);
+  }
+
   _handleThresholdChange() {
     this._updateValueCountLimitUrl();
 
-    const valueCountLimit = parseInt(
-      this._elements.candidateSupportThreshold.value, 10) || 0;
-    // candidateSupportThreshold is 1 more than valueCountLimit so that we can
-    // distinguish values at the limit from those above it.
-    const candidateSupportThreshold = 1 + valueCountLimit;
     // If the solver can't accommodate the new threshold, then resolve.
-    if (!this._solverRunner.setCandidateSupportThreshold(candidateSupportThreshold)) {
+    if (!this._solverRunner.setCandidateSupportThreshold(
+      this._candidateSupportThreshold())) {
       this._update();
     }
   }
@@ -515,7 +530,10 @@ export class SolutionController {
     const debugHandler = await this._makeDebugHandler();
 
     // Node: modeHandler can be null if initialization failed.
-    const modeHandler = await this._solverRunner.solve(constraints, { mode, debugHandler });
+    const modeHandler = await this._solverRunner.solve(constraints, {
+      mode, debugHandler,
+      candidateSupportThreshold: this._candidateSupportThreshold(),
+    });
 
     // Update download button based on handler capabilities
     if (modeHandler?.ALLOW_DOWNLOAD) {
