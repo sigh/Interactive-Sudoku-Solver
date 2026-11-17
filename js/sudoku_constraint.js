@@ -1540,9 +1540,9 @@ export class SudokuConstraint {
 
   static ChaosConstruction = class ChaosConstruction extends SudokuConstraintBase {
     static DESCRIPTION = (`
-      Construct jigsaw regions during solving. Regions have size equal to the
-      number of values, are orthogonally connected, and each region contains
-      every value once.`);
+      Construct orthogonally connected jigsaw regions with no repeated values.
+      Region size defaults to the larger grid dimension and can be overridden
+      with RegionSize; changing the value range does not change region size.`);
     static CATEGORY = 'LayoutCheckbox';
     static REQUIRES_SUDOKU_GRID = true;
     static UNIQUENESS_KEY_FIELD = 'type';
