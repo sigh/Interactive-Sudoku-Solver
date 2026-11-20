@@ -115,6 +115,7 @@ const SAMPLES = [
   '.PillArrow~2~R1C1~R1C2~R1C3',
   '.Cage~10~R1C1~R1C2',
   '.RellikCage~8~R1C1~R2C1',
+  '.Product~12~R2C1~R2C2',
   '.EqualityCage~R1C1~R1C2',
   '.Sum~0_=_1_1_-1~R5C1~R5C2~R6C1',
   '.Lunchbox~5~R1C1~R1C2~R1C3',

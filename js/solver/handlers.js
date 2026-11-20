@@ -83,6 +83,72 @@ export class SudokuConstraintHandler {
   }
 }
 
+export class Product extends SudokuConstraintHandler {
+  constructor(cells, product) {
+    super(cells);
+    this._product = BigInt(product);
+  }
+
+  initialize(grid, cellExclusions, geometry) {
+    this._values = geometry.allValues().map(value => BigInt(value));
+    return this.enforceConsistency(grid);
+  }
+
+  _remainingAfter(remaining, value) {
+    if (this._product === 0n) {
+      // For a zero target, 1 means a zero has already been selected.
+      return value === 0n ? 1n : remaining;
+    }
+    if (value === 0n || remaining % value !== 0n) return null;
+    return remaining / value;
+  }
+
+  enforceConsistency(grid, pQueue) {
+    const cells = this.cells;
+    // Track the quotients reachable after each prefix of cells, merging
+    // combinations that leave the same factor for the remaining cells.
+    const reachable = [new Set([this._product])];
+    for (let i = 0; i < cells.length; i++) {
+      const next = new Set();
+      for (const remaining of reachable[i]) {
+        for (let bits = grid[cells[i]]; bits; bits &= bits - 1) {
+          const bit = bits & -bits;
+          const result = this._remainingAfter(remaining, this._values[31 - Math.clz32(bit)]);
+          if (result !== null) next.add(result);
+        }
+      }
+      if (next.size === 0) return false;
+      reachable.push(next);
+    }
+    if (!reachable[cells.length].has(1n)) return false;
+
+    // Walk back from the completed product to keep only supported values.
+    let supported = new Set([1n]);
+    for (let i = cells.length - 1; i >= 0; i--) {
+      const cell = cells[i];
+      const previous = new Set();
+      let mask = 0;
+      for (const remaining of reachable[i]) {
+        for (let bits = grid[cell]; bits; bits &= bits - 1) {
+          const bit = bits & -bits;
+          const result = this._remainingAfter(remaining, this._values[31 - Math.clz32(bit)]);
+          if (supported.has(result)) {
+            mask |= bit;
+            previous.add(remaining);
+          }
+        }
+      }
+      if (grid[cell] !== mask) {
+        grid[cell] = mask;
+        if (pQueue) pQueue.addForCell(cell);
+      }
+      supported = previous;
+    }
+    return true;
+  }
+}
+
+
 // This handler purely exists to pass information about boxes to the optimizer.
 export class BoxRegionInfo extends SudokuConstraintHandler {
   constructor(boxRegions) {

@@ -604,6 +604,11 @@ export class SudokuBuilder {
             cells, constraint.sum, constraint.coeffs || undefined);
           break;
 
+        case 'Product':
+          cells = constraint.cells.map(c => geometry.parseCellId(c).cellIndex);
+          yield new HandlerModule.Product(cells, constraint.product);
+          break;
+
         case 'Regex':
           {
             const cells = constraint.cells.map(c => geometry.parseCellId(c).cellIndex);

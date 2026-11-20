@@ -2421,6 +2421,37 @@ export class SudokuConstraint {
     }
   }
 
+  static Product = class Product extends SudokuConstraintBase {
+    static DESCRIPTION = (
+      "Values must multiply up to the given product. Values don't need to be unique.");
+    static CATEGORY = 'LinesAndSets';
+    static CELLS_EDITABLE = true;
+    static DISPLAY_CONFIG = {
+      displayClass: 'ShadedRegion',
+      pattern: ShadedRegionOptions.SQUARE_PATTERN,
+      labelField: 'product',
+    };
+    static ARGUMENT_CONFIG = {
+      label: 'product',
+    };
+
+    constructor(product, ...cells) {
+      const target = String(product).trim();
+      if (!/^\d+$/.test(target) ||
+        (typeof product === 'number' && !Number.isSafeInteger(product))) {
+        throw Error('Product must be a non-negative integer: ' + product);
+      }
+      const normalized = String(BigInt(target));
+      super(normalized, ...cells);
+      this.cells = cells;
+      this.product = normalized;
+    }
+
+    chipLabel() {
+      return 'Product (' + this.product + ')';
+    }
+  }
+
   static LittleKiller = class LittleKiller extends OutsideConstraintBase {
     static DESCRIPTION = (`
       Values along diagonal must add to the given sum. Values may repeat.`);
